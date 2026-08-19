@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("USER") // USER, ADMIN
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String
+  price       Float
+  images      String   // Comma-separated JSON or string
+  stock       Int      @default(0)
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  status      String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, CANCELLED
+  totalAmount Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
