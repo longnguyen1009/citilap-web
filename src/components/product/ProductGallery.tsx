@@ -25,7 +25,7 @@ export default function ProductGallery({ images, productName, discount }: { imag
             key={idx} 
             onClick={() => setActiveIndex(idx)}
             className={`border rounded-lg overflow-hidden cursor-pointer p-2 aspect-square flex items-center justify-center transition-all ${
-              idx === activeIndex ? 'border-blue-600 ring-2 ring-blue-600' : 'border-gray-200 hover:border-blue-400'
+              idx === activeIndex ? 'border-red-600 ring-1 ring-red-600' : 'border-gray-200 hover:border-red-400'
             }`}
           >
             <img src={img} alt={`thumb-${idx}`} className="w-full h-full object-contain" />

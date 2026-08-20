@@ -148,7 +148,7 @@ export default function Home() {
                 <div className="text-white">
                   <h3 className="text-xl md:text-2xl font-black mb-1 text-yellow-400 uppercase italic">Ưu đãi cực khủng</h3>
                   <p className="font-bold text-sm mb-3">Tặng chuột Gaming & Balo</p>
-                  <button className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-5 rounded-full uppercase text-xs shadow-lg">Mua ngay</button>
+                  <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-5 rounded-full uppercase text-xs shadow-lg">Mua ngay</button>
                 </div>
               </div>
             </div>

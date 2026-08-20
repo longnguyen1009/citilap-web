@@ -105,6 +105,83 @@ export default function CategoryPage({ params }: { params: { slug: string } }) {
     }));
   }
 
+  if (params.slug === "linh-kien" || params.slug === "gear") {
+    return (
+      <div className="bg-[#f1f5f9] min-h-screen pb-12">
+        <div className="bg-white border-b border-gray-200 mb-6">
+          <div className="container mx-auto px-4 max-w-[1370px]">
+            <nav className="flex text-sm text-gray-500 py-3 font-medium items-center">
+              <Link href="/" className="hover:text-blue-600 transition">Trang chủ</Link>
+              <ChevronRight className="w-4 h-4 mx-1" />
+              <span className="text-gray-800 font-bold">{categoryName}</span>
+            </nav>
+          </div>
+        </div>
+
+        <div className="container mx-auto px-4 max-w-[1370px]">
+          <div className="bg-gradient-to-r from-blue-900 to-indigo-800 rounded-2xl p-8 mb-8 text-white flex flex-col items-center text-center shadow-lg">
+            <h1 className="text-3xl font-black mb-3 uppercase tracking-wide">Thế giới {categoryName}</h1>
+            <p className="text-blue-100 mb-6 max-w-2xl">Bàn phím cơ, chuột gaming, tai nghe, balo, và hàng ngàn phụ kiện công nghệ chất lượng cao.</p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {["Chuột", "Bàn Phím", "Tai Nghe", "Balo - Túi", "Ổ Cứng Di Động", "Webcam", "Cáp Sạc"].map((tag) => (
+                <button key={tag} className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-sm font-bold transition backdrop-blur-sm border border-white/20">
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Phụ kiện Layout - No CPU/RAM filters */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="lg:col-span-1 space-y-6 hidden lg:block">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h3 className="font-bold text-gray-900 mb-4 uppercase flex items-center gap-2 border-b pb-2">
+                  <Filter className="w-4 h-4 text-blue-600" /> Hãng sản xuất
+                </h3>
+                <div className="space-y-3 text-sm text-gray-700">
+                  {["Logitech", "Razer", "Corsair", "Akko", "DareU", "Sony"].map((brand) => (
+                    <label key={brand} className="flex items-center gap-3 cursor-pointer hover:text-blue-600">
+                      <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+                      <span>{brand}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                <h3 className="font-bold text-gray-900 mb-4 uppercase border-b pb-2">Mức giá</h3>
+                <div className="space-y-3 text-sm text-gray-700">
+                  {["Dưới 500k", "500k - 1 Triệu", "1 - 2 Triệu", "Trên 2 Triệu"].map((price) => (
+                    <label key={price} className="flex items-center gap-3 cursor-pointer hover:text-blue-600">
+                      <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
+                      <span>{price}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="lg:col-span-3">
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-700">Sắp xếp theo:</span>
+                </div>
+                <div className="flex flex-wrap gap-2 text-sm">
+                  <button className="bg-blue-50 text-blue-600 border border-blue-200 font-bold px-4 py-2 rounded-lg transition">Mới nhất</button>
+                  <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-medium px-4 py-2 rounded-lg transition">Bán chạy</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                {mockProducts.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#f1f5f9] min-h-screen pb-12">
       {/* 1. Breadcrumb */}

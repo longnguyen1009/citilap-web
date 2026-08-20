@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
+import { Check, Gift, Truck, CreditCard, ShieldCheck, Headphones } from "lucide-react";
 
 type Variant = {
   id: string;
@@ -53,42 +54,55 @@ export default function ProductPriceOptions({
 
   return (
     <>
+      {/* Price Box */}
+      <div className="mb-4">
+        <div className="flex items-end gap-4 mb-2">
+          <span className="text-[32px] font-bold text-red-600 tracking-tight leading-none">{currentPrice}</span>
+          <span className="text-sm text-gray-400 line-through mb-1">{currentOldPrice}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded text-[12px] text-gray-700">
+             <ShieldCheck className="w-3.5 h-3.5 text-gray-500" />
+             <span><span className="font-bold text-gray-900">Bảo hành:</span> 12 tháng chính hãng</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-green-50/50 border border-green-100 px-2.5 py-1 rounded text-[12px] text-green-700">
+             <Check className="w-3.5 h-3.5" />
+             <span className="font-bold">Còn hàng</span>
+          </div>
+        </div>
+      </div>
+
       {/* Options */}
       {variants && variants.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-bold text-gray-800 mb-3 uppercase">Tuỳ chọn bộ nhớ (RAM/SSD)</h3>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="mb-6 mt-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {variants.map((v) => (
               <button 
                 key={v.id}
                 onClick={() => setSelectedVariant(v)}
-                className={`border rounded-lg p-3 text-left transition-all ${
+                className={`border rounded p-2 text-center transition-all relative ${
                   selectedVariant?.id === v.id 
-                    ? 'border-red-600 bg-red-50 ring-1 ring-red-600' 
-                    : 'border-gray-200 hover:border-red-400'
+                    ? 'border-red-500 bg-white' 
+                    : 'border-gray-200 hover:border-red-300 bg-white'
                 }`}
               >
-                <div className={`font-bold text-sm ${selectedVariant?.id === v.id ? 'text-red-700' : 'text-gray-800'}`}>
+                {selectedVariant?.id === v.id && (
+                  <div className="absolute top-0 right-0 bg-red-500 text-white w-4 h-4 rounded-bl flex items-center justify-center">
+                    <Check className="w-3 h-3" />
+                  </div>
+                )}
+                <div className={`text-[11px] leading-tight mb-1 ${selectedVariant?.id === v.id ? 'text-gray-900' : 'text-gray-700'}`}>
                   {v.label}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">{v.price}</div>
+                <div className="text-[13px] font-bold text-red-600">{v.price}</div>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Price Box */}
-      <div className="bg-gradient-to-r from-red-50 to-white border border-red-100 rounded-xl p-4 md:p-6 mb-6">
-        <div className="flex items-end gap-4 mb-2">
-          <span className="text-4xl font-black text-red-600 tracking-tight">{currentPrice}</span>
-          <span className="text-lg text-gray-400 line-through mb-1">{currentOldPrice}</span>
-        </div>
-        <p className="text-sm text-gray-600">Giá đã bao gồm VAT. Bảo hành chính hãng 12 tháng.</p>
-      </div>
-
       {/* Action Buttons */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-auto">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         <button 
           onClick={handleBuyNow}
           className="bg-red-600 hover:bg-red-700 text-white rounded-lg p-4 flex flex-col items-center justify-center transition shadow-lg shadow-red-600/30"
@@ -100,6 +114,77 @@ export default function ProductPriceOptions({
           <span className="font-black text-xl uppercase">TRẢ GÓP 0%</span>
           <span className="text-xs opacity-90">Thủ tục online đơn giản</span>
         </button>
+      </div>
+
+      {/* Gift Box (Dashed Red Border) */}
+      <div className="border border-red-500 border-dashed rounded-lg p-4 pt-6 relative mb-6">
+        <div className="absolute -top-3.5 left-4 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-1 px-4 rounded-full flex items-center gap-2 text-sm shadow-sm">
+          <Gift className="w-4 h-4" /> Quà tặng và Khuyến mãi
+        </div>
+        <ul className="space-y-3 text-sm text-gray-800 font-medium">
+          <li className="flex items-start gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1.5 shrink-0"></div>
+            <div>
+              Giảm tới <span className="text-red-600 font-bold">1.000.000 VNĐ</span> khi quý khách mua máy lần 2!
+            </div>
+          </li>
+          <li className="flex items-start gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1.5 shrink-0"></div>
+            <div>
+              <span className="font-bold">Tặng kèm bộ phụ kiện cao cấp:</span>
+              <ul className="list-disc pl-5 mt-1 font-normal space-y-1">
+                <li>Chuột không dây.</li>
+                <li>Túi chống sốc Laptop.</li>
+                <li>Bàn di chuột chuyên game.</li>
+              </ul>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      {/* Policies */}
+      <div className="bg-[#f0f8ff] rounded-lg p-4 mt-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex items-start gap-3">
+            <div className="bg-red-600 p-1.5 rounded-full text-white shrink-0 shadow-sm mt-0.5">
+              <Truck className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-900 text-[13px] leading-tight mb-0.5">Miễn Phí Ship Nội Thành</h4>
+              <p className="text-[12px] text-gray-600 leading-tight">Bán kính 10km từ cửa hàng.</p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="bg-red-600 p-1.5 rounded-full text-white shrink-0 shadow-sm mt-0.5">
+              <CreditCard className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-900 text-[13px] leading-tight mb-0.5">Trả Góp Linh Động</h4>
+              <p className="text-[12px] text-gray-600 leading-tight">Qua thẻ tín dụng, MPOS, HDsaison, Mcredit.</p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="bg-red-600 p-1.5 rounded-full text-white shrink-0 shadow-sm mt-0.5">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-900 text-[13px] leading-tight mb-0.5">Cam Kết Chất Lượng</h4>
+              <p className="text-[12px] text-gray-600 leading-tight">Bảo hành 1 năm. Miễn phí cài đặt trọn đời.</p>
+            </div>
+          </div>
+          
+          <div className="flex items-start gap-3">
+            <div className="bg-red-600 p-1.5 rounded-full text-white shrink-0 shadow-sm mt-0.5">
+              <Headphones className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="font-bold text-gray-900 text-[13px] leading-tight mb-0.5">Hỗ Trợ 24/7</h4>
+              <p className="text-[12px] text-gray-600 leading-tight">Tư vấn tận tình, xử lý nhanh chóng.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );

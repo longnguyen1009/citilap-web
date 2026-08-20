@@ -37,8 +37,11 @@ export default async function ProductDetail({ params }: { params: { id: string }
       weight: "2.35 kg"
     },
     variants: [
-      { id: "v1", label: "16GB RAM / 512GB SSD", price: "28.490.000đ", oldPrice: "32.990.000đ" },
-      { id: "v2", label: "32GB RAM / 1TB SSD", price: "31.490.000đ", oldPrice: "36.990.000đ" }
+      { id: "v1", label: "Ryzen 7 6800H, 16GB, 512GB, RTX 3050Ti 4GB, 15.6 FHD 165Hz", price: "28.490.000đ", oldPrice: "32.990.000đ" },
+      { id: "v2", label: "Ryzen 7 6800H, 16GB, 1TB, RTX 3050Ti 4GB, 15.6 FHD 165Hz", price: "29.990.000đ", oldPrice: "34.490.000đ" },
+      { id: "v3", label: "Ryzen 7 6800H, 32GB, 1TB, RTX 3050Ti 4GB, 15.6 FHD 165Hz", price: "31.490.000đ", oldPrice: "36.990.000đ" },
+      { id: "v4", label: "Ryzen 7 6800H, 32GB, 2TB, RTX 3050Ti 4GB, 15.6 FHD 165Hz", price: "33.990.000đ", oldPrice: "39.990.000đ" },
+      { id: "v5", label: "Ryzen 7 6800H, 64GB, 2TB, RTX 3050Ti 4GB, 15.6 FHD 165Hz", price: "37.490.000đ", oldPrice: "43.990.000đ" },
     ]
   };
 
@@ -87,37 +90,24 @@ export default async function ProductDetail({ params }: { params: { id: string }
       <div className="container mx-auto px-4 max-w-[1370px] mt-6">
         
         {/* 2. Top Section (Chốt Sale) */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6 mb-6">
+        <div className="bg-transparent mb-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            {/* Left: Gallery (Client Component) */}
-            <ProductGallery 
-              images={product.images} 
-              productName={product.name} 
-              discount={product.discount} 
-            />
+            {/* Left: Gallery & Mua Kèm (Col 5) */}
+            <div className="lg:col-span-5 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+              <ProductGallery 
+                images={product.images} 
+                productName={product.name} 
+                discount={product.discount} 
+              />
+            </div>
 
-            {/* Right: Buy Box */}
-            <div className="lg:col-span-7 flex flex-col">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight mb-2">
-                {product.name}
+            {/* Right: Info & Buy */}
+            <div className="lg:col-span-7 bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6 flex flex-col">
+              <h1 className="text-xl md:text-2xl font-bold text-[#003399] leading-tight mb-4">
+                [Mới 100%] {product.name}
               </h1>
               
-              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-6">
-                <span className="flex items-center gap-1 text-yellow-500">
-                  <Star className="w-4 h-4 fill-yellow-500"/>
-                  <span className="font-bold text-gray-800 ml-1">{product.rating}</span> 
-                  ({product.reviews} đánh giá)
-                </span>
-                <span className="border-l border-gray-300 h-4 hidden sm:block"></span>
-                <span>Mã SP: <span className="font-bold text-blue-600">{product.sku}</span></span>
-                <span className="border-l border-gray-300 h-4 hidden sm:block"></span>
-                <span className="flex items-center gap-1 text-green-600 font-bold">
-                  <CheckCircle className="w-4 h-4" /> {product.status}
-                </span>
-              </div>
-
-              {/* Price Options (Client Component) */}
               <ProductPriceOptions 
                 productId={product.id}
                 productName={product.name}
@@ -126,48 +116,8 @@ export default async function ProductDetail({ params }: { params: { id: string }
                 initialPrice={product.price} 
                 initialOldPrice={product.oldPrice} 
               />
-
-              {/* Specs Summary */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
-                  <Cpu className="w-6 h-6 text-gray-500 mx-auto mb-1" />
-                  <span className="block text-xs font-bold text-gray-800 line-clamp-1">{product.specs.cpu.split(" (")[0]}</span>
-                </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
-                  <Monitor className="w-6 h-6 text-gray-500 mx-auto mb-1" />
-                  <span className="block text-xs font-bold text-gray-800 line-clamp-1">16GB RAM</span>
-                </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
-                  <HardDrive className="w-6 h-6 text-gray-500 mx-auto mb-1" />
-                  <span className="block text-xs font-bold text-gray-800 line-clamp-1">512GB SSD</span>
-                </div>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-center">
-                  <Zap className="w-6 h-6 text-gray-500 mx-auto mb-1" />
-                  <span className="block text-xs font-bold text-gray-800 line-clamp-1">RTX 3050Ti</span>
-                </div>
-              </div>
-
-              {/* Gift Box */}
-              <div className="border border-red-300 rounded-lg overflow-hidden mb-6">
-                <div className="bg-red-600 text-white font-bold py-2 px-4 flex items-center gap-2 uppercase text-sm">
-                  <Gift className="w-5 h-5" /> Quà tặng & Ưu đãi
-                </div>
-                <div className="p-4 bg-red-50/50 text-sm">
-                  <ul className="space-y-2 text-gray-800 font-medium">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" /> Tặng Chuột Gaming không dây hoặc Balo Predator cao cấp.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" /> Giảm thêm 500.000đ khi thanh toán qua VNPay.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" /> Giảm 20% khi mua kèm phụ kiện (Bàn phím, Tai nghe).
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
             </div>
+
           </div>
         </div>
 
@@ -201,98 +151,40 @@ export default async function ProductDetail({ params }: { params: { id: string }
             </div>
           </div>
 
-          {/* Right: Thông số & Cam kết */}
+          {/* Right: Thông số kỹ thuật */}
           <div className="lg:col-span-4 space-y-6">
-            
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-xl font-bold text-gray-900 border-b-2 border-gray-100 pb-3 mb-6 uppercase flex items-center gap-2">
-                <CheckCircle className="w-6 h-6 text-green-600"/> Yên tâm mua sắm
-              </h2>
-              <ul className="space-y-4">
-                <li className="flex items-start gap-3">
-                  <ShieldCheck className="w-6 h-6 text-blue-600 shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-800 text-sm">Bảo hành 12 Tháng</h4>
-                    <p className="text-xs text-gray-500">Tại tất cả các trung tâm uy tín</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <RefreshCw className="w-6 h-6 text-blue-600 shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-800 text-sm">Đổi trả miễn phí</h4>
-                    <p className="text-xs text-gray-500">Trong 15 ngày nếu có lỗi từ NSX</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Truck className="w-6 h-6 text-blue-600 shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-800 text-sm">Giao hàng hoả tốc</h4>
-                    <p className="text-xs text-gray-500">Nhận hàng trong 2H tại nội thành</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <ThumbsUp className="w-6 h-6 text-blue-600 shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-gray-800 text-sm">Dịch vụ tận tâm</h4>
-                    <p className="text-xs text-gray-500">Hỗ trợ cài đặt phần mềm trọn đời</p>
-                  </div>
-                </li>
-              </ul>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-0 overflow-hidden">
-              <div className="bg-gray-50 p-4 border-b border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900 uppercase">Thông số kỹ thuật</h2>
-              </div>
-              <div className="p-4">
-                <table className="w-full text-sm text-left text-gray-700">
-                  <tbody>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-3 px-2 bg-gray-50 w-1/3 font-medium">Vi xử lý (CPU)</td>
-                      <td className="py-3 px-2">{product.specs.cpu}</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-3 px-2 bg-gray-50 font-medium">RAM</td>
-                      <td className="py-3 px-2">{product.specs.ram}</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-3 px-2 bg-gray-50 font-medium">Ổ cứng</td>
-                      <td className="py-3 px-2">{product.specs.ssd}</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-3 px-2 bg-gray-50 font-medium">Đồ hoạ (VGA)</td>
-                      <td className="py-3 px-2">{product.specs.vga}</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-3 px-2 bg-gray-50 font-medium">Màn hình</td>
-                      <td className="py-3 px-2">{product.specs.display}</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-3 px-2 bg-gray-50 font-medium">Hệ điều hành</td>
-                      <td className="py-3 px-2">{product.specs.os}</td>
-                    </tr>
-                    <tr className="border-b border-gray-100">
-                      <td className="py-3 px-2 bg-gray-50 font-medium">Pin</td>
-                      <td className="py-3 px-2">{product.specs.battery}</td>
-                    </tr>
-                    <tr>
-                      <td className="py-3 px-2 bg-gray-50 font-medium">Trọng lượng</td>
-                      <td className="py-3 px-2">{product.specs.weight}</td>
-                    </tr>
-                  </tbody>
-                </table>
+            <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+              <h2 className="text-lg font-bold mb-4 uppercase border-b pb-3">Thông số kỹ thuật</h2>
+              <div className="space-y-1">
+                <div className="flex bg-gray-50 p-3 rounded">
+                  <span className="w-1/3 text-gray-500 font-medium text-sm flex items-center gap-2"><Cpu className="w-4 h-4 text-blue-500"/> CPU</span>
+                  <span className="w-2/3 text-gray-900 font-medium text-sm">{product.specs.cpu}</span>
+                </div>
+                <div className="flex p-3 rounded">
+                  <span className="w-1/3 text-gray-500 font-medium text-sm flex items-center gap-2"><HardDrive className="w-4 h-4 text-blue-500"/> RAM</span>
+                  <span className="w-2/3 text-gray-900 font-medium text-sm">{product.specs.ram}</span>
+                </div>
+                <div className="flex bg-gray-50 p-3 rounded">
+                  <span className="w-1/3 text-gray-500 font-medium text-sm flex items-center gap-2"><HardDrive className="w-4 h-4 text-blue-500"/> SSD</span>
+                  <span className="w-2/3 text-gray-900 font-medium text-sm">{product.specs.ssd}</span>
+                </div>
+                <div className="flex p-3 rounded">
+                  <span className="w-1/3 text-gray-500 font-medium text-sm flex items-center gap-2"><Monitor className="w-4 h-4 text-blue-500"/> VGA</span>
+                  <span className="w-2/3 text-gray-900 font-medium text-sm">{product.specs.vga}</span>
+                </div>
+                <div className="flex bg-gray-50 p-3 rounded">
+                  <span className="w-1/3 text-gray-500 font-medium text-sm flex items-center gap-2"><Laptop className="w-4 h-4 text-blue-500"/> Màn hình</span>
+                  <span className="w-2/3 text-gray-900 font-medium text-sm">{product.specs.display}</span>
+                </div>
               </div>
             </div>
-
           </div>
         </div>
 
         {/* 4. Bottom Section (Related Products) */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 uppercase flex items-center gap-2">
-            Sản phẩm tương tự
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <h2 className="text-xl font-bold uppercase mb-6 flex items-center gap-2"><Star className="w-6 h-6 text-yellow-500"/> Sản phẩm tương tự</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {relatedProducts.map((p) => <ProductCard key={p.id} product={p} />)}
           </div>
         </div>
