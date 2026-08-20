@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { 
-  ShoppingCart, Search, Menu, PhoneCall, MapPin, 
+  Search, Menu, PhoneCall, MapPin, 
   ClipboardCheck, User, Monitor, ChevronDown 
 } from "lucide-react";
+import CartIcon from "./CartIcon";
 
 export default function Header() {
   const navItems = [
@@ -13,7 +14,6 @@ export default function Header() {
     { name: "Apple - Macbook", href: "/category/macbook" },
     { name: "Linh Kiện - Phụ Kiện", href: "/category/linh-kien" },
     { name: "Tin tức - Review", href: "/news" },
-    { name: "Liên hệ CitiLap", href: "/contact" },
   ];
 
   return (
@@ -33,10 +33,23 @@ export default function Header() {
 
           {/* Danh mục & Search */}
           <div className="flex flex-grow max-w-3xl items-center gap-4 ml-4">
-            <button className="hidden md:flex items-center gap-2 bg-[#1f2937] hover:bg-[#374151] px-4 py-2.5 rounded text-sm font-medium transition">
-              <Menu className="w-5 h-5" />
-              <span>Danh mục</span>
-            </button>
+            <div className="relative group hidden md:block">
+              <button className="flex items-center gap-2 bg-[#1f2937] hover:bg-[#374151] px-4 py-2.5 rounded text-sm font-medium transition cursor-pointer">
+                <Menu className="w-5 h-5" />
+                <span>Danh mục</span>
+              </button>
+              {/* Dropdown Menu */}
+              <div className="absolute top-full left-0 pt-3 w-[260px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
+                <div className="bg-white rounded-lg shadow-2xl border border-gray-100 py-2 text-sm text-gray-700">
+                  <Link href="/category/laptop-gaming" className="block px-5 py-2.5 hover:bg-blue-50 hover:text-blue-600 transition font-bold border-b border-gray-50">Laptop Gaming</Link>
+                  <Link href="/category/ultrabook" className="block px-5 py-2.5 hover:bg-blue-50 hover:text-blue-600 transition font-bold border-b border-gray-50">Ultrabook Cao Cấp</Link>
+                  <Link href="/category/may-luot" className="block px-5 py-2.5 hover:bg-blue-50 hover:text-blue-600 transition font-bold border-b border-gray-50">Laptop Cũ - Máy Lướt</Link>
+                  <Link href="/category/workstation" className="block px-5 py-2.5 hover:bg-blue-50 hover:text-blue-600 transition font-bold border-b border-gray-50">Máy Trạm - Workstation</Link>
+                  <Link href="/category/gear" className="block px-5 py-2.5 hover:bg-blue-50 hover:text-blue-600 transition font-bold border-b border-gray-50">Phụ Kiện & Gear</Link>
+                  <Link href="/category/apple" className="block px-5 py-2.5 hover:bg-blue-50 hover:text-blue-600 transition font-bold">Apple (MacBook - iPad)</Link>
+                </div>
+              </div>
+            </div>
             <div className="relative flex-grow">
               <input 
                 type="text" 
@@ -50,7 +63,7 @@ export default function Header() {
           </div>
 
           {/* Action Links */}
-          <div className="hidden lg:flex items-center gap-6 ml-4">
+          <div className="hidden lg:flex items-center gap-8 ml-4">
             <div className="flex items-center gap-2">
               <PhoneCall className="w-5 h-5 text-gray-300" />
               <div className="flex flex-col">
@@ -59,14 +72,6 @@ export default function Header() {
               </div>
             </div>
             
-            <Link href="/stores" className="flex items-center gap-2 hover:text-blue-400 transition">
-              <MapPin className="w-5 h-5 text-gray-300" />
-              <div className="flex flex-col">
-                <span className="text-[11px] text-gray-400">Hệ thống</span>
-                <span className="text-xs font-medium">cửa hàng</span>
-              </div>
-            </Link>
-
             <Link href="/order-tracking" className="flex items-center gap-2 hover:text-blue-400 transition">
               <ClipboardCheck className="w-5 h-5 text-gray-300" />
               <div className="flex flex-col">
@@ -75,20 +80,12 @@ export default function Header() {
               </div>
             </Link>
 
-            <Link href="/cart" className="flex items-center gap-2 hover:text-blue-400 transition">
-              <ShoppingCart className="w-5 h-5 text-gray-300" />
-              <div className="flex flex-col">
-                <span className="text-[11px] text-gray-400">Giỏ hàng</span>
-                <span className="text-xs font-medium">
-                  Sản phẩm <span className="inline-flex items-center justify-center bg-[#1f2937] text-[10px] w-4 h-4 rounded-full ml-1">0</span>
-                </span>
-              </div>
-            </Link>
-
             <Link href="/login" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-16 h-10 transition">
               <User className="w-4 h-4 text-gray-300 mb-0.5" />
               <span className="text-[10px] text-gray-300">Thông tin</span>
             </Link>
+
+            <CartIcon />
           </div>
           
         </div>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { 
   ChevronRight, Laptop, Cpu, ShieldCheck, ThumbsUp, 
   Zap, Truck, Monitor, Flame, Award, Briefcase, 
-  Server, Headphones, PlayCircle, Star, CheckCircle 
+  Server, Headphones, PlayCircle, Star, CheckCircle, Clock 
 } from "lucide-react";
 
 // --- DUMMY DATA ---
@@ -82,48 +82,18 @@ const mockUltrabooks = [
 const mockUsedLaptops = mockProducts.map(p => ({...p, name: `[Cũ 99%] ${p.name}`, price: "18.500.000đ", oldPrice: p.price, discount: "HOT"}));
 const mockWorkstations = mockProducts.map(p => ({...p, name: `ThinkPad P16 Gen 1 / Precision 7670`, price: "55.000.000đ", oldPrice: "65.000.000đ", discount: "-15%"}));
 
-// --- COMPONENTS ---
-const ProductCard = ({ product, badgeColor = "bg-red-600" }: { product: any, badgeColor?: string }) => (
-  <Link href={`/product/${product.id}`} className="group flex flex-col bg-white border border-gray-100 hover:border-blue-500 rounded-md overflow-hidden transition-all duration-300 hover:shadow-lg relative">
-    <div className={`absolute top-2 left-2 z-10 ${badgeColor} text-white text-xs font-bold px-2 py-1 rounded-md shadow-sm`}>
-      {product.discount}
-    </div>
-    <div className="relative aspect-square p-4 flex items-center justify-center bg-white overflow-hidden">
-      <img src={product.image} alt={product.name} className="object-contain group-hover:scale-105 transition duration-300 w-full h-full" />
-    </div>
-    <div className="p-3 flex-grow flex flex-col">
-      <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 mb-2 group-hover:text-blue-600 transition">
-        {product.name}
-      </h3>
-      
-      <div className="bg-gray-50 rounded border border-gray-100 p-2 mb-3 mt-auto">
-        <div className="grid grid-cols-2 gap-x-1 gap-y-2 text-[10px] text-gray-600">
-          <span className="truncate flex items-center gap-1"><Cpu className="w-3 h-3 text-gray-400"/> {product.specs.cpu}</span>
-          <span className="truncate flex items-center gap-1"><Monitor className="w-3 h-3 text-gray-400"/> {product.specs.ram}</span>
-          <span className="truncate flex items-center gap-1"><Laptop className="w-3 h-3 text-gray-400"/> {product.specs.ssd}</span>
-          <span className="truncate flex items-center gap-1"><Monitor className="w-3 h-3 text-gray-400"/> {product.specs.display}</span>
-        </div>
-      </div>
-
-      <div className="flex flex-col mt-auto">
-        <span className="text-red-600 font-bold text-lg leading-none mb-1">{product.price}</span>
-        <span className="text-gray-400 text-xs line-through">{product.oldPrice}</span>
-      </div>
-    </div>
-  </Link>
-);
+import ProductCard from "@/components/product/ProductCard";
 
 const BlockHeader = ({ title, icon: Icon, colorClass, links }: { title: string, icon: any, colorClass: string, links: string[] }) => (
-  <div className={`flex flex-col md:flex-row md:justify-between md:items-center mb-6 pb-2 border-b-2 ${colorClass.replace("bg-", "border-").replace("text-white", "")}`}>
-    <h2 className="text-xl md:text-2xl font-black text-gray-800 uppercase flex items-center gap-2 mb-3 md:mb-0">
-      <span className={`${colorClass} p-1.5 rounded-md`}><Icon className="w-5 h-5"/></span>
-      {title}
+  <div className={`${colorClass} rounded-t-lg px-4 py-3 flex flex-col lg:flex-row lg:justify-between lg:items-center shadow-sm`}>
+    <h2 className="text-lg md:text-xl font-black text-white uppercase flex items-center gap-2 mb-3 lg:mb-0">
+      <Icon className="w-6 h-6"/> {title}
     </h2>
-    <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-gray-600">
+    <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
       {links.map((link, i) => (
-        <Link key={i} href="#" className="hover:text-blue-600 bg-gray-100 px-3 py-1 rounded-full">{link}</Link>
+        <Link key={i} href="#" className="hover:bg-white hover:text-gray-900 bg-white/20 text-white px-3 py-1 rounded-full transition text-[11px] md:text-xs tracking-wide">{link}</Link>
       ))}
-      <Link href="/category/all" className="flex items-center text-blue-600 hover:underline font-bold ml-2">
+      <Link href="/category/all" className="flex items-center text-white hover:underline font-bold ml-2 text-xs md:text-sm">
         Xem tất cả <ChevronRight className="w-4 h-4" />
       </Link>
     </div>
@@ -133,11 +103,11 @@ const BlockHeader = ({ title, icon: Icon, colorClass, links }: { title: string, 
 // --- MAIN PAGE ---
 export default function Home() {
   return (
-    <div className="bg-[#f5f5f8] min-h-screen pb-12">
+    <div className="bg-[#f1f5f9] min-h-screen pb-12">
       
       {/* 1. HERO SECTION */}
       <section className="bg-[#0f172a]">
-        <div className="w-full relative h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] overflow-hidden">
+        <div className="w-full relative h-[250px] sm:h-[300px] md:h-[350px] lg:h-[400px] overflow-hidden">
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop')" }}>
             <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/90 via-[#0b1221]/50 to-transparent flex items-center">
               <div className="container mx-auto px-4 max-w-[1370px]">
@@ -159,26 +129,26 @@ export default function Home() {
       </section>
 
       {/* SUB-BANNERS */}
-      <section className="py-6">
+      <section className="py-4">
         <div className="container mx-auto px-4 max-w-[1370px]">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl overflow-hidden shadow-sm relative group aspect-[21/9]">
+            <div className="rounded-xl overflow-hidden shadow-md relative group h-[120px] md:h-[150px]">
               <img src="https://images.unsplash.com/photo-1598550476439-6847785fcea6?q=80&w=1200&auto=format&fit=crop" className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 to-transparent flex items-center p-8">
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 to-transparent flex items-center p-6">
                 <div className="text-white">
-                  <h3 className="text-2xl font-black mb-2 text-yellow-400 uppercase italic">Ultrabook Cao Cấp</h3>
-                  <p className="font-bold text-lg mb-4">Sang trọng & Mỏng nhẹ</p>
-                  <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full uppercase text-sm">Xem ngay</button>
+                  <h3 className="text-xl md:text-2xl font-black mb-1 text-yellow-400 uppercase italic">Ultrabook Cao Cấp</h3>
+                  <p className="font-bold text-sm mb-3">Sang trọng & Mỏng nhẹ</p>
+                  <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-5 rounded-full uppercase text-xs shadow-lg">Xem ngay</button>
                 </div>
               </div>
             </div>
-            <div className="rounded-xl overflow-hidden shadow-sm relative group aspect-[21/9]">
+            <div className="rounded-xl overflow-hidden shadow-md relative group h-[120px] md:h-[150px]">
               <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop" className="w-full h-full object-cover group-hover:scale-105 transition duration-500"/>
-              <div className="absolute inset-0 bg-gradient-to-r from-red-900/80 to-transparent flex items-center p-8">
+              <div className="absolute inset-0 bg-gradient-to-r from-red-900/80 to-transparent flex items-center p-6">
                 <div className="text-white">
-                  <h3 className="text-2xl font-black mb-2 text-yellow-400 uppercase italic">Ưu đãi cực khủng</h3>
-                  <p className="font-bold text-lg mb-4">Tặng chuột Gaming & Balo</p>
-                  <button className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-full uppercase text-sm">Mua ngay</button>
+                  <h3 className="text-xl md:text-2xl font-black mb-1 text-yellow-400 uppercase italic">Ưu đãi cực khủng</h3>
+                  <p className="font-bold text-sm mb-3">Tặng chuột Gaming & Balo</p>
+                  <button className="bg-red-600 hover:bg-red-700 text-white font-bold py-1.5 px-5 rounded-full uppercase text-xs shadow-lg">Mua ngay</button>
                 </div>
               </div>
             </div>
@@ -191,9 +161,9 @@ export default function Home() {
         <div className="container mx-auto px-4 max-w-[1370px]">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {features.map((feature, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col md:flex-row items-center justify-center gap-3 shadow-sm hover:shadow-md transition cursor-pointer group">
-                <feature.icon className="w-8 h-8 text-blue-600 group-hover:scale-110 transition" />
-                <span className="font-bold text-gray-800 text-sm md:text-base text-center md:text-left">{feature.title}</span>
+              <div key={index} className="bg-white border-b-2 border-blue-600 rounded-lg p-3 flex flex-col md:flex-row items-center justify-center gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition duration-300 cursor-pointer group">
+                <feature.icon className="w-7 h-7 text-blue-600 group-hover:scale-110 transition" />
+                <span className="font-bold text-gray-800 text-xs md:text-sm text-center md:text-left">{feature.title}</span>
               </div>
             ))}
           </div>
@@ -201,25 +171,26 @@ export default function Home() {
       </section>
 
       {/* 2. FLASH SALE */}
-      <section className="pb-8">
+      <section className="pb-12">
         <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-lg shadow-sm p-1">
-            <div className="bg-white rounded-md p-4 md:p-6">
+          <div className="bg-gradient-to-r from-red-600 to-orange-500 rounded-xl shadow-lg p-1.5 transform hover:scale-[1.002] transition duration-300">
+            <div className="bg-white rounded-lg p-4 md:p-6">
               <div className="flex flex-col md:flex-row justify-between items-center mb-6">
                 <h2 className="text-2xl md:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-600 to-orange-500 uppercase flex items-center gap-2 italic">
                   <Flame className="w-8 h-8 text-red-600"/> DEAL CHỚP NHOÁNG
                 </h2>
-                <div className="flex items-center gap-3 mt-4 md:mt-0">
+                <div className="flex items-center gap-3 mt-4 md:mt-0 bg-gray-50 px-4 py-2 rounded-full border border-gray-200">
+                  <Clock className="w-5 h-5 text-gray-600" />
                   <span className="font-bold text-gray-600">Kết thúc trong:</span>
                   <div className="flex gap-2">
-                    <span className="bg-gray-800 text-white font-bold px-3 py-2 rounded-md">02</span><span className="font-bold pt-1">:</span>
-                    <span className="bg-gray-800 text-white font-bold px-3 py-2 rounded-md">45</span><span className="font-bold pt-1">:</span>
-                    <span className="bg-gray-800 text-white font-bold px-3 py-2 rounded-md">18</span>
+                    <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">02</span><span className="font-bold pt-1 text-red-600">:</span>
+                    <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">45</span><span className="font-bold pt-1 text-red-600">:</span>
+                    <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">18</span>
                   </div>
                 </div>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {mockProducts.map((p) => <ProductCard key={p.id + 'fs'} product={{...p, discount: "Giảm 30%"}} badgeColor="bg-yellow-500 text-black" />)}
+                {mockProducts.map((p) => <ProductCard key={p.id + 'fs'} product={{...p, discount: "Giảm 30%"}} badgeColor="bg-gradient-to-r from-yellow-400 to-yellow-500 text-black shadow-md" />)}
               </div>
             </div>
           </div>
@@ -227,59 +198,93 @@ export default function Home() {
       </section>
 
       {/* 3. LAPTOP GAMING */}
-      <section className="pb-8">
+      <section className="pb-12">
         <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 border-t-4 border-red-600">
-            <BlockHeader title="Laptop Gaming - Chiến Thần Đồ Hoạ" icon={Zap} colorClass="bg-red-600 text-white" links={["Dưới 20 Triệu", "20-30 Triệu", "Cao Cấp", "Mới Về"]} />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {mockProducts.map((p) => <ProductCard key={p.id + 'gm'} product={p} />)}
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden transform hover:shadow-lg transition duration-300">
+            <BlockHeader 
+              title="Laptop Gaming - Chiến Thần Đồ Hoạ" 
+              icon={Zap} 
+              colorClass="bg-gradient-to-r from-red-700 to-red-500" 
+              links={["Dưới 20 Triệu", "20-30 Triệu", "Cao Cấp", "Mới Về"]} 
+            />
+            <div className="p-4 md:p-6 bg-white">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {mockProducts.map((p) => <ProductCard key={p.id + 'gm'} product={p} />)}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* 4. ULTRABOOK CAO CẤP */}
-      <section className="pb-8">
+      <section className="pb-12">
         <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 border-t-4 border-blue-600">
-            <BlockHeader title="Ultrabook Cao Cấp - Doanh Nhân" icon={Briefcase} colorClass="bg-blue-600 text-white" links={["MacBook", "Dell XPS", "ThinkPad", "HP Spectre"]} />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {mockUltrabooks.map((p) => <ProductCard key={p.id + 'ub'} product={p} badgeColor="bg-blue-600" />)}
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden transform hover:shadow-lg transition duration-300">
+            <BlockHeader 
+              title="Ultrabook Cao Cấp - Doanh Nhân" 
+              icon={Briefcase} 
+              colorClass="bg-gradient-to-r from-blue-700 to-blue-500" 
+              links={["MacBook", "Dell XPS", "ThinkPad", "HP Spectre"]} 
+            />
+            <div className="p-4 md:p-6 bg-white">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {mockUltrabooks.map((p) => <ProductCard key={p.id + 'ub'} product={p} badgeColor="bg-blue-600" />)}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* 5. MÁY LƯỚT - LIKE NEW */}
-      <section className="pb-8">
+      <section className="pb-12">
         <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 border-t-4 border-green-600">
-            <BlockHeader title="Chuyên Trang Máy Lướt - Tiết Kiệm Tối Đa" icon={Award} colorClass="bg-green-600 text-white" links={["Like New 99%", "Bảo hành 12 Tháng", "Trả Góp 0%"]} />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {mockUsedLaptops.map((p) => <ProductCard key={p.id + 'ul'} product={p} badgeColor="bg-green-600" />)}
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden transform hover:shadow-lg transition duration-300">
+            <BlockHeader 
+              title="Chuyên Trang Máy Lướt - Tiết Kiệm Tối Đa" 
+              icon={Award} 
+              colorClass="bg-gradient-to-r from-green-600 to-emerald-500" 
+              links={["Like New 99%", "Bảo hành 12 Tháng", "Trả Góp 0%"]} 
+            />
+            <div className="p-4 md:p-6 bg-white">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {mockUsedLaptops.map((p) => <ProductCard key={p.id + 'ul'} product={p} badgeColor="bg-green-600" />)}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* 6. MÁY TRẠM (WORKSTATION) */}
-      <section className="pb-8">
+      <section className="pb-12">
         <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 border-t-4 border-gray-800">
-            <BlockHeader title="Máy Trạm Workstation - Đồ Hoạ Chuyên Nghiệp" icon={Server} colorClass="bg-gray-800 text-white" links={["Dell Precision", "ThinkPad P", "HP ZBook"]} />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {mockWorkstations.map((p) => <ProductCard key={p.id + 'ws'} product={p} badgeColor="bg-gray-800" />)}
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden transform hover:shadow-lg transition duration-300">
+            <BlockHeader 
+              title="Máy Trạm Workstation - Đồ Hoạ Chuyên Nghiệp" 
+              icon={Server} 
+              colorClass="bg-gradient-to-r from-gray-800 to-gray-600" 
+              links={["Dell Precision", "ThinkPad P", "HP ZBook"]} 
+            />
+            <div className="p-4 md:p-6 bg-white">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {mockWorkstations.map((p) => <ProductCard key={p.id + 'ws'} product={p} badgeColor="bg-gray-800" />)}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* 7. PHỤ KIỆN & GEAR */}
-      <section className="pb-8">
+      <section className="pb-12">
         <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="bg-white rounded-lg shadow-sm p-4 md:p-6 border-t-4 border-purple-600">
-            <BlockHeader title="Phụ Kiện & Gear Gaming" icon={Headphones} colorClass="bg-purple-600 text-white" links={["Chuột Gaming", "Bàn Phím Cơ", "Tai Nghe", "Balo - Túi Chống Sốc"]} />
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden transform hover:shadow-lg transition duration-300">
+            <BlockHeader 
+              title="Phụ Kiện & Gear Gaming" 
+              icon={Headphones} 
+              colorClass="bg-gradient-to-r from-purple-700 to-purple-500" 
+              links={["Chuột Gaming", "Bàn Phím Cơ", "Tai Nghe", "Balo - Túi Chống Sốc"]} 
+            />
+            <div className="p-4 md:p-6 bg-white">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {/* Using mock data for gears, just replacing name/image */}
               {mockProducts.slice(0,5).map((p, i) => (
                 <Link href="#" key={i+'gear'} className="group flex flex-col bg-white border border-gray-100 hover:border-purple-500 rounded-md overflow-hidden transition-all duration-300 hover:shadow-lg">
@@ -292,6 +297,7 @@ export default function Home() {
                   </div>
                 </Link>
               ))}
+              </div>
             </div>
           </div>
         </div>
