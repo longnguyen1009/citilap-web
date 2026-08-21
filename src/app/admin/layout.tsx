@@ -10,7 +10,10 @@ import {
   LogOut, 
   Bell, 
   Search,
-  Menu
+  Menu,
+  ShoppingCart,
+  Package,
+  FolderTree
 } from "lucide-react";
 
 export default function AdminLayout({
@@ -22,7 +25,9 @@ export default function AdminLayout({
 
   const navigation = [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-    { name: "Products", href: "/admin/products", icon: ShoppingBag },
+    { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
+    { name: "Products", href: "/admin/products", icon: Package },
+    { name: "Categories", href: "/admin/categories", icon: FolderTree },
     { name: "Customers", href: "/admin/customers", icon: Users },
     { name: "Settings", href: "/admin/settings", icon: Settings },
   ];
