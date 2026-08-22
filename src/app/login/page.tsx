@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Mail, Lock, User, ArrowRight, Github, Monitor } from "lucide-react";
+import { Mail, Lock, User, ArrowRight, Monitor } from "lucide-react";
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
