@@ -37,13 +37,22 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
     const data = await request.json();
     
     // Only allow updating certain fields
-    const updatedOrder = await prisma.order.update({
+    await prisma.order.update({
       where: { id: params.id },
       data: {
         status: data.status,
         paymentStatus: data.paymentStatus,
         shippingAddress: data.shippingAddress,
       }
+    });
+
+    // Return the full order with relations so the client can refresh in place
+    const updatedOrder = await prisma.order.findUnique({
+      where: { id: params.id },
+      include: {
+        user: { select: { name: true, email: true, phone: true } },
+        items: { include: { product: { select: { name: true, images: true, category: true } } } },
+      },
     });
 
     return NextResponse.json({ success: true, data: updatedOrder });

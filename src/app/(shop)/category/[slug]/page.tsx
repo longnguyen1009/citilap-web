@@ -2,7 +2,25 @@ import Link from "next/link";
 import { ChevronRight, Filter, SlidersHorizontal } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 
-export default function CategoryPage({ params }: { params: { slug: string } }) {
+// Map brand names to display names
+const brandNames: Record<string, string> = {
+  lenovo: "Lenovo", asus: "Asus", acer: "Acer", hp: "HP", dell: "Dell", msi: "MSI",
+  gigabyte: "Gigabyte", apple: "Apple", lg: "LG", samsung: "Samsung",
+};
+
+// Map series names to display names
+const seriesNames: Record<string, string> = {
+  legion: "Legion", rog: "ROG", predator: "Predator", omen: "Omen",
+  alienware: "Alienware", aorus: "AORUS", loq: "LOQ",
+  "macbook-air": "MacBook Air", "macbook-pro": "MacBook Pro",
+  xps: "XPS", inspiron: "Inspiron", thinkpad: "ThinkPad", ideapad: "IdeaPad",
+  elitebook: "EliteBook", pavilion: "Pavilion", zenbook: "ZenBook", swift: "Swift",
+  precision: "Precision", "thinkpad-p": "ThinkPad P", zbook: "ZBook",
+  proart: "ProArt", conceptd: "ConceptD", creator: "Creator",
+  pro: "Pro", laptop: "Laptop", go: "Go", book: "Book",
+};
+
+export default function CategoryPage({ params, searchParams }: { params: { slug: string }, searchParams: { brand?: string; series?: string; sub?: string } }) {
   const categoryMap: Record<string, string> = {
     "laptop-gaming": "Laptop Gaming",
     "ultrabook": "Ultrabook Cao Cấp",
@@ -14,66 +32,111 @@ export default function CategoryPage({ params }: { params: { slug: string } }) {
     "workstation": "Máy Trạm - Workstation",
     "gear": "Phụ Kiện & Gear",
     "apple": "Apple (MacBook - iPad)",
+    "surface": "Microsoft Surface",
+    "pc": "PC - Máy tính để bàn",
+    "linh-kien-pc": "Linh kiện PC",
+    "camera": "Camera",
+    "laptop-moi": "Laptop Mới",
+    "laptop-cu": "Laptop Like New",
   };
 
-  const categoryName = categoryMap[params.slug] || "Danh mục sản phẩm";
+  const categorySlug = params.slug;
+  const categoryName = categoryMap[categorySlug] || "Danh mục sản phẩm";
+  const brand = searchParams.brand;
+  const series = searchParams.series;
+  const sub = searchParams.sub;
 
-  // Mock data for the category
+  // Build display title
+  let displayTitle = categoryName;
+  if (brand) displayTitle += ` ${brandNames[brand] || brand}`;
+  if (series) displayTitle += ` ${seriesNames[series] || series}`;
+  if (sub) displayTitle += ` - ${sub}`;
+
+  // Mock data for the category - generate based on brand/series
   let mockProducts = [];
 
-  if (params.slug === "laptop-gaming") {
-    mockProducts = [
-      {
-        id: "g1",
-        name: "Lenovo Legion 5 15ARH7H (Ryzen 7 6800H / 16GB / 512GB / RTX 3050Ti)",
-        price: "28.490.000đ", oldPrice: "32.990.000đ", discount: "-14%",
-        image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "Ryzen 7 6800H", ram: "16GB", ssd: "512GB", display: "15.6 FHD 165Hz" }
-      },
-      {
-        id: "g2", name: "Acer Predator Helios Neo 16",
-        price: "34.990.000đ", oldPrice: "39.990.000đ", discount: "-13%",
-        image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "512GB", display: "16.0 WQXGA" }
-      },
-      {
-        id: "g3", name: "Asus ROG Strix G15 G513RC",
-        price: "23.990.000đ", oldPrice: "27.990.000đ", discount: "-14%",
-        image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "Ryzen 7 6800H", ram: "8GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
-      },
-      {
-        id: "g4", name: "MSI Katana 15 B13VFK",
-        price: "29.990.000đ", oldPrice: "33.990.000đ", discount: "-11%",
+  // Generate products based on brand and series
+  const generateProducts = (baseName: string, count: number = 8) => {
+    return Array.from({ length: count }).map((_, i) => {
+      const price = (20 + i * 2 + Math.floor(Math.random() * 5)) * 100000;
+      const oldPrice = price + (3 + Math.floor(Math.random() * 5)) * 1000000;
+      return {
+        id: `${categorySlug}-${brand || 'all'}-${series || 'all'}-${i}`,
+        name: `${baseName} Mẫu ${i + 1} (Intel Core i${5 + (i % 4) * 2} / ${8 + (i % 3) * 8}GB / ${256 + (i % 4) * 256}GB)`,
+        price: `${price.toLocaleString('vi-VN')}đ`,
+        oldPrice: `${oldPrice.toLocaleString('vi-VN')}đ`,
+        discount: `-${Math.floor(Math.random() * 15 + 5)}%`,
         image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i7 13620H", ram: "16GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
-      },
-      {
-        id: "g5", name: "Dell Alienware m16 R1",
-        price: "42.490.000đ", oldPrice: "47.990.000đ", discount: "-11%",
-        image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "1TB", display: "16.0 QHD+ 165Hz" }
-      },
-      {
-        id: "g6", name: "Gigabyte Aorus 15 BKF",
-        price: "31.990.000đ", oldPrice: "35.990.000đ", discount: "-11%",
-        image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i7 13700H", ram: "16GB", ssd: "512GB", display: "15.6 QHD 165Hz" }
-      },
-      {
-        id: "g7", name: "HP Victus 16 2023",
-        price: "21.990.000đ", oldPrice: "25.990.000đ", discount: "-15%",
-        image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i5 13500H", ram: "16GB", ssd: "512GB", display: "16.1 FHD 144Hz" }
-      },
-      {
-        id: "g8", name: "Acer Nitro 5 Tiger 2022",
-        price: "19.990.000đ", oldPrice: "23.990.000đ", discount: "-16%",
-        image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i5 12500H", ram: "8GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
-      }
-    ];
-  } else if (params.slug === "ultrabook") {
+        specs: {
+          cpu: i % 2 === 0 ? "Core i7 13700H" : "Ryzen 7 7840HS",
+          ram: `${8 + (i % 3) * 8}GB`,
+          ssd: `${256 + (i % 4) * 256}GB`,
+          display: "15.6 FHD 144Hz"
+        }
+      };
+    });
+  };
+
+  if (categorySlug === "laptop-gaming") {
+    // If brand/series specified, generate filtered products
+    if (brand || series) {
+      const brandLabel = brandNames[brand || ''] || brand || '';
+      const seriesLabel = seriesNames[series || ''] || series || '';
+      const productName = `${brandLabel} ${seriesLabel}`.trim() || categoryName;
+      mockProducts = generateProducts(productName);
+    } else {
+      mockProducts = [
+        {
+          id: "g1", name: "Lenovo Legion 5 15ARH7H (Ryzen 7 6800H / 16GB / 512GB / RTX 3050Ti)",
+          price: "28.490.000đ", oldPrice: "32.990.000đ", discount: "-14%",
+          image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "Ryzen 7 6800H", ram: "16GB", ssd: "512GB", display: "15.6 FHD 165Hz" }
+        },
+        {
+          id: "g2", name: "Acer Predator Helios Neo 16",
+          price: "34.990.000đ", oldPrice: "39.990.000đ", discount: "-13%",
+          image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "512GB", display: "16.0 WQXGA" }
+        },
+        {
+          id: "g3", name: "Asus ROG Strix G15 G513RC",
+          price: "23.990.000đ", oldPrice: "27.990.000đ", discount: "-14%",
+          image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "Ryzen 7 6800H", ram: "8GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
+        },
+        {
+          id: "g4", name: "MSI Katana 15 B13VFK",
+          price: "29.990.000đ", oldPrice: "33.990.000đ", discount: "-11%",
+          image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "i7 13620H", ram: "16GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
+        },
+        {
+          id: "g5", name: "Dell Alienware m16 R1",
+          price: "42.490.000đ", oldPrice: "47.990.000đ", discount: "-11%",
+          image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "1TB", display: "16.0 QHD+ 165Hz" }
+        },
+        {
+          id: "g6", name: "Gigabyte Aorus 15 BKF",
+          price: "31.990.000đ", oldPrice: "35.990.000đ", discount: "-11%",
+          image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "i7 13700H", ram: "16GB", ssd: "512GB", display: "15.6 QHD 165Hz" }
+        },
+        {
+          id: "g7", name: "HP Victus 16 2023",
+          price: "21.990.000đ", oldPrice: "25.990.000đ", discount: "-15%",
+          image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "i5 13500H", ram: "16GB", ssd: "512GB", display: "16.1 FHD 144Hz" }
+        },
+        {
+          id: "g8", name: "Acer Nitro 5 Tiger 2022",
+          price: "19.990.000đ", oldPrice: "23.990.000đ", discount: "-16%",
+          image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop",
+          specs: { cpu: "i5 12500H", ram: "8GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
+        }
+      ];
+    }
+  } else if (categorySlug === "ultrabook") {
     mockProducts = [
       {
         id: "u1", name: "Dell XPS 13 Plus 9320",
@@ -89,20 +152,29 @@ export default function CategoryPage({ params }: { params: { slug: string } }) {
       }
     ];
   } else {
-    mockProducts = Array.from({ length: 8 }).map((_, i) => ({
-      id: `${params.slug}-p${i}`,
-      name: `Laptop ${categoryName} Mẫu ${i + 1} (Intel Core i7 / 16GB / 512GB)`,
-      price: `${20 + i}.990.000đ`,
-      oldPrice: `${25 + i}.990.000đ`,
-      discount: "-15%",
-      image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
-      specs: {
-        cpu: "Core i7 13700H",
-        ram: "16GB",
-        ssd: "512GB",
-        display: "15.6 FHD 144Hz"
-      }
-    }));
+    // For other categories, generate based on brand/series/sub
+    if (brand || series || sub) {
+      const brandLabel = brandNames[brand || ''] || brand || '';
+      const seriesLabel = seriesNames[series || ''] || series || '';
+      const subLabel = sub || '';
+      const productName = `${brandLabel} ${seriesLabel} ${subLabel}`.trim() || categoryName;
+      mockProducts = generateProducts(productName);
+    } else {
+      mockProducts = Array.from({ length: 8 }).map((_, i) => ({
+        id: `${categorySlug}-p${i}`,
+        name: `Laptop ${categoryName} Mẫu ${i + 1} (Intel Core i7 / 16GB / 512GB)`,
+        price: `${20 + i}.990.000đ`,
+        oldPrice: `${25 + i}.990.000đ`,
+        discount: "-15%",
+        image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
+        specs: {
+          cpu: "Core i7 13700H",
+          ram: "16GB",
+          ssd: "512GB",
+          display: "15.6 FHD 144Hz"
+        }
+      }));
+    }
   }
 
   if (params.slug === "linh-kien" || params.slug === "gear") {
@@ -113,14 +185,14 @@ export default function CategoryPage({ params }: { params: { slug: string } }) {
             <nav className="flex text-sm text-gray-500 py-3 font-medium items-center">
               <Link href="/" className="hover:text-blue-600 transition">Trang chủ</Link>
               <ChevronRight className="w-4 h-4 mx-1" />
-              <span className="text-gray-800 font-bold">{categoryName}</span>
+              <span className="text-gray-800 font-bold">{displayTitle}</span>
             </nav>
           </div>
         </div>
 
         <div className="container mx-auto px-4 max-w-[1370px]">
           <div className="bg-gradient-to-r from-blue-900 to-indigo-800 rounded-2xl p-8 mb-8 text-white flex flex-col items-center text-center shadow-lg">
-            <h1 className="text-3xl font-black mb-3 uppercase tracking-wide">Thế giới {categoryName}</h1>
+            <h1 className="text-3xl font-black mb-3 uppercase tracking-wide">Thế giới {displayTitle}</h1>
             <p className="text-blue-100 mb-6 max-w-2xl">Bàn phím cơ, chuột gaming, tai nghe, balo, và hàng ngàn phụ kiện công nghệ chất lượng cao.</p>
             <div className="flex flex-wrap justify-center gap-3">
               {["Chuột", "Bàn Phím", "Tai Nghe", "Balo - Túi", "Ổ Cứng Di Động", "Webcam", "Cáp Sạc"].map((tag) => (
@@ -190,7 +262,7 @@ export default function CategoryPage({ params }: { params: { slug: string } }) {
           <nav className="flex text-sm text-gray-500 py-3 font-medium items-center">
             <Link href="/" className="hover:text-blue-600 transition">Trang chủ</Link>
             <ChevronRight className="w-4 h-4 mx-1" />
-            <span className="text-gray-800 font-bold">{categoryName}</span>
+            <span className="text-gray-800 font-bold">{displayTitle}</span>
           </nav>
         </div>
       </div>
@@ -199,7 +271,7 @@ export default function CategoryPage({ params }: { params: { slug: string } }) {
         {/* 2. Banner & Title */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 uppercase">
-            {categoryName}
+            {displayTitle}
           </h1>
           <p className="text-sm text-gray-500 mt-2">
             Khám phá {mockProducts.length} sản phẩm cấu hình cao, giá tốt nhất thị trường.

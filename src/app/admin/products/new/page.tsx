@@ -1,11 +1,34 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Save, Upload, Image as ImageIcon, X, Plus } from "lucide-react";
 
+type Category = { id: string; name: string };
+
 export default function NewProductPage() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { void fetch("/api/categories").then((response) => response.json()).then((result) => { if (result.success) setCategories(result.data); }); }, []);
+  const saveProduct = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); setSaving(true); setMessage("");
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get("name") || "");
+    const slug = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const response = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug, price: Number(form.get("price")), originalPrice: form.get("originalPrice"), description: form.get("description"), stock: Number(form.get("stock")), status: form.get("status"), categoryId: form.get("categoryId"), images: [] }) });
+    setSaving(false);
+    if (response.ok) {
+      setMessage("Đã lưu sản phẩm.");
+      router.push("/admin/products");
+    } else {
+      setMessage("Không thể lưu sản phẩm. Hãy kiểm tra danh mục và thông tin bắt buộc.");
+    }
+  };
   return (
-    <div className="max-w-5xl mx-auto pb-12">
+    <form onSubmit={saveProduct} className="max-w-5xl mx-auto pb-12">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
         <div className="flex items-center gap-4">
@@ -18,10 +41,10 @@ export default function NewProductPage() {
           </div>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-6 rounded-lg shadow-sm hover:bg-gray-50 transition">
+          <Link href="/admin/products" className="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-6 rounded-lg shadow-sm hover:bg-gray-50 transition flex items-center justify-center">
             Hủy
-          </button>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-sm transition flex items-center gap-2">
+          </Link>
+          <button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-sm transition flex items-center gap-2 disabled:opacity-60">
             <Save className="w-4 h-4" /> Lưu sản phẩm
           </button>
         </div>
@@ -37,23 +60,23 @@ export default function NewProductPage() {
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Tên sản phẩm *</label>
-                <input type="text" placeholder="Nhập tên sản phẩm (VD: Lenovo Legion 5...)" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                <input required name="name" type="text" placeholder="Nhập tên sản phẩm (VD: Lenovo Legion 5...)" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               
               <div className="grid grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Giá bán (VNĐ) *</label>
-                  <input type="number" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input required name="price" type="number" min="0" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Giá gốc (VNĐ)</label>
-                  <input type="number" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input name="originalPrice" type="number" min="0" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Mô tả ngắn</label>
-                <textarea rows={3} placeholder="Mô tả nổi bật về sản phẩm..." className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                <textarea name="description" rows={3} placeholder="Mô tả nổi bật về sản phẩm..." className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
               </div>
             </div>
           </div>
@@ -71,22 +94,13 @@ export default function NewProductPage() {
             </div>
 
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
-              {/* Thumbnail 1 */}
-              <div className="relative aspect-square border border-gray-200 rounded-lg overflow-hidden group">
-                <img src="https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=300" className="w-full h-full object-cover" alt="" />
-                <button className="absolute top-1 right-1 bg-white/90 rounded-full p-1 text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <X className="w-4 h-4" />
-                </button>
-                <div className="absolute bottom-0 left-0 right-0 bg-blue-600 text-white text-[10px] text-center py-1 font-bold">Ảnh bìa</div>
-              </div>
-              
-              {/* Empty Slots */}
-              {[1,2,3,4].map(i => (
+              {[1,2,3,4,5].map(i => (
                 <div key={i} className="aspect-square border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 bg-gray-50">
                   <ImageIcon className="w-6 h-6 opacity-50" />
                 </div>
               ))}
             </div>
+            <p className="text-xs text-gray-400 mt-4">Tính năng tải ảnh lên sẽ được bổ sung sau. Ảnh sản phẩm hiện được quản lý qua URL.</p>
           </div>
 
           {/* Specifications */}
@@ -137,7 +151,7 @@ export default function NewProductPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Trạng thái</label>
-                <select className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                <select name="status" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value="active">Đang bán (Hiển thị)</option>
                   <option value="draft">Bản nháp (Ẩn)</option>
                   <option value="archived">Lưu trữ</option>
@@ -146,7 +160,7 @@ export default function NewProductPage() {
               
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Số lượng tồn kho</label>
-                <input type="number" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                <input name="stock" type="number" min="0" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               
               <div>
@@ -163,12 +177,9 @@ export default function NewProductPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Danh mục chính</label>
-                <select className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                <select required name="categoryId" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value="">-- Chọn danh mục --</option>
-                  <option value="laptop-gaming">Laptop Gaming</option>
-                  <option value="laptop-van-phong">Laptop Văn phòng</option>
-                  <option value="macbook">MacBook</option>
-                  <option value="phu-kien">Phụ kiện</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                 </select>
               </div>
               
@@ -196,6 +207,7 @@ export default function NewProductPage() {
 
         </div>
       </div>
-    </div>
+      {message && <p className="fixed bottom-6 right-6 rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg">{message}</p>}
+    </form>
   );
 }

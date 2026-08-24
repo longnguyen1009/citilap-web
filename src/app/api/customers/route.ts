@@ -8,32 +8,52 @@ export async function GET(request: Request) {
     const tier = searchParams.get('tier');
 
     const where: any = {};
-    
+
     if (tier) {
       where.tier = tier;
     }
-    
+
     if (search) {
       where.OR = [
         { name: { contains: search } },
         { email: { contains: search } },
-        { phone: { contains: search } }
+        { phone: { contains: search } },
       ];
     }
 
-    const customers = await prisma.user.findMany({
+    const users = await prisma.user.findMany({
       where,
-      include: {
-        _count: {
-          select: { orders: true }
-        }
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        tier: true,
+        totalSpend: true,
+        createdAt: true,
+        _count: { select: { orders: true } },
+        orders: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { createdAt: true },
+        },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ success: true, data: customers });
+    const data = users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      tier: user.tier,
+      totalSpend: user.totalSpend,
+      totalOrders: user._count.orders,
+      lastOrder: user.orders[0]?.createdAt ?? null,
+      createdAt: user.createdAt,
+    }));
+
+    return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error('Failed to fetch customers:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch customers' }, { status: 500 });

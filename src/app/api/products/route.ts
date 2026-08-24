@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@/../generated/prisma/client';
 
 export async function GET(request: Request) {
   try {
@@ -7,7 +8,7 @@ export async function GET(request: Request) {
     const category = searchParams.get('category');
     const search = searchParams.get('search');
 
-    const where: any = {};
+    const where: Prisma.ProductWhereInput = {};
     
     if (category) {
       where.category = { slug: category };

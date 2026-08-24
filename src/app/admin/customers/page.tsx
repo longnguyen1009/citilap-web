@@ -1,19 +1,75 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { Search, Filter, MoreHorizontal, User, Mail, Phone, MapPin, Download } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Search, Mail, Phone, Download, RefreshCw } from "lucide-react";
+
+type Customer = {
+  id: string;
+  name: string | null;
+  email: string;
+  phone: string | null;
+  tier: string;
+  totalSpend: number;
+  totalOrders: number;
+  lastOrder: string | null;
+  createdAt: string;
+};
+
+const tierBadge: Record<string, string> = {
+  "Vàng": "text-yellow-700 bg-yellow-100",
+  "Bạc": "text-gray-600 bg-gray-200",
+  "Mới": "text-blue-600 bg-blue-100",
+};
 
 export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [tierFilter, setTierFilter] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const customers = [
-    { id: "CUS-001", name: "Nguyễn Văn A", email: "nguyenvana@gmail.com", phone: "0988.123.456", totalOrders: 12, totalSpend: 145500000, lastOrder: "20/08/2026", status: "Thành viên Vàng", statusColor: "text-yellow-600 bg-yellow-100" },
-    { id: "CUS-002", name: "Trần Thị B", email: "tranthib@gmail.com", phone: "0912.345.678", totalOrders: 3, totalSpend: 25000000, lastOrder: "15/08/2026", status: "Thành viên Bạc", statusColor: "text-gray-600 bg-gray-200" },
-    { id: "CUS-003", name: "Lê Hoàng C", email: "hoangc.le@gmail.com", phone: "0909.111.222", totalOrders: 1, totalSpend: 5500000, lastOrder: "10/08/2026", status: "Thành viên Mới", statusColor: "text-blue-600 bg-blue-100" },
-    { id: "CUS-004", name: "Phạm D", email: "phamd123@gmail.com", phone: "0888.999.888", totalOrders: 8, totalSpend: 86000000, lastOrder: "05/08/2026", status: "Thành viên Vàng", statusColor: "text-yellow-600 bg-yellow-100" },
-    { id: "CUS-005", name: "Hoàng Văn E", email: "hve99@gmail.com", phone: "0933.444.555", totalOrders: 0, totalSpend: 0, lastOrder: "-", status: "Chưa kích hoạt", statusColor: "text-red-600 bg-red-100" },
-  ];
+  useEffect(() => {
+    let canceled = false;
+    const load = async () => {
+      setLoading(true);
+      const query = new URLSearchParams();
+      if (searchTerm) query.set("search", searchTerm);
+      if (tierFilter) query.set("tier", tierFilter);
+      try {
+        const response = await fetch(`/api/customers?${query}`);
+        const result = await response.json();
+        if (!canceled && result.success) setCustomers(result.data);
+      } finally {
+        if (!canceled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { canceled = true; };
+  }, [searchTerm, tierFilter]);
+
+  const stats = useMemo(() => {
+    const total = customers.length;
+    const gold = customers.filter((c) => c.tier === "Vàng").length;
+    const silver = customers.filter((c) => c.tier === "Bạc").length;
+    const avgSpend = total ? customers.reduce((sum, c) => sum + c.totalSpend, 0) / total : 0;
+    return { total, gold, silver, avgSpend };
+  }, [customers]);
+
+  const exportCustomers = () => {
+    const csv = [
+      "Tên,Email,SĐT,Hạng,Tổng đơn,Tổng chi tiêu,Đăng ký",
+      ...customers.map((c) =>
+        [c.name || "—", c.email, c.phone || "—", c.tier, c.totalOrders, c.totalSpend, new Date(c.createdAt).toLocaleDateString("vi-VN")]
+          .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+          .join(",")
+      ),
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "khach-hang.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -22,7 +78,7 @@ export default function CustomersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Quản lý Khách hàng</h1>
           <p className="text-sm text-gray-500 mt-1">Quản lý danh sách khách hàng và lịch sử mua sắm của họ.</p>
         </div>
-        <button className="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition flex items-center justify-center gap-2">
+        <button type="button" onClick={exportCustomers} className="bg-white border border-gray-300 text-gray-700 font-medium py-2 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition flex items-center justify-center gap-2">
           <Download className="w-4 h-4" /> Xuất dữ liệu
         </button>
       </div>
@@ -30,23 +86,19 @@ export default function CustomersPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="text-gray-500 text-sm font-medium mb-1">Tổng khách hàng</div>
-          <div className="text-3xl font-black text-gray-900">12,456</div>
-          <div className="text-sm text-green-600 font-bold mt-2">+145 tháng này</div>
+          <div className="text-3xl font-black text-gray-900">{stats.total.toLocaleString("vi-VN")}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="text-gray-500 text-sm font-medium mb-1">Thành viên Vàng</div>
-          <div className="text-3xl font-black text-gray-900">856</div>
-          <div className="text-sm text-gray-500 font-medium mt-2">Đóng góp 60% doanh thu</div>
+          <div className="text-3xl font-black text-gray-900">{stats.gold.toLocaleString("vi-VN")}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="text-gray-500 text-sm font-medium mb-1">Thành viên Bạc</div>
-          <div className="text-3xl font-black text-gray-900">3,240</div>
-          <div className="text-sm text-gray-500 font-medium mt-2">Cần chăm sóc thêm</div>
+          <div className="text-3xl font-black text-gray-900">{stats.silver.toLocaleString("vi-VN")}</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="text-gray-500 text-sm font-medium mb-1">Chi tiêu trung bình</div>
-          <div className="text-3xl font-black text-gray-900">15.4M</div>
-          <div className="text-sm text-green-600 font-bold mt-2">+2.1M so với T7</div>
+          <div className="text-3xl font-black text-gray-900">{Math.round(stats.avgSpend).toLocaleString("vi-VN")}đ</div>
         </div>
       </div>
 
@@ -66,7 +118,7 @@ export default function CustomersPage() {
             />
           </div>
           <div className="flex gap-2">
-            <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+            <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
               <option value="">Tất cả hạng thành viên</option>
               <option value="Vàng">Thành viên Vàng</option>
               <option value="Bạc">Thành viên Bạc</option>
@@ -80,80 +132,64 @@ export default function CustomersPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Khách hàng
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Trạng thái
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Tổng đơn
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Tổng chi tiêu
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Lần mua cuối
-                </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">
-                  Thao tác
-                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Khách hàng</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hạng</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tổng đơn</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Tổng chi tiêu</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Lần mua cuối</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {customers.map((customer) => (
-                <tr key={customer.id} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600">
-                          {customer.name.charAt(0)}
+              {loading ? (
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500"><RefreshCw className="w-5 h-5 animate-spin inline mr-2" />Đang tải khách hàng...</td></tr>
+              ) : customers.length === 0 ? (
+                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">Không tìm thấy khách hàng phù hợp.</td></tr>
+              ) : (
+                customers.map((customer) => (
+                  <tr key={customer.id} className="hover:bg-gray-50 transition">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center font-bold text-blue-600">
+                          {(customer.name || customer.email).charAt(0).toUpperCase()}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-bold text-gray-900">{customer.name || "Chưa cập nhật"}</div>
+                          <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
+                            <Mail className="w-3 h-3" /> {customer.email}
+                          </div>
+                          {customer.phone && (
+                            <div className="text-xs text-gray-500 flex items-center gap-1">
+                              <Phone className="w-3 h-3" /> {customer.phone}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-bold text-gray-900">{customer.name}</div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                          <Mail className="w-3 h-3" /> {customer.email}
-                        </div>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          <Phone className="w-3 h-3" /> {customer.phone}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${customer.statusColor}`}>
-                      {customer.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
-                    {customer.totalOrders}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">
-                    {customer.totalSpend.toLocaleString("vi-VN")}đ
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
-                    {customer.lastOrder}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-gray-400 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 p-2 rounded-lg inline-flex items-center justify-center transition">
-                      <MoreHorizontal className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full ${tierBadge[customer.tier] || "bg-gray-100 text-gray-600"}`}>
+                        {customer.tier}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
+                      {customer.totalOrders}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600">
+                      {customer.totalSpend.toLocaleString("vi-VN")}đ
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-medium">
+                      {customer.lastOrder ? new Date(customer.lastOrder).toLocaleDateString("vi-VN") : "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        
-        {/* Pagination */}
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
           <div className="text-sm text-gray-700">
-            Hiển thị <span className="font-bold">1</span> đến <span className="font-bold">5</span> trong số <span className="font-bold">12,456</span> khách hàng
-          </div>
-          <div className="flex gap-2">
-            <button className="px-3 py-1 border border-gray-300 rounded bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50">Trước</button>
-            <button className="px-3 py-1 border border-gray-300 rounded bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">Tiếp</button>
+            Hiển thị <span className="font-bold">{customers.length}</span> khách hàng
           </div>
         </div>
       </div>
