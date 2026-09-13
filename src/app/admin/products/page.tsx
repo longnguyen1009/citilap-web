@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Search, Edit, Trash2, Tag, RefreshCw } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Tag, RefreshCw, Download, Upload, Filter, CheckSquare, Square } from "lucide-react";
 
 type Product = {
   id: string;
@@ -39,6 +39,14 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDraft, setBulkDraft] = useState(false);
+  const [bulkFeatured, setBulkFeatured] = useState(false);
+  const [bulkNewArrival, setBulkNewArrival] = useState(false);
+  const [bulkFlash, setBulkFlash] = useState(false);
+  const [bulkApplying, setBulkApplying] = useState(false);
+  const [bulkMode, setBulkMode] = useState<"none" | "bulk">("none");
+  const [importDraft, setImportDraft] = useState("");
 
   const loadProducts = useCallback(async (search: string) => {
     setLoading(true);
@@ -80,6 +88,41 @@ export default function ProductsPage() {
     const statusMatches = !statusFilter || product.status === statusFilter;
     return categoryMatches && stockMatches && statusMatches;
   });
+
+  const toggleSelect = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
+  const toggleSelectAll = () => setSelectedIds((current) => current.length === filteredProducts.length ? [] : filteredProducts.map((product) => product.id));
+  const applyBulkMetadata = async () => {
+    if (selectedIds.length === 0 || bulkApplying) return;
+    setBulkApplying(true); setMessage("");
+    try {
+      const response = await fetch("/api/products/bulk-metadata", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds, status: bulkDraft ? "draft" : undefined, isFeatured: bulkFeatured, isNewArrival: bulkNewArrival, isFlashSale: bulkFlash }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.error || "Không thể cập nhật hàng loạt");
+      if (result.updatedIds?.length) setProducts((current) => current.map((product) => result.updatedIds.includes(product.id) ? { ...product, ...(bulkDraft ? { status: "draft" } : {}), ...(bulkFeatured ? { isFeatured: true } : {}), ...(bulkNewArrival ? { isNewArrival: true } : {}), ...(bulkFlash ? { isFlashSale: true } : {}) } : product));
+      setMessage(`Đã cập nhật ${result.updatedIds?.length || selectedIds.length} sản phẩm.`);
+      setSelectedIds([]); setBulkDraft(false); setBulkFeatured(false); setBulkNewArrival(false); setBulkFlash(false); setBulkMode("none");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Lỗi cập nhật hàng loạt."); }
+    finally { setBulkApplying(false); }
+  };
+  const exportProductsMetadata = async () => {
+    try {
+      const response = await fetch("/api/products/metadata");
+      const result = await response.json().catch(() => ({ data: [] }));
+      const blob = new Blob([JSON.stringify(result.data || [], null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `products-metadata-${Date.now()}.json`; anchor.click(); URL.revokeObjectURL(url);
+      setMessage("Đã xuất metadata sản phẩm.");
+    } catch { setMessage("Không thể xuất metadata."); }
+  };
+  const importProductsMetadata = async () => {
+    if (!importDraft.trim() || bulkApplying) return;
+    setBulkApplying(true); setMessage("");
+    try {
+      const rows = JSON.parse(importDraft); if (!Array.isArray(rows) || rows.length === 0) throw new Error("Dữ liệu import không hợp lệ");
+      const response = await fetch("/api/products/metadata", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows }) }); const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.error || "Không thể import");
+      setMessage(`Đã import ${result.updatedCount || 0} bản ghi.`); setImportDraft(""); void loadProducts(searchTerm);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Lỗi import metadata."); }
+    finally { setBulkApplying(false); }
+  };
 
   const deleteProduct = async (product: Product) => {
     if (!window.confirm(`Xóa sản phẩm “${product.name}”?`)) return;
@@ -138,7 +181,7 @@ export default function ProductsPage() {
               <option value="in">Còn hàng</option>
               <option value="out">Hết hàng</option>
             </select>
-            <button type="button" onClick={() => void loadProducts(searchTerm)} title="Tải lại" className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition"><RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} /></button>
+            <button type="button" onClick={() => void loadProducts(searchTerm)} title="Tải lại" className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition"><RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} /></button><button type="button" onClick={() => exportProductsMetadata()} title="Xuất metadata" className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-600 transition"><Download className="w-5 h-5" /></button><button type="button" onClick={() => setBulkMode(bulkMode === "bulk" ? "none" : "bulk")} title="Chỉnh sửa hàng loạt" className={`p-2 border rounded-lg transition ${bulkMode === "bulk" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-gray-300 hover:bg-gray-50 text-gray-600"}`}><Filter className="w-5 h-5" /></button>
           </div>
         </div>
 
@@ -146,7 +189,7 @@ export default function ProductsPage() {
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
-              <tr>
+              <tr>{bulkMode === "bulk" && <th className="px-3 py-3"><button type="button" onClick={toggleSelectAll} className="text-gray-600 hover:text-gray-900">{selectedIds.length === filteredProducts.length && filteredProducts.length > 0 ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}</button></th>}
                 <th scope="col" className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                   Sản phẩm
                 </th>
@@ -171,7 +214,7 @@ export default function ProductsPage() {
               {loading ? <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">Đang tải sản phẩm...</td></tr> : filteredProducts.length === 0 ? <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-500">Không tìm thấy sản phẩm phù hợp.</td></tr> : filteredProducts.map((product) => {
                 const status = statusLabel[product.status] || statusLabel.active;
                 return (
-                  <tr key={product.id} className="hover:bg-gray-50 transition">
+                  <tr key={product.id} className="hover:bg-gray-50 transition">{bulkMode === "bulk" && <td className="px-3 py-4"><button type="button" onClick={() => toggleSelect(product.id)} className="text-blue-600 hover:text-blue-800">{selectedIds.includes(product.id) ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}</button></td>}
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded border border-gray-200 p-1 flex-shrink-0 bg-white">
@@ -224,7 +267,7 @@ export default function ProductsPage() {
           </table>
         </div>
 
-        {/* Footer */}
+        {bulkMode === "bulk" && <div className="border-t border-blue-100 bg-blue-50 p-4 space-y-4"><div className="flex flex-col sm:flex-row sm:items-center gap-4"><div className="text-sm font-bold text-blue-800">Đã chọn: {selectedIds.length}</div><label className="text-sm flex items-center gap-2"><input type="checkbox" checked={bulkDraft} onChange={(e) => setBulkDraft(e.target.checked)} /> Đặt nháp</label><label className="text-sm flex items-center gap-2"><input type="checkbox" checked={bulkFeatured} onChange={(e) => setBulkFeatured(e.target.checked)} /> Nổi bật</label><label className="text-sm flex items-center gap-2"><input type="checkbox" checked={bulkNewArrival} onChange={(e) => setBulkNewArrival(e.target.checked)} /> Hàng mới</label><label className="text-sm flex items-center gap-2"><input type="checkbox" checked={bulkFlash} onChange={(e) => setBulkFlash(e.target.checked)} /> Flash sale</label><button disabled={selectedIds.length === 0 || bulkApplying} onClick={() => void applyBulkMetadata()} className="bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded-lg disabled:opacity-60">{bulkApplying ? "Đang lưu..." : "Áp dụng"}</button></div><div className="border-t border-blue-200 pt-3"><div className="text-xs font-bold text-blue-800 mb-2">Import JSON metadata (mảng id/fields)</div><textarea value={importDraft} onChange={(e) => setImportDraft(e.target.value)} rows={3} className="w-full border border-blue-200 rounded-lg p-2 text-xs font-mono bg-white" placeholder={`[{"id":"...","brand":"Lenovo","isFeatured":true}]`} /><button disabled={!importDraft.trim() || bulkApplying} onClick={() => void importProductsMetadata()} className="mt-2 bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-60">Import metadata</button></div></div>}
         <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
           <div className="text-sm text-gray-700">
             Hiển thị <span className="font-bold">{filteredProducts.length}</span> trong số <span className="font-bold">{products.length}</span> sản phẩm

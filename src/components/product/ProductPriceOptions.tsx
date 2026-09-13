@@ -12,43 +12,48 @@ type Variant = {
   oldPrice: string;
 };
 
-export default function ProductPriceOptions({ 
+export default function ProductPriceOptions({
   productId,
   productName,
   productImage,
-  variants, 
-  initialPrice, 
-  initialOldPrice 
-}: { 
-  productId: string,
-  productName: string,
-  productImage: string,
-  variants: Variant[], 
-  initialPrice: string, 
-  initialOldPrice: string 
+  variants,
+  initialPrice,
+  initialOldPrice,
+  onAddToCart,
+}: {
+  productId: string;
+  productName: string;
+  productImage: string;
+  variants: Variant[];
+  initialPrice: string;
+  initialOldPrice: string;
+  onAddToCart?: () => void;
 }) {
   const [selectedVariant, setSelectedVariant] = useState(variants[0] || null);
 
   const currentPrice = selectedVariant ? selectedVariant.price : initialPrice;
   const currentOldPrice = selectedVariant ? selectedVariant.oldPrice : initialOldPrice;
-
-  // Xử lý chuỗi giá thành số để tính toán
-  const numericPrice = parseInt(currentPrice.replace(/\D/g, ""));
+  const numericPrice = parseInt(currentPrice.replace(/\D/g, ""), 10) || 0;
 
   const { addToCart } = useCart();
   const router = useRouter();
 
-  const handleBuyNow = () => {
+  const handleAddToCart = () => {
     addToCart({
       id: selectedVariant ? `${productId}-${selectedVariant.id}` : productId,
-      productId: productId,
+      productId,
       name: productName,
       price: numericPrice,
       displayPrice: currentPrice,
       image: productImage,
       variantLabel: selectedVariant ? selectedVariant.label : undefined,
-      quantity: 1
+      quantity: 1,
     });
+    onAddToCart?.();
+  };
+
+  const handleBuyNow = () => {
+    handleAddToCart();
     router.push("/cart");
   };
 
@@ -62,12 +67,12 @@ export default function ProductPriceOptions({
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-3">
           <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-100 px-2.5 py-1 rounded text-[12px] text-gray-700">
-             <ShieldCheck className="w-3.5 h-3.5 text-gray-500" />
-             <span><span className="font-bold text-gray-900">Bảo hành:</span> 12 tháng chính hãng</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-gray-500" />
+            <span><span className="font-bold text-gray-900">Bảo hành:</span> 12 tháng chính hãng</span>
           </div>
           <div className="flex items-center gap-1.5 bg-green-50/50 border border-green-100 px-2.5 py-1 rounded text-[12px] text-green-700">
-             <Check className="w-3.5 h-3.5" />
-             <span className="font-bold">Còn hàng</span>
+            <Check className="w-3.5 h-3.5" />
+            <span className="font-bold">Còn hàng</span>
           </div>
         </div>
       </div>
@@ -77,12 +82,13 @@ export default function ProductPriceOptions({
         <div className="mb-6 mt-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {variants.map((v) => (
-              <button 
+              <button
                 key={v.id}
+                type="button"
                 onClick={() => setSelectedVariant(v)}
                 className={`border rounded p-2 text-center transition-all relative ${
-                  selectedVariant?.id === v.id 
-                    ? 'border-red-500 bg-white' 
+                  selectedVariant?.id === v.id
+                    ? 'border-red-500 bg-white'
                     : 'border-gray-200 hover:border-red-300 bg-white'
                 }`}
               >
@@ -103,17 +109,38 @@ export default function ProductPriceOptions({
 
       {/* Action Buttons */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        <button 
+        <button
+          type="button"
           onClick={handleBuyNow}
           className="bg-red-600 hover:bg-red-700 text-white rounded-lg p-4 flex flex-col items-center justify-center transition shadow-lg shadow-red-600/30"
         >
           <span className="font-black text-xl uppercase">MUA NGAY</span>
           <span className="text-xs opacity-90">Giao hàng tận nơi nhanh chóng</span>
         </button>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 flex flex-col items-center justify-center transition shadow-lg shadow-blue-600/30">
-          <span className="font-black text-xl uppercase">TRẢ GÓP 0%</span>
-          <span className="text-xs opacity-90">Thủ tục online đơn giản</span>
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 flex flex-col items-center justify-center transition shadow-lg shadow-blue-600/30"
+        >
+          <span className="font-black text-xl uppercase">THÊM VÀO GIỎ</span>
+          <span className="text-xs opacity-90">Có thể mua sau hoặc chọn trả góp</span>
         </button>
+      </div>
+
+      {/* Voucher */}
+      <div className="mb-6 rounded-lg border border-dashed border-green-500 bg-green-50/40 p-4">
+        <div className="mb-2 text-sm font-bold text-green-700">Nhập mã giảm giá / voucher</div>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Nhập mã coupon"
+            className="flex-1 rounded-md border border-green-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+          <button type="button" className="rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition">
+            Áp dụng
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-green-700/80">Nhập mã tại bước thanh toán để nhận ưu đãi tốt nhất.</p>
       </div>
 
       {/* Gift Box (Dashed Red Border) */}
@@ -123,13 +150,13 @@ export default function ProductPriceOptions({
         </div>
         <ul className="space-y-3 text-sm text-gray-800 font-medium">
           <li className="flex items-start gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1.5 shrink-0"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1.5 shrink-0" />
             <div>
               Giảm tới <span className="text-red-600 font-bold">1.000.000 VNĐ</span> khi quý khách mua máy lần 2!
             </div>
           </li>
           <li className="flex items-start gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1.5 shrink-0"></div>
+            <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1.5 shrink-0" />
             <div>
               <span className="font-bold">Tặng kèm bộ phụ kiện cao cấp:</span>
               <ul className="list-disc pl-5 mt-1 font-normal space-y-1">
@@ -154,7 +181,7 @@ export default function ProductPriceOptions({
               <p className="text-[12px] text-gray-600 leading-tight">Bán kính 10km từ cửa hàng.</p>
             </div>
           </div>
-          
+
           <div className="flex items-start gap-3">
             <div className="bg-red-600 p-1.5 rounded-full text-white shrink-0 shadow-sm mt-0.5">
               <CreditCard className="w-4 h-4" />
@@ -164,7 +191,7 @@ export default function ProductPriceOptions({
               <p className="text-[12px] text-gray-600 leading-tight">Qua thẻ tín dụng, MPOS, HDsaison, Mcredit.</p>
             </div>
           </div>
-          
+
           <div className="flex items-start gap-3">
             <div className="bg-red-600 p-1.5 rounded-full text-white shrink-0 shadow-sm mt-0.5">
               <ShieldCheck className="w-4 h-4" />
@@ -174,7 +201,7 @@ export default function ProductPriceOptions({
               <p className="text-[12px] text-gray-600 leading-tight">Bảo hành 1 năm. Miễn phí cài đặt trọn đời.</p>
             </div>
           </div>
-          
+
           <div className="flex items-start gap-3">
             <div className="bg-red-600 p-1.5 rounded-full text-white shrink-0 shadow-sm mt-0.5">
               <Headphones className="w-4 h-4" />

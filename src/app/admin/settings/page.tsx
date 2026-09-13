@@ -35,6 +35,7 @@ export default function SettingsPage() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-hydration restore from localStorage
       if (raw) setSettings({ ...DEFAULTS, ...JSON.parse(raw) });
     } catch {
       // bỏ qua dữ liệu hỏng

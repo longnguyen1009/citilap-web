@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { ChevronRight, MapPin, Phone, Mail, Clock, Send } from "lucide-react";
 
+export const metadata = {
+  title: "Liên hệ",
+  description: "Liên hệ với CITILAP.VN - Hotline tư vấn miễn phí, hỗ trợ 24/7. Địa chỉ showroom, giờ mở cửa và thông tin liên hệ.",
+};
+
 export default function ContactPage() {
   return (
     <div className="bg-[#f1f5f9] min-h-screen pb-12">
@@ -113,7 +118,7 @@ export default function ContactPage() {
                   <textarea rows={4} placeholder="Xin chào, tôi cần hỗ trợ về..." className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none transition resize-y"></textarea>
                 </div>
 
-                <button type="button" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 w-full md:w-auto">
+                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-xl transition-all shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 w-full md:w-auto" aria-label="Gửi liên hệ">
                   <Send className="w-5 h-5" />
                   Gửi yêu cầu
                 </button>

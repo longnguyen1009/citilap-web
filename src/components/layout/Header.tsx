@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, FormEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Search, Menu, PhoneCall,
   ClipboardCheck, User, Monitor, ChevronDown, ChevronRight,
   Laptop, Gamepad2, Briefcase, Palette, RefreshCw, Cpu,
-  Tablet, HardDrive, Camera, Sparkles, ArrowRight, Star, X
+  Tablet, HardDrive, Camera, Sparkles, ArrowRight, X, Heart
 } from "lucide-react";
 import CartIcon from "./CartIcon";
+import { useWishlist } from "@/context/WishlistContext";
 
 const categoryIcons: Record<string, React.ElementType> = {
   "Laptop Mới": Sparkles,
@@ -143,7 +145,10 @@ const categoryMenu = [
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
+  const { wishlistCount } = useWishlist();
 
   // Đóng menu khi click bên ngoài
   useEffect(() => {
@@ -290,10 +295,8 @@ export default function Header() {
                           {/* Sub-menu (Level 2) - Mega Menu */}
                           {hasChildren && isHovered && (
                             <>
-                              {/* Bridge: invisible area connecting menu item to mega menu */}
-                              <div className="absolute top-0 left-full w-4 h-full z-40"></div>
-                              {/* Mega Menu */}
-                              <div className="absolute top-0 left-full ml-4 w-[420px] z-50">
+                              {/* Mega Menu - sát ngay bên phải menu chính */}
+                              <div className="absolute top-0 left-full w-[420px] z-50">
                                 <div className="bg-white shadow-2xl shadow-gray-200/80 rounded-xl border border-gray-100/80 overflow-hidden">
                                   {/* Compact header */}
                                   <div className="bg-blue-600 px-4 py-3 flex items-center gap-2">
@@ -352,14 +355,24 @@ export default function Header() {
             </div>
 
             <div className="relative flex-grow">
-              <input
-                type="text"
-                placeholder="Bạn cần tìm gì..."
-                className="w-full h-10 pl-4 pr-12 rounded bg-white text-gray-800 outline-none text-sm focus:ring-2 focus:ring-blue-500"
-              />
-              <button className="absolute right-0 top-0 h-10 w-12 flex items-center justify-center text-gray-800 hover:text-blue-600">
-                <Search className="w-5 h-5" />
-              </button>
+              <form
+                onSubmit={(e: FormEvent) => {
+                  e.preventDefault();
+                  if (searchQuery.trim()) router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                }}
+                className="relative"
+              >
+                <input
+                  type="text"
+                  placeholder="Bạn cần tìm gì..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-10 pl-4 pr-12 rounded bg-white text-gray-800 outline-none text-sm focus:ring-2 focus:ring-blue-500"
+                />
+                <button type="submit" className="absolute right-0 top-0 h-10 w-12 flex items-center justify-center text-gray-800 hover:text-blue-600">
+                  <Search className="w-5 h-5" />
+                </button>
+              </form>
             </div>
           </div>
 
@@ -384,6 +397,16 @@ export default function Header() {
             <Link href="/login" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-16 h-10 transition">
               <User className="w-4 h-4 text-gray-300 mb-0.5" />
               <span className="text-[10px] text-gray-300">Thông tin</span>
+            </Link>
+
+            <Link href="/wishlist" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-16 h-10 transition relative">
+              <Heart className="w-4 h-4 text-gray-300 mb-0.5" />
+              <span className="text-[10px] text-gray-300">Yêu thích</span>
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+                  {wishlistCount > 9 ? "9+" : wishlistCount}
+                </span>
+              )}
             </Link>
 
             <CartIcon />

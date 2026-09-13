@@ -3,30 +3,99 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Save, Upload, Image as ImageIcon, X, Plus } from "lucide-react";
+import { ArrowLeft, Save, Upload, X, Plus, Trash2 } from "lucide-react";
 
 type Category = { id: string; name: string };
+
+type SpecRow = { key: string; value: string };
 
 export default function NewProductPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
-  useEffect(() => { void fetch("/api/categories").then((response) => response.json()).then((result) => { if (result.success) setCategories(result.data); }); }, []);
-  const saveProduct = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setSaving(true); setMessage("");
-    const form = new FormData(event.currentTarget);
+
+  // Dynamic specs
+  const [specs, setSpecs] = useState<SpecRow[]>([
+    { key: "CPU", value: "" },
+    { key: "RAM", value: "" },
+    { key: "SSD", value: "" },
+    { key: "GPU", value: "" },
+    { key: "Màn hình", value: "" },
+  ]);
+
+  // Image URLs
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+
+  useEffect(() => {
+    void fetch("/api/categories")
+      .then((r) => r.json())
+      .then((result) => { if (result.success) setCategories(result.data); });
+  }, []);
+
+  const addSpec = () => setSpecs([...specs, { key: "", value: "" }]);
+  const removeSpec = (i: number) => setSpecs(specs.filter((_, idx) => idx !== i));
+  const updateSpec = (i: number, field: keyof SpecRow, val: string) => {
+    const copy = [...specs];
+    copy[i] = { ...copy[i], [field]: val };
+    setSpecs(copy);
+  };
+
+  const addImageUrl = () => setImageUrls([...imageUrls, ""]);
+  const removeImageUrl = (i: number) => setImageUrls(imageUrls.filter((_, idx) => idx !== i));
+  const updateImageUrl = (i: number, val: string) => {
+    const copy = [...imageUrls];
+    copy[i] = val;
+    setImageUrls(copy);
+  };
+
+  const specsToJSON = (): Record<string, string> => {
+    const obj: Record<string, string> = {};
+    specs.forEach((s) => { if (s.key.trim() && s.value.trim()) obj[s.key.trim()] = s.value.trim(); });
+    return obj;
+  };
+
+  const saveProduct = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage("");
+    const form = new FormData(e.currentTarget);
     const name = String(form.get("name") || "");
-    const slug = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const response = await fetch("/api/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, slug, price: Number(form.get("price")), originalPrice: form.get("originalPrice"), description: form.get("description"), stock: Number(form.get("stock")), status: form.get("status"), categoryId: form.get("categoryId"), images: [] }) });
+    const slug = name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const filteredImages = imageUrls.map((u) => u.trim()).filter(Boolean);
+    const price = Number(form.get("price"));
+    const originalPriceValue = form.get("originalPrice");
+    const originalPrice = originalPriceValue ? Number(originalPriceValue) : null;
+    if (!name.trim() || !Number.isFinite(price) || price < 0 || (originalPrice !== null && (!Number.isFinite(originalPrice) || originalPrice < price))) {
+      setSaving(false);
+      setMessage("Vui lòng kiểm tra tên và giá sản phẩm. Giá gốc phải lớn hơn hoặc bằng giá bán.");
+      return;
+    }
+    const response = await fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name, slug,
+        price,
+        originalPrice,
+        description: form.get("description"),
+        stock: Number(form.get("stock")),
+        status: form.get("status"),
+        categoryId: form.get("categoryId"),
+        tags: form.get("tags"),
+        images: filteredImages.length > 0 ? filteredImages : [],
+        specs: specsToJSON(),
+      }),
+    });
     setSaving(false);
     if (response.ok) {
-      setMessage("Đã lưu sản phẩm.");
-      router.push("/admin/products");
+      setMessage("Đã lưu sản phẩm thành công!");
+      setTimeout(() => router.push("/admin/products"), 1000);
     } else {
-      setMessage("Không thể lưu sản phẩm. Hãy kiểm tra danh mục và thông tin bắt buộc.");
+      setMessage("Không thể lưu. Hãy kiểm tra thông tin bắt buộc.");
     }
   };
+
   return (
     <form onSubmit={saveProduct} className="max-w-5xl mx-auto pb-12">
       {/* Header */}
@@ -51,18 +120,16 @@ export default function NewProductPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column - Main Info */}
+        {/* Left: Main Info */}
         <div className="lg:col-span-2 space-y-8">
-          
           {/* Basic Info */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-6 pb-2 border-b border-gray-100">Thông tin cơ bản</h2>
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Tên sản phẩm *</label>
-                <input required name="name" type="text" placeholder="Nhập tên sản phẩm (VD: Lenovo Legion 5...)" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                <input required name="name" type="text" placeholder="VD: Lenovo Legion 5 15ARH7H..." className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
-              
               <div className="grid grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Giá bán (VNĐ) *</label>
@@ -70,84 +137,84 @@ export default function NewProductPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-2">Giá gốc (VNĐ)</label>
-                  <input name="originalPrice" type="number" min="0" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                  <input name="originalPrice" type="number" min="0" placeholder="Để trống nếu không giảm" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
                 </div>
               </div>
-
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Mô tả ngắn</label>
-                <textarea name="description" rows={3} placeholder="Mô tả nổi bật về sản phẩm..." className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Mô tả sản phẩm</label>
+                <textarea name="description" rows={4} placeholder="Mô tả chi tiết về sản phẩm..." className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none resize-y" />
               </div>
             </div>
           </div>
 
-          {/* Media / Images */}
+          {/* Images (URL) */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-6 pb-2 border-b border-gray-100">Hình ảnh sản phẩm</h2>
-            
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition cursor-pointer mb-4">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3">
-                <Upload className="w-6 h-6 text-blue-600" />
-              </div>
-              <p className="font-bold text-gray-700 mb-1">Click để tải ảnh lên</p>
-              <p className="text-sm text-gray-500">Hoặc kéo thả file vào đây (PNG, JPG, max 5MB)</p>
-            </div>
-
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
-              {[1,2,3,4,5].map(i => (
-                <div key={i} className="aspect-square border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 bg-gray-50">
-                  <ImageIcon className="w-6 h-6 opacity-50" />
+            <h2 className="text-lg font-bold text-gray-900 mb-6 pb-2 border-b border-gray-100">Hình ảnh sản phẩm (URL)</h2>
+            <div className="space-y-3">
+              {imageUrls.map((url, i) => (
+                <div key={i} className="flex gap-2 items-center">
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => updateImageUrl(i, e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  {url && (
+                    <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex-shrink-0 overflow-hidden">
+                      <img src={url} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    </div>
+                  )}
+                  <button type="button" onClick={() => removeImageUrl(i)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-4">Tính năng tải ảnh lên sẽ được bổ sung sau. Ảnh sản phẩm hiện được quản lý qua URL.</p>
+            <button type="button" onClick={addImageUrl} className="mt-3 flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-800 transition">
+              <Plus className="w-4 h-4" /> Thêm ảnh
+            </button>
           </div>
 
-          {/* Specifications */}
+          {/* Dynamic Specs */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-6 pb-2 border-b border-gray-100">
               <h2 className="text-lg font-bold text-gray-900">Thông số kỹ thuật</h2>
-              <button className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:text-blue-800 transition">
+              <button type="button" onClick={addSpec} className="text-sm font-bold text-blue-600 flex items-center gap-1 hover:text-blue-800 transition">
                 <Plus className="w-4 h-4" /> Thêm thông số
               </button>
             </div>
-            
-            <div className="space-y-4">
-              <div className="flex gap-4 items-start">
-                <input type="text" defaultValue="CPU" className="w-1/3 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-gray-50" />
-                <div className="flex-1 flex gap-2">
-                  <input type="text" placeholder="VD: Intel Core i7-13700H" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <button className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><X className="w-5 h-5" /></button>
+            <div className="space-y-3">
+              {specs.map((spec, i) => (
+                <div key={i} className="flex gap-3 items-center">
+                  <input
+                    type="text"
+                    value={spec.key}
+                    onChange={(e) => updateSpec(i, "key", e.target.value)}
+                    placeholder="Tên (VD: CPU)"
+                    className="w-1/3 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-gray-50"
+                  />
+                  <input
+                    type="text"
+                    value={spec.value}
+                    onChange={(e) => updateSpec(i, "value", e.target.value)}
+                    placeholder="Giá trị (VD: Ryzen 7 6800H)"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                  <button type="button" onClick={() => removeSpec(i)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition shrink-0">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              </div>
-              
-              <div className="flex gap-4 items-start">
-                <input type="text" defaultValue="RAM" className="w-1/3 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium bg-gray-50" />
-                <div className="flex-1 flex gap-2">
-                  <input type="text" placeholder="VD: 16GB DDR5 4800MHz" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <button className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"><X className="w-5 h-5" /></button>
-                </div>
-              </div>
-
-              <div className="flex gap-4 items-start">
-                <input type="text" placeholder="Tên thông số (VD: Màn hình)" className="w-1/3 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                <div className="flex-1 flex gap-2">
-                  <input type="text" placeholder="Giá trị (VD: 15.6 inch FHD 144Hz)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <button className="p-2 text-gray-400 cursor-not-allowed rounded-lg transition"><X className="w-5 h-5" /></button>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
-
         </div>
 
-        {/* Right Column - Organization & Settings */}
+        {/* Right: Organization & Settings */}
         <div className="space-y-8">
-          
           {/* Status & Inventory */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">Kho & Trạng thái</h2>
-            
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Trạng thái</label>
@@ -157,57 +224,35 @@ export default function NewProductPage() {
                   <option value="archived">Lưu trữ</option>
                 </select>
               </div>
-              
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Số lượng tồn kho</label>
-                <input name="stock" type="number" min="0" placeholder="0" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Mã sản phẩm (SKU)</label>
-                <input type="text" placeholder="VD: LNV-LG5-01" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none uppercase" />
+                <input name="stock" type="number" min="0" defaultValue={0} className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
             </div>
           </div>
 
-          {/* Organization */}
+          {/* Category */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">Phân loại</h2>
-            
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Danh mục chính</label>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Danh mục chính *</label>
                 <select required name="categoryId" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value="">-- Chọn danh mục --</option>
-                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">Thương hiệu</label>
-                <select className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
-                  <option value="">-- Chọn thương hiệu --</option>
-                  <option value="lenovo">Lenovo</option>
-                  <option value="asus">Asus</option>
-                  <option value="dell">Dell</option>
-                  <option value="apple">Apple</option>
-                </select>
-              </div>
-
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Tags</label>
-                <input type="text" placeholder="Nhập tag, cách nhau bởi dấu phẩy" className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-md flex items-center gap-1">gaming <X className="w-3 h-3 cursor-pointer" /></span>
-                  <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-md flex items-center gap-1">rtx 3050 <X className="w-3 h-3 cursor-pointer" /></span>
-                </div>
+                <input name="tags" type="text" placeholder="gaming, rtx 4060, 16GB..." className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 outline-none" />
+                <p className="text-xs text-gray-400 mt-1">Cách nhau bởi dấu phẩy</p>
               </div>
             </div>
           </div>
-
         </div>
       </div>
-      {message && <p className="fixed bottom-6 right-6 rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg">{message}</p>}
+
+      {message && <p className="fixed bottom-6 right-6 rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg z-50">{message}</p>}
     </form>
   );
 }

@@ -1,7 +1,27 @@
 import Link from "next/link";
 import { ChevronRight, FileText, ShieldCheck, Truck, CreditCard, RefreshCw, AlertCircle } from "lucide-react";
 
-export default function PolicyPage({ params }: { params: { slug: string } }) {
+const policyNames: Record<string, string> = {
+  "huong-dan-mua-hang": "Hướng dẫn mua hàng",
+  "bao-hanh": "Chính sách bảo hành",
+  "doi-tra": "Chính sách đổi trả",
+  "van-chuyen": "Chính sách vận chuyển",
+  "thanh-toan": "Phương thức thanh toán",
+  "bao-mat": "Chính sách bảo mật",
+};
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const name = policyNames[slug] || "Chính sách";
+  return {
+    title: name,
+    description: `${name} tại CITILAP.VN - Xem chi tiết chính sách bảo hành, đổi trả, vận chuyển và thanh toán.`,
+  };
+}
+
+export default async function PolicyPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+
   const policies = [
     { id: "huong-dan-mua-hang", name: "Hướng dẫn mua hàng", icon: <FileText className="w-5 h-5" /> },
     { id: "bao-hanh", name: "Chính sách bảo hành", icon: <ShieldCheck className="w-5 h-5" /> },
@@ -14,7 +34,7 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
     { id: "dieu-khoan", name: "Điều khoản sử dụng", icon: <AlertCircle className="w-5 h-5" /> },
   ];
 
-  const currentPolicy = policies.find(p => p.id === params.slug) || policies[0];
+  const currentPolicy = policies.find(p => p.id === slug) || policies[0];
 
   return (
     <div className="bg-[#f1f5f9] min-h-screen pb-12">
@@ -43,7 +63,7 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
                     key={policy.id} 
                     href={`/chinh-sach/${policy.id}`}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-colors ${
-                      params.slug === policy.id 
+                      slug === policy.id 
                         ? "bg-blue-50 text-blue-600" 
                         : "text-gray-600 hover:bg-gray-50 hover:text-blue-600"
                     }`}
@@ -64,7 +84,7 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
               {/* Dynamic Content based on slug */}
               <div className="prose prose-blue max-w-none text-gray-700">
                 
-                {params.slug === "bao-hanh" ? (
+                {slug === "bao-hanh" ? (
                   <>
                     <h3 className="text-xl font-bold text-gray-900 mt-6 mb-3">1. Điều kiện bảo hành</h3>
                     <p>Sản phẩm được bảo hành miễn phí nếu đảm bảo tất cả các điều kiện sau:</p>
@@ -83,7 +103,7 @@ export default function PolicyPage({ params }: { params: { slug: string } }) {
                       <li>Sản phẩm bị hư hỏng do lỗi người sử dụng (rơi vỡ, móp méo, vào nước...).</li>
                     </ul>
                   </>
-                ) : params.slug === "kiem-tra-bao-hanh" ? (
+                ) : slug === "kiem-tra-bao-hanh" ? (
                   <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
                     <h3 className="text-xl font-bold text-gray-900 mb-4">Tra cứu thông tin bảo hành</h3>
                     <p className="mb-6 text-gray-600">Vui lòng nhập số Serial (S/N) hoặc số điện thoại mua hàng để kiểm tra thời hạn bảo hành của thiết bị.</p>

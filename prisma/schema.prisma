@@ -25,6 +25,8 @@ model Category {
   id            String     @id @default(cuid())
   name          String     @unique
   slug          String     @unique
+  description   String?
+  image         String?
   parentId      String?
   parent        Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
   subCategories Category[] @relation("CategoryToCategory")
@@ -33,23 +35,89 @@ model Category {
   updatedAt     DateTime   @updatedAt
 }
 
+model ProductEditLog {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  action     String
+  actorName  String?
+  snapshot   String?
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+}
+
+model ProductVersion {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  version   Int
+  data      String
+  createdAt DateTime @default(now())
+
+  @@unique([productId, version])
+  @@index([productId])
+}
+
 model Product {
   id            String   @id @default(cuid())
   name          String
   slug          String   @unique
-  description   String
-  price         Float
-  originalPrice Float?
-  images        String   // JSON string or comma-separated
-  stock         Int      @default(0)
-  status        String   @default("active") // active, draft, archived
+  description     String
+  contentHtml     String?
+  brand           String?
+  model           String?
+  series          String?
+  warranty        String?
+  condition       String?
+  origin          String?
+  seoTitle        String?
+  seoDescription  String?
+  canonicalSlug   String?
+  isFeatured      Boolean  @default(false)
+  isNewArrival    Boolean  @default(false)
+  isFlashSale     Boolean  @default(false)
+  isBestSeller    Boolean  @default(false)
+  allowBackorder  Boolean  @default(false)
+  minOrderQty     Int      @default(1)
+  maxOrderQty     Int?
+  lowestPrice30d  Float?
+  publishAt       DateTime?
+  unpublishAt     DateTime?
+  price           Float
+  originalPrice   Float?
+  images          String   // JSON string or comma-separated
+  stock           Int      @default(0)
+  status          String   @default("active") // active, draft, archived
   specs         String?  // JSON string for specs
   tags          String?  // Comma-separated string
   categoryId    String
   category      Category @relation(fields: [categoryId], references: [id])
+  variants      ProductVariant[]
+  editLogs      ProductEditLog[]
+  versions      ProductVersion[]
   orderItems    OrderItem[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku           String   @unique
+  name          String
+  options       String
+  price         Float
+  originalPrice Float?
+  stock         Int      @default(0)
+  image         String?
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([productId])
 }
 
 model Order {

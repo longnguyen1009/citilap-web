@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { ChevronRight, Filter, SlidersHorizontal } from "lucide-react";
+import { ChevronRight, Filter } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
+import CategoryFilters from "@/components/category/CategoryFilters";
 
 // Map brand names to display names
 const brandNames: Record<string, string> = {
@@ -8,364 +9,175 @@ const brandNames: Record<string, string> = {
   gigabyte: "Gigabyte", apple: "Apple", lg: "LG", samsung: "Samsung",
 };
 
-// Map series names to display names
-const seriesNames: Record<string, string> = {
-  legion: "Legion", rog: "ROG", predator: "Predator", omen: "Omen",
-  alienware: "Alienware", aorus: "AORUS", loq: "LOQ",
-  "macbook-air": "MacBook Air", "macbook-pro": "MacBook Pro",
-  xps: "XPS", inspiron: "Inspiron", thinkpad: "ThinkPad", ideapad: "IdeaPad",
-  elitebook: "EliteBook", pavilion: "Pavilion", zenbook: "ZenBook", swift: "Swift",
-  precision: "Precision", "thinkpad-p": "ThinkPad P", zbook: "ZBook",
-  proart: "ProArt", conceptd: "ConceptD", creator: "Creator",
-  pro: "Pro", laptop: "Laptop", go: "Go", book: "Book",
+const categoryMap: Record<string, string> = {
+  "laptop-gaming": "Laptop Gaming",
+  "ultrabook": "Ultrabook Cao Cấp",
+  "laptop-van-phong": "Laptop Văn Phòng",
+  "laptop-do-hoa": "Laptop Đồ Hoạ - Kỹ Thuật",
+  "macbook": "Apple - Macbook",
+  "linh-kien": "Linh Kiện - Phụ Kiện",
+  "may-luot": "Laptop Cũ - Máy Lướt",
+  "workstation": "Máy Trạm - Workstation",
+  "gear": "Phụ Kiện & Gear",
+  "apple": "Apple (MacBook - iPad)",
+  "surface": "Microsoft Surface",
+  "pc": "PC - Máy tính để bàn",
+  "linh-kien-pc": "Linh kiện PC",
+  "camera": "Camera",
+  "laptop-moi": "Laptop Mới",
+  "laptop-cu": "Laptop Like New",
 };
 
-export default function CategoryPage({ params, searchParams }: { params: { slug: string }, searchParams: { brand?: string; series?: string; sub?: string } }) {
-  const categoryMap: Record<string, string> = {
-    "laptop-gaming": "Laptop Gaming",
-    "ultrabook": "Ultrabook Cao Cấp",
-    "laptop-van-phong": "Laptop Văn Phòng",
-    "laptop-do-hoa": "Laptop Đồ Hoạ - Kỹ Thuật",
-    "macbook": "Apple - Macbook",
-    "linh-kien": "Linh Kiện - Phụ Kiện",
-    "may-luot": "Laptop Cũ - Máy Lướt",
-    "workstation": "Máy Trạm - Workstation",
-    "gear": "Phụ Kiện & Gear",
-    "apple": "Apple (MacBook - iPad)",
-    "surface": "Microsoft Surface",
-    "pc": "PC - Máy tính để bàn",
-    "linh-kien-pc": "Linh kiện PC",
-    "camera": "Camera",
-    "laptop-moi": "Laptop Mới",
-    "laptop-cu": "Laptop Like New",
+// Full product data per category
+const allProductsByCategory: Record<string, { id: string; name: string; price: string; oldPrice: string; discount: string; image: string; brand: string; specs: { cpu: string; ram: string; ssd: string; gpu: string; display: string } }[]> = {
+  "laptop-gaming": [
+    { id: "g1", name: "Lenovo Legion 5 15ARH7H (Ryzen 7 6800H / 16GB / 512GB / RTX 3050Ti)", price: "28.490.000đ", oldPrice: "32.990.000đ", discount: "-14%", image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop", brand: "Lenovo", specs: { cpu: "Ryzen 7 6800H", ram: "16GB", ssd: "512GB", gpu: "RTX 3050Ti 4GB", display: "15.6 FHD 165Hz" } },
+    { id: "g2", name: "Acer Predator Helios Neo 16", price: "34.990.000đ", oldPrice: "39.990.000đ", discount: "-13%", image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop", brand: "Acer", specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "512GB", gpu: "RTX 4060 8GB", display: "16.0 WQXGA" } },
+    { id: "g3", name: "Asus ROG Strix G15 G513RC", price: "23.990.000đ", oldPrice: "27.990.000đ", discount: "-14%", image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop", brand: "Asus", specs: { cpu: "Ryzen 7 6800H", ram: "8GB", ssd: "512GB", gpu: "RTX 3050Ti 4GB", display: "15.6 FHD 144Hz" } },
+    { id: "g4", name: "MSI Katana 15 B13VFK", price: "29.990.000đ", oldPrice: "33.990.000đ", discount: "-11%", image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop", brand: "MSI", specs: { cpu: "i7 13620H", ram: "16GB", ssd: "512GB", gpu: "RTX 4060 8GB", display: "15.6 FHD 144Hz" } },
+    { id: "g5", name: "Dell Alienware m16 R1", price: "42.490.000đ", oldPrice: "47.990.000đ", discount: "-11%", image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop", brand: "Dell", specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "1TB", gpu: "RTX 4060 8GB", display: "16.0 QHD+ 165Hz" } },
+    { id: "g6", name: "Gigabyte Aorus 15 BKF", price: "31.990.000đ", oldPrice: "35.990.000đ", discount: "-11%", image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop", brand: "Gigabyte", specs: { cpu: "i7 13700H", ram: "16GB", ssd: "512GB", gpu: "RTX 4060 8GB", display: "15.6 QHD 165Hz" } },
+    { id: "g7", name: "HP Victus 16 2023", price: "21.990.000đ", oldPrice: "25.990.000đ", discount: "-15%", image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop", brand: "HP", specs: { cpu: "i5 13500H", ram: "16GB", ssd: "512GB", gpu: "RTX 3050 6GB", display: "16.1 FHD 144Hz" } },
+    { id: "g8", name: "Acer Nitro 5 Tiger 2022", price: "19.990.000đ", oldPrice: "23.990.000đ", discount: "-16%", image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop", brand: "Acer", specs: { cpu: "i5 12500H", ram: "8GB", ssd: "512GB", gpu: "RTX 3050 4GB", display: "15.6 FHD 144Hz" } },
+    { id: "g9", name: "Lenovo Legion Pro 5 16ARX8", price: "38.990.000đ", oldPrice: "42.990.000đ", discount: "-9%", image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop", brand: "Lenovo", specs: { cpu: "Ryzen 9 7945HX", ram: "32GB", ssd: "1TB", gpu: "RTX 4070 8GB", display: "16.0 WQXGA 240Hz" } },
+    { id: "g10", name: "Asus ROG Strix G16 G614JI", price: "44.990.000đ", oldPrice: "49.990.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop", brand: "Asus", specs: { cpu: "i9 13980HX", ram: "32GB", ssd: "1TB", gpu: "RTX 4080 12GB", display: "16.0 QHD 240Hz" } },
+  ],
+  "laptop-van-phong": [
+    { id: "vp1", name: "Dell XPS 15 9530", price: "42.990.000đ", oldPrice: "47.990.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop", brand: "Dell", specs: { cpu: "i7 13700H", ram: "16GB", ssd: "512GB", gpu: "Iris Xe", display: "15.6 FHD+" } },
+    { id: "vp2", name: "Lenovo ThinkPad X1 Carbon Gen 11", price: "35.990.000đ", oldPrice: "39.990.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop", brand: "Lenovo", specs: { cpu: "i7 1365U", ram: "16GB", ssd: "512GB", gpu: "Iris Xe", display: "14 WUXGA" } },
+    { id: "vp3", name: "HP EliteBook 860 G10", price: "29.990.000đ", oldPrice: "33.490.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop", brand: "HP", specs: { cpu: "i7 1365U", ram: "16GB", ssd: "512GB", gpu: "Iris Xe", display: "16 WUXGA" } },
+    { id: "vp4", name: "Asus Zenbook 14 OLED UX3402", price: "24.490.000đ", oldPrice: "27.990.000đ", discount: "-12%", image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop", brand: "Asus", specs: { cpu: "i5 1240P", ram: "16GB", ssd: "512GB", gpu: "Iris Xe", display: "14 2.8K OLED" } },
+    { id: "vp5", name: "Dell Inspiron 16 5630", price: "19.990.000đ", oldPrice: "22.990.000đ", discount: "-13%", image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop", brand: "Dell", specs: { cpu: "i5 1340P", ram: "8GB", ssd: "512GB", gpu: "Iris Xe", display: "16 FHD+" } },
+    { id: "vp6", name: "Acer Swift Go 14", price: "19.990.000đ", oldPrice: "23.490.000đ", discount: "-14%", image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop", brand: "Acer", specs: { cpu: "i5 13500H", ram: "16GB", ssd: "512GB", gpu: "Iris Xe", display: "14 2.8K OLED" } },
+    { id: "vp7", name: "HP Pavilion 14 dv2000", price: "16.990.000đ", oldPrice: "19.490.000đ", discount: "-12%", image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop", brand: "HP", specs: { cpu: "i5 1235U", ram: "8GB", ssd: "512GB", gpu: "Iris Xe", display: "14 FHD IPS" } },
+    { id: "vp8", name: "Lenovo IdeaPad 5 Pro 16", price: "21.990.000đ", oldPrice: "25.490.000đ", discount: "-13%", image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop", brand: "Lenovo", specs: { cpu: "Ryzen 7 7730U", ram: "16GB", ssd: "512GB", gpu: "Iris Xe", display: "16 2.5K" } },
+  ],
+  "macbook": [
+    { id: "mb1", name: "MacBook Air M3 15 inch", price: "37.990.000đ", oldPrice: "", discount: "NEW", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=800&auto=format&fit=crop", brand: "Apple", specs: { cpu: "Apple M3", ram: "8GB", ssd: "256GB", gpu: "GPU 10-core", display: "15.3 Liquid Retina" } },
+    { id: "mb2", name: "MacBook Pro M3 Pro 14 inch", price: "49.990.000đ", oldPrice: "", discount: "NEW", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=800&auto=format&fit=crop", brand: "Apple", specs: { cpu: "Apple M3 Pro", ram: "18GB", ssd: "512GB", gpu: "GPU 14-core", display: "14 Liquid Retina XDR" } },
+    { id: "mb3", name: "MacBook Air M2 13 inch", price: "27.990.000đ", oldPrice: "31.990.000đ", discount: "-12%", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=800&auto=format&fit=crop", brand: "Apple", specs: { cpu: "Apple M2", ram: "8GB", ssd: "256GB", gpu: "GPU 8-core", display: "13.6 Liquid Retina" } },
+    { id: "mb4", name: "MacBook Pro M3 Max 16 inch", price: "74.990.000đ", oldPrice: "", discount: "NEW", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=800&auto=format&fit=crop", brand: "Apple", specs: { cpu: "Apple M3 Max", ram: "36GB", ssd: "1TB", gpu: "GPU 30-core", display: "16 Liquid Retina XDR" } },
+    { id: "mb5", name: "MacBook Pro M3 14 inch", price: "41.990.000đ", oldPrice: "", discount: "NEW", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=800&auto=format&fit=crop", brand: "Apple", specs: { cpu: "Apple M3", ram: "8GB", ssd: "512GB", gpu: "GPU 10-core", display: "14 Liquid Retina XDR" } },
+  ],
+  "laptop-do-hoa": [
+    { id: "dg1", name: "HP ZBook Studio G10", price: "45.990.000đ", oldPrice: "50.990.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop", brand: "HP", specs: { cpu: "i7 13800H", ram: "32GB", ssd: "1TB", gpu: "RTX A1000", display: "15.6 4K OLED" } },
+    { id: "dg2", name: "Dell Precision 5680", price: "52.990.000đ", oldPrice: "58.990.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop", brand: "Dell", specs: { cpu: "i7 13700H", ram: "32GB", ssd: "1TB", gpu: "RTX A2000", display: "16 UHD+" } },
+    { id: "dg3", name: "Asus ProArt Studiobook 16", price: "48.990.000đ", oldPrice: "54.990.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop", brand: "Asus", specs: { cpu: "i9 13980HX", ram: "32GB", ssd: "1TB", gpu: "RTX 4070 8GB", display: "16 3.2K OLED" } },
+    { id: "dg4", name: "Lenovo ThinkPad P16 Gen 2", price: "55.990.000đ", oldPrice: "62.990.000đ", discount: "-11%", image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop", brand: "Lenovo", specs: { cpu: "i7 13850HX", ram: "32GB", ssd: "1TB", gpu: "RTX A2000", display: "16 WQXGA" } },
+    { id: "dg5", name: "MSI Creator Z16P HX Studio", price: "49.990.000đ", oldPrice: "55.990.000đ", discount: "-10%", image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop", brand: "MSI", specs: { cpu: "i9 12900HX", ram: "32GB", ssd: "1TB", gpu: "RTX 3080Ti", display: "16 QHD+ 165Hz" } },
+  ],
+};
+
+// Fallback: generate products for unknown categories
+function generateFallbackProducts(slug: string, name: string) {
+  return Array.from({ length: 8 }).map((_, i) => ({
+    id: `${slug}-p${i}`, name: `${name} Mẫu ${i + 1} (Intel Core i7 / 16GB / 512GB)`,
+    price: `${20 + i}.990.000đ`, oldPrice: `${25 + i}.990.000đ`, discount: "-15%",
+    image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
+    brand: ["Asus", "Dell", "HP", "Lenovo", "MSI"][i % 5],
+    specs: { cpu: "Core i7 13700H", ram: "16GB", ssd: "512GB", gpu: "RTX 4050 6GB", display: "15.6 FHD 144Hz" },
+  }));
+}
+
+// Accessories categories
+const accessoryCategories = ["linh-kien", "gear", "linh-kien-pc", "camera"];
+
+type CategoryProduct = (typeof allProductsByCategory)[string][number];
+
+function formatPrice(value: number) {
+  return `${value.toLocaleString("vi-VN")}đ`;
+}
+
+function normalizeProduct(product: {
+  id: string; name: string; price: number; originalPrice: number | null; images: string; tags: string | null; specs: string | null;
+}): CategoryProduct {
+  let images: string[] = [];
+  let specs: Record<string, string> = {};
+  try { const parsed = JSON.parse(product.images); images = Array.isArray(parsed) ? parsed : [product.images]; } catch { images = product.images ? [product.images] : []; }
+  try { const parsed = product.specs ? JSON.parse(product.specs) : {}; specs = Array.isArray(parsed) ? Object.fromEntries(parsed.map((item: { name: string; value: string }) => [item.name, item.value])) : parsed; } catch { specs = {}; }
+  const price = Number(product.price);
+  const originalPrice = product.originalPrice ? Number(product.originalPrice) : null;
+  return {
+    id: product.id,
+    name: product.name,
+    price: formatPrice(price),
+    oldPrice: originalPrice ? formatPrice(originalPrice) : "",
+    discount: originalPrice && originalPrice > price ? `-${Math.round((1 - price / originalPrice) * 100)}%` : "",
+    image: images[0] || "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop",
+    brand: (product.tags || "").split(",")[1]?.trim() || product.name.split(" ")[0],
+    specs: { cpu: specs.CPU || specs.cpu || "", ram: specs.RAM || specs.ram || "", ssd: specs.SSD || specs.ssd || "", gpu: specs.GPU || specs.VGA || specs.gpu || "", display: specs["Màn hình"] || specs.display || "" },
   };
+}
 
-  const categorySlug = params.slug;
-  const categoryName = categoryMap[categorySlug] || "Danh mục sản phẩm";
-  const brand = searchParams.brand;
-  const series = searchParams.series;
-  const sub = searchParams.sub;
-
-  // Build display title
-  let displayTitle = categoryName;
-  if (brand) displayTitle += ` ${brandNames[brand] || brand}`;
-  if (series) displayTitle += ` ${seriesNames[series] || series}`;
-  if (sub) displayTitle += ` - ${sub}`;
-
-  // Mock data for the category - generate based on brand/series
-  let mockProducts = [];
-
-  // Generate products based on brand and series
-  const generateProducts = (baseName: string, count: number = 8) => {
-    return Array.from({ length: count }).map((_, i) => {
-      const price = (20 + i * 2 + Math.floor(Math.random() * 5)) * 100000;
-      const oldPrice = price + (3 + Math.floor(Math.random() * 5)) * 1000000;
-      return {
-        id: `${categorySlug}-${brand || 'all'}-${series || 'all'}-${i}`,
-        name: `${baseName} Mẫu ${i + 1} (Intel Core i${5 + (i % 4) * 2} / ${8 + (i % 3) * 8}GB / ${256 + (i % 4) * 256}GB)`,
-        price: `${price.toLocaleString('vi-VN')}đ`,
-        oldPrice: `${oldPrice.toLocaleString('vi-VN')}đ`,
-        discount: `-${Math.floor(Math.random() * 15 + 5)}%`,
-        image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
-        specs: {
-          cpu: i % 2 === 0 ? "Core i7 13700H" : "Ryzen 7 7840HS",
-          ram: `${8 + (i % 3) * 8}GB`,
-          ssd: `${256 + (i % 4) * 256}GB`,
-          display: "15.6 FHD 144Hz"
-        }
-      };
-    });
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const name = categoryMap[slug] || "Danh mục sản phẩm";
+  return {
+    title: name,
+    description: `Mua ${name} chính hãng giá tốt tại CITILAP.VN. Bảo hành 12 tháng, tư vấn miễn phí, giao hàng nhanh toàn quốc.`,
   };
+}
 
-  if (categorySlug === "laptop-gaming") {
-    // If brand/series specified, generate filtered products
-    if (brand || series) {
-      const brandLabel = brandNames[brand || ''] || brand || '';
-      const seriesLabel = seriesNames[series || ''] || series || '';
-      const productName = `${brandLabel} ${seriesLabel}`.trim() || categoryName;
-      mockProducts = generateProducts(productName);
-    } else {
-      mockProducts = [
-        {
-          id: "g1", name: "Lenovo Legion 5 15ARH7H (Ryzen 7 6800H / 16GB / 512GB / RTX 3050Ti)",
-          price: "28.490.000đ", oldPrice: "32.990.000đ", discount: "-14%",
-          image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "Ryzen 7 6800H", ram: "16GB", ssd: "512GB", display: "15.6 FHD 165Hz" }
-        },
-        {
-          id: "g2", name: "Acer Predator Helios Neo 16",
-          price: "34.990.000đ", oldPrice: "39.990.000đ", discount: "-13%",
-          image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "512GB", display: "16.0 WQXGA" }
-        },
-        {
-          id: "g3", name: "Asus ROG Strix G15 G513RC",
-          price: "23.990.000đ", oldPrice: "27.990.000đ", discount: "-14%",
-          image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "Ryzen 7 6800H", ram: "8GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
-        },
-        {
-          id: "g4", name: "MSI Katana 15 B13VFK",
-          price: "29.990.000đ", oldPrice: "33.990.000đ", discount: "-11%",
-          image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "i7 13620H", ram: "16GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
-        },
-        {
-          id: "g5", name: "Dell Alienware m16 R1",
-          price: "42.490.000đ", oldPrice: "47.990.000đ", discount: "-11%",
-          image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "i7 13700HX", ram: "16GB", ssd: "1TB", display: "16.0 QHD+ 165Hz" }
-        },
-        {
-          id: "g6", name: "Gigabyte Aorus 15 BKF",
-          price: "31.990.000đ", oldPrice: "35.990.000đ", discount: "-11%",
-          image: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "i7 13700H", ram: "16GB", ssd: "512GB", display: "15.6 QHD 165Hz" }
-        },
-        {
-          id: "g7", name: "HP Victus 16 2023",
-          price: "21.990.000đ", oldPrice: "25.990.000đ", discount: "-15%",
-          image: "https://images.unsplash.com/photo-1593640408182-31c70c8268f5?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "i5 13500H", ram: "16GB", ssd: "512GB", display: "16.1 FHD 144Hz" }
-        },
-        {
-          id: "g8", name: "Acer Nitro 5 Tiger 2022",
-          price: "19.990.000đ", oldPrice: "23.990.000đ", discount: "-16%",
-          image: "https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?q=80&w=800&auto=format&fit=crop",
-          specs: { cpu: "i5 12500H", ram: "8GB", ssd: "512GB", display: "15.6 FHD 144Hz" }
-        }
-      ];
-    }
-  } else if (categorySlug === "ultrabook") {
-    mockProducts = [
-      {
-        id: "u1", name: "Dell XPS 13 Plus 9320",
-        price: "45.990.000đ", oldPrice: "49.990.000đ", discount: "-8%",
-        image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i7 1260P", ram: "16GB", ssd: "512GB", display: "13.4 3.5K OLED" }
-      },
-      {
-        id: "u2", name: "LG Gram 14 2023",
-        price: "28.990.000đ", oldPrice: "32.990.000đ", discount: "-12%",
-        image: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?q=80&w=800&auto=format&fit=crop",
-        specs: { cpu: "i5 1340P", ram: "16GB", ssd: "512GB", display: "14.0 WUXGA" }
-      }
-    ];
-  } else {
-    // For other categories, generate based on brand/series/sub
-    if (brand || series || sub) {
-      const brandLabel = brandNames[brand || ''] || brand || '';
-      const seriesLabel = seriesNames[series || ''] || series || '';
-      const subLabel = sub || '';
-      const productName = `${brandLabel} ${seriesLabel} ${subLabel}`.trim() || categoryName;
-      mockProducts = generateProducts(productName);
-    } else {
-      mockProducts = Array.from({ length: 8 }).map((_, i) => ({
-        id: `${categorySlug}-p${i}`,
-        name: `Laptop ${categoryName} Mẫu ${i + 1} (Intel Core i7 / 16GB / 512GB)`,
-        price: `${20 + i}.990.000đ`,
-        oldPrice: `${25 + i}.990.000đ`,
-        discount: "-15%",
-        image: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?q=80&w=800&auto=format&fit=crop",
-        specs: {
-          cpu: "Core i7 13700H",
-          ram: "16GB",
-          ssd: "512GB",
-          display: "15.6 FHD 144Hz"
-        }
-      }));
+export default async function CategoryPage({ params, searchParams }: { params: Promise<{ slug: string }>, searchParams: Promise<{ brand?: string; sort?: string; page?: string }> }) {
+  const { slug } = await params;
+  const { brand, sort, page } = await searchParams;
+
+  const categoryName = categoryMap[slug] || "Danh mục sản phẩm";
+  const displayTitle = brand ? `${categoryName} ${brandNames[brand] || brand}` : categoryName;
+
+  // Prefer database products so the storefront reflects admin changes.
+  let products: CategoryProduct[] = [];
+  if (process.env.DATABASE_URL) {
+    try {
+      const { prisma } = await import("@/lib/prisma");
+      const rows = await prisma.product.findMany({
+        where: { category: { slug }, status: "active" },
+        orderBy: { createdAt: "desc" },
+      });
+      products = rows.map(normalizeProduct);
+    } catch (error) {
+      console.error("Failed to load category products:", error);
     }
   }
-
-  if (params.slug === "linh-kien" || params.slug === "gear") {
-    return (
-      <div className="bg-[#f1f5f9] min-h-screen pb-12">
-        <div className="bg-white border-b border-gray-200 mb-6">
-          <div className="container mx-auto px-4 max-w-[1370px]">
-            <nav className="flex text-sm text-gray-500 py-3 font-medium items-center">
-              <Link href="/" className="hover:text-blue-600 transition">Trang chủ</Link>
-              <ChevronRight className="w-4 h-4 mx-1" />
-              <span className="text-gray-800 font-bold">{displayTitle}</span>
-            </nav>
-          </div>
-        </div>
-
-        <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="bg-gradient-to-r from-blue-900 to-indigo-800 rounded-2xl p-8 mb-8 text-white flex flex-col items-center text-center shadow-lg">
-            <h1 className="text-3xl font-black mb-3 uppercase tracking-wide">Thế giới {displayTitle}</h1>
-            <p className="text-blue-100 mb-6 max-w-2xl">Bàn phím cơ, chuột gaming, tai nghe, balo, và hàng ngàn phụ kiện công nghệ chất lượng cao.</p>
-            <div className="flex flex-wrap justify-center gap-3">
-              {["Chuột", "Bàn Phím", "Tai Nghe", "Balo - Túi", "Ổ Cứng Di Động", "Webcam", "Cáp Sạc"].map((tag) => (
-                <button key={tag} className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full text-sm font-bold transition backdrop-blur-sm border border-white/20">
-                  {tag}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Phụ kiện Layout - No CPU/RAM filters */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-1 space-y-6 hidden lg:block">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <h3 className="font-bold text-gray-900 mb-4 uppercase flex items-center gap-2 border-b pb-2">
-                  <Filter className="w-4 h-4 text-blue-600" /> Hãng sản xuất
-                </h3>
-                <div className="space-y-3 text-sm text-gray-700">
-                  {["Logitech", "Razer", "Corsair", "Akko", "DareU", "Sony"].map((brand) => (
-                    <label key={brand} className="flex items-center gap-3 cursor-pointer hover:text-blue-600">
-                      <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
-                      <span>{brand}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-                <h3 className="font-bold text-gray-900 mb-4 uppercase border-b pb-2">Mức giá</h3>
-                <div className="space-y-3 text-sm text-gray-700">
-                  {["Dưới 500k", "500k - 1 Triệu", "1 - 2 Triệu", "Trên 2 Triệu"].map((price) => (
-                    <label key={price} className="flex items-center gap-3 cursor-pointer hover:text-blue-600">
-                      <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
-                      <span>{price}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
-            <div className="lg:col-span-3">
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-gray-700">Sắp xếp theo:</span>
-                </div>
-                <div className="flex flex-wrap gap-2 text-sm">
-                  <button className="bg-blue-50 text-blue-600 border border-blue-200 font-bold px-4 py-2 rounded-lg transition">Mới nhất</button>
-                  <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-medium px-4 py-2 rounded-lg transition">Bán chạy</button>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-                {mockProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  if (products.length === 0) {
+    products = allProductsByCategory[slug] || generateFallbackProducts(slug, categoryName);
   }
+
+  // Get available brands in this category
+  const availableBrands = [...new Set(products.map((p) => p.brand))].sort();
 
   return (
     <div className="bg-[#f1f5f9] min-h-screen pb-12">
-      {/* 1. Breadcrumb */}
+      {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 max-w-[1370px]">
-          <nav className="flex text-sm text-gray-500 py-3 font-medium items-center">
+          <nav className="flex items-center text-sm text-gray-500 py-3 font-medium">
             <Link href="/" className="hover:text-blue-600 transition">Trang chủ</Link>
-            <ChevronRight className="w-4 h-4 mx-1" />
+            <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400" />
             <span className="text-gray-800 font-bold">{displayTitle}</span>
           </nav>
         </div>
       </div>
 
       <div className="container mx-auto px-4 max-w-[1370px] mt-6">
-        {/* 2. Banner & Title */}
+        {/* Title Banner */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 uppercase">
-            {displayTitle}
-          </h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 uppercase">{displayTitle}</h1>
           <p className="text-sm text-gray-500 mt-2">
-            Khám phá {mockProducts.length} sản phẩm cấu hình cao, giá tốt nhất thị trường.
+            Khám phá {products.length} sản phẩm cấu hình cao, giá tốt nhất thị trường.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* 3. Sidebar Filter */}
-          <div className="lg:col-span-1 space-y-6 hidden lg:block">
-            {/* Filter Group: Hãng */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <h3 className="font-bold text-gray-900 mb-4 uppercase flex items-center gap-2 border-b pb-2">
-                <Filter className="w-4 h-4 text-blue-600" /> Hãng sản xuất
-              </h3>
-              <div className="space-y-3 text-sm text-gray-700">
-                {["Asus", "Acer", "Dell", "Lenovo", "MSI", "HP"].map((brand) => (
-                  <label key={brand} className="flex items-center gap-3 cursor-pointer hover:text-blue-600">
-                    <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
-                    <span>{brand}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Filter Group: Giá */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <h3 className="font-bold text-gray-900 mb-4 uppercase border-b pb-2">Mức giá</h3>
-              <div className="space-y-3 text-sm text-gray-700">
-                {["Dưới 15 triệu", "15 - 20 triệu", "20 - 30 triệu", "Trên 30 triệu"].map((price) => (
-                  <label key={price} className="flex items-center gap-3 cursor-pointer hover:text-blue-600">
-                    <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
-                    <span>{price}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Filter Group: CPU */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-              <h3 className="font-bold text-gray-900 mb-4 uppercase border-b pb-2">Bộ vi xử lý</h3>
-              <div className="space-y-3 text-sm text-gray-700">
-                {["Core i5", "Core i7", "Core i9", "Ryzen 5", "Ryzen 7"].map((cpu) => (
-                  <label key={cpu} className="flex items-center gap-3 cursor-pointer hover:text-blue-600">
-                    <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" />
-                    <span>{cpu}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Product List & Sort */}
-          <div className="lg:col-span-3">
-            {/* Top Bar Sort */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <button className="lg:hidden bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition">
-                  <Filter className="w-4 h-4" /> Lọc
-                </button>
-                <span className="text-sm font-bold text-gray-700">Sắp xếp theo:</span>
-              </div>
-              <div className="flex flex-wrap gap-2 text-sm">
-                <button className="bg-blue-50 text-blue-600 border border-blue-200 font-bold px-4 py-2 rounded-lg transition">Mới nhất</button>
-                <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-medium px-4 py-2 rounded-lg transition">Bán chạy</button>
-                <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-medium px-4 py-2 rounded-lg transition flex items-center gap-1">Giá thấp <ChevronRight className="w-3 h-3 rotate-90"/></button>
-                <button className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-medium px-4 py-2 rounded-lg transition flex items-center gap-1">Giá cao <ChevronRight className="w-3 h-3 -rotate-90"/></button>
-              </div>
-            </div>
-
-            {/* Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-              {mockProducts.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-
-            {/* Pagination */}
-            <div className="mt-10 flex justify-center">
-              <nav className="flex items-center gap-2">
-                <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition disabled:opacity-50" disabled>
-                  <ChevronRight className="w-5 h-5 rotate-180" />
-                </button>
-                <button className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-600 text-white font-bold shadow-md">1</button>
-                <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-medium transition">2</button>
-                <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-medium transition">3</button>
-                <span className="text-gray-500 px-2">...</span>
-                <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-blue-600 font-medium transition">8</button>
-                <button className="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </nav>
-            </div>
-          </div>
-        </div>
+        {/* Client-side filter/sort wrapper */}
+        <CategoryFilters
+          products={products}
+          availableBrands={availableBrands}
+          currentBrand={brand}
+          currentSort={sort}
+          currentPage={page}
+          categorySlug={slug}
+          categoryName={categoryName}
+        />
       </div>
     </div>
   );

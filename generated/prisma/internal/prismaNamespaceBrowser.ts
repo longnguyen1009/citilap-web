@@ -53,7 +53,10 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   User: 'User',
   Category: 'Category',
+  ProductEditLog: 'ProductEditLog',
+  ProductVersion: 'ProductVersion',
   Product: 'Product',
+  ProductVariant: 'ProductVariant',
   Order: 'Order',
   OrderItem: 'OrderItem'
 } as const
@@ -91,6 +94,8 @@ export const CategoryScalarFieldEnum = {
   id: 'id',
   name: 'name',
   slug: 'slug',
+  description: 'description',
+  image: 'image',
   parentId: 'parentId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -99,11 +104,54 @@ export const CategoryScalarFieldEnum = {
 export type CategoryScalarFieldEnum = (typeof CategoryScalarFieldEnum)[keyof typeof CategoryScalarFieldEnum]
 
 
+export const ProductEditLogScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  action: 'action',
+  actorName: 'actorName',
+  snapshot: 'snapshot',
+  createdAt: 'createdAt'
+} as const
+
+export type ProductEditLogScalarFieldEnum = (typeof ProductEditLogScalarFieldEnum)[keyof typeof ProductEditLogScalarFieldEnum]
+
+
+export const ProductVersionScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  version: 'version',
+  data: 'data',
+  createdAt: 'createdAt'
+} as const
+
+export type ProductVersionScalarFieldEnum = (typeof ProductVersionScalarFieldEnum)[keyof typeof ProductVersionScalarFieldEnum]
+
+
 export const ProductScalarFieldEnum = {
   id: 'id',
   name: 'name',
   slug: 'slug',
   description: 'description',
+  contentHtml: 'contentHtml',
+  brand: 'brand',
+  model: 'model',
+  series: 'series',
+  warranty: 'warranty',
+  condition: 'condition',
+  origin: 'origin',
+  seoTitle: 'seoTitle',
+  seoDescription: 'seoDescription',
+  canonicalSlug: 'canonicalSlug',
+  isFeatured: 'isFeatured',
+  isNewArrival: 'isNewArrival',
+  isFlashSale: 'isFlashSale',
+  isBestSeller: 'isBestSeller',
+  allowBackorder: 'allowBackorder',
+  minOrderQty: 'minOrderQty',
+  maxOrderQty: 'maxOrderQty',
+  lowestPrice30d: 'lowestPrice30d',
+  publishAt: 'publishAt',
+  unpublishAt: 'unpublishAt',
   price: 'price',
   originalPrice: 'originalPrice',
   images: 'images',
@@ -117,6 +165,24 @@ export const ProductScalarFieldEnum = {
 } as const
 
 export type ProductScalarFieldEnum = (typeof ProductScalarFieldEnum)[keyof typeof ProductScalarFieldEnum]
+
+
+export const ProductVariantScalarFieldEnum = {
+  id: 'id',
+  productId: 'productId',
+  sku: 'sku',
+  name: 'name',
+  options: 'options',
+  price: 'price',
+  originalPrice: 'originalPrice',
+  stock: 'stock',
+  image: 'image',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProductVariantScalarFieldEnum = (typeof ProductVariantScalarFieldEnum)[keyof typeof ProductVariantScalarFieldEnum]
 
 
 export const OrderScalarFieldEnum = {

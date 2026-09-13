@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, ReactNode } from "react";
 
 export interface CartItem {
   id: string; // product id + variant id
@@ -11,6 +11,7 @@ export interface CartItem {
   image: string;
   variantLabel?: string;
   quantity: number;
+  maxQuantity?: number; // available stock
 }
 
 interface CartContextType {
@@ -29,11 +30,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load from local storage
+  // Load from local storage after mount (useEffect keeps SSR hydration safe:
+  // server and client both start with [] before the saved cart is applied)
   useEffect(() => {
     const savedCart = localStorage.getItem("citilap_cart");
     if (savedCart) {
       try {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-hydration restore from localStorage
         setCart(JSON.parse(savedCart));
       } catch (e) {
         console.error("Failed to parse cart", e);
@@ -53,8 +56,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCart((prev) => {
       const existingItem = prev.find((i) => i.id === item.id);
       if (existingItem) {
+        const newQuantity = existingItem.quantity + item.quantity;
+        // Check stock limit if maxQuantity is set
+        if (existingItem.maxQuantity && newQuantity > existingItem.maxQuantity) {
+          alert(`Chỉ còn ${existingItem.maxQuantity} sản phẩm trong kho!`);
+          return prev;
+        }
         return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
+          i.id === item.id ? { ...i, quantity: newQuantity } : i
         );
       }
       return [...prev, item];
@@ -68,7 +77,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const updateQuantity = (id: string, quantity: number) => {
     if (quantity < 1) return;
     setCart((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, quantity } : item))
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        // Check stock limit if maxQuantity is set
+        if (item.maxQuantity && quantity > item.maxQuantity) {
+          alert(`Chỉ còn ${item.maxQuantity} sản phẩm trong kho!`);
+          return { ...item, quantity: item.maxQuantity };
+        }
+        return { ...item, quantity };
+      })
     );
   };
 
@@ -76,8 +93,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCart([]);
   };
 
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const cartTotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  const cartCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
+  const cartTotal = useMemo(() => cart.reduce((total, item) => total + item.price * item.quantity, 0), [cart]);
 
   return (
     <CartContext.Provider

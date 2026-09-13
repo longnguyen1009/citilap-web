@@ -168,7 +168,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="p-6">
                       <div className="flex gap-4">
-                        <img src="https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=200&auto=format&fit=crop" alt="product" className="w-20 h-20 object-contain border border-gray-200 rounded-lg p-2" />
+                        <img src="https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=200&auto=format&fit=crop" alt="Lenovo Legion 5 15ARH7H" className="w-20 h-20 object-contain border border-gray-200 rounded-lg p-2" />
                         <div className="flex-grow">
                           <h3 className="font-bold text-gray-900 text-sm mb-1">Lenovo Legion 5 15ARH7H (Ryzen 7 6800H / 16GB / 512GB)</h3>
                           <p className="text-gray-500 text-sm">Phân loại: Xám</p>
@@ -198,7 +198,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="p-6">
                       <div className="flex gap-4">
-                        <img src="https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?q=80&w=200&auto=format&fit=crop" alt="product" className="w-20 h-20 object-contain border border-gray-200 rounded-lg p-2" />
+                        <img src="https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?q=80&w=200&auto=format&fit=crop" alt="Chuột Logitech G102 Lightsync" className="w-20 h-20 object-contain border border-gray-200 rounded-lg p-2" />
                         <div className="flex-grow">
                           <h3 className="font-bold text-gray-900 text-sm mb-1">Chuột Logitech G102 Lightsync</h3>
                           <p className="text-gray-500 text-sm">Phân loại: Đen</p>

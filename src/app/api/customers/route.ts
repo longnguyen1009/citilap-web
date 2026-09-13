@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { mockUsers } from '@/lib/mock-data';
+
+const hasDatabase = !!process.env.DATABASE_URL;
 
 export async function GET(request: Request) {
   try {
@@ -7,12 +9,28 @@ export async function GET(request: Request) {
     const search = searchParams.get('search');
     const tier = searchParams.get('tier');
 
-    const where: any = {};
-
-    if (tier) {
-      where.tier = tier;
+    if (!hasDatabase) {
+      let filtered = [...mockUsers];
+      if (tier) filtered = filtered.filter(u => u.tier === tier);
+      if (search) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(u =>
+          u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.phone?.includes(q)
+        );
+      }
+      const data = filtered.map(u => ({
+        id: u.id, name: u.name, email: u.email, phone: u.phone,
+        tier: u.tier, totalSpend: u.totalSpend,
+        totalOrders: u.id === 'user-1' ? 5 : u.id === 'user-2' ? 3 : 0,
+        lastOrder: new Date(), createdAt: u.createdAt,
+      }));
+      return NextResponse.json({ success: true, data });
     }
 
+    const { prisma } = await import('@/lib/prisma');
+    const where: Record<string, unknown> = {};
+
+    if (tier) where.tier = tier;
     if (search) {
       where.OR = [
         { name: { contains: search } },
@@ -24,32 +42,17 @@ export async function GET(request: Request) {
     const users = await prisma.user.findMany({
       where,
       select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        tier: true,
-        totalSpend: true,
-        createdAt: true,
+        id: true, name: true, email: true, phone: true, tier: true, totalSpend: true, createdAt: true,
         _count: { select: { orders: true } },
-        orders: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { createdAt: true },
-        },
+        orders: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     const data = users.map((user) => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      tier: user.tier,
-      totalSpend: user.totalSpend,
-      totalOrders: user._count.orders,
-      lastOrder: user.orders[0]?.createdAt ?? null,
+      id: user.id, name: user.name, email: user.email, phone: user.phone,
+      tier: user.tier, totalSpend: user.totalSpend,
+      totalOrders: user._count.orders, lastOrder: user.orders[0]?.createdAt ?? null,
       createdAt: user.createdAt,
     }));
 

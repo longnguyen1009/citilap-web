@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { DollarSign, ShoppingCart, Users, AlertTriangle, Package, RefreshCw } from "lucide-react";
+import { DollarSign, ShoppingCart, Users, AlertTriangle, Package, RefreshCw, Clock } from "lucide-react";
 
 type DashboardData = {
   stats: {
@@ -44,6 +44,8 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [schedulerResult, setSchedulerResult] = useState<string | null>(null);
+  const [schedulerRunning, setSchedulerRunning] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -61,8 +63,32 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load() calls setState after async fetch, safe pattern
     void load();
   }, []);
+
+  const runScheduler = async () => {
+    setSchedulerRunning(true);
+    setSchedulerResult(null);
+    try {
+      const res = await fetch("/api/cron/publish-scheduler");
+      const result = await res.json();
+      if (result.success) {
+        const parts = [];
+        if (result.published > 0) parts.push(`${result.published} sản phẩm đã xuất bản`);
+        if (result.unpublished > 0) parts.push(`${result.unpublished} sản phẩm đã ẩn`);
+        if (result.cleanedVersions > 0) parts.push(`${result.cleanedVersions} version cũ đã dọn`);
+        setSchedulerResult(parts.length > 0 ? `✅ ${parts.join(", ")}` : "✅ Không có thay đổi nào cần thực hiện.");
+      } else {
+        setSchedulerResult("❌ Lỗi khi chạy scheduler.");
+      }
+    } catch {
+      setSchedulerResult("❌ Không thể kết nối scheduler.");
+    } finally {
+      setSchedulerRunning(false);
+      void load();
+    }
+  };
 
   if (loading) {
     return (
@@ -158,9 +184,13 @@ export default function DashboardPage() {
             <span className="text-sm text-gray-500">Tổng: <span className="font-bold text-gray-900">{formatVnd(stats.totalRevenue)}</span></span>
           </div>
           <div className="p-6">
-            <div className="h-72 w-full flex items-end gap-2 justify-between">
+            <div className="h-72 w-full flex items-end gap-1 sm:gap-2 justify-between">
               {monthlyRevenue.map((month, i) => (
-                <div key={i} className="w-full flex flex-col items-center justify-end h-full group cursor-pointer" title={`${month.label}: ${formatVnd(month.revenue)}`}>
+                <div key={i} className="w-full flex flex-col items-center justify-end h-full group cursor-pointer relative">
+                  {/* Tooltip */}
+                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                    {formatVnd(month.revenue)}
+                  </div>
                   <div
                     className="w-full bg-blue-600 rounded-t-sm transition-all duration-300 group-hover:bg-indigo-600 min-h-[2px]"
                     style={{ height: `${(month.revenue / maxRevenue) * 100}%` }}
@@ -168,7 +198,7 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 flex justify-between text-xs text-gray-400">
+            <div className="mt-4 flex justify-between text-[10px] sm:text-xs text-gray-400">
               {monthlyRevenue.map((month, i) => (
                 <span key={i}>{month.label}</span>
               ))}
@@ -277,6 +307,24 @@ export default function DashboardPage() {
               </ul>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Scheduler Section */}
+      <div className="mt-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-indigo-100 rounded-lg"><Clock className="w-5 h-5 text-indigo-600" /></div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">Lên lịch xuất bản tự động</h3>
+            <p className="text-xs text-gray-500">Kiểm tra và thực hiện lịch xuất bản/ẩn sản phẩm theo thời gian đã设定</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => void runScheduler()} disabled={schedulerRunning} className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-60">
+            {schedulerRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+            {schedulerRunning ? "Đang chạy..." : "Chạy scheduler ngay"}
+          </button>
+          {schedulerResult && <span className="text-sm text-gray-700">{schedulerResult}</span>}
         </div>
       </div>
     </div>

@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { ChevronRight, Calendar, User, ArrowRight, TrendingUp } from "lucide-react";
 
+export const metadata = {
+  title: "Tin tức & Review",
+  description: "Tin tức công nghệ mới nhất, đánh giá laptop, mẹo mua sắm và thủ thuật hữu ích từ CITILAP.VN.",
+};
+
 export default function NewsPage() {
   const featuredArticle = {
     id: 1,
