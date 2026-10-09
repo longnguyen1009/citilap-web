@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/wasm-compiler-edge"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -302,6 +302,16 @@ export type ProductEditLogUncheckedUpdateManyInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+export type ProductEditLogListRelationFilter = {
+  every?: Prisma.ProductEditLogWhereInput
+  some?: Prisma.ProductEditLogWhereInput
+  none?: Prisma.ProductEditLogWhereInput
+}
+
+export type ProductEditLogOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
+}
+
 export type ProductEditLogCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   productId?: Prisma.SortOrder
@@ -327,16 +337,6 @@ export type ProductEditLogMinOrderByAggregateInput = {
   actorName?: Prisma.SortOrder
   snapshot?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
-}
-
-export type ProductEditLogListRelationFilter = {
-  every?: Prisma.ProductEditLogWhereInput
-  some?: Prisma.ProductEditLogWhereInput
-  none?: Prisma.ProductEditLogWhereInput
-}
-
-export type ProductEditLogOrderByRelationAggregateInput = {
-  _count?: Prisma.SortOrder
 }
 
 export type ProductEditLogCreateNestedManyWithoutProductInput = {

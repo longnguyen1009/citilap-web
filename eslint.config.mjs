@@ -12,7 +12,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    ".claude/worktrees/**",
+    "mcp-web-reader/**",
+    "generated/**",
+    "test-prisma.ts",
+    "prisma/**",
+    "scripts/*.mjs",
+    "dist/**",
+    ".wrangler/**",
   ]),
+
 ]);
 
 export default eslintConfig;

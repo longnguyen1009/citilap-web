@@ -1,8 +1,10 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useState } from "react";
 import { Star, Package } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 type RecProduct = { id: string; name: string; slug?: string; price: number; originalPrice?: number | null; images: string[] | string; brand?: string | null; stock: number };
 
@@ -14,7 +16,7 @@ function RecCard({ p }: { p: RecProduct }) {
   return (
     <Link href={`/product/${p.id}`} className="block bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition p-3 group">
       <div className="relative aspect-square bg-gray-50 rounded-lg overflow-hidden mb-3">
-        {img ? <img src={img} alt={p.name} className="w-full h-full object-contain group-hover:scale-105 transition" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Star className="w-8 h-8" /></div>}
+        {img ? <Image src={img} alt={p.name} fill sizes="300px" className="object-contain group-hover:scale-105 transition" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Star className="w-8 h-8" /></div>}
         {discount > 0 && <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">-{discount}%</span>}
       </div>
       <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 mb-1 group-hover:text-blue-600 transition">{p.name}</h3>

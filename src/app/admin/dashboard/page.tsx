@@ -71,7 +71,10 @@ export default function DashboardPage() {
     setSchedulerRunning(true);
     setSchedulerResult(null);
     try {
-      const res = await fetch("/api/cron/publish-scheduler");
+      const token = typeof window !== "undefined" ? window.sessionStorage.getItem("admin_token") : null;
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch("/api/cron/publish-scheduler", { method: "POST", headers });
       const result = await res.json();
       if (result.success) {
         const parts = [];

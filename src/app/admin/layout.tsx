@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
@@ -13,6 +14,7 @@ import {
   ShoppingCart,
   Package,
   FolderTree,
+  Mail,
   X,
   ExternalLink
 } from "lucide-react";
@@ -23,11 +25,13 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const navigation = [
     { name: "Tổng quan", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Đơn hàng", href: "/admin/orders", icon: ShoppingCart },
+    { name: "Hộp thư liên hệ", href: "/admin/contacts", icon: Mail },
     { name: "Sản phẩm", href: "/admin/products", icon: Package },
     { name: "Danh mục", href: "/admin/categories", icon: FolderTree },
     { name: "Khách hàng", href: "/admin/customers", icon: Users },
@@ -35,6 +39,12 @@ export default function AdminLayout({
   ];
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+    router.replace("/login");
+    router.refresh();
+  };
 
   const sidebarContent = (
     <>
@@ -73,7 +83,7 @@ export default function AdminLayout({
           <ExternalLink className="w-5 h-5" />
           Xem trang bán hàng
         </Link>
-        <button className="flex items-center gap-3 px-3 py-2.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg w-full transition">
+        <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg w-full transition">
           <LogOut className="w-5 h-5" />
           Đăng xuất
         </button>

@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState, useMemo, ReactNode } fr
 export interface CartItem {
   id: string; // product id + variant id
   productId: string;
+  variantId?: string;
   name: string;
   price: number; // numeric price for calculation
   displayPrice: string;
@@ -36,8 +37,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const savedCart = localStorage.getItem("citilap_cart");
     if (savedCart) {
       try {
+        const parsed: unknown = JSON.parse(savedCart);
+        const valid = Array.isArray(parsed) ? parsed.filter((item): item is CartItem => {
+          if (!item || typeof item !== "object") return false;
+          const value = item as Partial<CartItem>;
+          return typeof value.id === "string" && typeof value.productId === "string" && typeof value.name === "string" && typeof value.image === "string" && typeof value.price === "number" && Number.isFinite(value.price) && typeof value.quantity === "number" && Number.isInteger(value.quantity) && value.quantity > 0;
+        }) : [];
         // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-hydration restore from localStorage
-        setCart(JSON.parse(savedCart));
+        setCart(valid);
       } catch (e) {
         console.error("Failed to parse cart", e);
       }
@@ -59,7 +66,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         const newQuantity = existingItem.quantity + item.quantity;
         // Check stock limit if maxQuantity is set
         if (existingItem.maxQuantity && newQuantity > existingItem.maxQuantity) {
-          alert(`Chỉ còn ${existingItem.maxQuantity} sản phẩm trong kho!`);
           return prev;
         }
         return prev.map((i) =>
@@ -81,7 +87,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (item.id !== id) return item;
         // Check stock limit if maxQuantity is set
         if (item.maxQuantity && quantity > item.maxQuantity) {
-          alert(`Chỉ còn ${item.maxQuantity} sản phẩm trong kho!`);
           return { ...item, quantity: item.maxQuantity };
         }
         return { ...item, quantity };

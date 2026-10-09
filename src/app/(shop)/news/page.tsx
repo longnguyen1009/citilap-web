@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronRight, Calendar, User, ArrowRight, TrendingUp } from "lucide-react";
 
 export const metadata = {
@@ -89,7 +90,7 @@ export default function NewsPage() {
         <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 mb-8 group cursor-pointer">
           <div className="grid grid-cols-1 lg:grid-cols-2">
             <div className="relative overflow-hidden h-[300px] lg:h-auto">
-              <img src={featuredArticle.image} alt={featuredArticle.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              <Image src={featuredArticle.image} alt={featuredArticle.title} fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover transition-transform duration-700 group-hover:scale-105" />
               <div className="absolute top-4 left-4 bg-red-600 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider shadow-lg">
                 Bài viết nổi bật
               </div>
@@ -135,7 +136,7 @@ export default function NewsPage() {
               {articles.map((article) => (
                 <div key={article.id} className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 group cursor-pointer flex flex-col h-full">
                   <div className="relative h-48 overflow-hidden">
-                    <img src={article.image} alt={article.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <Image src={article.image} alt={article.title} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover transition-transform duration-500 group-hover:scale-105" />
                     <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-blue-600 text-xs font-bold px-3 py-1 rounded-full shadow-sm">
                       {article.category}
                     </div>

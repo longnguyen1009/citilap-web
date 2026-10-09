@@ -3,25 +3,23 @@
 import { useState, useEffect } from "react";
 import { Clock } from "lucide-react";
 
-export default function FlashSaleCountdown() {
-  const [timeLeft, setTimeLeft] = useState({ hours: 2, minutes: 45, seconds: 18 });
+export default function FlashSaleCountdown({ endAt }: { endAt?: string | number | Date }) {
+  const target = endAt ? new Date(endAt).getTime() : 0;
+  const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        }
-        return prev;
-      });
-    }, 1000);
+    if (!target) return;
+    const update = () => setTimeLeft(Math.max(0, target - Date.now()));
+    update();
+    const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [target]);
 
+  if (!target || timeLeft <= 0) return <span className="text-sm font-bold text-gray-500">Flash sale đã kết thúc</span>;
+  const totalSeconds = Math.floor(timeLeft / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
   const pad = (n: number) => n.toString().padStart(2, "0");
 
   return (
@@ -29,11 +27,11 @@ export default function FlashSaleCountdown() {
       <Clock className="w-5 h-5 text-gray-600" />
       <span className="font-bold text-gray-600">Kết thúc trong:</span>
       <div className="flex gap-2">
-        <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">{pad(timeLeft.hours)}</span>
+        <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">{pad(hours)}</span>
         <span className="font-bold pt-1 text-red-600 animate-pulse">:</span>
-        <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">{pad(timeLeft.minutes)}</span>
+        <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">{pad(minutes)}</span>
         <span className="font-bold pt-1 text-red-600 animate-pulse">:</span>
-        <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">{pad(timeLeft.seconds)}</span>
+        <span className="bg-red-600 text-white font-bold px-3 py-1.5 rounded-md shadow-inner">{pad(seconds)}</span>
       </div>
     </div>
   );

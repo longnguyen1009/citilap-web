@@ -1,51 +1,86 @@
 import type { MetadataRoute } from "next";
+import { businessProfile } from "@/config/business-profile";
+import { prisma } from "@/lib/prisma";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://citilap.vn";
-
-const shopCategories = [
-  "laptop-gaming",
-  "laptop-van-phong",
-  "macbook",
-  "laptop-do-hoa",
-  "may-luot",
-  "phu-kien",
-];
-
-const policySlugs = [
-  "chinh-sach-bao-mat",
-  "chinh-sach-doi-tra",
-  "chinh-sach-bao-hanh",
-  "dieu-khoan-su-dung",
-];
-
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const baseUrl = businessProfile.canonicalSiteUrl;
   const now = new Date();
 
-  const staticPages: MetadataRoute.Sitemap = [
-    { url: BASE_URL, lastModified: now, changeFrequency: "daily", priority: 1.0 },
-    { url: `${BASE_URL}/hot-sale`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
-    { url: `${BASE_URL}/search`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
-    { url: `${BASE_URL}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
-    { url: `${BASE_URL}/news`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
-    { url: `${BASE_URL}/cart`, lastModified: now, changeFrequency: "never", priority: 0.2 },
-    { url: `${BASE_URL}/checkout`, lastModified: now, changeFrequency: "never", priority: 0.2 },
-    { url: `${BASE_URL}/order-tracking`, lastModified: now, changeFrequency: "never", priority: 0.3 },
-    { url: `${BASE_URL}/login`, lastModified: now, changeFrequency: "never", priority: 0.3 },
+  // 1. Core Verified Public Pages (No drafts, no checkout, no cart, no admin, no search)
+  const corePages: MetadataRoute.Sitemap = [
+    {
+      url: baseUrl,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 1.0,
+    },
+    {
+      url: `${baseUrl}/hot-sale`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
+      url: `${baseUrl}/category`,
+      lastModified: now,
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/gioi-thieu`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/he-thong-cua-hang`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/lien-he`,
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    },
   ];
 
-  const categoryPages: MetadataRoute.Sitemap = shopCategories.map((slug) => ({
-    url: `${BASE_URL}/category/${slug}`,
-    lastModified: now,
-    changeFrequency: "daily" as const,
-    priority: 0.8,
-  }));
+  // 2. Dynamic Active Categories from D1
+  let categoryPages: MetadataRoute.Sitemap = [];
+  try {
+    const categories = await prisma.category.findMany({
+      select: { slug: true, updatedAt: true },
+    });
+    categoryPages = categories.map((cat) => ({
+      url: `${baseUrl}/category/${cat.slug}`,
+      lastModified: cat.updatedAt || now,
+      changeFrequency: "daily" as const,
+      priority: 0.8,
+    }));
+  } catch (err) {
+    console.error("[Sitemap] Failed to query categories:", err);
+  }
 
-  const policyPages: MetadataRoute.Sitemap = policySlugs.map((slug) => ({
-    url: `${BASE_URL}/chinh-sach/${slug}`,
-    lastModified: now,
-    changeFrequency: "monthly" as const,
-    priority: 0.4,
-  }));
+  // 3. Dynamic Active Products from D1
+  let productPages: MetadataRoute.Sitemap = [];
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        status: { in: ["ACTIVE", "active"] },
+      },
+      select: { slug: true, updatedAt: true },
+      take: 1000,
+    });
+    productPages = products.map((prod) => ({
+      url: `${baseUrl}/product/${prod.slug}`,
+      lastModified: prod.updatedAt || now,
+      changeFrequency: "weekly" as const,
+      priority: 0.7,
+    }));
+  } catch (err) {
+    console.error("[Sitemap] Failed to query products:", err);
+  }
 
-  return [...staticPages, ...categoryPages, ...policyPages];
+  return [...corePages, ...categoryPages, ...productPages];
 }

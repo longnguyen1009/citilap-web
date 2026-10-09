@@ -1,45 +1,184 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle, ShoppingBag, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, Clock, MapPin, Phone, User, Package, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
 
-import { Suspense } from "react";
+interface OrderDetail {
+  id: string;
+  orderNumber: string;
+  status: string;
+  createdAt: string;
+  customerName: string;
+  customerPhone: string;
+  shippingAddress: string | null;
+  note: string | null;
+  subtotalAmount: number;
+  shippingFee: number;
+  totalAmount: number;
+  items: Array<{
+    id: string;
+    productName: string;
+    sku: string | null;
+    price: number;
+    quantity: number;
+    lineTotal: number;
+    image?: string;
+  }>;
+}
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get("orderId") || "CTL123456";
+  const orderId = searchParams.get("orderId");
+  const token = searchParams.get("token");
+
+  const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [loading, setLoading] = useState(Boolean(orderId && token));
+
+  useEffect(() => {
+    if (!orderId || !token) {
+      return;
+    }
+
+    let isMounted = true;
+    fetch(`/api/orders/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data.success && data.data) {
+          setOrder(data.data);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load order details:", err);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [orderId, token]);
+
+  if (loading) {
+    return (
+      <div className="bg-white p-12 rounded-2xl shadow-sm text-center max-w-md w-full border border-gray-100 flex flex-col items-center justify-center">
+        <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
+        <p className="text-gray-600 font-medium">Đang tải thông tin đơn hàng...</p>
+      </div>
+    );
+  }
+
+  const displayOrderNumber = order?.orderNumber || (orderId ? `CTL-${orderId.slice(-6).toUpperCase()}` : "CTL-ORD");
 
   return (
-    <div className="bg-white p-8 md:p-12 rounded-2xl shadow-sm text-center max-w-2xl w-full border-t-4 border-green-500">
-      <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-        <CheckCircle className="w-12 h-12" />
-      </div>
-      
-      <h1 className="text-3xl font-black text-gray-900 mb-2 uppercase">Đặt hàng thành công!</h1>
-      <p className="text-gray-600 mb-6 text-lg">Cảm ơn bạn đã mua sắm tại CitiLap. Chúng tôi sẽ sớm liên hệ để xác nhận đơn hàng.</p>
-      
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 mb-8 text-left inline-block w-full max-w-md mx-auto">
-        <div className="flex justify-between items-center border-b border-gray-200 pb-3 mb-3">
-          <span className="text-gray-600">Mã đơn hàng:</span>
-          <span className="font-bold text-gray-900 text-lg">{orderId}</span>
+    <div className="bg-white p-6 md:p-10 rounded-2xl shadow-sm max-w-2xl w-full border border-gray-100">
+      {/* Icon & Heading */}
+      <div className="text-center pb-6 border-b border-gray-100">
+        <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 ring-8 ring-emerald-50/50">
+          <CheckCircle2 className="w-10 h-10" />
         </div>
-        <div className="flex justify-between items-center border-b border-gray-200 pb-3 mb-3">
-          <span className="text-gray-600">Thời gian đặt:</span>
-          <span className="font-bold text-gray-900">{new Date().toLocaleDateString("vi-VN")}</span>
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-gray-600">Phương thức:</span>
-          <span className="font-bold text-gray-900">Thanh toán khi nhận hàng</span>
+        <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+          Đã Tiếp Nhận Đơn Đặt Hàng!
+        </h1>
+        <p className="text-gray-500 mt-2 text-sm max-w-md mx-auto">
+          Cảm ơn bạn đã lựa chọn CitiLap. Cửa hàng đã ghi nhận yêu cầu và sẽ liên hệ sớm nhất để xác nhận.
+        </p>
+
+        <div className="mt-4 inline-flex items-center gap-2 bg-amber-50 text-amber-800 text-xs font-bold px-3.5 py-1.5 rounded-full border border-amber-200">
+          <Clock className="w-3.5 h-3.5" /> Trạng thái: Chờ xác nhận (PENDING)
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <Link href="/order-tracking" className="w-full sm:w-auto bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-6 rounded-lg transition inline-flex items-center justify-center gap-2">
-          <ShoppingBag className="w-5 h-5" /> Theo dõi đơn hàng
-        </Link>
-        <Link href="/" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition inline-flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30">
-          Tiếp tục mua sắm <ArrowRight className="w-5 h-5" />
+      {/* Thông tin đơn hàng tóm tắt */}
+      <div className="mt-6 space-y-4">
+        <div className="bg-gray-50 border border-gray-200/80 rounded-xl p-4.5 text-sm space-y-2.5">
+          <div className="flex justify-between items-center pb-2.5 border-b border-gray-200 text-xs md:text-sm">
+            <span className="text-gray-500 font-medium">Mã đơn hàng:</span>
+            <span className="font-mono font-bold text-blue-600 text-base">{displayOrderNumber}</span>
+          </div>
+
+          {order && (
+            <>
+              <div className="flex items-start gap-2 text-xs md:text-sm">
+                <User className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <span className="text-gray-500">Khách hàng:</span>
+                <span className="font-bold text-gray-800 ml-auto">{order.customerName}</span>
+              </div>
+
+              <div className="flex items-start gap-2 text-xs md:text-sm">
+                <Phone className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <span className="text-gray-500">Số điện thoại:</span>
+                <span className="font-bold text-gray-800 ml-auto">{order.customerPhone}</span>
+              </div>
+
+              {order.shippingAddress && (
+                <div className="flex items-start gap-2 text-xs md:text-sm">
+                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                  <span className="text-gray-500 shrink-0">Địa chỉ:</span>
+                  <span className="text-gray-800 font-medium text-right ml-auto">{order.shippingAddress}</span>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex justify-between items-center pt-2.5 border-t border-gray-200 text-xs md:text-sm">
+            <span className="text-gray-500 font-medium">Hình thức thanh toán:</span>
+            <span className="font-bold text-gray-800">Thanh toán khi nhận máy (COD)</span>
+          </div>
+        </div>
+
+        {/* Danh sách sản phẩm nếu có */}
+        {order && order.items && order.items.length > 0 && (
+          <div className="border border-gray-200 rounded-xl p-4">
+            <h3 className="text-xs font-bold text-gray-600 uppercase mb-3 flex items-center gap-1.5">
+              <Package className="w-4 h-4 text-gray-500" /> Sản phẩm đã đặt ({order.items.length})
+            </h3>
+            <div className="divide-y divide-gray-100 text-sm">
+              {order.items.map((item) => (
+                <div key={item.id} className="py-2.5 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-grow">
+                    <div className="font-bold text-gray-900 text-xs md:text-sm truncate">{item.productName}</div>
+                    {item.sku && <div className="text-[11px] text-gray-500 font-mono">SKU: {item.sku}</div>}
+                    <div className="text-xs text-gray-500">Số lượng: x{item.quantity}</div>
+                  </div>
+                  <div className="font-bold text-red-600 text-xs md:text-sm shrink-0">
+                    {item.lineTotal.toLocaleString("vi-VN")}đ
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center text-sm">
+              <span className="font-bold text-gray-700">Tạm tính:</span>
+              <span className="font-black text-red-600 text-base">
+                {order.totalAmount.toLocaleString("vi-VN")}đ
+              </span>
+            </div>
+            <div className="text-[11px] text-gray-500 italic text-right mt-1">
+              Phí giao hàng (nếu có) sẽ được nhân viên tư vấn trao đổi và xác nhận khi gọi điện.
+            </div>
+          </div>
+        )}
+
+        {/* Hộp ghi chú bước tiếp theo */}
+        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4 text-xs md:text-sm text-amber-900 space-y-1">
+          <div className="font-bold text-amber-950">Bước tiếp theo:</div>
+          <p className="leading-relaxed">
+            Nhân viên kinh doanh của CitiLap sẽ gọi điện đến số điện thoại của quý khách để kiểm tra cấu hình, quà tặng kèm
+            và thỏa thuận phương thức vận chuyển thuận tiện nhất.
+          </p>
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <Link
+          href="/"
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition inline-flex items-center justify-center gap-2 shadow-sm text-sm"
+        >
+          Tiếp tục mua sắm <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
     </div>
@@ -48,8 +187,8 @@ function SuccessContent() {
 
 export default function CheckoutSuccessPage() {
   return (
-    <div className="bg-[#f1f5f9] min-h-[70vh] flex flex-col items-center justify-center p-4">
-      <Suspense fallback={<div className="p-8 text-center">Đang xử lý...</div>}>
+    <div className="bg-[#f8fafc] min-h-[75vh] flex flex-col items-center justify-center p-4 py-12">
+      <Suspense fallback={<div className="p-8 text-center text-gray-500">Đang chuẩn bị trang xác nhận...</div>}>
         <SuccessContent />
       </Suspense>
     </div>

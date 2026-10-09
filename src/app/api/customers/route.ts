@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
 import { mockUsers } from '@/lib/mock-data';
+import { requireAdmin } from '@/lib/auth';
 
 const hasDatabase = !!process.env.DATABASE_URL;
 
 export async function GET(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const tier = searchParams.get('tier');
+    const page = Math.min(Math.max(Number(searchParams.get('page') || 1), 1), 10000);
+    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 25), 1), 100);
+    if (!Number.isInteger(page) || !Number.isInteger(limit) || (search && search.length > 100) || (tier && !['Vàng', 'Bạc', 'Mới'].includes(tier))) {
+      return NextResponse.json({ success: false, error: 'Invalid query' }, { status: 400 });
+    }
 
     if (!hasDatabase) {
       let filtered = [...mockUsers];
@@ -18,13 +26,14 @@ export async function GET(request: Request) {
           u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.phone?.includes(q)
         );
       }
-      const data = filtered.map(u => ({
+      const total = filtered.length;
+      const data = filtered.slice((page - 1) * limit, page * limit).map(u => ({
         id: u.id, name: u.name, email: u.email, phone: u.phone,
         tier: u.tier, totalSpend: u.totalSpend,
         totalOrders: u.id === 'user-1' ? 5 : u.id === 'user-2' ? 3 : 0,
         lastOrder: new Date(), createdAt: u.createdAt,
       }));
-      return NextResponse.json({ success: true, data });
+      return NextResponse.json({ success: true, data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
     }
 
     const { prisma } = await import('@/lib/prisma');
@@ -39,6 +48,7 @@ export async function GET(request: Request) {
       ];
     }
 
+    const total = await prisma.user.count({ where });
     const users = await prisma.user.findMany({
       where,
       select: {
@@ -47,6 +57,8 @@ export async function GET(request: Request) {
         orders: { orderBy: { createdAt: 'desc' }, take: 1, select: { createdAt: true } },
       },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
     const data = users.map((user) => ({
@@ -56,7 +68,10 @@ export async function GET(request: Request) {
       createdAt: user.createdAt,
     }));
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json(
+      { success: true, data, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } },
+      { headers: { 'Cache-Control': 'private, no-store, no-cache, must-revalidate' } }
+    );
   } catch (error) {
     console.error('Failed to fetch customers:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch customers' }, { status: 500 });

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { mockOrders, mockProducts, mockUsers } from '@/lib/mock-data';
+import { requireAdmin } from '@/lib/auth';
 
 const hasDatabase = !!process.env.DATABASE_URL;
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
   try {
     if (!hasDatabase) {
       // Return mock dashboard data
@@ -90,10 +93,11 @@ export async function GET() {
       ? ((monthRevenue._sum.totalAmount ?? 0) - prevMonthRevenue._sum.totalAmount) / prevMonthRevenue._sum.totalAmount
       : null;
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        stats: {
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          stats: {
           totalRevenue: totalRevenue._sum.totalAmount ?? 0,
           monthRevenue: monthRevenue._sum.totalAmount ?? 0,
           monthOrders: monthRevenue._count._all,
@@ -111,7 +115,13 @@ export async function GET() {
           sold: item._sum.quantity ?? 0,
         })),
       },
-    });
+    },
+    {
+      headers: {
+        'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+      },
+    }
+  );
   } catch (error) {
     console.error('Failed to fetch dashboard stats:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch dashboard stats' }, { status: 500 });

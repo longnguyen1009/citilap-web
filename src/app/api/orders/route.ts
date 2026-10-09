@@ -1,57 +1,163 @@
 import { NextResponse } from 'next/server';
-import { mockOrders, mockUsers } from '@/lib/mock-data';
+import { requireAdmin } from '@/lib/auth';
+import { createOrder, listOrders, CreateOrderInput } from '@/server/services/order.service';
+import { checkRateLimit, rateLimitExceededResponse, getClientIp } from '@/lib/rate-limiter';
+import { verifyTurnstileToken } from '@/lib/turnstile';
 
-const hasDatabase = !!process.env.DATABASE_URL;
+function errorResponse(message: string, status: number, code = 'INVALID_REQUEST') {
+  return NextResponse.json(
+    { success: false, error: { code, message } },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+      },
+    }
+  );
+}
 
 export async function GET(request: Request) {
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+    const page = Math.min(Math.max(Number(searchParams.get('page') || 1), 1), 10000);
+    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 25), 1), 100);
 
-    if (!hasDatabase) {
-      let filtered = [...mockOrders];
-      if (status) filtered = filtered.filter(o => o.status === status);
-      if (search) {
-        const q = search.toLowerCase();
-        filtered = filtered.filter(o => {
-          const user = mockUsers.find(u => u.id === o.userId);
-          return user?.name.toLowerCase().includes(q) || user?.email.toLowerCase().includes(q);
-        });
-      }
-      const data = filtered.map(o => ({
-        ...o,
-        user: mockUsers.find(u => u.id === o.userId) || null,
-        items: [],
-      }));
-      return NextResponse.json({ success: true, data });
+    if (!Number.isInteger(page) || !Number.isInteger(limit)) {
+      return errorResponse('Invalid pagination', 400);
     }
 
-    const { prisma } = await import('@/lib/prisma');
-    const where: Record<string, unknown> = {};
+    const result = await listOrders({ status, search, page, limit });
 
-    if (status) where.status = status;
-    if (search) {
-      where.user = {
-        OR: [
-          { name: { contains: search } },
-          { email: { contains: search } }
-        ]
-      };
-    }
-
-    const orders = await prisma.order.findMany({
-      where,
-      include: {
-        user: { select: { name: true, email: true, phone: true } },
-        items: true,
+    return NextResponse.json(
+      {
+        success: true,
+        data: result.orders,
+        pagination: result.pagination,
       },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return NextResponse.json({ success: true, data: orders });
+      {
+        headers: {
+          'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+        },
+      }
+    );
   } catch (error) {
     console.error('Failed to fetch orders:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch orders' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  // 1. Rate limiting check (5 submissions per 10 minutes per IP)
+  const rateLimit = await checkRateLimit('order', request, 5, 600);
+  if (!rateLimit.allowed) {
+    return rateLimitExceededResponse(rateLimit.retryAfter);
+  }
+
+  const idempotencyKey = request.headers.get('idempotency-key')?.trim() || null;
+  if (idempotencyKey && idempotencyKey.length > 200) {
+    return errorResponse('Idempotency-Key is too long', 400);
+  }
+
+  try {
+    const body = await request.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return errorResponse('Invalid request body', 400);
+    }
+
+    // 2. Turnstile validation (Fail-closed in Staging/Production if enforced or secret configured)
+    const turnstileToken =
+      request.headers.get('cf-turnstile-response') ||
+      (typeof body.turnstileToken === 'string' ? body.turnstileToken : null);
+    const clientIp = getClientIp(request);
+    const turnstileCheck = await verifyTurnstileToken(turnstileToken, clientIp, { action: 'order' });
+    if (!turnstileCheck.success) {
+      return errorResponse(
+        turnstileCheck.error || 'Xác thực bảo mật Turnstile không hợp lệ hoặc đã hết hạn.',
+        403,
+        turnstileCheck.errorCode || 'TURNSTILE_FAILED'
+      );
+    }
+
+    // 3. Payload size & item quantity constraints
+    const items = Array.isArray(body.items) ? body.items : [];
+    if (items.length > 10) {
+      return errorResponse('Số lượng sản phẩm trong một đơn hàng không được vượt quá 10.', 400, 'TOO_MANY_ITEMS');
+    }
+
+    for (const it of items) {
+      if (typeof it.quantity === 'number' && (it.quantity < 1 || it.quantity > 5)) {
+        return errorResponse('Số lượng cho mỗi sản phẩm không được vượt quá 5 chiếc.', 400, 'INVALID_ITEM_QUANTITY');
+      }
+    }
+
+    const payload: CreateOrderInput = {
+      items,
+      customerName: typeof body.customerName === 'string' ? body.customerName.slice(0, 100) : '',
+      customerPhone: typeof body.customerPhone === 'string' ? body.customerPhone.slice(0, 20) : '',
+      customerEmail: typeof body.customerEmail === 'string' ? body.customerEmail.slice(0, 254) : null,
+      shippingAddress: typeof body.shippingAddress === 'string' ? body.shippingAddress.slice(0, 500) : null,
+      note: typeof body.note === 'string' ? body.note.slice(0, 1000) : null,
+      shippingMethod: typeof body.shippingMethod === 'string' ? body.shippingMethod : 'standard',
+      paymentMethod: typeof body.paymentMethod === 'string' ? body.paymentMethod : 'COD',
+    };
+
+    const result = await createOrder(payload, idempotencyKey);
+
+    const orderObj = result.order as { id: string; orderNumber: string };
+    return NextResponse.json(
+      {
+        success: true,
+        data: result.order,
+        orderId: orderObj.id,
+        orderNumber: orderObj.orderNumber,
+        confirmationToken: result.confirmationToken,
+        isIdempotentReplay: result.isIdempotentReplay || false,
+      },
+      {
+        status: result.isIdempotentReplay ? 200 : 201,
+        headers: {
+          'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+        },
+      }
+    );
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    const code = err?.code || err?.message || '';
+
+    if (code === 'IDEMPOTENCY_PAYLOAD_MISMATCH') {
+      return errorResponse('Nội dung đặt hàng không khớp với yêu cầu trước đó của mã Idempotency này.', 422, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
+    }
+    if (code === 'EMPTY_CART') {
+      return errorResponse('Giỏ hàng trống. Vui lòng chọn sản phẩm.', 400, 'EMPTY_CART');
+    }
+    if (code === 'TOO_MANY_ITEMS') {
+      return errorResponse('Số lượng mặt hàng vượt quá giới hạn cho phép (tối đa 50).', 400, 'TOO_MANY_ITEMS');
+    }
+    if (code === 'CUSTOMER_NAME_INVALID') {
+      return errorResponse('Vui lòng nhập họ và tên hợp lệ.', 400, 'CUSTOMER_NAME_INVALID');
+    }
+    if (code === 'CUSTOMER_PHONE_INVALID') {
+      return errorResponse('Vui lòng nhập số điện thoại hợp lệ (9 - 15 chữ số).', 400, 'CUSTOMER_PHONE_INVALID');
+    }
+    if (code === 'CUSTOMER_EMAIL_INVALID') {
+      return errorResponse('Email không hợp lệ.', 400, 'CUSTOMER_EMAIL_INVALID');
+    }
+    if (code === 'PRODUCT_UNAVAILABLE') {
+      return errorResponse('Một hoặc nhiều sản phẩm trong giỏ hàng hiện không khả dụng.', 409, 'PRODUCT_UNAVAILABLE');
+    }
+    if (code === 'VARIANT_UNAVAILABLE') {
+      return errorResponse('Cấu hình sản phẩm đã chọn hiện không khả dụng.', 409, 'VARIANT_UNAVAILABLE');
+    }
+    if (code === 'INVALID_ITEM') {
+      return errorResponse('Thông tin sản phẩm trong giỏ hàng không hợp lệ.', 400, 'INVALID_ITEM');
+    }
+
+    console.error('Failed to create order:', error);
+    return errorResponse('Không thể tạo đơn hàng. Vui lòng thử lại sau.', 500, 'ORDER_CREATE_FAILED');
   }
 }

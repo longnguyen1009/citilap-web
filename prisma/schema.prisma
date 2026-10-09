@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
+  runtime  = "cloudflare"
 }
 
 datasource db {
@@ -15,10 +16,25 @@ model User {
   phone      String?
   role       String   @default("USER") // USER, ADMIN
   tier       String   @default("Mới") // Vàng, Bạc, Mới
-  totalSpend Float    @default(0)
+  totalSpend Int      @default(0) // Integer VND
   orders     Order[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  logo        String?   // R2 media key or image path
+  description String?
+  status      String    @default("ACTIVE") // ACTIVE, INACTIVE
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([status])
 }
 
 model Category {
@@ -30,9 +46,151 @@ model Category {
   parentId      String?
   parent        Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
   subCategories Category[] @relation("CategoryToCategory")
+  sortOrder     Int        @default(0)
+  status        String     @default("ACTIVE") // ACTIVE, INACTIVE
   products      Product[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+
+  @@index([parentId])
+  @@index([status])
+  @@index([sortOrder])
+}
+
+model Product {
+  id             String           @id @default(cuid())
+  name           String
+  slug           String           @unique
+  description    String
+  shortDescription String?
+  contentHtml    String?
+  brand          String?          // Transitional string field for backward compatibility
+  brandId        String?
+  brandRel       Brand?           @relation(fields: [brandId], references: [id])
+  model          String?
+  series         String?
+  warranty       String?
+  condition      String           @default("NEW") // Stable code: NEW, LIKE_NEW, USED, REFURBISHED, LIQUIDATION
+  origin         String?
+  seoTitle       String?
+  seoDescription String?
+  canonicalSlug  String?
+  isFeatured     Boolean          @default(false)
+  isNewArrival   Boolean          @default(false)
+  isFlashSale    Boolean          @default(false)
+  isBestSeller   Boolean          @default(false)
+  allowBackorder Boolean          @default(false)
+  minOrderQty    Int              @default(1)
+  maxOrderQty    Int?
+  lowestPrice30d Int?             // Integer VND
+  publishAt      DateTime?
+  unpublishAt    DateTime?
+  price          Int              // Integer VND
+  originalPrice  Int?             // Integer VND
+  images         String           @default("[]") // JSON string for backward compatibility
+  stock          Int              @default(0) // Transitional aggregate until inventory system
+  status         String           @default("ACTIVE") // Stable code: DRAFT, ACTIVE, INACTIVE, ARCHIVED
+  
+  // Filter-critical specification columns (Option A - optimized for D1 queries & index lookup)
+  cpu            String?          // e.g. "Intel Core i7-13700H", "AMD Ryzen 7 7840HS"
+  cpuSeries      String?          // e.g. "Core i5", "Core i7", "Core i9", "Ryzen 7", "Apple M3"
+  gpu            String?          // e.g. "NVIDIA GeForce RTX 4060 8GB"
+  gpuSeries      String?          // e.g. "RTX 4050", "RTX 4060", "RTX 4070", "RTX 4080", "Onboard"
+  ram            String?          // e.g. "16GB DDR5"
+  ramGb          Int?             // e.g. 8, 16, 32, 64
+  storage        String?          // e.g. "512GB NVMe SSD"
+  storageGb      Int?             // e.g. 512, 1024, 2048
+  display        String?          // e.g. "15.6 inch FHD 144Hz"
+  screenSize     Float?           // e.g. 14.0, 15.6, 16.0
+  refreshRate    Int?             // e.g. 60, 120, 144, 165, 240
+  
+  specs          String?          // JSON string for full PDP specifications
+  tags           String?          // Comma-separated string
+  categoryId     String
+  category       Category         @relation(fields: [categoryId], references: [id])
+  variants       ProductVariant[]
+  productImages  ProductImage[]
+  editLogs       ProductEditLog[]
+  versions       ProductVersion[]
+  orderItems     OrderItem[]
+  inventoryType  String           @default("SERIALIZED") // SERIALIZED, QUANTITY
+  serialUnits    SerialUnit[]
+  inventoryBalances InventoryBalance[]
+  inventoryTransactions InventoryTransaction[]
+  inventoryReservations InventoryReservation[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  deletedAt      DateTime?
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([status])
+  @@index([condition])
+  @@index([price])
+  @@index([isFeatured])
+  @@index([isNewArrival])
+  @@index([isFlashSale])
+  @@index([isBestSeller])
+  @@index([createdAt])
+  @@index([ramGb])
+  @@index([cpuSeries])
+  @@index([gpuSeries])
+}
+
+model ProductVariant {
+  id            String    @id @default(cuid())
+  productId     String
+  product       Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku           String    @unique
+  name          String
+  options       String    // JSON string for variant config pairs
+  price         Int       // Integer VND
+  originalPrice Int?      // Integer VND
+  stock         Int       @default(0) // Transitional aggregate
+  image         String?
+  status        String    @default("ACTIVE") // ACTIVE, INACTIVE
+  
+  // Specific variant config specs
+  cpu           String?
+  gpu           String?
+  ram           String?
+  storage       String?
+  display       String?
+
+  productImages         ProductImage[]
+  serialUnits           SerialUnit[]
+  inventoryBalances     InventoryBalance[]
+  inventoryTransactions InventoryTransaction[]
+  inventoryReservations InventoryReservation[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([productId])
+  @@index([status])
+}
+
+model ProductImage {
+  id        String          @id @default(cuid())
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  r2Key     String          // Source of truth key in Cloudflare R2 bucket
+  url       String?         // Public path or relative path (derived from r2Key if null)
+  mimeType  String?         @default("image/webp")
+  width     Int?
+  height    Int?
+  size      Int?            // Size in bytes
+  alt       String?
+  sortOrder Int             @default(0)
+  isPrimary Boolean         @default(false)
+  createdAt DateTime        @default(now())
+
+  @@index([productId])
+  @@index([variantId])
+  @@index([r2Key])
+  @@index([isPrimary])
+  @@index([sortOrder])
 }
 
 model ProductEditLog {
@@ -60,88 +218,211 @@ model ProductVersion {
   @@index([productId])
 }
 
-model Product {
-  id            String   @id @default(cuid())
-  name          String
-  slug          String   @unique
-  description     String
-  contentHtml     String?
-  brand           String?
-  model           String?
-  series          String?
-  warranty        String?
-  condition       String?
-  origin          String?
-  seoTitle        String?
-  seoDescription  String?
-  canonicalSlug   String?
-  isFeatured      Boolean  @default(false)
-  isNewArrival    Boolean  @default(false)
-  isFlashSale     Boolean  @default(false)
-  isBestSeller    Boolean  @default(false)
-  allowBackorder  Boolean  @default(false)
-  minOrderQty     Int      @default(1)
-  maxOrderQty     Int?
-  lowestPrice30d  Float?
-  publishAt       DateTime?
-  unpublishAt     DateTime?
-  price           Float
-  originalPrice   Float?
-  images          String   // JSON string or comma-separated
-  stock           Int      @default(0)
-  status          String   @default("active") // active, draft, archived
-  specs         String?  // JSON string for specs
-  tags          String?  // Comma-separated string
-  categoryId    String
-  category      Category @relation(fields: [categoryId], references: [id])
-  variants      ProductVariant[]
-  editLogs      ProductEditLog[]
-  versions      ProductVersion[]
-  orderItems    OrderItem[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model ProductVariant {
-  id            String   @id @default(cuid())
-  productId     String
-  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku           String   @unique
-  name          String
-  options       String
-  price         Float
-  originalPrice Float?
-  stock         Int      @default(0)
-  image         String?
-  status        String   @default("active")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([productId])
-}
-
 model Order {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  status          String   @default("Chờ xác nhận") // Chờ xác nhận, Đang xử lý, Đang vận chuyển, Đã hoàn thành, Đã hủy
-  totalAmount     Float
+  id              String      @id @default(cuid())
+  orderNumber     String?     @unique
+  idempotencyKey  String?     @unique
+  payloadHash     String?
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  status          String      @default("PENDING") // PENDING, COMPLETED
+  subtotalAmount  Int         @default(0) // Integer VND
+  shippingFee     Int         @default(0) // Integer VND
+  discountAmount  Int         @default(0) // Integer VND
+  totalAmount     Int         @default(0) // Integer VND
   shippingAddress String?
-  paymentMethod   String   @default("COD") // COD, Chuyển khoản, Thẻ tín dụng
-  paymentStatus   String   @default("Chưa thanh toán") // Chưa thanh toán, Đã thanh toán, Đã hoàn tiền
+  customerName    String
+  customerPhone   String
+  customerEmail   String?
+  shippingMethod  String?     @default("standard")
+  note            String?
+  paymentMethod   String      @default("COD")
+  paymentStatus   String      @default("PENDING")
+  confirmationTokenHash String?
   items           OrderItem[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  completedAt     DateTime?
+
+  @@index([status])
+  @@index([customerPhone])
+  @@index([createdAt])
 }
 
 model OrderItem {
+  id                  String      @id @default(cuid())
+  orderId             String
+  order               Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId           String
+  product             Product     @relation(fields: [productId], references: [id])
+  variantId           String?
+  serialUnitId        String?
+  serialUnit          SerialUnit? @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  productName         String?
+  sku                 String?
+  productNameSnapshot String?
+  skuSnapshot         String?
+  variantNameSnapshot String?
+  price               Int         // Integer VND price at the time of purchase
+  priceSnapshot       Int?
+  quantity            Int
+  lineTotal           Int         @default(0)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([serialUnitId])
+}
+
+model Warehouse {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
+  address     String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  serialUnits           SerialUnit[]
+  inventoryBalances     InventoryBalance[]
+  inventoryTransactions InventoryTransaction[]
+  inventoryReservations InventoryReservation[]
+
+  @@index([status])
+  @@index([sortOrder])
+}
+
+model SerialUnit {
+  id                 String          @id @default(cuid())
+  productId          String
+  product            Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId          String?
+  variant            ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  warehouseId        String
+  warehouse          Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  serialNumber       String          @unique
+  condition          String          @default("NEW") // Stable: NEW, LIKE_NEW, USED, OPEN_BOX, REFURBISHED
+  status             String          @default("AVAILABLE") // AVAILABLE, RESERVED, ALLOCATED, SOLD, QC_HOLD, REPAIR, DAMAGED, RETURNING, RETURNED
+  costPrice          Int?            // Integer VND
+  warrantyMonths     Int?
+  notes              String?
+  allocatedReference String?         // e.g. orderId / orderNumber
+  allocatedAt        DateTime?
+  receivedAt         DateTime        @default(now())
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  orderItems            OrderItem[]
+  inventoryTransactions InventoryTransaction[]
+  inventoryReservations InventoryReservation[]
+
+  @@index([productId])
+  @@index([variantId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([condition])
+  @@index([warehouseId, status])
+  @@index([variantId, status])
+}
+
+model InventoryBalance {
+  id          String         @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  productId   String
+  product     Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  onHand      Int            @default(0)
+  reserved    Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([warehouseId, variantId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([warehouseId])
+}
+
+model InventoryTransaction {
+  id              String          @id @default(cuid())
+  warehouseId     String
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  productId       String
+  product         Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId       String?
+  variant         ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  serialUnitId    String?
+  serialUnit      SerialUnit?     @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  transactionType String          // RECEIVE, ADJUSTMENT, TRANSFER_IN, TRANSFER_OUT, RESERVE, RELEASE, ALLOCATE, SALE, RETURN, DAMAGE
+  quantityDelta   Int             // Integer delta (+ or -)
+  referenceType   String          // ORDER, PURCHASE, TRANSFER, MANUAL_ADJUSTMENT, RESERVATION
+  referenceId     String?
+  idempotencyKey  String?         @unique
+  actorId         String?
+  reason          String?
+  balanceBefore   Int?
+  balanceAfter    Int?
+  createdAt       DateTime        @default(now())
+
+  @@index([warehouseId])
+  @@index([productId])
+  @@index([variantId])
+  @@index([serialUnitId])
+  @@index([transactionType])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model InventoryReservation {
+  id             String         @id @default(cuid())
+  warehouseId    String
+  warehouse      Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  productId      String
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId      String
+  variant        ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  serialUnitId   String?
+  serialUnit     SerialUnit?    @relation(fields: [serialUnitId], references: [id], onDelete: SetNull)
+  quantity       Int            @default(1)
+  referenceType  String         // CHECKOUT, ORDER, MANUAL_HOLD
+  referenceId    String
+  status         String         @default("ACTIVE") // ACTIVE, COMMITTED, RELEASED, EXPIRED, CANCELLED
+  expiresAt      DateTime
+  idempotencyKey String?        @unique
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([warehouseId])
+  @@index([variantId])
+  @@index([serialUnitId])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([referenceType, referenceId])
+}
+
+model ContactSubmission {
   id        String   @id @default(cuid())
-  orderId   String
-  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
-  product   Product  @relation(fields: [productId], references: [id])
-  quantity  Int
-  price     Float    // Price at the time of purchase
+  name      String
+  phone     String
+  email     String?
+  message   String?
+  status    String   @default("PENDING") // PENDING, PROCESSED
+  ipHash    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
 }
+
+model RateLimitRecord {
+  key       String   @id
+  count     Int      @default(1)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+

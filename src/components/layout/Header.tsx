@@ -1,152 +1,66 @@
 "use client";
 
-import { useState, useRef, useEffect, FormEvent } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
-  Search, Menu, PhoneCall,
+  Menu, PhoneCall,
   ClipboardCheck, User, Monitor, ChevronDown, ChevronRight,
   Laptop, Gamepad2, Briefcase, Palette, RefreshCw, Cpu,
   Tablet, HardDrive, Camera, Sparkles, ArrowRight, X, Heart
 } from "lucide-react";
 import CartIcon from "./CartIcon";
 import { useWishlist } from "@/context/WishlistContext";
+import SearchAutocomplete from "@/components/search/SearchAutocomplete";
+import type { CategorySummary, BrandSummary } from "@/server/services/catalog.service";
+import { businessProfile } from "@/config/business-profile";
 
 const categoryIcons: Record<string, React.ElementType> = {
-  "Laptop Mới": Sparkles,
+  "laptop-gaming": Gamepad2,
   "Laptop Gaming": Gamepad2,
+  "laptop-van-phong": Briefcase,
   "Laptop Văn Phòng": Briefcase,
+  "laptop-do-hoa": Palette,
   "Laptop Đồ Họa – Kĩ Thuật": Palette,
+  "Laptop Đồ Hoạ - Kỹ Thuật": Palette,
+  "laptop-cu": RefreshCw,
   "Laptop Like New": RefreshCw,
+  "linh-kien": Cpu,
   "Linh Kiện – Phụ Kiện": Cpu,
-  "Microsoft Surface": Tablet,
-  "PC- Máy tính để bàn": HardDrive,
-  "Linh kiện PC- Máy bàn": Cpu,
-  "Camera": Camera,
+  "Linh Kiện - Phụ Kiện": Cpu,
+  "laptop-moi": Sparkles,
+  "Laptop Mới": Sparkles,
+  "macbook": Tablet,
+  "pc": HardDrive,
+  "camera": Camera,
 };
 
-const categoryMenu = [
-  { name: "Laptop Mới", href: "/category/laptop-moi" },
-  {
-    name: "Laptop Gaming",
-    href: "/category/laptop-gaming",
-    children: [
-      { name: "Lenovo Legion", href: "/category/laptop-gaming?brand=lenovo&series=legion" },
-      { name: "Asus ROG", href: "/category/laptop-gaming?brand=asus&series=rog" },
-      { name: "Acer Predator", href: "/category/laptop-gaming?brand=acer&series=predator" },
-      { name: "MSI Gaming", href: "/category/laptop-gaming?brand=msi" },
-      { name: "HP Omen", href: "/category/laptop-gaming?brand=hp&series=omen" },
-      { name: "Dell Alienware", href: "/category/laptop-gaming?brand=dell&series=alienware" },
-      { name: "Gigabyte AORUS", href: "/category/laptop-gaming?brand=gigabyte&series=aorus" },
-      { name: "Lenovo LOQ", href: "/category/laptop-gaming?brand=lenovo&series=loq" },
-    ]
-  },
-  {
-    name: "Laptop Văn Phòng",
-    href: "/category/laptop-van-phong",
-    children: [
-      { name: "MacBook Air", href: "/category/laptop-van-phong?brand=apple&series=macbook-air" },
-      { name: "MacBook Pro", href: "/category/laptop-van-phong?brand=apple&series=macbook-pro" },
-      { name: "Dell XPS", href: "/category/laptop-van-phong?brand=dell&series=xps" },
-      { name: "Dell Inspiron", href: "/category/laptop-van-phong?brand=dell&series=inspiron" },
-      { name: "Lenovo ThinkPad", href: "/category/laptop-van-phong?brand=lenovo&series=thinkpad" },
-      { name: "Lenovo IdeaPad", href: "/category/laptop-van-phong?brand=lenovo&series=ideapad" },
-      { name: "HP EliteBook", href: "/category/laptop-van-phong?brand=hp&series=elitebook" },
-      { name: "HP Pavilion", href: "/category/laptop-van-phong?brand=hp&series=pavilion" },
-      { name: "Asus ZenBook", href: "/category/laptop-van-phong?brand=asus&series=zenbook" },
-      { name: "Acer Swift", href: "/category/laptop-van-phong?brand=acer&series=swift" },
-    ]
-  },
-  {
-    name: "Laptop Đồ Họa – Kĩ Thuật",
-    href: "/category/laptop-do-hoa",
-    children: [
-      { name: "Dell Precision", href: "/category/laptop-do-hoa?brand=dell&series=precision" },
-      { name: "Lenovo ThinkPad P", href: "/category/laptop-do-hoa?brand=lenovo&series=thinkpad-p" },
-      { name: "HP ZBook", href: "/category/laptop-do-hoa?brand=hp&series=zbook" },
-      { name: "Asus ProArt", href: "/category/laptop-do-hoa?brand=asus&series=proart" },
-      { name: "Acer ConceptD", href: "/category/laptop-do-hoa?brand=acer&series=conceptd" },
-      { name: "MSI Creator", href: "/category/laptop-do-hoa?brand=msi&series=creator" },
-    ]
-  },
-  {
-    name: "Laptop Like New",
-    href: "/category/laptop-cu",
-    children: [
-      { name: "MacBook Cũ", href: "/category/laptop-cu?brand=apple" },
-      { name: "Dell Cũ", href: "/category/laptop-cu?brand=dell" },
-      { name: "Lenovo Cũ", href: "/category/laptop-cu?brand=lenovo" },
-      { name: "HP Cũ", href: "/category/laptop-cu?brand=hp" },
-      { name: "Asus Cũ", href: "/category/laptop-cu?brand=asus" },
-      { name: "Acer Cũ", href: "/category/laptop-cu?brand=acer" },
-    ]
-  },
-  {
-    name: "Linh Kiện – Phụ Kiện",
-    href: "/category/linh-kien",
-    children: [
-      { name: "Bàn Phím", href: "/category/linh-kien?sub=ban-phim" },
-      { name: "Chuột Máy Tính", href: "/category/linh-kien?sub=chuot" },
-      { name: "Tai Nghe", href: "/category/linh-kien?sub=tai-nghe" },
-      { name: "Webcam", href: "/category/linh-kien?sub=webcam" },
-      { name: "Ổ Cứng SSD", href: "/category/linh-kien?sub=ssd" },
-      { name: "RAM Laptop", href: "/category/linh-kien?sub=ram" },
-      { name: "Sạc & Cáp", href: "/category/linh-kien?sub=sac-cap" },
-      { name: "Túi & Balo", href: "/category/linh-kien?sub=tui-balo" },
-    ]
-  },
-  {
-    name: "Microsoft Surface",
-    href: "/category/surface",
-    children: [
-      { name: "Surface Pro", href: "/category/surface?series=pro" },
-      { name: "Surface Laptop", href: "/category/surface?series=laptop" },
-      { name: "Surface Go", href: "/category/surface?series=go" },
-      { name: "Surface Book", href: "/category/surface?series=book" },
-    ]
-  },
-  {
-    name: "PC- Máy tính để bàn",
-    href: "/category/pc",
-    children: [
-      { name: "PC Gaming", href: "/category/pc?sub=gaming" },
-      { name: "PC Văn Phòng", href: "/category/pc?sub=van-phong" },
-      { name: "PC Đồ Họa", href: "/category/pc?sub=do-hoa" },
-      { name: "PC Mini", href: "/category/pc?sub=mini" },
-      { name: "All-in-One", href: "/category/pc?sub=all-in-one" },
-    ]
-  },
-  {
-    name: "Linh kiện PC- Máy bàn",
-    href: "/category/linh-kien-pc",
-    children: [
-      { name: "CPU / Bộ vi xử lý", href: "/category/linh-kien-pc?sub=cpu" },
-      { name: "Mainboard", href: "/category/linh-kien-pc?sub=mainboard" },
-      { name: "RAM PC", href: "/category/linh-kien-pc?sub=ram" },
-      { name: "VGA / Card màn hình", href: "/category/linh-kien-pc?sub=vga" },
-      { name: "Nguồn Máy Tính", href: "/category/linh-kien-pc?sub=nguon" },
-      { name: "Case / Thùng máy", href: "/category/linh-kien-pc?sub=case" },
-      { name: "Tản Nhiệt", href: "/category/linh-kien-pc?sub=tan-nhiet" },
-      { name: "Ổ Cứng SSD / HDD", href: "/category/linh-kien-pc?sub=o-cung" },
-    ]
-  },
-  {
-    name: "Camera",
-    href: "/category/camera",
-    children: [
-      { name: "Camera Wifi", href: "/category/camera?sub=wifi" },
-      { name: "Camera IP", href: "/category/camera?sub=ip" },
-      { name: "Camera Hành Trình", href: "/category/camera?sub=hanh-trinh" },
-      { name: "Phụ Kiện Camera", href: "/category/camera?sub=phu-kien" },
-    ]
-  },
-];
+export interface HeaderCategoryItem {
+  id?: string;
+  name: string;
+  slug?: string;
+  href: string;
+  productCount?: number;
+  children?: { name: string; href: string }[];
+}
 
-export default function Header() {
+export interface HeaderNavItem {
+  name: string;
+  href: string;
+  hot?: boolean;
+  children?: { name: string; href: string }[];
+}
+
+export interface HeaderProps {
+  categories?: CategorySummary[];
+  brands?: BrandSummary[];
+}
+
+export default function Header({ categories = [], brands = [] }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const router = useRouter();
+  const [hoveredNav, setHoveredNav] = useState<number | null>(null);
+  const pathname = usePathname();
   const menuRef = useRef<HTMLDivElement>(null);
   const { wishlistCount } = useWishlist();
 
@@ -172,45 +86,78 @@ export default function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const navItems = [
-    { name: "HOT SALE", href: "/hot-sale", hot: true },
-    {
-      name: "Laptop Gaming",
-      href: "/category/laptop-gaming",
-      children: [
-        { name: "Lenovo Legion", href: "/category/laptop-gaming?brand=lenovo&series=legion" },
-        { name: "Asus ROG", href: "/category/laptop-gaming?brand=asus&series=rog" },
-        { name: "Acer Predator", href: "/category/laptop-gaming?brand=acer&series=predator" },
-        { name: "MSI Gaming", href: "/category/laptop-gaming?brand=msi" },
-        { name: "HP Omen", href: "/category/laptop-gaming?brand=hp&series=omen" },
-        { name: "Dell Alienware", href: "/category/laptop-gaming?brand=dell&series=alienware" },
-        { name: "Lenovo LOQ", href: "/category/laptop-gaming?brand=lenovo&series=loq" },
-        { name: "Gigabyte AORUS", href: "/category/laptop-gaming?brand=gigabyte&series=aorus" },
-      ]
-    },
-    {
-      name: "Laptop Văn Phòng",
-      href: "/category/laptop-van-phong",
-      children: [
-        { name: "MacBook Air", href: "/category/laptop-van-phong?brand=apple&series=macbook-air" },
-        { name: "MacBook Pro", href: "/category/laptop-van-phong?brand=apple&series=macbook-pro" },
-        { name: "Dell XPS", href: "/category/laptop-van-phong?brand=dell&series=xps" },
-        { name: "Dell Inspiron", href: "/category/laptop-van-phong?brand=dell&series=inspiron" },
-        { name: "Lenovo ThinkPad", href: "/category/laptop-van-phong?brand=lenovo&series=thinkpad" },
-        { name: "Lenovo IdeaPad", href: "/category/laptop-van-phong?brand=lenovo&series=ideapad" },
-        { name: "HP EliteBook", href: "/category/laptop-van-phong?brand=hp&series=elitebook" },
-        { name: "HP Pavilion", href: "/category/laptop-van-phong?brand=hp&series=pavilion" },
-        { name: "Asus ZenBook", href: "/category/laptop-van-phong?brand=asus&series=zenbook" },
-        { name: "Acer Swift", href: "/category/laptop-van-phong?brand=acer&series=swift" },
-      ]
-    },
-    { name: "Laptop Đồ Hoạ - Kỹ Thuật", href: "/category/laptop-do-hoa" },
-    { name: "Apple - Macbook", href: "/category/macbook" },
-    { name: "Linh Kiện - Phụ Kiện", href: "/category/linh-kien" },
-    { name: "Tin tức - Review", href: "/news" },
-  ];
+  // Keyboard accessibility: Escape closes menus
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        setHoveredItem(null);
+        setHoveredNav(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
-  const [hoveredNav, setHoveredNav] = useState<number | null>(null);
+  // Build dynamic dropdown categories from D1 data
+  const dynamicCategoryMenu: HeaderCategoryItem[] = categories.length > 0
+    ? categories.map((cat) => {
+        const children = cat.subCategories && cat.subCategories.length > 0
+          ? cat.subCategories.map((sub) => ({
+              name: sub.name,
+              href: `/category/${sub.slug}`,
+            }))
+          : brands.length > 0 && !cat.slug.includes("linh-kien") && !cat.slug.includes("camera")
+            ? brands.map((b) => ({
+                name: `${cat.name.replace("Laptop ", "")} ${b.name}`,
+                href: `/category/${cat.slug}?brand=${b.slug}`,
+              }))
+            : undefined;
+
+        return {
+          id: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+          href: `/category/${cat.slug}`,
+          productCount: cat.productCount,
+          children,
+        };
+      })
+    : [
+        { name: "Laptop Gaming", slug: "laptop-gaming", href: "/category/laptop-gaming" },
+        { name: "Laptop Văn Phòng", slug: "laptop-van-phong", href: "/category/laptop-van-phong" },
+        { name: "Laptop Đồ Họa – Kĩ Thuật", slug: "laptop-do-hoa", href: "/category/laptop-do-hoa" },
+        { name: "Laptop Like New", slug: "laptop-cu", href: "/category/laptop-cu" },
+        { name: "Linh Kiện – Phụ Kiện", slug: "linh-kien", href: "/category/linh-kien" },
+      ];
+
+  // Build top navbar items from D1 data
+  const topNavCategories: HeaderNavItem[] = categories.length > 0
+    ? categories.slice(0, 5).map((cat) => ({
+        name: cat.name,
+        href: `/category/${cat.slug}`,
+        children: brands.length > 0 && !cat.slug.includes("linh-kien")
+          ? brands.map((b) => ({
+              name: b.name,
+              href: `/category/${cat.slug}?brand=${b.slug}`,
+            }))
+          : undefined,
+      }))
+    : [
+        { name: "Laptop Gaming", href: "/category/laptop-gaming" },
+        { name: "Laptop Văn Phòng", href: "/category/laptop-van-phong" },
+        { name: "Laptop Đồ Hoạ - Kỹ Thuật", href: "/category/laptop-do-hoa" },
+        { name: "Laptop Like New", href: "/category/laptop-cu" },
+        { name: "Linh Kiện - Phụ Kiện", href: "/category/linh-kien" },
+      ];
+
+  const dynamicNavItems: HeaderNavItem[] = [
+    { name: "HOT SALE", href: "/hot-sale", hot: true },
+    ...topNavCategories,
+    { name: "Cửa hàng", href: "/he-thong-cua-hang" },
+    { name: "Giới thiệu", href: "/gioi-thieu" },
+    { name: "Tin tức", href: "/news" },
+  ];
 
   return (
     <header className="w-full sticky top-0 z-50 shadow-md">
@@ -232,6 +179,12 @@ export default function Header() {
             <div className="relative hidden md:block" ref={menuRef}>
               {/* Button Danh mục - Click to toggle */}
               <button
+                type="button"
+                id="category-menu-button"
+                aria-expanded={menuOpen}
+                aria-haspopup="true"
+                aria-controls="category-dropdown-menu"
+                aria-label="Danh mục sản phẩm"
                 onClick={() => {
                   setMenuOpen(!menuOpen);
                   setHoveredItem(null);
@@ -249,14 +202,19 @@ export default function Header() {
 
               {/* Dropdown Menu */}
               {menuOpen && (
-                <div className="absolute top-full left-0 pt-3 w-[280px] z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div
+                  id="category-dropdown-menu"
+                  role="region"
+                  aria-label="Menu danh mục sản phẩm"
+                  className="absolute top-full left-0 pt-3 w-[280px] z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                >
                   <div className="bg-white rounded-2xl shadow-2xl shadow-gray-200/60 py-2 text-sm text-gray-700 relative border border-gray-100/80">
                     {/* Decorative top gradient */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 rounded-t-2xl"></div>
 
-                    {categoryMenu.map((item, idx) => {
-                      const IconComponent = categoryIcons[item.name] || Laptop;
-                      const hasChildren = !!item.children;
+                    {dynamicCategoryMenu.map((item, idx) => {
+                      const IconComponent = (item.slug && categoryIcons[item.slug]) || categoryIcons[item.name] || Laptop;
+                      const hasChildren = !!item.children && item.children.length > 0;
                       const isHovered = hoveredItem === idx;
 
                       return (
@@ -283,7 +241,7 @@ export default function Header() {
                                   isHovered ? "text-blue-600" : "text-gray-400"
                                 }`} />
                               </div>
-                              <span>{item.name}</span>
+                              <span className="truncate">{item.name}</span>
                             </div>
                             {hasChildren && (
                               <ChevronRight className={`w-4 h-4 transition-all duration-200 ${
@@ -299,9 +257,12 @@ export default function Header() {
                               <div className="absolute top-0 left-full w-[420px] z-50">
                                 <div className="bg-white shadow-2xl shadow-gray-200/80 rounded-xl border border-gray-100/80 overflow-hidden">
                                   {/* Compact header */}
-                                  <div className="bg-blue-600 px-4 py-3 flex items-center gap-2">
-                                    <IconComponent className="w-4 h-4 text-white" />
-                                    <span className="font-bold text-xs text-white">{item.name}</span>
+                                  <div className="bg-blue-600 px-4 py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <IconComponent className="w-4 h-4 text-white" />
+                                      <span className="font-bold text-xs text-white">{item.name}</span>
+                                    </div>
+                                    <span className="text-[10px] text-blue-100 uppercase tracking-wider font-semibold">Theo thương hiệu</span>
                                   </div>
 
                                   {/* Compact brand list */}
@@ -355,36 +316,27 @@ export default function Header() {
             </div>
 
             <div className="relative flex-grow">
-              <form
-                onSubmit={(e: FormEvent) => {
-                  e.preventDefault();
-                  if (searchQuery.trim()) router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-                }}
-                className="relative"
-              >
-                <input
-                  type="text"
-                  placeholder="Bạn cần tìm gì..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-10 pl-4 pr-12 rounded bg-white text-gray-800 outline-none text-sm focus:ring-2 focus:ring-blue-500"
-                />
-                <button type="submit" className="absolute right-0 top-0 h-10 w-12 flex items-center justify-center text-gray-800 hover:text-blue-600">
-                  <Search className="w-5 h-5" />
-                </button>
-              </form>
+              <SearchAutocomplete
+                placeholder="Bạn cần tìm gì..."
+                className="w-full"
+                size="md"
+              />
             </div>
           </div>
 
           {/* Action Links */}
           <div className="hidden lg:flex items-center gap-8 ml-4">
-            <div className="flex items-center gap-2">
+            <a
+              href={businessProfile.telHref}
+              className="flex items-center gap-2 hover:text-blue-400 transition"
+              title={`Gọi Hotline tư vấn ${businessProfile.displayPhone}`}
+            >
               <PhoneCall className="w-5 h-5 text-gray-300" />
               <div className="flex flex-col">
                 <span className="text-[11px] text-gray-400">Hotline</span>
-                <span className="text-sm font-bold">0899.188.186</span>
+                <span className="text-sm font-bold">{businessProfile.displayPhone}</span>
               </div>
-            </div>
+            </a>
 
             <Link href="/order-tracking" className="flex items-center gap-2 hover:text-blue-400 transition">
               <ClipboardCheck className="w-5 h-5 text-gray-300" />
@@ -419,41 +371,48 @@ export default function Header() {
       <div className="bg-white border-b border-gray-200 hidden md:block">
         <div className="container mx-auto px-4 max-w-[1370px]">
           <ul className="flex items-center justify-between py-3">
-            {navItems.map((item, index) => (
-              <li
-                key={index}
-                className="relative"
-                onMouseEnter={() => item.children && setHoveredNav(index)}
-                onMouseLeave={() => item.children && setHoveredNav(null)}
-              >
-                <Link
-                  href={item.href}
-                  className={`flex items-center gap-1 text-sm font-bold uppercase transition hover:text-blue-600 ${
-                    item.hot ? "text-red-600" : "text-gray-800"
-                  }`}
+            {dynamicNavItems.map((item, index) => {
+              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
+              return (
+                <li
+                  key={index}
+                  className="relative"
+                  onMouseEnter={() => item.children && setHoveredNav(index)}
+                  onMouseLeave={() => item.children && setHoveredNav(null)}
                 >
-                  {item.name}
-                  {item.children && <ChevronDown className="w-4 h-4" />}
-                </Link>
+                  <Link
+                    href={item.href}
+                    className={`flex items-center gap-1 text-sm font-bold uppercase transition hover:text-blue-600 ${
+                      isActive
+                        ? "text-blue-600 border-b-2 border-blue-600 pb-0.5"
+                        : item.hot
+                        ? "text-red-600"
+                        : "text-gray-800"
+                    }`}
+                  >
+                    {item.name}
+                    {item.children && <ChevronDown className="w-4 h-4" />}
+                  </Link>
 
-                {/* Dropdown */}
-                {item.children && hoveredNav === index && (
-                  <div className="absolute top-full left-0 pt-2 z-50">
-                    <div className="bg-white rounded-xl shadow-xl shadow-gray-200/60 border border-gray-100 py-2 min-w-[200px]">
-                      {item.children.map((sub, sidx) => (
-                        <Link
-                          key={sidx}
-                          href={sub.href}
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
-                        >
-                          {sub.name}
-                        </Link>
-                      ))}
+                  {/* Dropdown */}
+                  {item.children && hoveredNav === index && (
+                    <div className="absolute top-full left-0 pt-2 z-50">
+                      <div className="bg-white rounded-xl shadow-xl shadow-gray-200/60 border border-gray-100 py-2 min-w-[200px]">
+                        {item.children.map((sub, sidx) => (
+                          <Link
+                            key={sidx}
+                            href={sub.href}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
+                          >
+                            {sub.name}
+                          </Link>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </li>
-            ))}
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>

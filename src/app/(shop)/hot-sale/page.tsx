@@ -159,7 +159,7 @@ export default function HotSalePage() {
   const ultrabookFiltered = activeTab === "Tất cả" || activeTab === "Ultrabook" ? ultrabookProducts : [];
 
   return (
-    <main className="min-h-screen bg-[#f1f5f9] pb-12">
+    <div className="min-h-screen bg-surface-subtle pb-12">
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-red-700 via-red-600 to-orange-500 py-10 text-white">
         <div className="mx-auto max-w-[1370px] px-4 text-center">
@@ -232,6 +232,6 @@ export default function HotSalePage() {
           </Link>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

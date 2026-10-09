@@ -83,6 +83,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     });
   } catch (error) {
     console.error("Failed to load recommendations:", error);
-    return NextResponse.json({ success: true, data: { related: [], bundles: [] } });
+    return NextResponse.json({ success: false, error: "Failed to load recommendations" }, { status: 500 });
   }
 }

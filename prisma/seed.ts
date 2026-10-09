@@ -122,9 +122,26 @@ async function main() {
   if (!existingOrder) {
     await prisma.order.create({
       data: {
-        userId: user.id, status: "Đã hoàn thành", totalAmount: demoProduct.price,
-        shippingAddress: "Demo seed - Hà Nội", paymentMethod: "COD", paymentStatus: "Đã thanh toán",
-        items: { create: [{ productId: demoProduct.id, quantity: 1, price: demoProduct.price }] },
+        userId: user.id,
+        customerName: "Khách hàng Demo",
+        customerPhone: "0901234567",
+        status: "COMPLETED",
+        totalAmount: demoProduct.price,
+        subtotalAmount: demoProduct.price,
+        shippingAddress: "Demo seed - Hà Nội",
+        paymentMethod: "COD",
+        paymentStatus: "COMPLETED",
+        items: {
+          create: [{
+            productId: demoProduct.id,
+            productName: demoProduct.name,
+            productNameSnapshot: demoProduct.name,
+            quantity: 1,
+            price: demoProduct.price,
+            priceSnapshot: demoProduct.price,
+            lineTotal: demoProduct.price,
+          }],
+        },
       },
     });
   }

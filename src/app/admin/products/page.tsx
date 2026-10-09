@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Search, Edit, Trash2, Tag, RefreshCw, Download, Upload, Filter, CheckSquare, Square } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Tag, RefreshCw, Download, Filter, CheckSquare, Square } from "lucide-react";
+import Image from "next/image";
 
 type Product = {
   id: string;
@@ -218,7 +219,7 @@ export default function ProductsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded border border-gray-200 p-1 flex-shrink-0 bg-white">
-                          <img src={getImage(product.images)} alt={product.name} className="w-full h-full object-contain" />
+                          <div className="relative w-full h-full"><Image src={getImage(product.images)} alt={product.name} fill sizes="48px" className="object-contain" /></div>
                         </div>
                         <div>
                           <div className="font-bold text-gray-900 text-sm">{product.name}</div>

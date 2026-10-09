@@ -2,19 +2,216 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0f172a;
+  --max-width-shop: 1370px;
 }
 
-@theme inline {
+@theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
+
+  /* Citilap Brand & Interactive Tokens */
+  --color-brand-primary: #2563eb;
+  --color-brand-primary-hover: #1d4ed8;
+  --color-brand-primary-subtle: #eff6ff;
+  --color-brand-accent: #f59e0b;
+  --color-brand-navy: #0b1221;
+  --color-brand-navy-surface: #0f172a;
+
+  /* Price & Promo Tokens */
+  --color-price-current: #dc2626;
+  --color-price-old: #94a3b8;
+  --color-discount: #dc2626;
+  --color-badge-sale: #dc2626;
+
+  /* Laptop Condition Tokens (Citilap Core) */
+  --color-condition-new: #1d4ed8;
+  --color-condition-new-bg: #eff6ff;
+  --color-condition-new-border: #bfdbfe;
+  --color-condition-like-new: #b45309;
+  --color-condition-like-new-bg: #fffbeb;
+  --color-condition-like-new-border: #fde68a;
+  --color-condition-used: #475569;
+  --color-condition-used-bg: #f1f5f9;
+  --color-condition-used-border: #cbd5e1;
+
+  /* Stock & Inventory State Tokens */
+  --color-stock-available: #15803d;
+  --color-stock-available-bg: #f0fdf4;
+  --color-stock-low: #d97706;
+  --color-stock-low-bg: #fffbeb;
+  --color-stock-out: #64748b;
+  --color-stock-out-bg: #f1f5f9;
+
+  /* Feedback Tokens */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-error: #dc2626;
+  --color-info: #2563eb;
+
+  /* Surface & Border Neutrals */
+  --color-surface: #ffffff;
+  --color-surface-card: #ffffff;
+  --color-surface-subtle: #f8fafc;
+  --color-surface-muted: #f1f5f9;
+  --color-surface-raised: #ffffff;
+  --color-border-default: #e2e8f0;
+  --color-border-subtle: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+
+  /* Text Hierarchy */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+  --color-text-inverse: #ffffff;
+
+  /* Standardized Radius Hierarchy */
+  --radius-sm: 0.25rem;        /* 4px - tiny badges */
+  --radius-control: 0.5rem;    /* 8px - buttons, inputs, chips */
+  --radius-card: 0.75rem;      /* 12px - product cards, standard panels */
+  --radius-surface: 1rem;      /* 16px - section containers, dialogs */
+  --radius-panel: 1rem;        /* 16px - panel borders */
+  --radius-pill: 9999px;       /* 9999px - badges, pill tags */
+
+  /* Standardized Subtle Shadows */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  --shadow-dropdown: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+  --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+  --shadow-popover: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
+
+  /* Container Storefront Width */
+  --container-shop: 1370px;
+  --max-width-shop: 1370px;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Storefront Typography Utilities */
+.text-caption {
+  font-size: 0.6875rem; /* 11px */
+  line-height: 1rem;
+}
+
+.text-label {
+  font-size: 0.75rem; /* 12px */
+  line-height: 1rem;
+}
+
+.text-body-sm {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.25rem;
+}
+
+.text-body {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem;
+}
+
+.text-body-lg {
+  font-size: 1rem; /* 16px */
+  line-height: 1.5rem;
+}
+
+.text-title-sm {
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.5rem;
+  font-weight: 600;
+}
+
+.text-title {
+  font-size: 1.25rem; /* 20px */
+  line-height: 1.75rem;
+  font-weight: 700;
+}
+
+.text-heading {
+  font-size: 1.5rem; /* 24px */
+  line-height: 2rem;
+  font-weight: 800;
+}
+
+.text-display {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.text-title-hero {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.text-title-section {
+  font-size: clamp(1.125rem, 2vw, 1.375rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.text-title-card {
+  font-size: 0.84375rem; /* ~13.5px */
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.text-price-current {
+  color: var(--color-price-current);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.text-price-old {
+  color: var(--color-price-old);
+  text-decoration: line-through;
+  font-size: 0.75rem;
+}
+
+/* Storefront Container Utility */
+.container-shop {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: var(--max-width-shop);
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .container-shop {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-shop {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Storefront Surfaces & Borders */
+.surface-card {
+  background-color: var(--color-surface-card);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.surface-card-hover:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-card-hover);
 }
 
 /* iOS safe area for bottom nav */
@@ -31,9 +228,10 @@ body {
   display: none;
 }
 
-/* Focus visible ring for keyboard accessibility */
-.focus-ring:focus-visible {
-  outline: 2px solid #3b82f6;
+/* Accessible focus visible ring */
+.focus-ring:focus-visible,
+*:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
   outline-offset: 2px;
 }
 
@@ -44,7 +242,17 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

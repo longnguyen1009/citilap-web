@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
+import { requireCronSecret } from "@/lib/auth";
 
 const hasDatabase = !!process.env.DATABASE_URL;
 
-export async function GET() {
+export async function POST(request: Request) {
+  const denied = requireCronSecret(request);
+  if (denied) return denied;
+
   if (!hasDatabase) return NextResponse.json({ success: true, message: "No database configured" });
 
   try {
@@ -15,16 +19,17 @@ export async function GET() {
     const toPublish = await prisma.product.findMany({
       where: {
         publishAt: { not: null, lte: now },
-        status: { not: "active" },
+        status: "draft",
       },
-      select: { id: true, name: true },
+      select: { id: true },
+      take: 100,
     });
 
     if (toPublish.length > 0) {
       const ids = toPublish.map((p) => p.id);
       await prisma.product.updateMany({ where: { id: { in: ids } }, data: { status: "active" } });
       published = ids.length;
-      console.log(`[Scheduler] Published ${published} products:`, toPublish.map((p) => p.name));
+      console.log(`[Scheduler] Published ${published} products`);
     }
 
     // Unpublish products whose unpublishAt has passed and status is still active
@@ -33,14 +38,15 @@ export async function GET() {
         unpublishAt: { not: null, lte: now },
         status: "active",
       },
-      select: { id: true, name: true },
+      select: { id: true },
+      take: 100,
     });
 
     if (toUnpublish.length > 0) {
       const ids = toUnpublish.map((p) => p.id);
       await prisma.product.updateMany({ where: { id: { in: ids } }, data: { status: "archived" } });
       unpublished = ids.length;
-      console.log(`[Scheduler] Unpublished ${unpublished} products:`, toUnpublish.map((p) => p.name));
+      console.log(`[Scheduler] Unpublished ${unpublished} products`);
     }
 
     // Clean up old versions (keep last 10 per product)

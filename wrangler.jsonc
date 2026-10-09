@@ -1,0 +1,69 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "citilap-ecommerce",
+  "compatibility_date": "2024-11-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "citilap-db-dev",
+      "database_id": "932e3840-8062-49c9-8d4a-c6d0d33457ea",
+      "migrations_dir": "d1-migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PRODUCT_MEDIA",
+      "bucket_name": "citilap-media-dev"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "env": {
+    "staging": {
+      "name": "citilap-ecommerce-staging",
+      "vars": {
+        "APP_ENV": "staging",
+        "NEXT_PUBLIC_SITE_URL": "https://staging.citilap.vn"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "citilap-db-staging",
+          "database_id": "STAGING_D1_DB_ID_PLACEHOLDER",
+          "migrations_dir": "d1-migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "PRODUCT_MEDIA",
+          "bucket_name": "citilap-media-staging"
+        }
+      ]
+    },
+    "production": {
+      "name": "citilap-ecommerce-prod",
+      "vars": {
+        "APP_ENV": "production",
+        "NEXT_PUBLIC_SITE_URL": "https://citilap.vn"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "citilap-db-prod",
+          "database_id": "PROD_D1_DB_ID_PLACEHOLDER",
+          "migrations_dir": "d1-migrations"
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "PRODUCT_MEDIA",
+          "bucket_name": "citilap-media-prod"
+        }
+      ]
+    }
+  }
+}

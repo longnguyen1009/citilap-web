@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/client"
+import type * as runtime from "@prisma/client/runtime/wasm-compiler-edge"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -320,6 +320,16 @@ export type ProductVersionUncheckedUpdateManyInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+export type ProductVersionListRelationFilter = {
+  every?: Prisma.ProductVersionWhereInput
+  some?: Prisma.ProductVersionWhereInput
+  none?: Prisma.ProductVersionWhereInput
+}
+
+export type ProductVersionOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
+}
+
 export type ProductVersionProductIdVersionCompoundUniqueInput = {
   productId: string
   version: number
@@ -355,24 +365,6 @@ export type ProductVersionMinOrderByAggregateInput = {
 
 export type ProductVersionSumOrderByAggregateInput = {
   version?: Prisma.SortOrder
-}
-
-export type ProductVersionListRelationFilter = {
-  every?: Prisma.ProductVersionWhereInput
-  some?: Prisma.ProductVersionWhereInput
-  none?: Prisma.ProductVersionWhereInput
-}
-
-export type ProductVersionOrderByRelationAggregateInput = {
-  _count?: Prisma.SortOrder
-}
-
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
 }
 
 export type ProductVersionCreateNestedManyWithoutProductInput = {

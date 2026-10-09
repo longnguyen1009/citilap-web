@@ -6,32 +6,56 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:cloudflare": "vite dev --port 3001",
+    "build:cloudflare": "vite build",
+    "cf:typegen": "wrangler types --include-runtime=false",
+    "cf:deploy": "vinext-cloudflare deploy",
+    "db:generate": "prisma generate && node scripts/post-prisma-generate.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply citilap-db-dev --local",
+    "db:migrate:remote": "wrangler d1 migrations apply citilap-db-dev --remote",
+    "db:query:local": "wrangler d1 execute citilap-db-dev --local",
+    "db:seed:local": "wrangler d1 execute citilap-db-dev --local --file=scripts/seed-development.sql",
+    "verify:cf": "node scripts/build-verify.mjs && wrangler dev scripts/verify-cf.mjs --port 8787",
+    "postinstall": "node scripts/post-prisma-generate.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
     "@prisma/adapter-better-sqlite3": "^7.9.1",
+    "@prisma/adapter-d1": "^7.9.1",
     "@prisma/adapter-libsql": "^7.9.1",
     "@prisma/client": "^7.9.1",
+    "@vinext/cloudflare": "^1.0.1",
     "better-sqlite3": "^13.0.3",
     "lucide-react": "^1.33.0",
     "next": "16.3.1",
     "prisma": "^7.9.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-server-dom-webpack": "19.2.8",
+    "vinext": "^1.0.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1",
+    "@cloudflare/workers-types": "^5.20261006.1",
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "latest",
+    "@vitejs/plugin-rsc": "latest",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "latest",
+    "wrangler": "^4.147.0"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true,
     "better-sqlite3@13.0.3": true
-  }
+  },
+  "type": "module"
 }

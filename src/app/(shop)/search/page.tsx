@@ -1,185 +1,124 @@
-"use client";
-
-import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
-import { Search as SearchIcon, RefreshCw } from "lucide-react";
-import ProductCard from "@/components/product/ProductCard";
+import { Suspense } from "react";
+import type { Metadata } from "next";
 import Breadcrumb from "@/components/layout/Breadcrumb";
+import SearchListingContainer from "@/components/search/SearchListingContainer";
+import {
+  searchProducts,
+  type SearchFilterOptions,
+} from "@/server/services/search.service";
 
-type Product = {
-  id: string;
-  name: string;
-  price: number;
-  originalPrice: number | null;
-  images: string;
-  stock: number;
-  status: string;
-  specs: string | null;
-  category?: { name: string; slug: string } | null;
-};
+interface SearchPageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
 
-function parseImages(images: string): string {
-  try {
-    const parsed = JSON.parse(images);
-    return Array.isArray(parsed) && parsed[0] ? parsed[0] : "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop";
-  } catch {
-    return images || "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=800&auto=format&fit=crop";
+export async function generateMetadata({
+  searchParams,
+}: SearchPageProps): Promise<Metadata> {
+  const sp = await searchParams;
+  const q = typeof sp.q === "string" ? sp.q.trim() : "";
+
+  if (q) {
+    return {
+      title: `Tìm kiếm "${q}" | CitiLap.vn`,
+      description: `Kết quả tìm kiếm sản phẩm laptop, máy tính và linh kiện cho từ khóa "${q}" tại Citilap.vn. Hàng chính hãng, bảo hành uy tín.`,
+      robots: {
+        index: false,
+        follow: true,
+      },
+    };
   }
+
+  return {
+    title: "Tìm kiếm sản phẩm laptop chính hãng | CitiLap.vn",
+    description: "Tìm kiếm laptop gaming, laptop văn phòng, đồ họa và linh kiện giá tốt nhất tại Citilap.vn.",
+    robots: {
+      index: false,
+      follow: true,
+    },
+  };
 }
 
-function parseSpecs(specs: string | null): { cpu: string; ram: string; ssd: string; gpu: string; display: string } {
-  const fallback = { cpu: "", ram: "", ssd: "", gpu: "", display: "" };
-  if (!specs) return fallback;
-  try {
-    const parsed = JSON.parse(specs);
-    return { ...fallback, ...parsed };
-  } catch {
-    return fallback;
-  }
-}
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const sp = await searchParams;
 
-function formatPrice(price: number): string {
-  return price.toLocaleString("vi-VN") + "đ";
-}
-
-function SearchPageContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const query = searchParams.get("q") || "";
-  const [results, setResults] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchInput, setSearchInput] = useState(query);
-
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
-    setLoading(true);
-    fetch(`/api/products?search=${encodeURIComponent(query)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.success) setResults(data.data);
-        else setResults([]);
-      })
-      .catch(() => setResults([]))
-      .finally(() => setLoading(false));
-  }, [query]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchInput.trim()) router.push(`/search?q=${encodeURIComponent(searchInput.trim())}`);
+  const getStringOrArray = (val: string | string[] | undefined): string[] => {
+    if (!val) return [];
+    return Array.isArray(val) ? val : [val];
   };
 
+  const getNumberOrArray = (val: string | string[] | undefined): number[] => {
+    if (!val) return [];
+    const arr = Array.isArray(val) ? val : [val];
+    return arr.map(Number).filter((n) => !isNaN(n));
+  };
+
+  // Price presets
+  let minPrice = sp.minPrice ? Number(sp.minPrice) : undefined;
+  let maxPrice = sp.maxPrice ? Number(sp.maxPrice) : undefined;
+
+  if (typeof sp.pricePreset === "string" && !minPrice && !maxPrice) {
+    if (sp.pricePreset === "under-15" || sp.pricePreset === "under-15m") maxPrice = 15_000_000;
+    else if (sp.pricePreset === "15-20" || sp.pricePreset === "15m-20m") {
+      minPrice = 15_000_000;
+      maxPrice = 20_000_000;
+    } else if (sp.pricePreset === "20-30" || sp.pricePreset === "20m-25m") {
+      minPrice = 20_000_000;
+      maxPrice = 30_000_000;
+    } else if (sp.pricePreset === "over-30" || sp.pricePreset === "above-30m") {
+      minPrice = 30_000_000;
+    }
+  }
+
+  const query = typeof sp.q === "string" ? sp.q.trim() : "";
+
+  const sortValue =
+    typeof sp.sort === "string" &&
+    ["relevance", "price-asc", "price-desc", "newest"].includes(sp.sort)
+      ? (sp.sort as SearchFilterOptions["sort"])
+      : query
+      ? "relevance"
+      : "newest";
+
+  const options: SearchFilterOptions = {
+    query,
+    brand: getStringOrArray(sp.brand),
+    category: getStringOrArray(sp.category),
+    condition: getStringOrArray(sp.condition),
+    minPrice,
+    maxPrice,
+    cpu: getStringOrArray(sp.cpu),
+    gpu: getStringOrArray(sp.gpu),
+    ram: getNumberOrArray(sp.ram),
+    storage: getNumberOrArray(sp.storage),
+    sort: sortValue,
+    page: sp.page ? Math.max(1, Number(sp.page)) : 1,
+    limit: 12,
+  };
+
+  const searchResult = await searchProducts(options);
+
+  const breadcrumbItems = [
+    { label: "Trang chủ", href: "/" },
+    { label: "Tìm kiếm", href: "/search" },
+    ...(query ? [{ label: `"${query}"`, href: `/search?q=${encodeURIComponent(query)}` }] : []),
+  ];
+
   return (
-    <div className="bg-[#f1f5f9] min-h-screen pb-12">
-      <Breadcrumb items={[
-        { label: "Trang chủ", href: "/" },
-        { label: "Tìm kiếm", href: "/search" },
-      ]} />
+    <div className="bg-surface min-h-screen pb-16">
+      <Breadcrumb items={breadcrumbItems} />
 
-      <div className="container mx-auto px-4 max-w-[1370px] mt-6">
-        {/* Search Bar */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-          <h1 className="text-2xl font-black text-gray-900 uppercase mb-4">Tìm kiếm sản phẩm</h1>
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <div className="relative flex-1">
-              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Nhập tên sản phẩm, CPU, GPU, thương hiệu..."
-                aria-label="Tìm kiếm sản phẩm"
-                className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm"
-              />
+      <main className="container mx-auto px-4 max-w-[1370px] mt-6">
+        <Suspense
+          fallback={
+            <div className="bg-surface-card border border-border-default rounded-card p-12 text-center">
+              <div className="w-8 h-8 border-3 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-body-sm text-text-muted">Đang tìm kiếm sản phẩm...</p>
             </div>
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-lg transition shadow-md shadow-blue-600/30 shrink-0">
-              Tìm kiếm
-            </button>
-          </form>
-        </div>
-
-        {/* Results */}
-        {query ? (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-gray-600">
-                {loading ? (
-                  "Đang tìm kiếm..."
-                ) : (
-                  <>
-                    Tìm thấy <span className="font-bold text-blue-600">{results.length}</span> sản phẩm cho &quot;<span className="font-bold">{query}</span>&quot;
-                  </>
-                )}
-              </p>
-            </div>
-
-            {loading ? (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-                <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-gray-500">Đang tìm kiếm sản phẩm...</p>
-              </div>
-            ) : results.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {results.map((p) => (
-                  <ProductCard
-                    key={p.id}
-                    product={{
-                      id: p.id,
-                      name: p.name,
-                      price: formatPrice(p.price),
-                      oldPrice: p.originalPrice ? formatPrice(p.originalPrice) : null,
-                      discount: p.originalPrice ? `-${Math.round((1 - p.price / p.originalPrice) * 100)}%` : undefined,
-                      image: parseImages(p.images),
-                      specs: parseSpecs(p.specs),
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-                <SearchIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-gray-800 mb-2">Không tìm thấy sản phẩm</h2>
-                <p className="text-gray-500 mb-6">Không có sản phẩm nào khớp với từ khoá &quot;{query}&quot;.</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {["Legion", "MacBook", "ROG", "Dell XPS", "RTX 4060", "Predator"].map((sug) => (
-                    <Link key={sug} href={`/search?q=${sug}`} className="px-4 py-2 bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-sm font-bold text-gray-700 rounded-full transition">
-                      {sug}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-            <SearchIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-gray-800 mb-2">Nhập từ khoá để tìm kiếm</h2>
-            <p className="text-gray-500 mb-6">Tìm kiếm laptop, linh kiện, phụ kiện và nhiều hơn nữa.</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {["Laptop Gaming", "MacBook", "RTX 4060", "Dell XPS", "Lenovo Legion", "Acer Predator"].map((sug) => (
-                <button key={sug} onClick={() => router.push(`/search?q=${sug}`)} className="px-4 py-2 bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-sm font-bold text-gray-700 rounded-full transition">
-                  {sug}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+          }
+        >
+          <SearchListingContainer initialData={searchResult} />
+        </Suspense>
+      </main>
     </div>
-  );
-}
-
-export default function SearchPage() {
-  return (
-    <Suspense fallback={
-      <div className="bg-[#f1f5f9] min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Đang tải...</p>
-      </div>
-    }>
-      <SearchPageContent />
-    </Suspense>
   );
 }

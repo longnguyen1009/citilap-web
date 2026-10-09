@@ -1,0 +1,236 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import {
+  ChevronRight,
+  MapPin,
+  Phone,
+  Mail,
+  Clock,
+  ExternalLink,
+  MessageCircle,
+  Store,
+} from "lucide-react";
+import { businessProfile } from "@/config/business-profile";
+import ContactForm from "@/components/contact/ContactForm";
+
+export const metadata: Metadata = {
+  title: `Liên hệ & Hệ thống chi nhánh | ${businessProfile.brandName}`,
+  description: `Liên hệ với ${businessProfile.brandName} - Hotline: ${businessProfile.displayPhone}, Email: ${businessProfile.email}. Địa chỉ chi nhánh Hà Nội & Bắc Ninh, giờ làm việc và hướng dẫn chỉ đường.`,
+  alternates: {
+    canonical: `${businessProfile.canonicalSiteUrl}/lien-he`,
+  },
+  openGraph: {
+    title: `Liên hệ ${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
+    description: `Hotline: ${businessProfile.displayPhone}. Địa chỉ cơ sở Hà Nội và Bắc Ninh.`,
+    url: `${businessProfile.canonicalSiteUrl}/lien-he`,
+  },
+};
+
+export default function ContactPage() {
+  const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
+  const hcm = businessProfile.locations.find((l) => l.id === "hcm")!;
+
+  return (
+    <div className="bg-[#f8fafc] min-h-screen pb-16">
+      {/* 1. Breadcrumb */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-4 max-w-[1240px]">
+          <nav className="flex text-sm text-gray-500 py-3.5 font-medium items-center">
+            <Link href="/" className="hover:text-blue-600 transition">
+              Trang chủ
+            </Link>
+            <ChevronRight className="w-4 h-4 mx-2 text-gray-400" />
+            <span className="text-gray-900 font-bold">Liên hệ & Chi nhánh</span>
+          </nav>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 max-w-[1240px] mt-8">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">
+            Liên hệ với {businessProfile.brandName}
+          </h1>
+          <p className="text-sm text-gray-600 mt-2">
+            Đội ngũ chuyên viên kỹ thuật luôn sẵn sàng hỗ trợ giải đáp thắc mắc về cấu hình máy, kiểm tra tình trạng hàng và chính sách hậu mãi.
+          </p>
+        </div>
+
+        {/* 2. Quick Action Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          <a
+            href={businessProfile.telHref}
+            className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs hover:border-blue-500 hover:shadow-md transition group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+              <Phone className="w-5 h-5" />
+            </div>
+            <div className="text-xs text-gray-500 font-medium">Hotline tư vấn chính</div>
+            <div className="text-base font-bold text-gray-900 mt-0.5">{businessProfile.displayPhone}</div>
+            <div className="text-[11px] text-blue-600 font-medium mt-1">Bấm để gọi ngay →</div>
+          </a>
+
+          <a
+            href={bacNinh.telHref}
+            className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs hover:border-emerald-500 hover:shadow-md transition group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+              <Phone className="w-5 h-5" />
+            </div>
+            <div className="text-xs text-gray-500 font-medium">Hotline cơ sở Bắc Ninh</div>
+            <div className="text-base font-bold text-gray-900 mt-0.5">{bacNinh.displayPhone}</div>
+            <div className="text-[11px] text-emerald-600 font-medium mt-1">Bấm để gọi ngay →</div>
+          </a>
+
+          <a
+            href={`mailto:${businessProfile.email}`}
+            className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs hover:border-blue-500 hover:shadow-md transition group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="text-xs text-gray-500 font-medium">Email liên hệ</div>
+            <div className="text-sm font-bold text-gray-900 mt-0.5 truncate">{businessProfile.email}</div>
+            <div className="text-[11px] text-purple-600 font-medium mt-1">Gửi thư hỗ trợ →</div>
+          </a>
+
+          <a
+            href={businessProfile.socialProfiles.zalo}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs hover:border-blue-500 hover:shadow-md transition group"
+          >
+            <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+              <MessageCircle className="w-5 h-5" />
+            </div>
+            <div className="text-xs text-gray-500 font-medium">Kênh Zalo tư vấn</div>
+            <div className="text-base font-bold text-gray-900 mt-0.5">{businessProfile.socialProfiles.zaloPhone}</div>
+            <div className="text-[11px] text-sky-600 font-medium mt-1">Chat Zalo trực tiếp →</div>
+          </a>
+        </div>
+
+        {/* 3. Detailed Showrooms Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start mb-12">
+          {/* Left: Showroom List (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            <h2 className="text-xl font-black text-gray-900 uppercase flex items-center gap-2">
+              <Store className="w-5 h-5 text-blue-600" /> Hệ thống cơ sở phục vụ
+            </h2>
+
+            {/* Cơ sở Hà Nội */}
+            <div className="bg-white rounded-2xl p-6 border-2 border-blue-500/80 shadow-sm space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 mb-1">
+                    Trụ sở chính • Đang hoạt động
+                  </span>
+                  <h3 className="text-lg font-bold text-gray-900">{hanoi.name}</h3>
+                </div>
+                {hanoi.mapsUrl && (
+                  <a
+                    href={hanoi.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-red-500" /> Chỉ đường <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+
+              <div className="space-y-2 text-xs text-gray-600">
+                <div className="flex gap-2.5">
+                  <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span><strong>Địa chỉ:</strong> {hanoi.address}</span>
+                </div>
+                <div className="flex gap-2.5">
+                  <Phone className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span><strong>Điện thoại:</strong> <a href={hanoi.telHref} className="text-blue-600 font-bold hover:underline">{hanoi.displayPhone}</a></span>
+                </div>
+                <div className="flex gap-2.5">
+                  <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p><strong>Thứ Hai – Thứ Bảy:</strong> 09:00 – 20:00</p>
+                    <p className="text-amber-700 font-medium"><strong>Chủ nhật:</strong> Tiếp khách và tư vấn theo lịch hẹn trước</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-gray-100 text-xs text-emerald-700 font-medium space-y-1">
+                <p>✓ Tiếp khách xem và mua máy trực tiếp tại cơ sở</p>
+                <p>✓ Điểm nhận đơn online (Pickup) đã đặt trước trên website</p>
+                <p>✓ Hỗ trợ tiếp nhận bảo hành và kiểm tra kỹ thuật</p>
+              </div>
+            </div>
+
+            {/* Cơ sở Bắc Ninh */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-xs space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 mb-1">
+                    Cơ sở 2 • Đang hoạt động
+                  </span>
+                  <h3 className="text-lg font-bold text-gray-900">{bacNinh.name}</h3>
+                </div>
+                {bacNinh.mapsUrl && (
+                  <a
+                    href={bacNinh.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-xs font-semibold transition"
+                  >
+                    <MapPin className="w-3.5 h-3.5 text-red-500" /> Chỉ đường <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+
+              <div className="space-y-2 text-xs text-gray-600">
+                <div className="flex gap-2.5">
+                  <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span><strong>Địa chỉ:</strong> {bacNinh.address}</span>
+                </div>
+                <div className="flex gap-2.5">
+                  <Phone className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <span><strong>Điện thoại:</strong> <a href={bacNinh.telHref} className="text-emerald-600 font-bold hover:underline">{bacNinh.displayPhone}</a></span>
+                </div>
+                <div className="flex gap-2.5">
+                  <Clock className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p><strong>Thứ Hai – Thứ Bảy:</strong> 09:00 – 20:00</p>
+                    <p className="text-amber-700 font-medium"><strong>Chủ nhật:</strong> Tiếp khách theo lịch hẹn trước</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-gray-100 text-xs text-gray-600 space-y-1">
+                <p className="text-emerald-700 font-medium">✓ Đón khách đến xem máy, trải nghiệm và mua trực tiếp</p>
+                <p className="text-gray-500">
+                  <em>Lưu ý:</em> Cơ sở Bắc Ninh hiện chưa hỗ trợ nhận đơn online tại quầy. Khách đặt online vui lòng chọn &quot;Giao hàng tận nơi&quot; hoặc gọi hotline {bacNinh.displayPhone}.
+                </p>
+              </div>
+            </div>
+
+            {/* Cơ sở TP.HCM (Tạm đóng) */}
+            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200/80 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-200 text-gray-600">
+                  Tạm đóng cửa
+                </span>
+                <h3 className="text-sm font-bold text-gray-700">{hcm.name}</h3>
+              </div>
+              <p className="text-xs text-gray-500">{hcm.address}</p>
+              <p className="text-[11px] text-gray-500 italic">
+                {hcm.statusNotice}
+              </p>
+            </div>
+          </div>
+
+          {/* Right: Message Form (5 cols) */}
+          <div className="lg:col-span-5">
+            <ContactForm />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -19,6 +19,7 @@ export default function ProductPriceOptions({
   variants,
   initialPrice,
   initialOldPrice,
+  stock = 0,
   onAddToCart,
 }: {
   productId: string;
@@ -27,6 +28,7 @@ export default function ProductPriceOptions({
   variants: Variant[];
   initialPrice: string;
   initialOldPrice: string;
+  stock?: number;
   onAddToCart?: () => void;
 }) {
   const [selectedVariant, setSelectedVariant] = useState(variants[0] || null);
@@ -42,6 +44,7 @@ export default function ProductPriceOptions({
     addToCart({
       id: selectedVariant ? `${productId}-${selectedVariant.id}` : productId,
       productId,
+      variantId: selectedVariant?.id,
       name: productName,
       price: numericPrice,
       displayPrice: currentPrice,
@@ -72,7 +75,7 @@ export default function ProductPriceOptions({
           </div>
           <div className="flex items-center gap-1.5 bg-green-50/50 border border-green-100 px-2.5 py-1 rounded text-[12px] text-green-700">
             <Check className="w-3.5 h-3.5" />
-            <span className="font-bold">Còn hàng</span>
+            <span className="font-bold">{stock > 0 ? "In stock" : "Out of stock"}</span>
           </div>
         </div>
       </div>
@@ -127,22 +130,6 @@ export default function ProductPriceOptions({
         </button>
       </div>
 
-      {/* Voucher */}
-      <div className="mb-6 rounded-lg border border-dashed border-green-500 bg-green-50/40 p-4">
-        <div className="mb-2 text-sm font-bold text-green-700">Nhập mã giảm giá / voucher</div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Nhập mã coupon"
-            className="flex-1 rounded-md border border-green-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-          <button type="button" className="rounded-md bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700 transition">
-            Áp dụng
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-green-700/80">Nhập mã tại bước thanh toán để nhận ưu đãi tốt nhất.</p>
-      </div>
-
       {/* Gift Box (Dashed Red Border) */}
       <div className="border border-red-500 border-dashed rounded-lg p-4 pt-6 relative mb-6">
         <div className="absolute -top-3.5 left-4 bg-gradient-to-r from-red-500 to-red-600 text-white font-bold py-1 px-4 rounded-full flex items-center gap-2 text-sm shadow-sm">
@@ -158,7 +145,7 @@ export default function ProductPriceOptions({
           <li className="flex items-start gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-red-600 mt-1.5 shrink-0" />
             <div>
-              <span className="font-bold">Tặng kèm bộ phụ kiện cao cấp:</span>
+              <span className="font-bold">{stock > 0 ? "In stock" : "Out of stock"}</span>
               <ul className="list-disc pl-5 mt-1 font-normal space-y-1">
                 <li>Chuột không dây.</li>
                 <li>Túi chống sốc Laptop.</li>

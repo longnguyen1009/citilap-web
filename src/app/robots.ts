@@ -1,14 +1,21 @@
 import type { MetadataRoute } from "next";
+import { businessProfile } from "@/config/business-profile";
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://citilap.vn";
+  const baseUrl = businessProfile.canonicalSiteUrl;
 
   return {
     rules: [
       {
         userAgent: "*",
-        allow: "/",
-        disallow: ["/admin/", "/api/"],
+        allow: ["/", "/api/media/"],
+        disallow: [
+          "/admin/",
+          "/api/",
+          "/cart",
+          "/checkout/",
+          "/order-tracking",
+        ],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

@@ -23,20 +23,15 @@ export * from './enums';
  */
 export type User = Prisma.UserModel
 /**
+ * Model Brand
+ * 
+ */
+export type Brand = Prisma.BrandModel
+/**
  * Model Category
  * 
  */
 export type Category = Prisma.CategoryModel
-/**
- * Model ProductEditLog
- * 
- */
-export type ProductEditLog = Prisma.ProductEditLogModel
-/**
- * Model ProductVersion
- * 
- */
-export type ProductVersion = Prisma.ProductVersionModel
 /**
  * Model Product
  * 
@@ -48,6 +43,21 @@ export type Product = Prisma.ProductModel
  */
 export type ProductVariant = Prisma.ProductVariantModel
 /**
+ * Model ProductImage
+ * 
+ */
+export type ProductImage = Prisma.ProductImageModel
+/**
+ * Model ProductEditLog
+ * 
+ */
+export type ProductEditLog = Prisma.ProductEditLogModel
+/**
+ * Model ProductVersion
+ * 
+ */
+export type ProductVersion = Prisma.ProductVersionModel
+/**
  * Model Order
  * 
  */
@@ -57,3 +67,38 @@ export type Order = Prisma.OrderModel
  * 
  */
 export type OrderItem = Prisma.OrderItemModel
+/**
+ * Model Warehouse
+ * 
+ */
+export type Warehouse = Prisma.WarehouseModel
+/**
+ * Model SerialUnit
+ * 
+ */
+export type SerialUnit = Prisma.SerialUnitModel
+/**
+ * Model InventoryBalance
+ * 
+ */
+export type InventoryBalance = Prisma.InventoryBalanceModel
+/**
+ * Model InventoryTransaction
+ * 
+ */
+export type InventoryTransaction = Prisma.InventoryTransactionModel
+/**
+ * Model InventoryReservation
+ * 
+ */
+export type InventoryReservation = Prisma.InventoryReservationModel
+/**
+ * Model ContactSubmission
+ * 
+ */
+export type ContactSubmission = Prisma.ContactSubmissionModel
+/**
+ * Model RateLimitRecord
+ * 
+ */
+export type RateLimitRecord = Prisma.RateLimitRecordModel

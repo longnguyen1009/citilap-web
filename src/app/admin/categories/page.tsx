@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Edit, Trash2, Tag, Search, X, ChevronRight, Image as ImageIcon } from "lucide-react";
+import Image from "next/image";
 
 type Category = {
   id: string;
@@ -45,6 +46,7 @@ export default function CategoriesPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load remote data after mount
     void loadCategories();
   }, []);
 
@@ -206,7 +208,9 @@ export default function CategoriesPage() {
                         {/* Icon / Image */}
                         <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
                           {category.image ? (
-                            <img src={category.image} alt="" className="w-full h-full object-cover" />
+                            <div className="relative w-full h-full">
+                              <Image src={category.image} alt="" fill sizes="40px" className="object-cover" />
+                            </div>
                           ) : (
                             <Tag className="w-5 h-5 text-gray-400" />
                           )}
@@ -368,7 +372,9 @@ export default function CategoriesPage() {
                   </div>
                   {image && (
                     <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex-shrink-0 overflow-hidden">
-                      <img src={image} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      <div className="relative w-full h-full">
+                        <Image src={image} alt="" fill sizes="40px" className="object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      </div>
                     </div>
                   )}
                 </div>

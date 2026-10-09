@@ -27,7 +27,10 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem("citilap-wishlist");
-      if (stored) setWishlist(JSON.parse(stored));
+      if (stored) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- restore persisted client state after hydration
+        setWishlist(JSON.parse(stored));
+      }
     } catch { /* ignore */ }
     setLoaded(true);
   }, []);

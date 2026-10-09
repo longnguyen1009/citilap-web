@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Save, Upload, X, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
+import ImageUploader from "@/components/admin/ImageUploader";
 
 type Category = { id: string; name: string };
 
@@ -39,14 +40,6 @@ export default function NewProductPage() {
     const copy = [...specs];
     copy[i] = { ...copy[i], [field]: val };
     setSpecs(copy);
-  };
-
-  const addImageUrl = () => setImageUrls([...imageUrls, ""]);
-  const removeImageUrl = (i: number) => setImageUrls(imageUrls.filter((_, idx) => idx !== i));
-  const updateImageUrl = (i: number, val: string) => {
-    const copy = [...imageUrls];
-    copy[i] = val;
-    setImageUrls(copy);
   };
 
   const specsToJSON = (): Record<string, string> => {
@@ -147,33 +140,10 @@ export default function NewProductPage() {
             </div>
           </div>
 
-          {/* Images (URL) */}
+          {/* Images */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-6 pb-2 border-b border-gray-100">Hình ảnh sản phẩm (URL)</h2>
-            <div className="space-y-3">
-              {imageUrls.map((url, i) => (
-                <div key={i} className="flex gap-2 items-center">
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => updateImageUrl(i, e.target.value)}
-                    placeholder="https://example.com/image.jpg"
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
-                  {url && (
-                    <div className="w-10 h-10 rounded border border-gray-200 bg-gray-50 flex-shrink-0 overflow-hidden">
-                      <img src={url} alt="" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                    </div>
-                  )}
-                  <button type="button" onClick={() => removeImageUrl(i)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition shrink-0">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button type="button" onClick={addImageUrl} className="mt-3 flex items-center gap-1 text-sm font-bold text-blue-600 hover:text-blue-800 transition">
-              <Plus className="w-4 h-4" /> Thêm ảnh
-            </button>
+            <h2 className="text-lg font-bold text-gray-900 mb-6 pb-2 border-b border-gray-100">Hình ảnh sản phẩm</h2>
+            <ImageUploader images={imageUrls} onChange={setImageUrls} />
           </div>
 
           {/* Dynamic Specs */}

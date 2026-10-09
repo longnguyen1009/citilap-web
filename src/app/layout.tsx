@@ -4,6 +4,13 @@ import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import ScrollToTop from "@/components/layout/ScrollToTop";
+import { businessProfile } from "@/config/business-profile";
+import {
+  generateOrganizationJsonLd,
+  generateLocalBusinessesJsonLd,
+  generateWebSiteJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -18,39 +25,89 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "CITILAP.VN - Một chữ tín - Vạn niềm tin",
-    template: "%s | CITILAP.VN",
+    default: `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
+    template: `%s | ${businessProfile.brandName}`,
   },
-  description: "Cửa hàng công nghệ hàng đầu - Laptop Gaming, MacBook, Linh kiện PC, Phụ kiện chính hãng giá tốt nhất thị trường. Tư vấn miễn phí, bảo hành 12 tháng.",
-  keywords: ["laptop", "laptop gaming", "macbook", "pc", "linh kiện", "phụ kiện", "công nghệ", "citilap", "RTX", "Lenovo Legion", "ASUS ROG"],
-  authors: [{ name: "CITILAP.VN" }],
-  creator: "CITILAP.VN",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://citilap.vn"),
+  description: `Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng. ${businessProfile.traditionalMotto}. Tư vấn cấu hình chuẩn xác, bảo hành chu đáo theo gói sản phẩm.`,
+  keywords: [
+    "CitiLap",
+    "laptop",
+    "laptop gaming",
+    "ultrabook",
+    "laptop cu",
+    "laptop like new",
+    "linh kiện laptop",
+    "Lenovo Legion",
+    "ASUS ROG",
+    "Dell XPS",
+    "ThinkPad",
+    "Hà Nội",
+    "Bắc Ninh",
+  ],
+  authors: [{ name: businessProfile.brandName, url: businessProfile.canonicalSiteUrl }],
+  creator: businessProfile.brandName,
+  publisher: businessProfile.brandName,
+  metadataBase: new URL(businessProfile.canonicalSiteUrl),
+  alternates: {
+    canonical: businessProfile.canonicalSiteUrl,
+  },
   openGraph: {
     type: "website",
     locale: "vi_VN",
-    siteName: "CITILAP.VN",
-    title: "CITILAP.VN - Một chữ tín - Vạn niềm tin",
-    description: "Cửa hàng công nghệ hàng đầu - Laptop Gaming, MacBook, Linh kiện PC, Phụ kiện chính hãng giá tốt nhất thị trường.",
+    siteName: businessProfile.brandName,
+    title: `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
+    description: `Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng. ${businessProfile.traditionalMotto}.`,
+    url: businessProfile.canonicalSiteUrl,
+    images: [
+      {
+        url: `${businessProfile.canonicalSiteUrl}${businessProfile.logoAsset}`,
+        width: 900,
+        height: 900,
+        alt: `${businessProfile.brandName} Logo`,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "CITILAP.VN - Một chữ tín - Vạn niềm tin",
-    description: "Cửa hàng công nghệ hàng đầu - Laptop Gaming, MacBook, Linh kiện PC, Phụ kiện chính hãng giá tốt nhất thị trường.",
+    title: `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
+    description: `Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng. ${businessProfile.traditionalMotto}.`,
+    images: [`${businessProfile.canonicalSiteUrl}${businessProfile.logoAsset}`],
   },
   robots: {
     index: true,
     follow: true,
-    googleBot: { index: true, follow: true },
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const orgJsonLd = generateOrganizationJsonLd();
+  const webSiteJsonLd = generateWebSiteJsonLd();
+  const localBusinessesJsonLd = generateLocalBusinessesJsonLd();
+
+  const structuredDataString = serializeJsonLd([
+    orgJsonLd,
+    webSiteJsonLd,
+    ...localBusinessesJsonLd,
+  ]);
+
   return (
     <html
       lang="vi"
       className={`${inter.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: structuredDataString }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         <CartProvider>
           <WishlistProvider>

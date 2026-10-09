@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Trash2, ShoppingCart, ArrowRight, Minus, Plus, Tag, ShieldCheck, Truck, Headphones } from "lucide-react";
+import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import { useState } from "react";
 import Breadcrumb from "@/components/layout/Breadcrumb";
@@ -31,8 +32,6 @@ export default function CartPage() {
   };
 
   const discount = couponApplied ? couponDiscount : 0;
-  const shipping = cartTotal >= 20000000 ? 0 : 30000;
-  const total = cartTotal - discount + shipping;
 
   if (cart.length === 0) {
     return (
@@ -77,7 +76,7 @@ export default function CartPage() {
                     {/* Product Info */}
                     <div className="col-span-6 flex gap-4 w-full">
                       <Link href={`/product/${item.productId}`} className="w-20 h-20 md:w-24 md:h-24 flex-shrink-0 bg-gray-50 rounded-lg border border-gray-100 p-2 flex items-center justify-center hover:shadow-md transition">
-                        <img src={item.image} alt={item.name} className="object-contain w-full h-full" />
+                        <div className="relative w-full h-full"><Image src={item.image} alt={item.name} fill sizes="96px" className="object-contain" /></div>
                       </Link>
                       <div className="flex flex-col flex-grow justify-center min-w-0">
                         <Link href={`/product/${item.productId}`} className="font-bold text-gray-800 hover:text-blue-600 line-clamp-2 leading-tight text-sm md:text-base">
@@ -196,23 +195,18 @@ export default function CartPage() {
                     <span className="font-bold text-green-600">- {discount.toLocaleString("vi-VN")}đ</span>
                   </div>
                 )}
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center text-xs">
                   <span>Phí vận chuyển:</span>
-                  <span className={`font-bold ${shipping === 0 ? "text-green-600" : "text-gray-800"}`}>
-                    {shipping === 0 ? "Miễn phí" : `${shipping.toLocaleString("vi-VN")}đ`}
-                  </span>
+                  <span className="font-semibold text-blue-700">Xác nhận khi tư vấn</span>
                 </div>
-                {shipping === 0 && cartTotal >= 20000000 && (
-                  <p className="text-xs text-green-600">Bạn được miễn phí ship cho đơn từ 20 triệu!</p>
-                )}
               </div>
 
               <div className="border-t border-gray-100 pt-4 mb-6">
                 <div className="flex justify-between items-end mb-1">
-                  <span className="font-bold text-gray-800 uppercase">Tổng cộng:</span>
-                  <span className="text-3xl font-black text-red-600 tracking-tight">{total.toLocaleString("vi-VN")}đ</span>
+                  <span className="font-bold text-gray-800 uppercase text-sm">Tạm tính dự kiến:</span>
+                  <span className="text-2xl md:text-3xl font-black text-red-600 tracking-tight">{cartTotal.toLocaleString("vi-VN")}đ</span>
                 </div>
-                <p className="text-xs text-gray-500 text-right">(Đã bao gồm VAT)</p>
+                <p className="text-[11px] text-gray-500 text-right italic">(Chưa bao gồm phí vận chuyển nếu có, nhân viên sẽ xác nhận)</p>
               </div>
 
               <Link

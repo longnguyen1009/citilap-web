@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
+import { Container } from "@/components/ui/Container";
 
 const labelMap: Record<string, string> = {
   "": "Trang chủ",
@@ -40,28 +41,40 @@ function getSegmentLabel(segment: string): string {
   return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ");
 }
 
-interface BreadcrumbItem {
+export interface BreadcrumbItem {
   label: string;
   href: string;
 }
 
 function BreadcrumbNav({ crumbs }: { crumbs: BreadcrumbItem[] }) {
   return (
-    <div className="bg-white border-b border-gray-200">
-      <div className="container mx-auto px-4 max-w-[1370px]">
-        <nav className="flex items-center text-sm text-gray-500 py-3 font-medium overflow-x-auto">
+    <div className="bg-white border-b border-slate-200">
+      <Container>
+        <nav
+          aria-label="Breadcrumb"
+          className="flex items-center text-xs sm:text-sm text-slate-500 py-2.5 font-medium overflow-x-auto hide-scrollbar"
+        >
           {crumbs.map((crumb, i) => (
             <span key={crumb.href} className="flex items-center whitespace-nowrap">
-              {i > 0 && <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" />}
+              {i > 0 && (
+                <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-slate-300 shrink-0" />
+              )}
               {i === crumbs.length - 1 ? (
-                <span className="text-gray-800 font-bold">{crumb.label}</span>
+                <span className="text-slate-900 font-semibold" aria-current="page">
+                  {crumb.label}
+                </span>
               ) : (
-                <Link href={crumb.href} className="hover:text-blue-600 transition">{crumb.label}</Link>
+                <Link
+                  href={crumb.href}
+                  className="hover:text-blue-600 transition-colors"
+                >
+                  {crumb.label}
+                </Link>
               )}
             </span>
           ))}
         </nav>
-      </div>
+      </Container>
     </div>
   );
 }
@@ -76,9 +89,7 @@ export default function Breadcrumb({ items }: { items?: BreadcrumbItem[] }) {
 
   // Auto-generate from URL path
   const segments = pathname.split("/").filter(Boolean);
-  const crumbs: BreadcrumbItem[] = [
-    { label: "Trang chủ", href: "/" },
-  ];
+  const crumbs: BreadcrumbItem[] = [{ label: "Trang chủ", href: "/" }];
 
   let accumulatedPath = "";
   for (const segment of segments) {
