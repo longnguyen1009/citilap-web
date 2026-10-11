@@ -12,6 +12,7 @@ import {
 
 import HeroSection from "@/components/home/HeroSection";
 import FeatureStrip from "@/components/home/FeatureStrip";
+import CategoryGridSection from "@/components/home/CategoryGridSection";
 import FlashSaleSection from "@/components/home/FlashSaleSection";
 import ProductSection from "@/components/home/ProductSection";
 import MediaSection from "@/components/home/MediaSection";
@@ -85,7 +86,10 @@ export default function Home() {
       {/* 2. FEATURE STRIP */}
       <FeatureStrip />
 
-      {/* 3. FLASH SALE */}
+      {/* 3. KHÁM PHÁ HỆ SINH THÁI DANH MỤC & PHỤ KIỆN TECH */}
+      <CategoryGridSection />
+
+      {/* 4. FLASH SALE */}
       <Suspense fallback={<ProductSectionSkeleton />}>
         <FlashSaleSection />
       </Suspense>
@@ -96,7 +100,12 @@ export default function Home() {
           title="Hàng Mới Về - Bắt Trend Công Nghệ"
           icon={Sparkles}
           colorClass="bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800"
-          links={["Gaming Mới", "Ultrabook Mới", "Apple M3", "Workstation"]}
+          links={[
+            { label: "Gaming Mới", href: "/category/laptop-gaming?sort=newest" },
+            { label: "Ultrabook Mới", href: "/category/laptop-van-phong?sort=newest" },
+            { label: "Apple M3", href: "/category/macbook" },
+            { label: "Đồ Hoạ Mới", href: "/category/laptop-do-hoa?sort=newest" },
+          ]}
           slug="laptop-gaming"
           sectionKey="new"
           badgeColor="bg-indigo-600 text-white shadow-xs"
@@ -109,7 +118,12 @@ export default function Home() {
           title="Laptop Gaming - Chiến Thần Đồ Hoạ"
           icon={Zap}
           colorClass="bg-gradient-to-r from-red-700 via-red-600 to-red-800"
-          links={["RTX 4060", "RTX 4070", "Legion", "ROG Strix"]}
+          links={[
+            { label: "RTX 4060", href: "/category/laptop-gaming?gpu=RTX+4060" },
+            { label: "RTX 4070", href: "/category/laptop-gaming?gpu=RTX+4070" },
+            { label: "Legion", href: "/category/laptop-gaming?brand=lenovo" },
+            { label: "ROG Strix", href: "/category/laptop-gaming?brand=asus" },
+          ]}
           slug="laptop-gaming"
           sectionKey="gaming"
         />
@@ -121,7 +135,12 @@ export default function Home() {
           title="Ultrabook Cao Cấp - Doanh Nhân"
           icon={Briefcase}
           colorClass="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800"
-          links={["MacBook Air", "Dell XPS", "ThinkPad X1", "Zenbook"]}
+          links={[
+            { label: "MacBook Air", href: "/category/macbook" },
+            { label: "Dell XPS", href: "/category/laptop-van-phong?brand=dell" },
+            { label: "ThinkPad X1", href: "/category/laptop-van-phong?brand=lenovo" },
+            { label: "Zenbook", href: "/category/laptop-van-phong?brand=asus" },
+          ]}
           slug="laptop-van-phong"
           sectionKey="ultrabook"
           badgeColor="bg-blue-600 text-white shadow-xs"
@@ -134,22 +153,32 @@ export default function Home() {
           title="Máy Trạm Workstation - Đồ Hoạ Chuyên Nghiệp"
           icon={Server}
           colorClass="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-900"
-          links={["Dell Precision", "ThinkPad P", "ZBook", "RTX A1000"]}
+          links={[
+            { label: "Dell Precision", href: "/category/laptop-do-hoa?brand=dell" },
+            { label: "ThinkPad P", href: "/category/laptop-do-hoa?brand=lenovo" },
+            { label: "HP ZBook", href: "/category/laptop-do-hoa?brand=hp" },
+            { label: "GPU Chuyên Dụng", href: "/category/laptop-do-hoa" },
+          ]}
           slug="laptop-do-hoa"
           sectionKey="workstation"
           badgeColor="bg-gray-800 text-white shadow-xs"
         />
       </Suspense>
 
-      {/* 8. LAPTOP LIKE NEW - TIẾT KIỆM TỐI ĐA */}
+      {/* 8. PHỤ KIỆN LAPTOP & SETUP CÔNG NGHỆ */}
       <Suspense fallback={<ProductSectionSkeleton />}>
         <ProductSection
-          title="Laptop Like New 99% - Tiết Kiệm Tối Đa"
-          icon={RotateCcw}
+          title="Phụ Kiện Laptop & Đồ Chơi Công Nghệ"
+          icon={Headphones}
           colorClass="bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-800"
-          links={["Like New 99%", "Đã Qua Sử Dụng", "Bảo Hành 12T", "Zin 100%"]}
-          slug="laptop-cu"
-          sectionKey="like-new"
+          links={[
+            { label: "Chuột & Bàn Phím", href: "/category/linh-kien?type=mouse-keyboard" },
+            { label: "Balo & Túi Chống Sốc", href: "/category/linh-kien?type=bag" },
+            { label: "Củ Sạc GaN & Cáp", href: "/category/linh-kien?type=charger" },
+            { label: "Hub Type-C", href: "/category/linh-kien?type=hub" },
+          ]}
+          slug="linh-kien"
+          sectionKey="accessories"
           badgeColor="bg-emerald-600 text-white shadow-xs"
         />
       </Suspense>
@@ -160,23 +189,16 @@ export default function Home() {
           title="Bán Chạy Nhất - Được Yêu Thích"
           icon={TrendingUp}
           colorClass="bg-gradient-to-r from-orange-600 via-orange-500 to-orange-700"
-          links={["Top Gaming", "Top Mỏng Nhẹ", "Top Máy Lướt", "MacBook"]}
+          links={[
+            { label: "Top Gaming", href: "/category/laptop-gaming?sort=best-selling" },
+            { label: "Top Mỏng Nhẹ", href: "/category/laptop-van-phong?sort=best-selling" },
+            { label: "Top Đồ Hoạ", href: "/category/laptop-do-hoa?sort=best-selling" },
+            { label: "MacBook Hot", href: "/category/macbook?sort=best-selling" },
+          ]}
           slug="laptop-gaming"
           sectionKey="best-selling"
           badgeColor="bg-orange-600 text-white shadow-xs"
           rank={true}
-        />
-      </Suspense>
-
-      {/* 10. PHỤ KIỆN & GEAR GAMING */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection
-          title="Phụ Kiện & Gear Gaming"
-          icon={Headphones}
-          colorClass="bg-gradient-to-r from-purple-700 via-purple-600 to-purple-800"
-          links={["Chuột Gaming", "Bàn Phím Cơ", "Tai Nghe", "Balo Laptop"]}
-          slug="linh-kien"
-          sectionKey="accessories"
         />
       </Suspense>
 

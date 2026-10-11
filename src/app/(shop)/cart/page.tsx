@@ -83,7 +83,9 @@ export default function CartPage() {
                           {item.name}
                         </Link>
                         {item.variantLabel && (
-                          <span className="text-xs text-gray-500 mt-1 line-clamp-1">{item.variantLabel}</span>
+                          <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-md px-2 py-1 mt-1.5 w-fit leading-relaxed">
+                            {item.variantLabel}
+                          </div>
                         )}
                         <button
                           onClick={() => removeFromCart(item.id)}

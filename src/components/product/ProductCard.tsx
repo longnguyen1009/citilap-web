@@ -48,15 +48,71 @@ export interface ProductCardProps {
 }
 
 /**
- * Format spec values to keep cards clean and readable without excessive text
+ * Smart spec formatters to keep cards dense, legible, and unclipped on mobile & desktop grids
  */
-function cleanSpec(val?: string): string {
+function formatCpuSpec(val?: string): string {
   if (!val) return "";
   return val
     .replace(/^Intel\s+/i, "")
     .replace(/^AMD\s+/i, "")
+    .replace(/^Core\s+/i, "")
+    .replace(/Ryzen\s*(\d)\s*/i, "R$1-")
+    .replace(/Ultra\s*(\d)\s*/i, "U$1-")
+    .replace(/i(\d)\s+(\d)/i, "i$1-$2")
+    .trim();
+}
+
+function formatGpuSpec(val?: string): string {
+  if (!val) return "";
+  return val
     .replace(/^NVIDIA\s+/i, "")
     .replace(/^GeForce\s+/i, "")
+    .replace(/^Intel\s+/i, "")
+    .replace(/\s+Graphics/i, "")
+    .replace(/\s+\d+GB(\s+GDDR\d+)?/i, "") // strip trailing "8GB" or "8GB GDDR6"
+    .replace(/\s+Laptop\s+GPU/i, "")
+    .trim();
+}
+
+function formatRamSpec(val?: string): string {
+  if (!val) return "";
+  const match = val.match(/(\d+)\s*GB/i);
+  return match ? `${match[1]}GB` : val.split(" ")[0] || val;
+}
+
+function formatStorageSpec(val?: string): string {
+  if (!val) return "";
+  const matchTb = val.match(/(\d+)\s*TB/i);
+  if (matchTb) return `${matchTb[1]}TB`;
+  const matchGb = val.match(/(\d+)\s*GB/i);
+  if (matchGb) return `${matchGb[1]}GB`;
+  return val.replace(/SSD|NVMe|PCIe/gi, "").trim();
+}
+
+function formatDisplaySpec(val?: string): string {
+  if (!val) return "";
+  const sizeMatch = val.match(/(\d+(?:\.\d+)?)\s*(?:inch|")/i);
+  const size = sizeMatch ? `${sizeMatch[1].replace(/\.0$/, "")}"` : "";
+
+  let res = "";
+  if (/4K|UHD/i.test(val)) res = "4K";
+  else if (/2\.5K/i.test(val)) res = "2.5K";
+  else if (/2K|QHD\+?/i.test(val)) res = "2K";
+  else if (/FHD\+?/i.test(val)) res = "FHD";
+  else if (/Retina/i.test(val)) res = "Retina";
+  else if (/OLED/i.test(val)) res = "OLED";
+
+  if (size && res) return `${size} ${res}`;
+  if (size) return size;
+  return val.replace(/\s*inch\b/gi, '"').trim();
+}
+
+function formatWarranty(val?: string, fallback = "BH 12T"): string {
+  if (!val) return fallback;
+  return val
+    .replace(/^Bảo hành\s*/i, "BH ")
+    .replace(/\s*tháng/i, "T")
+    .replace(/\s*(1\s*đổi\s*1|tại|chính|hãng|toàn\s*diện).*$/i, "")
     .trim();
 }
 
@@ -92,14 +148,17 @@ export default function ProductCard({
   const conditionMeta = resolveConditionMeta(product.condition, product.name);
   const isLikeNew = conditionMeta.code === "LIKE_NEW" || conditionMeta.code === "USED";
   const isOutOfStock = product.stock !== undefined && product.stock !== null && product.stock <= 0;
-  const warrantyText = product.warranty || (isLikeNew ? "BH 06-12 tháng" : "BH 12-24 tháng");
+  const warrantyText = formatWarranty(
+    product.warranty,
+    isLikeNew ? "BH 06-12 tháng" : "BH 12-24 tháng"
+  );
 
-  // Format key specs
-  const cpu = cleanSpec(product.specs?.cpu);
-  const gpu = cleanSpec(product.specs?.gpu);
-  const ram = cleanSpec(product.specs?.ram);
-  const ssd = cleanSpec(product.specs?.ssd);
-  const display = cleanSpec(product.specs?.display);
+  // Format key specs for density & clarity
+  const cpu = formatCpuSpec(product.specs?.cpu);
+  const gpu = formatGpuSpec(product.specs?.gpu);
+  const ram = formatRamSpec(product.specs?.ram);
+  const ssd = formatStorageSpec(product.specs?.ssd);
+  const display = formatDisplaySpec(product.specs?.display);
   const hasSpecs = Boolean(cpu || gpu || ram || ssd || display);
 
   return (
@@ -217,33 +276,32 @@ export default function ProductCard({
               <SpecChip
                 icon={<Cpu className="w-3 h-3 text-text-muted shrink-0" />}
                 value={cpu}
-                title={`CPU: ${cpu}`}
+                title={`CPU: ${product.specs?.cpu || cpu}`}
               />
             )}
             {gpu && (
               <SpecChip
-                label="VGA"
                 highlight
                 value={gpu}
-                title={`GPU: ${gpu}`}
+                title={`GPU: ${product.specs?.gpu || gpu}`}
               />
             )}
             {(ram || ssd) && (
               <SpecChip
                 value={
                   <>
-                    <span className="font-semibold text-text-primary">{ram || "RAM"}</span>
-                    {ram && ssd && <span className="text-slate-300 mx-1">•</span>}
-                    <span className="text-text-secondary">{ssd}</span>
+                    <span className="font-semibold text-text-primary">{ram ? ram.replace(/GB$/i, "G") : "RAM"}</span>
+                    {ram && ssd && <span className="text-slate-400 mx-[1px]">/</span>}
+                    <span className="text-text-secondary">{ssd ? ssd.replace(/GB$/i, "G") : ""}</span>
                   </>
                 }
-                title={`${ram} / ${ssd}`}
+                title={`RAM: ${product.specs?.ram || ram} / SSD: ${product.specs?.ssd || ssd}`}
               />
             )}
             {display && (
               <SpecChip
                 value={display}
-                title={`Màn hình: ${display}`}
+                title={`Màn hình: ${product.specs?.display || display}`}
               />
             )}
           </div>
@@ -254,7 +312,7 @@ export default function ProductCard({
           {/* Warranty tag */}
           <div
             className="flex items-center gap-1 text-text-secondary font-medium truncate"
-            title={warrantyText}
+            title={product.warranty || warrantyText}
           >
             <ShieldCheck className="w-3.5 h-3.5 text-brand-primary shrink-0" />
             <span className="truncate">{warrantyText}</span>

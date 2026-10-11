@@ -1,5 +1,6 @@
 import { prisma, type PrismaClient } from "@/lib/prisma";
 import { getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
+import { ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 
 /**
  * Standardized Homepage & Card Product Data Contract (STORE-05)
@@ -160,6 +161,8 @@ export interface CategoryFilterOptions {
   categorySlug?: string;
   brand?: string | string[];
   condition?: string | string[];
+  accessoryType?: string | string[];
+  type?: string | string[];
   minPrice?: number;
   maxPrice?: number;
   cpu?: string | string[];
@@ -193,6 +196,7 @@ export interface CategoryFilteredResult {
   facets: {
     brands: FacetOption[];
     conditions: FacetOption[];
+    accessoryTypes?: FacetOption[];
     cpuSeries: FacetOption[];
     gpuSeries: FacetOption[];
     ramOptions: FacetOption<number>[];
@@ -716,6 +720,42 @@ export async function getCategoryFilteredProducts(
       where.condition = { in: conditionList };
     }
 
+    // Accessory Subtype Filter (for linh-kien or general accessory taxonomy)
+    const rawType = options.accessoryType || options.type;
+    const typeList = rawType
+      ? (Array.isArray(rawType) ? rawType : [rawType]).filter(Boolean)
+      : [];
+
+    if (typeList.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const typeClauses: any[] = [];
+      for (const tSlug of typeList) {
+        const typeItem = getAccessoryTypeBySlug(tSlug);
+        if (typeItem) {
+          typeClauses.push({ tags: { contains: typeItem.slug } });
+          typeClauses.push({ series: { contains: typeItem.slug } });
+          typeClauses.push({ model: { contains: typeItem.slug } });
+          for (const kw of typeItem.keywords) {
+            typeClauses.push({ name: { contains: kw } });
+            typeClauses.push({ slug: { contains: kw } });
+          }
+        } else {
+          typeClauses.push({ tags: { contains: tSlug } });
+          typeClauses.push({ series: { contains: tSlug } });
+          typeClauses.push({ name: { contains: tSlug } });
+          typeClauses.push({ slug: { contains: tSlug } });
+        }
+      }
+
+      if (typeClauses.length > 0) {
+        if (where.OR) {
+          where.AND = [...(where.AND || []), { OR: typeClauses }];
+        } else {
+          where.OR = typeClauses;
+        }
+      }
+    }
+
     // Price range filter (Integer VND)
     if (options.minPrice !== undefined || options.maxPrice !== undefined) {
       where.price = {};
@@ -826,6 +866,10 @@ export async function getCategoryFilteredProducts(
             }
           : { status: { in: ["ACTIVE", "active"] } },
         select: {
+          name: true,
+          slug: true,
+          tags: true,
+          series: true,
           brand: true,
           brandRel: { select: { id: true, name: true, slug: true } },
           condition: true,
@@ -885,6 +929,34 @@ export async function getCategoryFilteredProducts(
       }
     }
 
+    const accessoryTypeMap = new Map<string, number>();
+    if (category?.slug === "linh-kien") {
+      for (const p of facetPool) {
+        for (const typeItem of ACCESSORY_TYPES) {
+          const matchSlug =
+            (p.tags && p.tags.includes(typeItem.slug)) ||
+            (p.series && p.series.toLowerCase().includes(typeItem.slug.toLowerCase())) ||
+            typeItem.keywords.some(
+              (kw) =>
+                (p.name && p.name.toLowerCase().includes(kw.toLowerCase())) ||
+                (p.slug && p.slug.toLowerCase().includes(kw.toLowerCase()))
+            );
+          if (matchSlug) {
+            accessoryTypeMap.set(typeItem.slug, (accessoryTypeMap.get(typeItem.slug) || 0) + 1);
+          }
+        }
+      }
+    }
+
+    const accessoryTypeFacets: FacetOption[] =
+      category?.slug === "linh-kien"
+        ? ACCESSORY_TYPES.map((t) => ({
+            value: t.slug,
+            label: t.name,
+            count: accessoryTypeMap.get(t.slug) || 0,
+          }))
+        : [];
+
     const brandFacets: FacetOption[] = Array.from(brandMap.values())
       .map((b) => ({ value: b.slug, label: b.name, count: b.count }))
       .sort((a, b) => a.label.localeCompare(b.label));
@@ -927,6 +999,7 @@ export async function getCategoryFilteredProducts(
       facets: {
         brands: brandFacets,
         conditions: conditionFacets,
+        accessoryTypes: accessoryTypeFacets,
         cpuSeries: cpuFacets,
         gpuSeries: gpuFacets,
         ramOptions: ramFacets,

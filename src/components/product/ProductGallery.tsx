@@ -202,6 +202,7 @@ export default function ProductGallery({
                     alt={img.alt || `Ảnh ${idx + 1}`}
                     fill
                     sizes="80px"
+                    onError={() => setFailedImages((prev) => ({ ...prev, [idx]: true }))}
                     className="object-contain"
                   />
                 </div>

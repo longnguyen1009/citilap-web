@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, RotateCcw } from "lucide-react";
 import type { FacetOption } from "@/server/services/catalog.service";
+import { getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 
 interface ActiveFilterChipsProps {
   facets: {
@@ -19,6 +20,7 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const activeType = searchParams.get("type");
   const activeCategories = searchParams.getAll("category");
   const activeBrands = searchParams.getAll("brand");
   const activePricePreset = searchParams.get("pricePreset");
@@ -29,6 +31,15 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
   const activeGpus = searchParams.getAll("gpu");
 
   const chips: { key: string; value: string; label: string }[] = [];
+
+  if (activeType) {
+    const accType = getAccessoryTypeBySlug(activeType);
+    chips.push({
+      key: "type",
+      value: activeType,
+      label: `Loại: ${accType ? accType.shortName : activeType}`,
+    });
+  }
 
   activeCategories.forEach((c) => {
     const catObj = (facets.categories || []).find((item) => item.value === c);
@@ -42,10 +53,17 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
 
   if (activePricePreset) {
     const priceLabels: Record<string, string> = {
+      // Laptop presets
       "under-15": "Giá: Dưới 15 triệu",
       "15-20": "Giá: 15 - 20 triệu",
       "20-30": "Giá: 20 - 30 triệu",
       "over-30": "Giá: Trên 30 triệu",
+      // Accessory presets
+      "under-200k": "Giá: Dưới 200k",
+      "200k-500k": "Giá: 200k - 500k",
+      "500k-1m": "Giá: 500k - 1 triệu",
+      "1m-2m": "Giá: 1 - 2 triệu",
+      "over-2m": "Giá: Trên 2 triệu",
     };
     chips.push({
       key: "pricePreset",
@@ -87,6 +105,8 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
       params.delete("pricePreset");
       params.delete("minPrice");
       params.delete("maxPrice");
+    } else if (key === "type") {
+      params.delete("type");
     } else {
       const currentValues = params.getAll(key);
       params.delete(key);

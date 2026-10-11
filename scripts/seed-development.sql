@@ -12,7 +12,15 @@ INSERT OR IGNORE INTO "Brand" ("id", "name", "slug", "logo", "description", "sta
 ('br-hp', 'HP', 'hp', 'brands/hp.svg', 'Laptop HP thanh lịch từ Pavilion đến dòng máy trạm ZBook', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('br-apple', 'Apple', 'apple', 'brands/apple.svg', 'Hệ sinh thái MacBook sang trọng với chip Apple Silicon đỉnh cao', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 ('br-acer', 'Acer', 'acer', 'brands/acer.svg', 'Chiến binh gaming Predator & Nitro với tản nhiệt vượt trội', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('br-msi', 'MSI', 'msi', 'brands/msi.svg', 'Chuyên gia laptop gaming và đồ họa hàng đầu thế giới', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+('br-msi', 'MSI', 'msi', 'brands/msi.svg', 'Chuyên gia laptop gaming và đồ họa hàng đầu thế giới', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-logitech', 'Logitech', 'logitech', 'brands/logitech.svg', 'Phụ kiện chuột, bàn phím số 1 thế giới', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-anker', 'Anker', 'anker', 'brands/anker.svg', 'Củ sạc nhanh GaN, pin sạc dự phòng hàng đầu', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-ugreen', 'Ugreen', 'ugreen', 'brands/ugreen.svg', 'Hub Type-C, cáp sạc và phụ kiện công nghệ', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-tomtoc', 'Tomtoc', 'tomtoc', 'brands/tomtoc.svg', 'Balo và túi chống sốc laptop tiêu chuẩn quân đội', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-hyperwork', 'HyperWork', 'hyperwork', 'brands/hyperwork.svg', 'Phụ kiện setup bàn làm việc công thái học', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-baseus', 'Baseus', 'baseus', 'brands/baseus.svg', 'Đèn treo màn hình và phụ kiện thông minh', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-dareu', 'DareU', 'dareu', 'brands/dareu.svg', 'Bàn phím cơ và chuột gaming quốc dân', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('br-wiwu', 'WiWU', 'wiwu', 'brands/wiwu.svg', 'Túi chống sốc và phụ kiện tiện ích', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- 2. SEED CATEGORIES
 INSERT OR IGNORE INTO "Category" ("id", "name", "slug", "description", "image", "parentId", "sortOrder", "status", "createdAt", "updatedAt") VALUES

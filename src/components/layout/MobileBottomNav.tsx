@@ -71,6 +71,12 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
   }, [drawerOpen]);
 
   const isCategoryActive = pathname.startsWith("/category");
+  const isProductPage = pathname.startsWith("/product/");
+
+  // On product detail page, allow the dedicated purchase action bar to own the bottom space
+  if (isProductPage) {
+    return null;
+  }
 
   return (
     <>
@@ -236,6 +242,57 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
                   </Link>
                 );
               })}
+
+              {/* Phụ kiện & Đồ chơi công nghệ nổi bật */}
+              <div className="pt-3 border-t border-border-default/60">
+                <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider px-1 block mb-2">
+                  Phụ kiện & Đồ chơi công nghệ
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <Link
+                    href="/category/linh-kien?type=mouse-keyboard"
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                  >
+                    <span>⌨️ Chuột & Phím</span>
+                  </Link>
+                  <Link
+                    href="/category/linh-kien?type=bag"
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                  >
+                    <span>🎒 Balo & Túi sốc</span>
+                  </Link>
+                  <Link
+                    href="/category/linh-kien?type=charger"
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                  >
+                    <span>⚡ Sạc GaN & Cáp</span>
+                  </Link>
+                  <Link
+                    href="/category/linh-kien?type=hub"
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                  >
+                    <span>🔌 Hub Type-C</span>
+                  </Link>
+                  <Link
+                    href="/category/linh-kien?type=screenbar"
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                  >
+                    <span>💡 Đèn màn hình</span>
+                  </Link>
+                  <Link
+                    href="/category/linh-kien?type=audio"
+                    onClick={() => setDrawerOpen(false)}
+                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                  >
+                    <span>🎧 Tai nghe & Loa</span>
+                  </Link>
+                </div>
+              </div>
             </div>
 
             {/* Bottom Support Call */}

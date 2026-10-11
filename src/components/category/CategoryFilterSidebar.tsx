@@ -3,12 +3,15 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, RotateCcw } from "lucide-react";
 import type { FacetOption } from "@/server/services/catalog.service";
+import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES } from "@/config/accessory-taxonomy";
 
 export interface CategoryFilterSidebarProps {
+  categorySlug?: string;
   facets: {
     categories?: FacetOption[];
     brands: FacetOption[];
     conditions: FacetOption[];
+    accessoryTypes?: FacetOption[];
     cpuSeries: FacetOption[];
     gpuSeries: FacetOption[];
     ramOptions: FacetOption<number>[];
@@ -18,7 +21,7 @@ export interface CategoryFilterSidebarProps {
   onApplyMobile?: () => void;
 }
 
-const PRICE_PRESETS = [
+const LAPTOP_PRICE_PRESETS = [
   { value: "under-15", label: "Dưới 15 triệu", min: 0, max: 15_000_000 },
   { value: "15-20", label: "15 - 20 triệu", min: 15_000_000, max: 20_000_000 },
   { value: "20-30", label: "20 - 30 triệu", min: 20_000_000, max: 30_000_000 },
@@ -26,6 +29,7 @@ const PRICE_PRESETS = [
 ];
 
 export default function CategoryFilterSidebar({
+  categorySlug,
   facets,
   onApplyMobile,
 }: CategoryFilterSidebarProps) {
@@ -33,7 +37,11 @@ export default function CategoryFilterSidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const isAccessory = categorySlug === "linh-kien";
+  const currentPricePresets = isAccessory ? ACCESSORY_PRICE_PRESETS : LAPTOP_PRICE_PRESETS;
+
   // Current active params
+  const activeType = searchParams.get("type") || "";
   const activeCategories = searchParams.getAll("category");
   const activeBrands = searchParams.getAll("brand");
   const activePricePreset = searchParams.get("pricePreset") || "";
@@ -44,6 +52,7 @@ export default function CategoryFilterSidebar({
   const activeGpus = searchParams.getAll("gpu");
 
   const hasAnyFilter =
+    Boolean(activeType) ||
     activeCategories.length > 0 ||
     activeBrands.length > 0 ||
     Boolean(activePricePreset) ||
@@ -85,12 +94,13 @@ export default function CategoryFilterSidebar({
       params.delete("minPrice");
       params.delete("maxPrice");
     } else {
-      const preset = PRICE_PRESETS.find((p) => p.value === presetValue);
+      const preset = currentPricePresets.find((p) => p.value === presetValue);
       if (preset) {
         params.set("pricePreset", preset.value);
         if (preset.min > 0) params.set("minPrice", String(preset.min));
         else params.delete("minPrice");
-        if (preset.max < 150_000_000) params.set("maxPrice", String(preset.max));
+        const maxThreshold = isAccessory ? 50_000_000 : 150_000_000;
+        if (preset.max < maxThreshold) params.set("maxPrice", String(preset.max));
         else params.delete("maxPrice");
       }
     }
@@ -151,6 +161,40 @@ export default function CategoryFilterSidebar({
         </div>
       )}
 
+      {/* Loại phụ kiện (Dành riêng cho category linh-kien) */}
+      {isAccessory && (
+        <div className="pb-5 border-b border-border-subtle">
+          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
+            Loại phụ kiện
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {ACCESSORY_TYPES.map((t) => {
+              const isSelected = activeType === t.slug;
+              const facetMatch = facets.accessoryTypes?.find((f) => f.value === t.slug);
+              const count = facetMatch?.count;
+              return (
+                <button
+                  key={t.slug}
+                  onClick={() => updateParam("type", t.slug, false)}
+                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                    isSelected
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm font-semibold"
+                      : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
+                  }`}
+                >
+                  <span>{t.shortName}</span>
+                  {count !== undefined && count > 0 && (
+                    <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/85" : "text-text-muted"}`}>
+                      ({count})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* 1. Thương hiệu */}
       {facets.brands.length > 0 && (
         <div className="pb-5 border-b border-border-subtle">
@@ -189,7 +233,7 @@ export default function CategoryFilterSidebar({
           Mức giá
         </h3>
         <div className="space-y-2">
-          {PRICE_PRESETS.map((p) => {
+          {currentPricePresets.map((p) => {
             const isSelected = activePricePreset === p.value;
             return (
               <button
@@ -217,11 +261,11 @@ export default function CategoryFilterSidebar({
         </div>
       </div>
 
-      {/* 3. Tình trạng máy */}
+      {/* 3. Tình trạng máy / hàng */}
       {facets.conditions.length > 0 && (
         <div className="pb-5 border-b border-border-subtle">
           <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Tình trạng máy
+            {isAccessory ? "Tình trạng hàng" : "Tình trạng máy"}
           </h3>
           <div className="flex flex-wrap gap-2">
             {facets.conditions.map((c) => {
@@ -249,112 +293,117 @@ export default function CategoryFilterSidebar({
         </div>
       )}
 
-      {/* 4. Dung lượng RAM */}
-      {facets.ramOptions.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Dung lượng RAM
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {facets.ramOptions.map((r) => {
-              const isSelected = activeRams.includes(r.value);
-              return (
-                <button
-                  key={r.value}
-                  onClick={() => updateParam("ram", String(r.value), true)}
-                  className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
-                    isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
-                      : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* 4-7. Phần cứng máy tính (Ẩn nếu là phụ kiện và không phải danh mục Nâng cấp phần cứng) */}
+      {(!isAccessory || activeType === "hardware") && (
+        <>
+          {/* Dung lượng RAM */}
+          {facets.ramOptions.length > 0 && (
+            <div className="pb-5 border-b border-border-subtle">
+              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
+                Dung lượng RAM
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {facets.ramOptions.map((r) => {
+                  const isSelected = activeRams.includes(r.value);
+                  return (
+                    <button
+                      key={r.value}
+                      onClick={() => updateParam("ram", String(r.value), true)}
+                      className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
+                        isSelected
+                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
+                          : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* 5. Ổ cứng SSD */}
-      {facets.storageOptions.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Dung lượng ổ cứng
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {facets.storageOptions.map((s) => {
-              const isSelected = activeStorage.includes(s.value);
-              return (
-                <button
-                  key={s.value}
-                  onClick={() => updateParam("storage", String(s.value), true)}
-                  className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
-                    isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
-                      : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+          {/* Ổ cứng SSD */}
+          {facets.storageOptions.length > 0 && (
+            <div className="pb-5 border-b border-border-subtle">
+              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
+                Dung lượng ổ cứng
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                {facets.storageOptions.map((s) => {
+                  const isSelected = activeStorage.includes(s.value);
+                  return (
+                    <button
+                      key={s.value}
+                      onClick={() => updateParam("storage", String(s.value), true)}
+                      className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
+                        isSelected
+                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
+                          : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* 6. CPU Series */}
-      {facets.cpuSeries.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Dòng Vi xử lý (CPU)
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {facets.cpuSeries.map((c) => {
-              const isSelected = activeCpus.includes(c.value);
-              return (
-                <button
-                  key={c.value}
-                  onClick={() => updateParam("cpu", c.value, true)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
-                    isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
-                      : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+          {/* CPU Series */}
+          {facets.cpuSeries.length > 0 && (
+            <div className="pb-5 border-b border-border-subtle">
+              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
+                Dòng Vi xử lý (CPU)
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {facets.cpuSeries.map((c) => {
+                  const isSelected = activeCpus.includes(c.value);
+                  return (
+                    <button
+                      key={c.value}
+                      onClick={() => updateParam("cpu", c.value, true)}
+                      className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                        isSelected
+                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
+                          : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-      {/* 7. Card đồ họa (GPU) */}
-      {facets.gpuSeries.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Card màn hình (GPU)
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {facets.gpuSeries.map((g) => {
-              const isSelected = activeGpus.includes(g.value);
-              return (
-                <button
-                  key={g.value}
-                  onClick={() => updateParam("gpu", g.value, true)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
-                    isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
-                      : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
-                  }`}
-                >
-                  {g.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          {/* Card đồ họa (GPU) */}
+          {facets.gpuSeries.length > 0 && (
+            <div className="pb-5 border-b border-border-subtle">
+              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
+                Card màn hình (GPU)
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {facets.gpuSeries.map((g) => {
+                  const isSelected = activeGpus.includes(g.value);
+                  return (
+                    <button
+                      key={g.value}
+                      onClick={() => updateParam("gpu", g.value, true)}
+                      className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                        isSelected
+                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
+                          : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
+                      }`}
+                    >
+                      {g.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Mobile CTA */}

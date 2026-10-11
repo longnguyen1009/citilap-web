@@ -3,6 +3,11 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+export interface SectionHeaderLinkItem {
+  label: string;
+  href: string;
+}
+
 export interface SectionHeaderProps {
   title: string;
   subtitle?: string;
@@ -18,7 +23,7 @@ export interface SectionHeaderProps {
   // Banner mode for featured storefront sections
   variant?: "standard" | "banner";
   colorClass?: string;
-  links?: string[];
+  links?: Array<string | SectionHeaderLinkItem>;
   slug?: string;
 }
 
@@ -59,15 +64,19 @@ export function SectionHeader({
 
         {(links || slug) && (
           <div className="flex flex-wrap items-center gap-2 md:gap-3 text-sm font-medium relative z-10">
-            {links?.map((link, i) => (
-              <Link
-                key={i}
-                href={`/category/${slug}`}
-                className="hover:bg-white hover:text-slate-900 bg-white/10 backdrop-blur-md border border-white/20 text-white px-3.5 py-1 rounded-pill transition duration-200 text-caption md:text-xs tracking-wide shadow-xs"
-              >
-                {link}
-              </Link>
-            ))}
+            {links?.map((link, i) => {
+              const label = typeof link === "string" ? link : link.label;
+              const href = typeof link === "string" ? `/category/${slug}` : link.href;
+              return (
+                <Link
+                  key={i}
+                  href={href}
+                  className="hover:bg-white hover:text-slate-900 bg-white/10 backdrop-blur-md border border-white/20 text-white px-3.5 py-1 rounded-pill transition duration-200 text-caption md:text-xs tracking-wide shadow-xs"
+                >
+                  {label}
+                </Link>
+              );
+            })}
             <Link
               href={`/category/${slug}`}
               className="flex items-center text-white hover:text-yellow-300 font-bold ml-2 text-xs md:text-sm transition group"

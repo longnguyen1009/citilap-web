@@ -11,6 +11,7 @@ import type { SearchSuggestionItem, SearchSuggestionsResult } from "@/server/ser
 export interface SearchAutocompleteProps {
   initialQuery?: string;
   placeholder?: string;
+  mobilePlaceholder?: string;
   className?: string;
   inputClassName?: string;
   size?: "sm" | "md" | "lg";
@@ -23,6 +24,7 @@ export interface SearchAutocompleteProps {
 export default function SearchAutocomplete({
   initialQuery = "",
   placeholder = "Tìm kiếm theo tên máy, CPU, GPU, thương hiệu...",
+  mobilePlaceholder = "Tìm kiếm...",
   className = "",
   inputClassName = "",
   size = "md",
@@ -53,6 +55,15 @@ export default function SearchAutocomplete({
     setPrevInitialQuery(initialQuery);
     setQuery(initialQuery);
   }
+
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // Total selectable items in listbox: products + brands + categories + "View all"
   const totalSelectableItems =
@@ -250,17 +261,17 @@ export default function SearchAutocomplete({
     inputRef.current?.focus();
   };
 
-  // Height and font styling by size
+  // Height and font styling by size with mobile optimization
   const sizeStyles = {
-    sm: "h-9 text-xs pl-9 pr-8",
-    md: "h-10 text-sm pl-10 pr-9",
-    lg: "h-12 text-base pl-12 pr-10",
+    sm: "h-8 sm:h-9 text-[11px] sm:text-xs pl-6 sm:pl-9 pr-5 sm:pr-8",
+    md: "h-8.5 sm:h-10 text-[11.5px] sm:text-sm pl-6.5 sm:pl-10 pr-6 sm:pr-9",
+    lg: "h-10 sm:h-12 text-xs sm:text-base pl-8 sm:pl-12 pr-7 sm:pr-10",
   }[size];
 
   const iconSizes = {
-    sm: "w-4 h-4 left-2.5",
-    md: "w-4.5 h-4.5 left-3",
-    lg: "w-5 h-5 left-3.5",
+    sm: "w-3.5 h-3.5 left-2 sm:left-2.5",
+    md: "w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 left-2 sm:left-3",
+    lg: "w-4 h-4 sm:w-5 sm:h-5 left-2.5 sm:left-3.5",
   }[size];
 
   return (
@@ -285,7 +296,7 @@ export default function SearchAutocomplete({
             }
           }}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          placeholder={isMobile ? mobilePlaceholder : placeholder}
           autoFocus={autoFocus}
           autoComplete="off"
           spellCheck="false"

@@ -6,20 +6,15 @@ import {
   ShieldCheck,
   PackageCheck,
   Truck,
-  Phone,
-  MessageCircle,
   FileText,
   MessageSquare,
   Sparkles,
 } from "lucide-react";
 import ProductGallery from "@/components/product/ProductGallery";
-import ProductVariantSelector from "@/components/product/ProductVariantSelector";
-import ProductActions from "@/components/product/ProductActions";
+import ProductPurchaseSection from "@/components/product/ProductPurchaseSection";
 import ProductSpecsTable from "@/components/product/ProductSpecsTable";
-import ProductMobileCTA from "@/components/product/ProductMobileCTA";
 import ProductCard from "@/components/product/ProductCard";
 import ReviewForm from "@/components/product/ReviewForm";
-import { ConditionBadge } from "@/components/ui/ConditionBadge";
 import { SpecChip } from "@/components/ui/SpecChip";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
@@ -265,48 +260,10 @@ export default async function ProductDetailPage({
           {/* Right: Info, Variants & CTA Column (Col 7) */}
           <div className="lg:col-span-7">
             <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 sm:p-7 flex flex-col space-y-5">
-              {/* Product Badges & Metadata */}
-              <div className="flex flex-wrap items-center gap-2">
-                <ConditionBadge condition={product.condition} fallbackName={product.name} />
-                {product.brand && (
-                  <span className="text-xs font-bold bg-gray-100 text-gray-800 px-2.5 py-0.5 rounded-full">
-                    {product.brand}
-                  </span>
-                )}
-                {product.series && (
-                  <span className="text-xs font-medium text-gray-500">
-                    Dòng: <strong className="text-gray-700">{product.series}</strong>
-                  </span>
-                )}
-                {product.selectedSku && (
-                  <span className="text-xs font-mono text-gray-400 ml-auto hidden sm:inline">
-                    SKU: {product.selectedSku}
-                  </span>
-                )}
-              </div>
-
               {/* Title */}
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 leading-tight">
                 {product.name}
               </h1>
-
-              {/* Short Description if available */}
-              {product.shortDescription && (
-                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed border-l-2 border-blue-500 pl-3 italic">
-                  {product.shortDescription}
-                </p>
-              )}
-
-              {/* Variant Selector */}
-              {product.variants.length > 0 && (
-                <div className="pt-2 border-t border-gray-100">
-                  <ProductVariantSelector
-                    variants={product.variants}
-                    selectedVariantId={product.selectedVariantId}
-                    productSlug={product.slug}
-                  />
-                </div>
-              )}
 
               {/* Quick Specs Highlight */}
               {(product.specs.cpu || product.specs.ram || product.specs.ssd || product.specs.gpu || product.specs.display) && (
@@ -324,37 +281,20 @@ export default async function ProductDetailPage({
                 </div>
               )}
 
-              {/* Pricing, Quantity, Add to Cart & Buy Now */}
-              <ProductActions
+              {/* Unified Purchase Section: Condition, Variants, Warranty, Live Price, Actions */}
+              <ProductPurchaseSection
                 productId={product.id}
                 productName={product.name}
+                productSlug={product.slug}
                 productImage={product.primaryImageUrl || ""}
-                price={product.price}
-                originalPrice={product.originalPrice}
-                stock={product.stock}
-                selectedVariant={selectedVariant}
-                warranty={product.warranty}
+                initialCondition={product.condition}
+                initialWarranty={product.warranty}
+                basePrice={product.price}
+                baseOriginalPrice={product.originalPrice}
+                baseStock={product.stock}
+                variants={product.variants}
+                selectedVariantId={product.selectedVariantId}
               />
-
-              {/* Direct Hotline & Zalo Contact */}
-              <div className="pt-3 border-t border-gray-100 flex gap-3">
-                <a
-                  href={businessProfile.telHref}
-                  className="flex-1 flex items-center justify-center gap-2 border border-emerald-500 text-emerald-700 bg-emerald-50/30 hover:bg-emerald-50 rounded-xl py-2.5 font-bold text-xs sm:text-sm transition shadow-2xs"
-                >
-                  <Phone className="w-4 h-4 text-emerald-600" />
-                  <span>Hotline: {businessProfile.displayPhone}</span>
-                </a>
-                <a
-                  href={businessProfile.socialProfiles.zalo}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 flex items-center justify-center gap-2 border border-blue-500 text-blue-700 bg-blue-50/30 hover:bg-blue-50 rounded-xl py-2.5 font-bold text-xs sm:text-sm transition shadow-2xs"
-                >
-                  <MessageCircle className="w-4 h-4 text-blue-600" />
-                  <span>Chat Zalo tư vấn</span>
-                </a>
-              </div>
             </div>
           </div>
         </section>
@@ -524,17 +464,6 @@ export default async function ProductDetailPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLdString }}
-      />
-
-      {/* Sticky Mobile CTA Bar */}
-      <ProductMobileCTA
-        productId={product.id}
-        variantId={product.selectedVariantId}
-        variantLabel={product.selectedVariantName}
-        productName={product.name}
-        productImage={product.primaryImageUrl || ""}
-        price={product.price}
-        stock={product.stock}
       />
     </div>
   );

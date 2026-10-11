@@ -20,13 +20,13 @@ export function SpecChip({
   return (
     <div
       title={title}
-      className={`bg-slate-50 border border-slate-200/70 rounded px-1.5 py-1 flex items-center gap-1 truncate text-[11px] text-slate-700 ${className}`}
+      className={`bg-slate-50 border border-slate-200/70 rounded px-1 sm:px-1.5 py-0.5 flex items-center justify-center sm:justify-start gap-0.5 sm:gap-1 truncate text-[9px] sm:text-[11px] text-slate-700 ${className}`}
       {...props}
     >
-      {icon && <span className="text-slate-400 shrink-0">{icon}</span>}
+      {icon && <span className="text-slate-400 shrink-0 hidden sm:inline-flex">{icon}</span>}
       {label && (
         <span
-          className={`text-[9.5px] font-bold shrink-0 ${
+          className={`text-[9px] sm:text-[9.5px] font-bold shrink-0 ${
             highlight ? "text-blue-600" : "text-slate-500"
           }`}
         >

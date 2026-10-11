@@ -48,7 +48,6 @@ export default function ProductVariantSelector({
         <label className="text-sm font-bold text-gray-800 uppercase tracking-wide">
           Chọn cấu hình / Phiên bản ({variants.length})
         </label>
-        <span className="text-xs text-gray-500">Giá tự động thay đổi theo SKU</span>
       </div>
 
       <div
@@ -90,9 +89,9 @@ export default function ProductVariantSelector({
                 </div>
               )}
 
-              {/* Variant Name & SKU */}
+              {/* Variant Name */}
               <div>
-                <div className="flex items-center justify-between pr-4 mb-1">
+                <div className="flex items-center justify-between pr-4 mb-2">
                   <span
                     className={`text-sm font-bold leading-snug line-clamp-2 ${
                       isSelected ? "text-blue-900" : "text-gray-900"
@@ -100,9 +99,6 @@ export default function ProductVariantSelector({
                   >
                     {variant.name}
                   </span>
-                </div>
-                <div className="text-[11px] font-mono text-gray-400 mb-2">
-                  SKU: {variant.sku}
                 </div>
 
                 {/* Micro spec pills if variant has custom specs */}

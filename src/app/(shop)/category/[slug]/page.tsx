@@ -7,14 +7,16 @@ import {
   getCategoryFilteredProducts,
   type CategoryFilterOptions,
 } from "@/server/services/catalog.service";
+import { getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const sp = await searchParams;
   const category = await getCategoryBySlug(slug);
 
   if (!category) {
@@ -24,19 +26,31 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     };
   }
 
+  const typeParam = typeof sp.type === "string" ? sp.type : undefined;
+  const accessoryType = slug === "linh-kien" ? getAccessoryTypeBySlug(typeParam) : undefined;
+
+  const pageTitle = accessoryType
+    ? `${accessoryType.name} Chính Hãng - Giá Tốt | CitiLap`
+    : slug === "linh-kien"
+    ? "Phụ Kiện Laptop & Đồ Chơi Công Nghệ Chính Hãng | CitiLap"
+    : `${category.name} Chính Hãng, Giá Tốt | CitiLap`;
+
+  const pageDescription = accessoryType
+    ? accessoryType.description
+    : slug === "linh-kien"
+    ? "Balo, chuột gaming, bàn phím cơ, củ sạc GaN, hub chuyển đổi và phụ kiện setup bàn làm việc chính hãng tuyển chọn tại CitiLap."
+    : category.description ||
+      `Khám phá các sản phẩm ${category.name} tuyển chọn kỹ lưỡng, chất lượng cao, bảo hành linh hoạt tại CitiLap.`;
+
   return {
-    title: `${category.name} Chính Hãng, Giá Tốt | CitiLap`,
-    description:
-      category.description ||
-      `Khám phá các sản phẩm ${category.name} tuyển chọn kỹ lưỡng, chất lượng cao, bảo hành linh hoạt tại CitiLap.`,
+    title: pageTitle,
+    description: pageDescription,
     alternates: {
-      canonical: `https://citilap.vn/category/${category.slug}`,
+      canonical: `https://citilap.vn/category/${category.slug}${accessoryType ? `?type=${accessoryType.slug}` : ""}`,
     },
     openGraph: {
-      title: `${category.name} | CitiLap.vn`,
-      description:
-        category.description ||
-        `Mua ${category.name} chính hãng chất lượng cao tại CitiLap.`,
+      title: pageTitle,
+      description: pageDescription,
     },
   };
 }
@@ -63,17 +77,29 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   // Gracefully resolve pricePreset query parameter if minPrice/maxPrice not provided
   if (typeof sp.pricePreset === "string" && !minPrice && !maxPrice) {
-    if (sp.pricePreset === "under-15m") maxPrice = 15_000_000;
-    else if (sp.pricePreset === "15m-20m") { minPrice = 15_000_000; maxPrice = 20_000_000; }
-    else if (sp.pricePreset === "20m-25m") { minPrice = 20_000_000; maxPrice = 25_000_000; }
-    else if (sp.pricePreset === "25m-30m") { minPrice = 25_000_000; maxPrice = 30_000_000; }
-    else if (sp.pricePreset === "above-30m") { minPrice = 30_000_000; }
+    if (slug === "linh-kien") {
+      if (sp.pricePreset === "under-200k") maxPrice = 200_000;
+      else if (sp.pricePreset === "200k-500k") { minPrice = 200_000; maxPrice = 500_000; }
+      else if (sp.pricePreset === "500k-1m") { minPrice = 500_000; maxPrice = 1_000_000; }
+      else if (sp.pricePreset === "1m-2m") { minPrice = 1_000_000; maxPrice = 2_000_000; }
+      else if (sp.pricePreset === "over-2m") { minPrice = 2_000_000; }
+    } else {
+      if (sp.pricePreset === "under-15" || sp.pricePreset === "under-15m") maxPrice = 15_000_000;
+      else if (sp.pricePreset === "15-20" || sp.pricePreset === "15m-20m") { minPrice = 15_000_000; maxPrice = 20_000_000; }
+      else if (sp.pricePreset === "20-30" || sp.pricePreset === "20m-25m" || sp.pricePreset === "20m-30m") { minPrice = 20_000_000; maxPrice = 30_000_000; }
+      else if (sp.pricePreset === "over-30" || sp.pricePreset === "above-30m") { minPrice = 30_000_000; }
+    }
   }
+
+  const typeParam = typeof sp.type === "string" ? sp.type : undefined;
+  const accessoryType = slug === "linh-kien" ? getAccessoryTypeBySlug(typeParam) : undefined;
 
   const filterOptions: CategoryFilterOptions = {
     categorySlug: slug,
     brand: getStringOrArray(sp.brand),
     condition: getStringOrArray(sp.condition),
+    accessoryType: typeParam,
+    type: typeParam,
     minPrice,
     maxPrice,
     cpu: getStringOrArray(sp.cpu),
@@ -97,30 +123,66 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const category = result.category;
 
+  const displayName = accessoryType
+    ? accessoryType.name
+    : slug === "linh-kien"
+    ? "Phụ Kiện Laptop & Đồ Chơi Công Nghệ"
+    : category.name;
+
+  const displayDescription = accessoryType
+    ? accessoryType.description
+    : slug === "linh-kien"
+    ? "Balo, chuột gaming, bàn phím cơ, sạc GaN, hub chuyển đổi và phụ kiện setup bàn làm việc chính hãng tuyển chọn tại CitiLap."
+    : category.description;
+
+  const breadcrumbs = [
+    { label: "Trang chủ", href: "/" },
+    { label: "Danh mục", href: "/category" },
+  ];
+
+  if (slug === "linh-kien") {
+    breadcrumbs.push({
+      label: "Phụ kiện Laptop",
+      href: "/category/linh-kien",
+    });
+    if (accessoryType) {
+      breadcrumbs.push({
+        label: accessoryType.name,
+        href: `/category/linh-kien?type=${accessoryType.slug}`,
+      });
+    }
+  } else {
+    breadcrumbs.push({
+      label: category.name,
+      href: `/category/${category.slug}`,
+    });
+  }
+
   return (
     <div className="bg-surface-subtle min-h-screen pb-16">
       {/* Breadcrumb Bar */}
       <div className="bg-surface-card border-b border-border-default">
         <div className="container-shop py-3">
-          <Breadcrumb
-            items={[
-              { label: "Trang chủ", href: "/" },
-              { label: "Danh mục", href: "/category" },
-              { label: category.name, href: `/category/${category.slug}` },
-            ]}
-          />
+          <Breadcrumb items={breadcrumbs} />
         </div>
       </div>
 
       <div className="container-shop pt-8">
         {/* Category Header */}
         <div className="mb-8">
-          <h1 className="text-display font-black text-text-primary tracking-tight">
-            {category.name}
-          </h1>
-          {category.description && (
-            <p className="text-body-lg text-text-secondary mt-2 max-w-3xl leading-relaxed">
-              {category.description}
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-display font-black text-text-primary tracking-tight">
+              {displayName}
+            </h1>
+            {accessoryType && (
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                Phụ kiện
+              </span>
+            )}
+          </div>
+          {displayDescription && (
+            <p className="text-body-lg text-text-secondary max-w-3xl leading-relaxed">
+              {displayDescription}
             </p>
           )}
         </div>

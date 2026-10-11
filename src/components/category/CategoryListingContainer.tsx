@@ -23,6 +23,7 @@ export default function CategoryListingContainer({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const searchParams = useSearchParams();
 
+  const activeType = searchParams.get("type");
   const activeBrands = searchParams.getAll("brand");
   const activePricePreset = searchParams.get("pricePreset");
   const activeConditions = searchParams.getAll("condition");
@@ -32,6 +33,7 @@ export default function CategoryListingContainer({
   const activeGpus = searchParams.getAll("gpu");
 
   const totalActiveFilters =
+    (activeType ? 1 : 0) +
     activeBrands.length +
     (activePricePreset ? 1 : 0) +
     activeConditions.length +
@@ -49,7 +51,10 @@ export default function CategoryListingContainer({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
         {/* Desktop Sidebar (1 col) */}
         <aside className="hidden lg:block lg:col-span-1 bg-surface-card border border-border-default rounded-card p-5 sticky top-24 shadow-xs">
-          <CategoryFilterSidebar facets={initialData.facets} />
+          <CategoryFilterSidebar
+            categorySlug={initialData.category?.slug}
+            facets={initialData.facets}
+          />
         </aside>
 
         {/* Right Content (3 cols) */}
@@ -139,6 +144,7 @@ export default function CategoryListingContainer({
         onClose={() => setMobileDrawerOpen(false)}
         activeCount={totalActiveFilters}
         facets={initialData.facets}
+        categorySlug={initialData.category?.slug}
       />
     </div>
   );

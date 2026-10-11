@@ -131,32 +131,59 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
         { name: "Linh Kiện – Phụ Kiện", slug: "linh-kien", href: "/category/linh-kien" },
       ];
 
-  // Build top navbar items from D1 data
-  const topNavCategories: HeaderNavItem[] = categories.length > 0
-    ? categories.slice(0, 5).map((cat) => ({
-        name: cat.name,
-        href: `/category/${cat.slug}`,
-        children: brands.length > 0 && !cat.slug.includes("linh-kien")
-          ? brands.map((b) => ({
-              name: b.name,
-              href: `/category/${cat.slug}?brand=${b.slug}`,
-            }))
-          : undefined,
-      }))
+  // 1. Phụ kiện Laptop dropdown items
+  const accessoryNavChildren = [
+    { name: "Chuột & Bàn phím", href: "/category/linh-kien?type=mouse-keyboard" },
+    { name: "Balo & Túi chống sốc", href: "/category/linh-kien?type=bag" },
+    { name: "Củ sạc GaN & Cáp sạc", href: "/category/linh-kien?type=charger" },
+    { name: "Hub chuyển đổi Type-C", href: "/category/linh-kien?type=hub" },
+    { name: "Đế tản nhiệt & Giá đỡ", href: "/category/linh-kien?type=stand" },
+    { name: "Đèn màn hình & Desk Setup", href: "/category/linh-kien?type=screenbar" },
+    { name: "Tai nghe & Âm thanh", href: "/category/linh-kien?type=audio" },
+    { name: "Nâng cấp RAM & SSD", href: "/category/linh-kien?type=hardware" },
+  ];
+
+  // 2. Về CitiLap dropdown items (gộp Cửa hàng và Giới thiệu)
+  const aboutNavChildren = [
+    { name: "Giới thiệu CitiLap", href: "/gioi-thieu" },
+    { name: "Hệ thống cửa hàng", href: "/he-thong-cua-hang" },
+  ];
+
+  // 3. Lọc bỏ "Laptop Like New" (slug: laptop-cu), "Linh kiện", và test temp khỏi danh sách laptop chính
+  const laptopNavCategories: HeaderNavItem[] = categories.length > 0
+    ? categories
+        .filter((cat) => cat.slug !== "laptop-cu" && !cat.slug.includes("linh-kien") && !cat.slug.startsWith("temp-") && !cat.id.startsWith("temp-"))
+        .map((cat) => ({
+          name: cat.name,
+          href: `/category/${cat.slug}`,
+          children: brands.length > 0 && !cat.slug.includes("camera")
+            ? brands.map((b) => ({
+                name: `${cat.name.replace("Laptop ", "").replace("Apple - ", "")} ${b.name}`,
+                href: `/category/${cat.slug}?brand=${b.slug}`,
+              }))
+            : undefined,
+        }))
     : [
         { name: "Laptop Gaming", href: "/category/laptop-gaming" },
         { name: "Laptop Văn Phòng", href: "/category/laptop-van-phong" },
-        { name: "Laptop Đồ Hoạ - Kỹ Thuật", href: "/category/laptop-do-hoa" },
-        { name: "Laptop Like New", href: "/category/laptop-cu" },
-        { name: "Linh Kiện - Phụ Kiện", href: "/category/linh-kien" },
+        { name: "Laptop Đồ Hoạ", href: "/category/laptop-do-hoa" },
+        { name: "Apple - MacBook", href: "/category/macbook" },
       ];
 
   const dynamicNavItems: HeaderNavItem[] = [
     { name: "HOT SALE", href: "/hot-sale", hot: true },
-    ...topNavCategories,
-    { name: "Cửa hàng", href: "/he-thong-cua-hang" },
-    { name: "Giới thiệu", href: "/gioi-thieu" },
-    { name: "Tin tức", href: "/news" },
+    ...laptopNavCategories,
+    {
+      name: "PHỤ KIỆN LAPTOP",
+      href: "/category/linh-kien",
+      children: accessoryNavChildren,
+    },
+    {
+      name: "VỀ CITILAP",
+      href: "/gioi-thieu",
+      children: aboutNavChildren,
+    },
+    { name: "TIN TỨC", href: "/news" },
   ];
 
   return (
@@ -166,16 +193,16 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
         <div className="container mx-auto px-4 flex items-center justify-between gap-4 max-w-[1370px]">
 
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <Monitor className="w-10 h-10 text-blue-400" />
+          <Link href="/" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <Monitor className="w-8 h-8 sm:w-10 sm:h-10 text-blue-400" />
             <div className="flex flex-col">
-              <span className="text-2xl font-black leading-none tracking-wider text-white">CITILAP.VN</span>
-              <span className="text-[9px] tracking-[0.2em] text-blue-400 font-medium uppercase mt-1">Một chữ tín - Vạn niềm tin</span>
+              <span className="text-xl sm:text-2xl font-black leading-none tracking-wider text-white">CITILAP.VN</span>
+              <span className="text-[8px] sm:text-[9px] tracking-[0.2em] text-blue-400 font-medium uppercase mt-0.5 sm:mt-1 hidden sm:block">Một chữ tín - Vạn niềm tin</span>
             </div>
           </Link>
 
           {/* Danh mục & Search */}
-          <div className="flex flex-grow max-w-3xl items-center gap-4 ml-4">
+          <div className="flex flex-grow max-w-3xl items-center gap-2 sm:gap-4 ml-2 sm:ml-4">
             <div className="relative hidden md:block" ref={menuRef}>
               {/* Button Danh mục - Click to toggle */}
               <button
@@ -317,7 +344,8 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
 
             <div className="relative flex-grow">
               <SearchAutocomplete
-                placeholder="Bạn cần tìm gì..."
+                placeholder="Bạn cần tìm máy gì..."
+                mobilePlaceholder="Tìm laptop, phụ kiện"
                 className="w-full"
                 size="md"
               />
@@ -372,7 +400,14 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
         <div className="container mx-auto px-4 max-w-[1370px]">
           <ul className="flex items-center justify-between py-3">
             {dynamicNavItems.map((item, index) => {
-              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href + "/"));
+              const isChildActive = item.children?.some(
+                (c) => pathname === c.href || (c.href !== "/" && pathname.startsWith(c.href + "/"))
+              );
+              const isActive =
+                pathname === item.href ||
+                (item.href !== "/" && pathname.startsWith(item.href + "/")) ||
+                isChildActive;
+
               return (
                 <li
                   key={index}
@@ -396,13 +431,19 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
 
                   {/* Dropdown */}
                   {item.children && hoveredNav === index && (
-                    <div className="absolute top-full left-0 pt-2 z-50">
-                      <div className="bg-white rounded-xl shadow-xl shadow-gray-200/60 border border-gray-100 py-2 min-w-[200px]">
+                    <div className="absolute top-full left-0 pt-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div
+                        className={`bg-white rounded-xl shadow-xl shadow-gray-200/70 border border-gray-150 py-2 ${
+                          item.children.length > 5
+                            ? "min-w-[380px] grid grid-cols-2 p-2 gap-1"
+                            : "min-w-[210px]"
+                        }`}
+                      >
                         {item.children.map((sub, sidx) => (
                           <Link
                             key={sidx}
                             href={sub.href}
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium"
+                            className="block px-3.5 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium rounded-lg"
                           >
                             {sub.name}
                           </Link>

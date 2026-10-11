@@ -253,7 +253,7 @@ export default function Footer() {
       </div>
 
       {/* 3. Bottom Copyright & Notice */}
-      <div className="bg-[#050a14] py-4 text-center text-gray-500 text-xs border-t border-gray-800">
+      <div className="bg-[#050a14] pt-4 pb-20 md:pb-4 text-center text-gray-500 text-xs border-t border-gray-800">
         <div className="container mx-auto px-4 max-w-[1370px] space-y-1">
           <p>
             &copy; 2024 - {new Date().getFullYear()} CitiLap. {businessProfile.primaryTagline}. Tất cả quyền được bảo lưu.

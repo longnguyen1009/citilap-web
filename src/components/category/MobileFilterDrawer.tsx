@@ -15,6 +15,7 @@ export default function MobileFilterDrawer({
   onClose,
   activeCount,
   facets,
+  categorySlug,
 }: MobileFilterDrawerProps) {
   // Lock body scroll when drawer is open
   useEffect(() => {
@@ -78,7 +79,11 @@ export default function MobileFilterDrawer({
 
         {/* Scrollable Filters */}
         <div className="flex-1 overflow-y-auto p-5">
-          <CategoryFilterSidebar facets={facets} onApplyMobile={onClose} />
+          <CategoryFilterSidebar
+            categorySlug={categorySlug}
+            facets={facets}
+            onApplyMobile={onClose}
+          />
         </div>
       </div>
     </div>

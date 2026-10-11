@@ -1,6 +1,6 @@
 import Link from "next/link";
 import ProductCard, { type ProductCardProduct } from "@/components/product/ProductCard";
-import { SectionHeader } from "@/components/ui/SectionHeader";
+import { SectionHeader, type SectionHeaderLinkItem } from "@/components/ui/SectionHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { Button } from "@/components/ui/Button";
@@ -11,7 +11,7 @@ interface ProductSectionProps {
   title: string;
   icon: LucideIcon;
   colorClass: string;
-  links: string[];
+  links: Array<string | SectionHeaderLinkItem>;
   slug?: string;
   sectionKey: string;
   products?: ProductCardProduct[];
