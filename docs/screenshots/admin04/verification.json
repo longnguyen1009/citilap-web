@@ -1,0 +1,10 @@
+{
+  "passed": 9,
+  "viewports": [
+    1440,
+    768,
+    390
+  ],
+  "runtime": "Cloudflare Vite local D1/R2",
+  "errors": []
+}

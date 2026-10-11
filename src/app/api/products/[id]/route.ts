@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { mockProducts } from "@/lib/mock-data";
-import { requireAdmin, isAdminRequest } from "@/lib/auth";
+import { requireAdminMutation, isAdminRequest } from "@/lib/auth";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 const hasDatabase = !!process.env.DATABASE_URL;
@@ -62,12 +61,9 @@ function normalizeVariants(value: unknown): { variants?: NormalizedVariant[]; er
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    if (!hasDatabase) {
-      const product = mockProducts.find((p) => p.id === id);
-      if (!product) return NextResponse.json({ success: false, error: "Không tìm thấy sản phẩm" }, { status: 404 });
-      return NextResponse.json({ success: true, data: { id: product.id, name: product.name, price: product.price, originalPrice: product.originalPrice, images: product.images, stock: product.stock, specs: product.specs, categoryId: product.categoryId } });
-    }
-    const { prisma } = await import("@/lib/prisma");
+    const { createPrismaD1Client } = await import('@/lib/prisma');
+    const { mediaEnvironment } = await import('@/server/media-http');
+    const prisma = createPrismaD1Client((await mediaEnvironment()).DB);
     const product = await prisma.product.findFirst({
       where: isAdminRequest(_request) ? { id } : { id, status: { in: ["ACTIVE", "active"] } },
       include: {
@@ -95,12 +91,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireAdmin(_request);
+  const denied = requireAdminMutation(_request);
   if (denied) return denied;
   try {
     const { id } = await params;
     if (!hasDatabase) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
     const { prisma } = await import("@/lib/prisma");
+    if (await prisma.productStudio.findUnique({ where: { productId: id } })) return NextResponse.json({ success: false, error: 'Use Product Studio to edit this product.' }, { status: 409 });
+
     await prisma.product.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -110,12 +108,14 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireAdmin(request);
+  const denied = requireAdminMutation(request);
   if (denied) return denied;
   try {
     const { id } = await params;
     if (!hasDatabase) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
     const { prisma } = await import("@/lib/prisma");
+    if (await prisma.productStudio.findUnique({ where: { productId: id } })) return NextResponse.json({ success: false, error: 'Use Product Studio to edit this product.' }, { status: 409 });
+
     const data = await request.json();
     if (!data || typeof data !== "object" || Array.isArray(data)) return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 });
     if (typeof data.categoryId !== "string" || !data.categoryId.trim()) return NextResponse.json({ success: false, error: "Category is invalid" }, { status: 400 });

@@ -67,7 +67,13 @@ export const ModelName = {
   InventoryTransaction: 'InventoryTransaction',
   InventoryReservation: 'InventoryReservation',
   ContactSubmission: 'ContactSubmission',
-  RateLimitRecord: 'RateLimitRecord'
+  RateLimitRecord: 'RateLimitRecord',
+  NavigationStudio: 'NavigationStudio',
+  NavigationRevision: 'NavigationRevision',
+  ProductStudio: 'ProductStudio',
+  ProductStudioRevision: 'ProductStudioRevision',
+  MediaAsset: 'MediaAsset',
+  MediaUsage: 'MediaUsage'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -411,6 +417,85 @@ export const RateLimitRecordScalarFieldEnum = {
 } as const
 
 export type RateLimitRecordScalarFieldEnum = (typeof RateLimitRecordScalarFieldEnum)[keyof typeof RateLimitRecordScalarFieldEnum]
+
+
+export const NavigationStudioScalarFieldEnum = {
+  id: 'id',
+  revision: 'revision',
+  draft: 'draft',
+  published: 'published',
+  publishedRevision: 'publishedRevision',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NavigationStudioScalarFieldEnum = (typeof NavigationStudioScalarFieldEnum)[keyof typeof NavigationStudioScalarFieldEnum]
+
+
+export const NavigationRevisionScalarFieldEnum = {
+  revision: 'revision',
+  document: 'document',
+  action: 'action',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type NavigationRevisionScalarFieldEnum = (typeof NavigationRevisionScalarFieldEnum)[keyof typeof NavigationRevisionScalarFieldEnum]
+
+
+export const ProductStudioScalarFieldEnum = {
+  productId: 'productId',
+  revision: 'revision',
+  draft: 'draft',
+  published: 'published',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProductStudioScalarFieldEnum = (typeof ProductStudioScalarFieldEnum)[keyof typeof ProductStudioScalarFieldEnum]
+
+
+export const ProductStudioRevisionScalarFieldEnum = {
+  productId: 'productId',
+  revision: 'revision',
+  document: 'document',
+  action: 'action',
+  createdAt: 'createdAt'
+} as const
+
+export type ProductStudioRevisionScalarFieldEnum = (typeof ProductStudioRevisionScalarFieldEnum)[keyof typeof ProductStudioRevisionScalarFieldEnum]
+
+
+export const MediaAssetScalarFieldEnum = {
+  id: 'id',
+  kind: 'kind',
+  provider: 'provider',
+  storageKey: 'storageKey',
+  externalId: 'externalId',
+  name: 'name',
+  alt: 'alt',
+  caption: 'caption',
+  mimeType: 'mimeType',
+  size: 'size',
+  width: 'width',
+  height: 'height',
+  revision: 'revision',
+  state: 'state',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MediaAssetScalarFieldEnum = (typeof MediaAssetScalarFieldEnum)[keyof typeof MediaAssetScalarFieldEnum]
+
+
+export const MediaUsageScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  ownerType: 'ownerType',
+  ownerId: 'ownerId',
+  slot: 'slot',
+  createdAt: 'createdAt'
+} as const
+
+export type MediaUsageScalarFieldEnum = (typeof MediaUsageScalarFieldEnum)[keyof typeof MediaUsageScalarFieldEnum]
 
 
 export const SortOrder = {

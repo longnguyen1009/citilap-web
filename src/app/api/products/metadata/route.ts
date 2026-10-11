@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireAdminMutation } from "@/lib/auth";
 
 const hasDatabase = !!process.env.DATABASE_URL;
 const PRODUCT_STATUSES = new Set(["active", "draft", "archived"]);
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const denied = requireAdmin(request);
+  const denied = requireAdminMutation(request);
   if (denied) return denied;
   if (!hasDatabase) return fail("Database not configured", 503);
   try {
@@ -56,6 +56,8 @@ export async function PATCH(request: Request) {
     const ids = rows.map((row) => typeof row.id === "string" ? row.id.trim() : "");
     if (ids.some((id) => !id) || new Set(ids).size !== ids.length) return fail("Each row needs a unique id");
     const { prisma } = await import("@/lib/prisma");
+
+    if (await prisma.productStudio.count({ where: { productId: { in: ids } } })) return NextResponse.json({ success: false, error: 'Use Product Studio to edit this product.' }, { status: 409 });
     const existing = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true } });
     if (existing.length !== ids.length) return fail("One or more products do not exist", 404);
     const updates = rows.map((row) => {

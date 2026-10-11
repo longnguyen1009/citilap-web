@@ -3767,3 +3767,26 @@ Khi chủ sở hữu dự án quyết định triển khai lên Cloudflare Produ
 
 
 
+
+### ADMIN-01 — Nền tảng & hợp đồng dữ liệu CMS (2026-10-10)
+
+Status: DONE — phạm vi audit, thiết kế nền tảng và authoring contract; chưa triển khai CMS runtime.
+
+- Worktree riêng: `C:/Users/Admin/Desktop/citilap-web2-admin`, branch `feature/admin-cms-foundation`, baseline `6635fb1`.
+- Tài liệu chính: `docs/admin/ADMIN-01-FOUNDATION.md` (audit, menu đích, mô hình dữ liệu, publishing, quyền, tiêu chí phase).
+- Hợp đồng: `docs/admin/CMS-CONTRACT-V1.md`, validator/type `src/contracts/cms/v1.ts`.
+- Phối hợp Antigravity: `docs/admin/AGENT-HANDOFF.md`; chưa xác nhận agent kia đã đọc. Không sửa các file Frontstore đang thay đổi.
+- Zod v1: hero/category-grid/product-grid, media references, internal navigation, menu hai cấp, optimistic concurrency request metadata. Không thêm dependency.
+- Audit phát hiện: một số API catalog còn DATABASE_URL gate/mock fallback; settings chỉ lưu localStorage; CMS bài viết/layout/media chung chưa có. Các phát hiện được phân công ADMIN-02/03/04/05, chưa sửa trong phase này.
+- Verification: 9/9 contract tests PASS (`node --test scripts/test-cms-contracts.mjs`); full-project `npx.cmd tsc --noEmit --incremental false` PASS; scoped ESLint với `--no-ignore` PASS 0 errors/0 warnings.
+- Không chạy build/browser/D1 suite: chưa thay route/UI/service/database. Không áp migration, không deploy. Test schema không chứng minh auth, persistence hoặc rendering.
+- Next: ADMIN-02 Media Library; giữ compatibility với ProductImage và thống nhất resolved public DTO trước tích hợp Frontstore.
+
+## ADMIN-04 — Menu, danh mục và collection (2026-10-11)
+
+- Worktree Admin `citilap-web2-admin`, branch `feature/admin-cms-foundation`; code Frontstore thuộc Antigravity.
+- `/admin/navigation` và `/admin/categories` dùng chung editor nháp/xuất bản: menu chính desktop/mobile, footer, taxonomy/ảnh/thứ tự, collection chọn sản phẩm và phân trang bộ chọn.
+- Migration `0011_navigation_studio.sql`: snapshot/revision chung, Category projection khi publish, giữ danh tính và FK Product. Đã áp local; chưa remote.
+- Public contract: `/api/catalog/navigation`, `/api/catalog/collections/:slug`; `/api/categories` đọc D1, mutation cũ yêu cầu chuyển editor mới. Chi tiết: `docs/admin/ADMIN-04-NAVIGATION.md`.
+- Local QA: navigation service 15/15, browser 9/9 (1440/768/390), regression Product Studio 12/12; Prisma, typecheck, scoped ESLint và Cloudflare build PASS.
+- Frontstore chưa tích hợp header/drawer/category showcase/collection route; chưa staging/production, commit/merge/deploy. SiteSettings/business-profile còn riêng. Handoff: `docs/admin/AGENT-HANDOFF.md`.
