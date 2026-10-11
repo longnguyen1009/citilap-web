@@ -1,5 +1,5 @@
 import { prisma, type PrismaClient } from "@/lib/prisma";
-import { getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
+import { getProductImageUrl, getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import { ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 
 /**
@@ -262,9 +262,7 @@ export function mapD1ProductToHomepageProduct(row: ProductDbRow): HomepageProduc
     });
 
     const chosen = sortedImages[0];
-    if (chosen?.r2Key) {
-      resolvedImage = getPublicMediaUrl(chosen.r2Key);
-    }
+    resolvedImage = getProductImageUrl(chosen?.r2Key, chosen?.url);
   }
 
   // Fallback to legacy Product.images JSON field only if no ProductImage relation found
@@ -1172,7 +1170,7 @@ export async function getProductDetail(
     const images: ProductDetailImage[] = [];
     if (product.productImages && product.productImages.length > 0) {
       for (const img of product.productImages) {
-        const publicUrl = img.r2Key ? getPublicMediaUrl(img.r2Key) : (img.url || "");
+        const publicUrl = getProductImageUrl(img.r2Key, img.url);
         if (publicUrl) {
           images.push({
             id: img.id,

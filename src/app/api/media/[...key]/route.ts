@@ -3,7 +3,7 @@ import { getMediaObject, headMediaObject } from '@/infra/cloudflare/r2/storage';
 import { isAdminRequest } from '@/lib/auth';
 
 const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.svg']);
-const ALLOWED_PUBLIC_PREFIXES = ['products/', 'brand/'];
+const ALLOWED_PUBLIC_PREFIXES = ['products/', 'brand/', 'categories/'];
 const ALLOWED_TEMP_PREFIXES = ['tmp/products/'];
 
 function validateMediaKey(keySegments: string[], request: Request): { valid: boolean; r2Key?: string; error?: string; status?: number } {

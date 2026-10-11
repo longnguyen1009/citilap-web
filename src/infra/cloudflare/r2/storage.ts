@@ -60,8 +60,8 @@ export function getPublicMediaUrl(r2Key: string): string {
     return trimmed;
   }
 
-  // If already starts with /api/media/
-  if (trimmed.startsWith('/api/media/')) {
+  // Existing public media/library routes are already resolved URLs.
+  if (trimmed.startsWith('/api/media/') || trimmed.startsWith('/api/library/')) {
     return trimmed;
   }
 
@@ -73,6 +73,19 @@ export function getPublicMediaUrl(r2Key: string): string {
 
   // Local development / default streaming route
   return `/api/media/${trimmed.replace(/^\//, '')}`;
+}
+
+/**
+ * Resolve the public image URL recorded in ProductImage.
+ * Imported/seeded products can have a legacy external URL alongside a
+ * placeholder R2 key; Studio assets use a library key and /api/library URL.
+ * Prefer those explicit usable URLs rather than requesting a missing R2 key.
+ */
+export function getProductImageUrl(r2Key?: string | null, storedUrl?: string | null): string {
+  const url = storedUrl?.trim() || '';
+  if (/^https?:\/\//i.test(url) || url.startsWith('/api/library/')) return url;
+  if (r2Key?.startsWith('library/')) return '';
+  return r2Key ? getPublicMediaUrl(r2Key) : url.startsWith('/api/media/') ? url : '';
 }
 
 /**
