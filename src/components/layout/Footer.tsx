@@ -11,8 +11,9 @@ import {
   Clock,
 } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
+import type { ResolvedNavigation } from "@/contracts/cms/navigation";
 
-export default function Footer() {
+export default function Footer({ navigation }: { navigation?: ResolvedNavigation | null }) {
   const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
   const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
 
@@ -221,6 +222,19 @@ export default function Footer() {
                 Về CitiLap
               </h3>
               <ul className="space-y-2.5 text-sm text-gray-400">
+                {navigation?.menus.footer.map((item) => (
+                  <li key={item.id}>
+                    <Link href={item.href} className="hover:text-white transition font-medium">{item.label}</Link>
+                    {item.children.length > 0 && (
+                      <ul className="pl-3 mt-2 space-y-2 border-l border-gray-700">
+                        {item.children.map((child) => (
+                          <li key={child.id}><Link href={child.href} className="hover:text-white transition">{child.label}</Link></li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+                {!navigation && <>
                 <li>
                   <Link href="/gioi-thieu" className="hover:text-white transition">
                     Giới thiệu thương hiệu
@@ -246,6 +260,7 @@ export default function Footer() {
                     Chính sách bảo mật thông tin
                   </Link>
                 </li>
+                </>}
               </ul>
             </div>
           </div>

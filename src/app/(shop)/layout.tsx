@@ -2,6 +2,7 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import { getActiveCategories, getActiveBrands } from "@/server/services/catalog.service";
+import { getPublishedNavigation } from "@/server/services/storefront-cms.service";
 
 export default async function ShopLayout({
   children,
@@ -10,6 +11,7 @@ export default async function ShopLayout({
 }) {
   let categories: Awaited<ReturnType<typeof getActiveCategories>> = [];
   let brands: Awaited<ReturnType<typeof getActiveBrands>> = [];
+  const navigation = await getPublishedNavigation();
 
   try {
     [categories, brands] = await Promise.all([
@@ -22,10 +24,10 @@ export default async function ShopLayout({
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Header categories={categories} brands={brands} />
+      <Header categories={categories} brands={brands} navigation={navigation} />
       <main className="flex-grow pb-16 md:pb-0">{children}</main>
-      <Footer />
-      <MobileBottomNav categories={categories} />
+      <Footer navigation={navigation} />
+      <MobileBottomNav categories={categories} navigation={navigation} />
     </div>
   );
 }

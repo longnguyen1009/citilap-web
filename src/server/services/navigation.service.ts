@@ -1,10 +1,15 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { navigationWriteSchema, type NavigationDocument, type NavigationDetail, type NavigationTarget, type ResolvedNavigation } from '../../contracts/cms/navigation';
 import { MediaError, getAsset, type MediaEnvironment } from './media-library.service';
+import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
 
 type Row = { revision: number; draft: string; published: string | null; publishedRevision: number | null };
 type CategoryRow = { id: string; name: string; slug: string; description: string | null; parentId: string | null; image: string | null; status: string; sortOrder: number };
-const categoryRows = async (db: D1Database) => (await db.prepare('SELECT * FROM Category ORDER BY sortOrder,name').all<CategoryRow>()).results;
+const categoryRows = async (db: D1Database) => (await db.prepare('SELECT * FROM Category ORDER BY sortOrder,name').all<CategoryRow>()).results.map(c => ({
+  ...c,
+  // Existing seed/catalog rows store R2 keys, whereas CMS authoring uses URLs.
+  image: c.image && !c.image.startsWith('/') ? getPublicMediaUrl(c.image) : c.image,
+}));
 export async function navigationDetail(db: D1Database): Promise<NavigationDetail> {
   const row = await db.prepare("SELECT * FROM NavigationStudio WHERE id='site'").first<Row>();
   const rows = await categoryRows(db), productNames: Record<string,string> = {};

@@ -1,5 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { getPrismaClient } from '@/lib/prisma';
+import { assertPublishedStudioOrderable } from './storefront-order-guard';
 
 export interface OrderItemInput {
   productId: string;
@@ -302,12 +303,20 @@ export async function createOrder(
     // Fetch product from D1
     const product = await prisma.product.findUnique({
       where: { id: productId },
-      select: { id: true, name: true, price: true, status: true },
+      select: {
+        id: true, name: true, price: true, status: true,
+        studio: { select: { published: true } },
+      },
     });
 
     if (!product || product.status !== 'ACTIVE') {
       throw new Error('PRODUCT_UNAVAILABLE');
     }
+
+    // Published CMS availability is authoritative for Storefront requests,
+    // including carts saved before an item was switched to CONTACT/UNAVAILABLE.
+    // A stale CMS variant must not remain orderable after it was removed.
+    assertPublishedStudioOrderable(product.studio?.published, variantId);
 
     let price = product.price;
     let sku: string | null = null;

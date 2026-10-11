@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import type { CategorySummary } from "@/server/services/catalog.service";
+import type { ResolvedNavigation } from "@/contracts/cms/navigation";
 
 const categoryIconMap: Record<string, React.ElementType> = {
   "laptop-gaming": Gamepad2,
@@ -33,9 +34,10 @@ const categoryIconMap: Record<string, React.ElementType> = {
 
 interface MobileBottomNavProps {
   categories?: CategorySummary[];
+  navigation?: ResolvedNavigation | null;
 }
 
-export default function MobileBottomNav({ categories = [] }: MobileBottomNavProps) {
+export default function MobileBottomNav({ categories = [], navigation }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { cartCount } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -199,7 +201,21 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
               </Link>
 
               {/* Category Items */}
-              {categories.map((cat) => {
+              {navigation?.menus.main.map((item) => (
+                <div key={item.id} className="rounded-lg border border-border-default overflow-hidden">
+                  <Link href={item.href} onClick={() => setDrawerOpen(false)}
+                    className="flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle">
+                    {item.label}<ChevronRight className="w-4 h-4" />
+                  </Link>
+                  {item.children.length > 0 && <div className="border-t border-border-default bg-surface-subtle px-3 py-1">
+                    {item.children.map((child) => (
+                      <Link key={child.id} href={child.href} onClick={() => setDrawerOpen(false)}
+                        className="block pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary">{child.label}</Link>
+                    ))}
+                  </div>}
+                </div>
+              ))}
+              {!navigation && categories.map((cat) => {
                 const IconComponent = categoryIconMap[cat.slug] || Laptop;
                 const isSelected = pathname === `/category/${cat.slug}`;
 
@@ -244,7 +260,7 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
               })}
 
               {/* Phụ kiện & Đồ chơi công nghệ nổi bật */}
-              <div className="pt-3 border-t border-border-default/60">
+              {!navigation && <div className="pt-3 border-t border-border-default/60">
                 <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider px-1 block mb-2">
                   Phụ kiện & Đồ chơi công nghệ
                 </span>
@@ -292,7 +308,7 @@ export default function MobileBottomNav({ categories = [] }: MobileBottomNavProp
                     <span>🎧 Tai nghe & Loa</span>
                   </Link>
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* Bottom Support Call */}

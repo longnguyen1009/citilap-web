@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import ProductGallery from "@/components/product/ProductGallery";
 import ProductPurchaseSection from "@/components/product/ProductPurchaseSection";
+import StudioPurchaseSection from "@/components/product/StudioPurchaseSection";
 import ProductSpecsTable from "@/components/product/ProductSpecsTable";
 import ProductCard from "@/components/product/ProductCard";
 import ReviewForm from "@/components/product/ReviewForm";
@@ -22,6 +23,7 @@ import {
   getRelatedProducts,
 } from "@/server/services/catalog.service";
 import { businessProfile } from "@/config/business-profile";
+import { getPublishedStudio } from "@/server/services/storefront-cms.service";
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -49,8 +51,12 @@ export async function generateMetadata({
     };
   }
 
-  const title = product.seoTitle || `${product.name} | CITILAP.VN`;
+  const studio = await getPublishedStudio(product.slug);
+  const displayName = studio?.name || product.name;
+  const primaryImage = studio?.media.find((item) => item.kind === "IMAGE")?.url || product.primaryImageUrl;
+  const title = studio?.seoTitle || product.seoTitle || `${displayName} | CITILAP.VN`;
   const description =
+    studio?.seoDescription || studio?.description ||
     product.seoDescription ||
     product.shortDescription ||
     `Xem thông số chi tiết, cấu hình ${product.name} chính hãng tại CITILAP.VN. Giá ${product.price.toLocaleString("vi-VN")}đ, ${product.conditionLabel}, bảo hành ${product.warranty}.`;
@@ -68,13 +74,13 @@ export async function generateMetadata({
       description,
       url: canonicalUrl,
       type: "website",
-      images: product.primaryImageUrl ? [{ url: product.primaryImageUrl, alt: product.name }] : [],
+      images: primaryImage ? [{ url: primaryImage, alt: displayName }] : [],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: product.primaryImageUrl ? [product.primaryImageUrl] : [],
+      images: primaryImage ? [primaryImage] : [],
     },
   };
 }
@@ -108,6 +114,22 @@ export default async function ProductDetailPage({
     redirect(`/product/${product.slug}${searchString}`);
   }
 
+  const studio = await getPublishedStudio(product.slug);
+  const studioVariant = studio?.variants.find((v) => v.sku === skuParam) || studio?.variants[0];
+  const studioImages = studio?.media.filter((m): m is typeof m & { url: string } => m.kind === "IMAGE" && Boolean(m.url)) || [];
+  const galleryImages = studio ? studioImages.map((m) => ({
+    url: m.url, alt: m.alt || studio.name, variantId: m.variantId || null,
+  })) : product.images;
+  const cover = studio
+    ? (studioImages.find((m) => m.variantId && m.variantId === studioVariant?.id)?.url || studioImages[0]?.url || "")
+    : (product.primaryImageUrl || "");
+  const displayName = studio?.name || product.name;
+  const displayPrice = studioVariant?.price ?? studio?.price ?? product.price;
+  const displayAvailability = studio?.availability === "AVAILABLE" ? "https://schema.org/InStock"
+    : studio?.availability === "PREORDER" ? "https://schema.org/PreOrder"
+    : studio ? "https://schema.org/OutOfStock"
+    : product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
+
   // 4. Fetch related products from D1 (excluding current product)
   const relatedProducts = await getRelatedProducts(
     product.id,
@@ -121,51 +143,59 @@ export default async function ProductDetailPage({
     product.variants.find((v) => v.id === product.selectedVariantId) || null;
 
   // 6. Sanitize description
-  const safeDescription = sanitizeHtml(product.contentHtml || product.description || "");
+  const safeDescription = sanitizeHtml(studio ? (studio.contentHtml || studio.description) : (product.contentHtml || product.description || ""));
 
   // 7. Schema.org JSON-LD Structured Data
   const jsonLdProduct = {
     "@context": "https://schema.org",
     "@type": "Product",
     "@id": `https://citilap.vn/product/${product.slug}#product`,
-    name: selectedVariant ? `${product.name} (${selectedVariant.name})` : product.name,
-    image: product.images.map((img) => img.url),
-    description: (product.shortDescription || product.description || "").replace(/<[^>]+>/g, " ").slice(0, 500),
-    sku: product.selectedSku || product.model || product.slug,
-    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    name: studioVariant ? `${displayName} (${studioVariant.name})` : selectedVariant && !studio ? `${displayName} (${selectedVariant.name})` : displayName,
+    image: galleryImages.map((img) => img.url),
+    description: (studio?.description || product.shortDescription || product.description || "").replace(/<[^>]+>/g, " ").slice(0, 500),
+    sku: studioVariant?.sku || (!studio ? product.selectedSku : null) || product.model || product.slug,
+    brand: (studio?.brand || product.brand) ? { "@type": "Brand", name: studio?.brand || product.brand } : undefined,
     category: product.category || undefined,
     offers: {
       "@type": "Offer",
-      price: product.price,
+      price: displayPrice,
       priceCurrency: "VND",
-      availability: product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-      itemCondition: product.condition === "NEW" ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
-      url: product.selectedSku
-        ? `https://citilap.vn/product/${product.slug}?sku=${encodeURIComponent(product.selectedSku)}`
+      availability: displayAvailability,
+      itemCondition: (studioVariant?.condition || product.condition) === "NEW" ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
+      url: (studioVariant?.sku || (!studio && product.selectedSku))
+        ? `https://citilap.vn/product/${product.slug}?sku=${encodeURIComponent(studioVariant?.sku || product.selectedSku || "")}`
         : `https://citilap.vn/product/${product.slug}`,
     },
   };
 
-  const jsonLdProductGroup = product.variants.length > 1 ? {
+  const jsonLdVariants = studio ? studio.variants.map((v) => ({
+    name: `${displayName} - ${v.name}`, sku: v.sku, price: v.price,
+    availability: displayAvailability, condition: v.condition,
+  })) : product.variants.map((v) => ({
+    name: `${displayName} - ${v.name}`, sku: v.sku, price: v.price,
+    availability: v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    condition: product.condition,
+  }));
+  const jsonLdProductGroup = jsonLdVariants.length > 1 ? {
     "@context": "https://schema.org",
     "@type": "ProductGroup",
     "@id": `https://citilap.vn/product/${product.slug}#productgroup`,
-    name: product.name,
-    description: (product.shortDescription || product.description || "").replace(/<[^>]+>/g, " ").slice(0, 500),
-    image: product.images.map((img) => img.url),
-    brand: product.brand ? { "@type": "Brand", name: product.brand } : undefined,
+    name: displayName,
+    description: (studio?.description || product.shortDescription || product.description || "").replace(/<[^>]+>/g, " ").slice(0, 500),
+    image: galleryImages.map((img) => img.url),
+    brand: (studio?.brand || product.brand) ? { "@type": "Brand", name: studio?.brand || product.brand } : undefined,
     url: `https://citilap.vn/product/${product.slug}`,
     productGroupID: product.id,
-    hasVariant: product.variants.map((v) => ({
+    hasVariant: jsonLdVariants.map((v) => ({
       "@type": "Product",
-      name: `${product.name} - ${v.name}`,
+      name: v.name,
       sku: v.sku,
       offers: {
         "@type": "Offer",
         price: v.price,
         priceCurrency: "VND",
-        availability: v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-        itemCondition: product.condition === "NEW" ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
+        availability: v.availability,
+        itemCondition: v.condition === "NEW" ? "https://schema.org/NewCondition" : "https://schema.org/UsedCondition",
         url: `https://citilap.vn/product/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
       },
     })),
@@ -194,7 +224,7 @@ export default async function ProductDetailPage({
       {
         "@type": "ListItem",
         position: product.categorySlug ? 3 : 2,
-        name: product.name,
+        name: displayName,
         item: `https://citilap.vn/product/${product.slug}`,
       },
     ],
@@ -235,7 +265,7 @@ export default async function ProductDetailPage({
             )}
             <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
             <li className="text-gray-900 font-semibold truncate max-w-xs sm:max-w-md" aria-current="page">
-              {product.name}
+              {displayName}
             </li>
           </ol>
         </div>
@@ -249,11 +279,29 @@ export default async function ProductDetailPage({
           <div className="lg:col-span-5">
             <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-4 sticky top-16">
               <ProductGallery
-                images={product.images}
-                productName={product.name}
-                discount={product.discount}
-                selectedImage={product.primaryImageUrl}
+                images={galleryImages}
+                productName={displayName}
+                discount={studio ? undefined : product.discount}
+                selectedImage={cover}
               />
+              {studio?.media.filter((item): item is typeof item & { url: string } => item.kind === "VIDEO" && Boolean(item.url)).map((item, index) => {
+                const youtubeId = /^https:\/\/www\.youtube\.com\/watch\?v=([A-Za-z0-9_-]{11})$/.exec(item.url)?.[1];
+                return <div key={`${item.url}-${index}`} className="mt-4">
+                  {youtubeId ? <iframe
+                    className="aspect-video w-full rounded-xl bg-slate-900"
+                    src={`https://www.youtube-nocookie.com/embed/${youtubeId}`}
+                    title={item.alt || `Video giới thiệu ${displayName}`}
+                    loading="lazy"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  /> : <video className="w-full rounded-xl bg-slate-900" controls preload="metadata" playsInline aria-label={item.alt || `Video giới thiệu ${displayName}`}>
+                    <source src={item.url} />
+                    Trình duyệt của bạn không hỗ trợ phát video.
+                  </video>}
+                  {item.alt && <p className="mt-1 text-xs text-slate-500">{item.alt}</p>}
+                </div>;
+              })}
             </div>
           </div>
 
@@ -262,27 +310,36 @@ export default async function ProductDetailPage({
             <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-5 sm:p-7 flex flex-col space-y-5">
               {/* Title */}
               <h1 className="text-xl sm:text-2xl font-black text-gray-900 leading-tight">
-                {product.name}
+                {displayName}
               </h1>
 
               {/* Quick Specs Highlight */}
-              {(product.specs.cpu || product.specs.ram || product.specs.ssd || product.specs.gpu || product.specs.display) && (
+              {(studio ? studio.specs.some((s) => s.value) : (product.specs.cpu || product.specs.ram || product.specs.ssd || product.specs.gpu || product.specs.display)) && (
                 <div className="border border-blue-50 rounded-xl p-3.5 bg-blue-50/30 space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900 uppercase tracking-wide">
                     <Sparkles className="w-3.5 h-3.5 text-blue-600" /> Cấu hình tóm tắt
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
+                    {studio ? studio.specs.filter((spec) => spec.value).map((spec) => (
+                      <SpecChip key={spec.key} label={spec.key} value={spec.value} />
+                    )) : <>
                     {product.specs.cpu && <SpecChip label="CPU" value={product.specs.cpu} />}
                     {product.specs.gpu && <SpecChip label="GPU" value={product.specs.gpu} />}
                     {product.specs.ram && <SpecChip label="RAM" value={product.specs.ram} />}
                     {product.specs.ssd && <SpecChip label="SSD" value={product.specs.ssd} />}
                     {product.specs.display && <SpecChip label="Màn hình" value={product.specs.display} />}
+                    </>}
                   </div>
                 </div>
               )}
 
               {/* Unified Purchase Section: Condition, Variants, Warranty, Live Price, Actions */}
-              <ProductPurchaseSection
+              {studio ? <StudioPurchaseSection
+                studio={studio}
+                productId={product.id}
+                image={cover}
+                selectedSku={skuParam}
+              /> : <ProductPurchaseSection
                 productId={product.id}
                 productName={product.name}
                 productSlug={product.slug}
@@ -294,7 +351,7 @@ export default async function ProductDetailPage({
                 baseStock={product.stock}
                 variants={product.variants}
                 selectedVariantId={product.selectedVariantId}
-              />
+              />}
             </div>
           </div>
         </section>
@@ -321,7 +378,7 @@ export default async function ProductDetailPage({
             </article>
 
             {/* Accessories & Warranty Card */}
-            <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-6 sm:p-8">
+            {!studio && <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-6 sm:p-8">
               <h2 className="text-base sm:text-lg font-black text-gray-900 border-b border-gray-100 pb-3 mb-5 uppercase flex items-center gap-2">
                 <PackageCheck className="w-5 h-5 text-emerald-600" /> Phụ kiện đi kèm & Cam kết bảo hành
               </h2>
@@ -355,7 +412,7 @@ export default async function ProductDetailPage({
                   </div>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Delivery & Payment Policies */}
             <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-6 sm:p-8">
@@ -395,22 +452,29 @@ export default async function ProductDetailPage({
                   Chưa có đánh giá nào cho sản phẩm này
                 </p>
                 <p className="text-xs text-gray-500 max-w-md mx-auto">
-                  Bạn đã trải nghiệm {product.name}? Hãy chia sẻ cảm nhận thực tế của bạn để giúp các khách hàng khác lựa chọn cấu hình phù hợp!
+                  Bạn đã trải nghiệm {displayName}? Hãy chia sẻ cảm nhận thực tế của bạn để giúp các khách hàng khác lựa chọn cấu hình phù hợp!
                 </p>
               </div>
 
               {/* Review Submission Form */}
-              <ReviewForm productName={product.name} />
+              <ReviewForm productName={displayName} />
             </div>
           </div>
 
           {/* Right Column: Grouped Specifications Table (Col 4) */}
           <div className="lg:col-span-4 space-y-6">
             <div className="sticky top-16 space-y-6">
-              <ProductSpecsTable
+              {studio ? <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs" aria-label="Thông số kỹ thuật">
+                <h2 className="mb-4 text-lg font-black text-slate-900">Thông số kỹ thuật</h2>
+                {studio.specs.filter((s) => s.value).length ? <dl className="divide-y divide-slate-100">
+                  {studio.specs.filter((s) => s.value).map((spec) => <div key={spec.key} className="grid grid-cols-[minmax(100px,40%)_1fr] gap-2 py-3 text-sm">
+                    <dt className="font-medium text-slate-500">{spec.key}</dt><dd className="text-slate-900 break-words">{spec.value}</dd>
+                  </div>)}
+                </dl> : <p className="text-sm text-slate-500">Thông số đang được cập nhật.</p>}
+              </section> : <ProductSpecsTable
                 fullSpecs={product.fullSpecs}
                 productName={product.name}
-              />
+              />}
 
               {/* Consultation Hotline Card */}
               <div className="bg-gradient-to-br from-blue-900 to-indigo-950 text-white rounded-2xl p-6 shadow-md">

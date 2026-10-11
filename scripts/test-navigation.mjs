@@ -12,10 +12,12 @@ try {
  const DB=await mf.getD1Database('DB'),PRODUCT_MEDIA=await mf.getR2Bucket('PRODUCT_MEDIA'),env={DB,PRODUCT_MEDIA};
  for(const f of (await readdir('d1-migrations')).filter(f=>f.endsWith('.sql')).sort()) await DB.batch(unstable_splitSqlQuery(await readFile('d1-migrations/'+f,'utf8')).map(s=>DB.prepare(s)));
  await DB.prepare("INSERT INTO Category(id,name,slug,updatedAt) VALUES('laptop','Laptop','laptop',CURRENT_TIMESTAMP)").run();
+ await DB.prepare("UPDATE Category SET image='categories/gaming.webp' WHERE id='laptop'").run();
  for(const [id,status] of [['p1','ACTIVE'],['p2','ACTIVE'],['p3','DRAFT']]) await DB.prepare("INSERT INTO Product(id,name,slug,description,price,categoryId,status,updatedAt) VALUES(?,?,?,'',100,'laptop',?,CURRENT_TIMESTAMP)").bind(id,'Product '+id,id,status).run();
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
  const asset=(await api.uploadLibraryImage(env,new File([png],'category.png',{type:'image/png'}))).asset;
  let detail=await api.navigationDetail(DB),d=detail.document;
+ await check('legacy category R2 keys normalize to editable public URLs',async()=>{assert.equal(d.categories[0].image,'/api/media/categories/gaming.webp');assert.equal(api.navigationDocumentSchema.safeParse(d).success,true);assert.equal((await api.publicCategories(DB))[0].image,'/api/media/categories/gaming.webp');});
  const category={id:'accessories',name:'Phụ kiện',slug:'phu-kien',description:'Phụ kiện laptop',parentId:null,visible:true,assetId:asset.id,image:'',alt:'Phụ kiện'};
  d.categories.unshift(category);
  d.collections=[{id:'setup',name:'Góc làm việc',slug:'goc-lam-viec',description:'',visible:true,productIds:['p2','p1']}];

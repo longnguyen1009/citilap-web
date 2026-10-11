@@ -8,6 +8,7 @@ import {
   type CategoryFilterOptions,
 } from "@/server/services/catalog.service";
 import { getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
+import { getPublishedNavigation } from "@/server/services/storefront-cms.service";
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -16,6 +17,8 @@ interface CategoryPageProps {
 
 export async function generateMetadata({ params, searchParams }: CategoryPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const navigation = await getPublishedNavigation();
+  if (navigation && !navigation.categories.some((cat) => cat.slug === slug)) return { title: "Danh mục không tồn tại | CitiLap", robots: { index: false } };
   const sp = await searchParams;
   const category = await getCategoryBySlug(slug);
 
@@ -57,6 +60,8 @@ export async function generateMetadata({ params, searchParams }: CategoryPagePro
 
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { slug } = await params;
+  const navigation = await getPublishedNavigation();
+  if (navigation && !navigation.categories.some((cat) => cat.slug === slug)) notFound();
   const sp = await searchParams;
 
   // 1. Helper to extract string or array

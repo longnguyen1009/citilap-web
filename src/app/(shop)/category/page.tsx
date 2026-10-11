@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { type Metadata } from "next";
 import {
   Gamepad2,
@@ -12,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { getActiveCategories } from "@/server/services/catalog.service";
+import { getPublishedNavigation } from "@/server/services/storefront-cms.service";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import EmptyState from "@/components/ui/EmptyState";
 import Badge from "@/components/ui/Badge";
@@ -32,11 +34,15 @@ const categoryIconMap: Record<string, React.ElementType> = {
 };
 
 export default async function AllCategoriesPage() {
-  let categories: Awaited<ReturnType<typeof getActiveCategories>> = [];
+  type DisplayCategory = { id: string; slug: string; name: string; description: string | null; href: string; image?: string | null; alt?: string; productCount?: number };
+  let categories: DisplayCategory[] = [];
   let errorOccurred = false;
 
   try {
-    categories = await getActiveCategories();
+    const navigation = await getPublishedNavigation();
+    categories = navigation
+      ? navigation.categories
+      : (await getActiveCategories()).map((cat) => ({ ...cat, href: `/category/${cat.slug}` }));
   } catch (err) {
     console.error("[AllCategoriesPage] Failed to fetch categories from D1:", err);
     errorOccurred = true;
@@ -101,17 +107,19 @@ export default async function AllCategoriesPage() {
               return (
                 <Link
                   key={cat.id}
-                  href={`/category/${cat.slug}`}
+                  href={cat.href}
                   className="group bg-surface-card border border-border-default hover:border-brand-primary rounded-card p-6 flex flex-col justify-between transition-all duration-200 hover:shadow-card-hover"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-4 mb-4">
                       <div className="w-14 h-14 rounded-surface bg-brand-primary-subtle text-brand-primary flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-brand-primary group-hover:text-text-inverse transition-all duration-200">
-                        <IconComponent className="w-7 h-7" />
+                        {cat.image
+                          ? <Image src={cat.image} alt={cat.alt || cat.name} width={56} height={56} unoptimized className="w-full h-full rounded-surface object-cover" />
+                          : <IconComponent className="w-7 h-7" />}
                       </div>
-                      <Badge variant="primary" className="text-caption font-semibold">
+                      {cat.productCount !== undefined && <Badge variant="primary" className="text-caption font-semibold">
                         {cat.productCount} sản phẩm
-                      </Badge>
+                      </Badge>}
                     </div>
 
                     <h2 className="text-title font-bold text-text-primary group-hover:text-brand-primary transition-colors flex items-center gap-1.5">

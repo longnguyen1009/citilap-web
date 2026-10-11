@@ -14,6 +14,7 @@ import { useWishlist } from "@/context/WishlistContext";
 import SearchAutocomplete from "@/components/search/SearchAutocomplete";
 import type { CategorySummary, BrandSummary } from "@/server/services/catalog.service";
 import { businessProfile } from "@/config/business-profile";
+import type { ResolvedNavigation } from "@/contracts/cms/navigation";
 
 const categoryIcons: Record<string, React.ElementType> = {
   "laptop-gaming": Gamepad2,
@@ -54,9 +55,10 @@ export interface HeaderNavItem {
 export interface HeaderProps {
   categories?: CategorySummary[];
   brands?: BrandSummary[];
+  navigation?: ResolvedNavigation | null;
 }
 
-export default function Header({ categories = [], brands = [] }: HeaderProps) {
+export default function Header({ categories = [], brands = [], navigation }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const [hoveredNav, setHoveredNav] = useState<number | null>(null);
@@ -100,7 +102,13 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
   }, []);
 
   // Build dynamic dropdown categories from D1 data
-  const dynamicCategoryMenu: HeaderCategoryItem[] = categories.length > 0
+  const dynamicCategoryMenu: HeaderCategoryItem[] = navigation
+    ? navigation.categories.filter((cat) => !cat.parentId).map((cat) => ({
+        id: cat.id, name: cat.name, slug: cat.slug, href: cat.href,
+        children: navigation.categories.filter((child) => child.parentId === cat.id)
+          .map((child) => ({ name: child.name, href: child.href })),
+      }))
+    : categories.length > 0
     ? categories.map((cat) => {
         const children = cat.subCategories && cat.subCategories.length > 0
           ? cat.subCategories.map((sub) => ({
@@ -170,7 +178,7 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
         { name: "Apple - MacBook", href: "/category/macbook" },
       ];
 
-  const dynamicNavItems: HeaderNavItem[] = [
+  const legacyNavItems: HeaderNavItem[] = [
     { name: "HOT SALE", href: "/hot-sale", hot: true },
     ...laptopNavCategories,
     {
@@ -185,6 +193,13 @@ export default function Header({ categories = [], brands = [] }: HeaderProps) {
     },
     { name: "TIN TỨC", href: "/news" },
   ];
+
+  const dynamicNavItems: HeaderNavItem[] = navigation
+    ? navigation.menus.main.map((item) => ({
+        name: item.label, href: item.href,
+        children: item.children.map((child) => ({ name: child.label, href: child.href })),
+      }))
+    : legacyNavItems;
 
   return (
     <header className="w-full sticky top-0 z-50 shadow-md">

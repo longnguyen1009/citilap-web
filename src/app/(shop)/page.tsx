@@ -7,7 +7,6 @@ import {
   Server,
   TrendingUp,
   Headphones,
-  RotateCcw,
 } from "lucide-react";
 
 import HeroSection from "@/components/home/HeroSection";
@@ -19,6 +18,7 @@ import MediaSection from "@/components/home/MediaSection";
 import TestimonialSection from "@/components/home/TestimonialSection";
 import ContactSection from "@/components/home/ContactSection";
 import BrandSection from "@/components/home/BrandSection";
+import { getPublishedNavigation } from "@/server/services/storefront-cms.service";
 import { ProductGridSkeleton } from "@/components/ui/Skeleton";
 
 export const metadata: Metadata = {
@@ -60,7 +60,8 @@ function ProductSectionSkeleton() {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const navigation = await getPublishedNavigation();
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -87,7 +88,7 @@ export default function Home() {
       <FeatureStrip />
 
       {/* 3. KHÁM PHÁ HỆ SINH THÁI DANH MỤC & PHỤ KIỆN TECH */}
-      <CategoryGridSection />
+      <CategoryGridSection navigation={navigation} />
 
       {/* 4. FLASH SALE */}
       <Suspense fallback={<ProductSectionSkeleton />}>

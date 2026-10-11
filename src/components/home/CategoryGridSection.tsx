@@ -2,10 +2,14 @@
 
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Sparkles, ArrowRight } from "lucide-react";
+import Image from "next/image";
+import { ChevronLeft, ChevronRight, Sparkles, ArrowRight, Layers, type LucideIcon } from "lucide-react";
 import { SHOWCASE_CATEGORIES } from "@/config/category-showcase";
+import type { ResolvedNavigation } from "@/contracts/cms/navigation";
 
-export default function CategoryGridSection() {
+type DisplayCategory = { id: string; name: string; href: string; icon: LucideIcon; image?: string | null; alt?: string; badge?: string; badgeColor?: string };
+
+export default function CategoryGridSection({ navigation }: { navigation?: ResolvedNavigation | null }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScroll, setCanScroll] = useState(false);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -45,8 +49,12 @@ export default function CategoryGridSection() {
   };
 
   // Chia 16 danh mục thành 2 hàng đều đặn (mỗi hàng 8 mục)
-  const row1 = SHOWCASE_CATEGORIES.slice(0, 8);
-  const row2 = SHOWCASE_CATEGORIES.slice(8, 16);
+  const displayCategories: DisplayCategory[] = navigation
+    ? navigation.categories.map((cat) => ({ id: cat.id, name: cat.name, href: cat.href, icon: Layers, image: cat.image, alt: cat.alt }))
+    : SHOWCASE_CATEGORIES;
+  const rows = Array.from({ length: Math.ceil(displayCategories.length / 8) }, (_, index) =>
+    displayCategories.slice(index * 8, (index + 1) * 8)
+  );
 
   return (
     <section
@@ -119,9 +127,9 @@ export default function CategoryGridSection() {
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             <div className="flex flex-col gap-4 min-w-[760px] md:min-w-[980px] lg:min-w-full">
-              {/* Hàng 1 */}
-              <div className="grid grid-cols-8 gap-2 md:gap-3">
-                {row1.map((item) => {
+              {rows.map((row, rowIndex) => (
+                <div key={rowIndex} className="grid grid-cols-8 gap-2 md:gap-3">
+                {row.map((item) => {
                   const Icon = item.icon;
                   return (
                     <Link
@@ -132,7 +140,9 @@ export default function CategoryGridSection() {
                       {/* Vòng tròn Icon */}
                       <div className="relative mb-2">
                         <div className="w-13 h-13 md:w-16 md:h-16 rounded-full bg-slate-100/80 border border-slate-200/70 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50 group-hover:border-blue-400 group-hover:text-blue-600 group-hover:scale-105 group-hover:shadow-md group-hover:shadow-blue-500/10">
-                          <Icon className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-300 group-hover:scale-110" />
+                          {item.image
+                            ? <Image src={item.image} alt={item.alt || item.name} width={64} height={64} unoptimized className="w-full h-full rounded-full object-cover" />
+                            : <Icon className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-300 group-hover:scale-110" />}
                         </div>
                         {item.badge && (
                           <span
@@ -151,41 +161,8 @@ export default function CategoryGridSection() {
                     </Link>
                   );
                 })}
-              </div>
-
-              {/* Hàng 2 */}
-              <div className="grid grid-cols-8 gap-2 md:gap-3">
-                {row2.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      className="group flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 transition-all duration-200 snap-start text-center cursor-pointer"
-                    >
-                      {/* Vòng tròn Icon */}
-                      <div className="relative mb-2">
-                        <div className="w-13 h-13 md:w-16 md:h-16 rounded-full bg-slate-100/80 border border-slate-200/70 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50 group-hover:border-blue-400 group-hover:text-blue-600 group-hover:scale-105 group-hover:shadow-md group-hover:shadow-blue-500/10">
-                          <Icon className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-300 group-hover:scale-110" />
-                        </div>
-                        {item.badge && (
-                          <span
-                            className={`absolute -top-1 -right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-xs uppercase tracking-tight ${
-                              item.badgeColor || "bg-red-500 text-white"
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-                      {/* Tên danh mục */}
-                      <span className="text-xs md:text-sm font-semibold text-slate-800 leading-tight line-clamp-2 max-w-[85px] md:max-w-[105px] group-hover:text-blue-600 transition-colors">
-                        {item.name}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
+                </div>
+              ))}
             </div>
           </div>
 
