@@ -3,6 +3,8 @@
 import { useState, useRef } from "react";
 import { Upload, X, Image as ImageIcon, Loader2, Star, AlertCircle } from "lucide-react";
 import Image from "next/image";
+import MediaBrowser, { mediaRequest } from './media/MediaBrowser';
+import MediaDialog from './media/MediaDialog';
 
 export interface ImageUploaderProps {
   images: string[];
@@ -18,6 +20,7 @@ export default function ImageUploader({
   const [uploading, setUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -84,6 +87,19 @@ export default function ImageUploader({
 
   return (
     <div className="space-y-3">
+      <button type="button" disabled={uploading} className="media-button" onClick={() => setLibraryOpen(true)}>Chọn ảnh từ thư viện</button>
+      {libraryOpen && <MediaDialog title="Chọn ảnh từ thư viện" onClose={() => { if (!uploading) setLibraryOpen(false); }}>
+        {errorMessage && <p role="alert" className="media-error">{errorMessage}</p>}
+        <MediaBrowser picker onSelect={async (asset) => {
+          if (uploading || !asset.url) return;
+          setUploading(true); setErrorMessage(null);
+          try {
+            if (productId) await mediaRequest(`/api/admin/media/${asset.id}/attach`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productId }) });
+            onChange(Array.from(new Set([...images, asset.url]))); setLibraryOpen(false);
+          } catch (error) { setErrorMessage(error instanceof Error ? error.message : 'Không thể chọn ảnh.'); }
+          finally { setUploading(false); }
+        }} />
+      </MediaDialog>}
       {errorMessage && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />

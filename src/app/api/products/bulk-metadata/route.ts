@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdminMutation } from "@/lib/auth";
 
 const hasDatabase = !!process.env.DATABASE_URL;
 const BULK_STATUSES = new Set(["active", "draft", "archived"]);
 
 export async function PATCH(request: Request) {
-  const denied = requireAdmin(request);
+  const denied = requireAdminMutation(request);
   if (denied) return denied;
   if (!hasDatabase) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
   try {
@@ -28,6 +28,8 @@ export async function PATCH(request: Request) {
     if (typeof data.isFlashSale === "boolean") updateData.isFlashSale = data.isFlashSale;
     if (typeof data.isBestSeller === "boolean") updateData.isBestSeller = data.isBestSeller;
     if (Object.keys(updateData).length === 0) return NextResponse.json({ success: false, error: "Không có thay đổi nào được gửi" }, { status: 400 });
+
+    if (await prisma.productStudio.count({ where: { productId: { in: ids } } })) return NextResponse.json({ success: false, error: 'Use Product Studio to edit this product.' }, { status: 409 });
     const existing = await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true } });
     if (existing.length !== ids.length) return NextResponse.json({ success: false, error: "One or more products do not exist" }, { status: 404 });
     const result = await prisma.product.updateMany({ where: { id: { in: ids } }, data: updateData });

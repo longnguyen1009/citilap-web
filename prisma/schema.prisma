@@ -58,6 +58,7 @@ model Category {
 }
 
 model Product {
+  studio         ProductStudio?
   id             String           @id @default(cuid())
   name           String
   slug           String           @unique
@@ -424,5 +425,81 @@ model RateLimitRecord {
   expiresAt DateTime
 
   @@index([expiresAt])
+}
+
+// ADMIN-04: one versioned aggregate; categories project to existing Category on publish.
+model NavigationStudio {
+  id String @id
+  revision Int @default(0)
+  draft String
+  published String?
+  publishedRevision Int?
+  updatedAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+}
+
+model NavigationRevision {
+  revision Int @id
+  document String
+  action String
+  actor String @default("admin")
+  createdAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+}
+
+model ProductStudio {
+  productId String @id
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  revision Int @default(0)
+  draft String
+  published String?
+  updatedAt DateTime @default(now())
+  revisions ProductStudioRevision[]
+}
+
+model ProductStudioRevision {
+  productId String
+  studio ProductStudio @relation(fields: [productId], references: [productId], onDelete: Restrict)
+  revision Int
+  document String
+  action String
+  createdAt DateTime @default(now())
+  @@id([productId, revision])
+}
+
+// CMS registry; ProductImage relations are tracked by migration 0009 triggers.
+model MediaAsset {
+  id         String @id
+  kind       String
+  provider   String
+  storageKey String? @unique
+  externalId String?
+  name       String
+  alt        String @default("")
+  caption    String @default("")
+  mimeType   String?
+  size       Int?
+  width      Int?
+  height     Int?
+  revision   Int @default(1)
+  state      String @default("READY")
+  createdAt  String @default(dbgenerated("(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"))
+  updatedAt  String @default(dbgenerated("(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"))
+  usages     MediaUsage[]
+
+  @@unique([provider, externalId])
+  @@index([state, createdAt])
+}
+
+model MediaUsage {
+  id        String @id
+  assetId   String
+  asset     MediaAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  ownerType String
+  ownerId   String
+  slot      String
+  createdAt String @default(dbgenerated("(strftime('%Y-%m-%dT%H:%M:%fZ','now'))"))
+
+  @@unique([assetId, ownerType, ownerId, slot])
+  @@index([ownerType, ownerId], map: "MediaUsage_owner_idx")
+  @@index([assetId])
 }
 

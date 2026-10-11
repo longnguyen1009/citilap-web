@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireAdminMutation } from "@/lib/auth";
 
 const hasDatabase = !!process.env.DATABASE_URL;
 
@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireAdmin(request);
+  const denied = requireAdminMutation(request);
   if (denied) return denied;
   try {
     const { id } = await params;

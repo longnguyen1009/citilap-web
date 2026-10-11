@@ -1,0 +1,12 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["src/components/admin/media", "src/app/admin/media"],
+  "locale": "vi-VN",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": { "Select/Listbox": "native" },
+  "evidence": {
+    "crudFullFlow": "scripts/test-media-browser.mjs",
+    "failurePaths": "scripts/test-media-library.mjs"
+  }
+}

@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+import { build } from 'esbuild';
+import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
+import { unstable_splitSqlQuery } from 'wrangler';
+const bundle = await build({ stdin: { contents: `export * from './src/server/services/product-studio.service'; export * from './src/server/services/media-library.service'; export * from './src/contracts/cms/product-studio';`, resolveDir: process.cwd() }, bundle:true,platform:'node',format:'esm',write:false });
+const api = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const mf = new Miniflare(convertV4MiniflareOptions({ modules:true,script:'export default { fetch() { return new Response("studio"); } }',compatibilityDate:'2026-10-01',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],r2Buckets:['PRODUCT_MEDIA'] }));
+let passed=0;
+async function check(name,fn) { await fn(); passed++; console.log('PASS '+name); }
+try {
+ const DB=await mf.getD1Database('DB'), PRODUCT_MEDIA=await mf.getR2Bucket('PRODUCT_MEDIA'), env={DB,PRODUCT_MEDIA};
+ for(const f of (await readdir('d1-migrations')).filter(f=>f.endsWith('.sql')).sort()) await DB.batch(unstable_splitSqlQuery(await readFile(`d1-migrations/${f}`,'utf8')).map(s=>DB.prepare(s)));
+ await DB.prepare("INSERT INTO Category(id,name,slug,updatedAt) VALUES('studio-category','QA','qa',CURRENT_TIMESTAMP)").run();
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+ const asset=(await api.uploadLibraryImage(env,new File([png],'studio.png',{type:'image/png'}))).asset;
+ const document={...api.blankProduct(),name:'Laptop QA',slug:'laptop-qa',categoryId:'studio-category',price:10000000,availability:'AVAILABLE',media:[{assetId:asset.id,alt:'Laptop QA',variantId:''}],variants:[{id:'qa-variant',name:'16GB / 512GB',sku:'QA16',condition:'NEW',price:10000000,ram:'16GB',storage:'512GB',gpu:'4060'}],warranties:[{name:'12 tháng',description:'Bảo hành',adjustment:0,recommended:true}]};
+ let detail;
+ await check('all migrations; laptop draft creates existing Product identity',async()=>{detail=await api.writeStudio(env,null,{expectedRevision:0,action:'save',document});assert.equal(detail.revision,1);assert.equal((await DB.prepare('SELECT status FROM Product WHERE id=?').bind(detail.id).first()).status,'DRAFT');});
+ await check('draft never visible to public resolver',async()=>{await assert.rejects(()=>api.publicStudio(DB,document.slug),e=>e.status===404);});
+ await check('publish resolves media, variants, warranty and web status',async()=>{detail=await api.writeStudio(env,detail.id,{expectedRevision:1,action:'publish',document});const pub=await api.publicStudio(DB,document.slug);assert.equal(pub.canOrder,true);assert.equal(pub.media[0].url,asset.url);assert.equal(pub.variants[0].ram,'16GB');assert.equal(pub.warranties[0].name,'12 tháng');assert.equal(JSON.stringify(pub).includes('storageKey'),false);});
+ await check('editing published price does not change public price',async()=>{detail=await api.writeStudio(env,detail.id,{expectedRevision:2,action:'save',document:{...document,price:12000000}});assert.equal((await api.publicStudio(DB,document.slug)).price,10000000);assert.equal((await api.studioDetail(DB,detail.id)).document.price,12000000);});
+ await check('stale revision rejected without audit or data changes',async()=>{await assert.rejects(()=>api.writeStudio(env,detail.id,{expectedRevision:2,action:'publish',document}),e=>e.status===409);assert.equal((await api.studioDetail(DB,detail.id)).revision,3);});
+ await check('concurrent editors have exactly one winner',async()=>{const results=await Promise.allSettled([1,2].map(n=>api.writeStudio(env,detail.id,{expectedRevision:3,action:'save',document:{...document,name:'Edit '+n}})));assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.filter(x=>x.status==='rejected')[0].reason.status,409);});
+ await check('media archive blocked by retained draft and published revisions',async()=>{await assert.rejects(()=>api.editMedia(DB,asset.id,{revision:1,name:'QA',alt:'QA',caption:'',state:'ARCHIVED'}),e=>e.status===409);});
+ await check('publish updated price and unavailable independent of stock',async()=>{detail=await api.writeStudio(env,detail.id,{expectedRevision:4,action:'publish',document:{...document,price:12000000,availability:'UNAVAILABLE'}});const pub=await api.publicStudio(DB,document.slug);assert.equal(pub.price,12000000);assert.equal(pub.canOrder,false);assert.equal((await DB.prepare('SELECT price,stock FROM Product WHERE id=?').bind(detail.id).first()).stock,0);});
+ await check('unpublish excludes public; draft stays editable',async()=>{detail=await api.writeStudio(env,detail.id,{expectedRevision:5,action:'unpublish',document});await assert.rejects(()=>api.publicStudio(DB,document.slug),e=>e.status===404);assert.equal((await api.studioDetail(DB,detail.id)).revision,6);});
+ await check('mouse template, video and reload persistence',async()=>{const video=(await api.addVideo(DB,{name:'Video QA',url:'https://youtu.be/abcdefghijk'})).asset;const mouse={...api.blankProduct(),name:'Chuột QA',slug:'chuot-qa',categoryId:'studio-category',template:'MOUSE',specs:api.attributeTemplates.MOUSE.map(key=>({key,value:'QA'})),media:[{assetId:video.id,alt:'Video',variantId:''}]};const saved=await api.writeStudio(env,null,{expectedRevision:0,action:'save',document:mouse});assert.equal((await api.studioDetail(DB,saved.id)).document.specs[1].key,'DPI');});
+ await check('missing R2 prevents publish and preserves revision',async()=>{const a=await api.getAsset(DB,asset.id);await PRODUCT_MEDIA.delete(a.storageKey);await assert.rejects(()=>api.writeStudio(env,detail.id,{expectedRevision:6,action:'publish',document}),e=>e.status===400);assert.equal((await api.studioDetail(DB,detail.id)).revision,6);});
+ await check('invalid slug, duplicate variants, negative warranty and missing category rejected',async()=>{for(const d of [{...document,slug:'../x'},{...document,variants:[document.variants[0],document.variants[0]]},{...document,warranties:[{...document.warranties[0],adjustment:-20000000}]},{...document,categoryId:'missing'}]) await assert.rejects(()=>api.writeStudio(env,null,{expectedRevision:0,action:'save',document:d}));});
+ console.log(`Product Studio: ${passed}/${passed} PASS`);
+} finally { await mf.dispose(); }

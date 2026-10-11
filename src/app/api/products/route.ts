@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { mockProducts } from '@/lib/mock-data';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminMutation } from '@/lib/auth';
 import { sanitizeHtml } from '@/lib/sanitize-html';
 
 // Check if DATABASE_URL is configured
@@ -20,16 +19,9 @@ export async function GET(request: Request) {
     if ([category, search, brand, series, section].some((value) => value !== null && value.length > 100)) return NextResponse.json({ success: false, error: 'Filter is too long' }, { status: 400 });
 
     // If no database, return mock data
-    if (!hasDatabase) {
-      let filtered = [...mockProducts];
-      if (category) filtered = filtered.filter(p => p.categoryId === category);
-      if (search) filtered = filtered.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-      if (brand) filtered = filtered.filter(p => p.name.toLowerCase().includes(brand.toLowerCase()));
-      if (series) filtered = filtered.filter(p => p.name.toLowerCase().includes(series.toLowerCase()));
-      return NextResponse.json({ success: true, data: filtered.map(({ id, name, price, originalPrice, images, stock, specs, categoryId }) => ({ id, name, price, originalPrice, images, stock, specs, categoryId })) });
-    }
-
-    const { prisma } = await import('@/lib/prisma');
+    const { createPrismaD1Client } = await import('@/lib/prisma');
+    const { mediaEnvironment } = await import('@/server/media-http');
+    const prisma = createPrismaD1Client((await mediaEnvironment()).DB);
     const where: Record<string, unknown> = { status: { in: ['ACTIVE', 'active'] } };
 
     if (category) {
@@ -86,7 +78,7 @@ function toNullableIso(value: unknown): string | null { const text = toNullableS
 const PRODUCT_STATUSES = new Set(['ACTIVE', 'DRAFT', 'ARCHIVED', 'INACTIVE', 'OUT_OF_STOCK', 'active', 'draft', 'archived']);
 
 export async function POST(request: Request) {
-  const denied = requireAdmin(request);
+  const denied = requireAdminMutation(request);
   if (denied) return denied;
   try {
     if (!hasDatabase) {

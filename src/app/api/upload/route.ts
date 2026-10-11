@@ -278,8 +278,8 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ success: false, error: 'Không tìm thấy ảnh', code: 'IMAGE_NOT_FOUND' }, { status: 404 });
       }
 
-      // Delete from Cloudflare R2
-      await deleteMediaObject(img.r2Key);
+      // Detach the product relation only. Media may be reused by CMS or legacy URLs.
+      // Library archiving is reversible; permanent R2 deletion needs a separate retention job.
 
       // Delete from D1
       await prisma.productImage.delete({

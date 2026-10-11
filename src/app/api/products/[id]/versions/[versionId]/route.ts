@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireAdminMutation } from "@/lib/auth";
 
 const hasDatabase = !!process.env.DATABASE_URL;
 
@@ -22,12 +22,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string; versionId: string }> }) {
-  const denied = requireAdmin(request);
+  const denied = requireAdminMutation(request);
   if (denied) return denied;
   try {
     const { id, versionId } = await params;
     if (!hasDatabase) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
     const { prisma } = await import("@/lib/prisma");
+    if (await prisma.productStudio.findUnique({ where: { productId: id } })) return NextResponse.json({ success: false, error: 'Use Product Studio to edit this product.' }, { status: 409 });
+
     const version = await prisma.productVersion.findUnique({ where: { id: versionId } });
     if (!version || version.productId !== id) return NextResponse.json({ success: false, error: "Version không tồn tại" }, { status: 404 });
     let snapshot: Record<string, unknown>;
