@@ -1,54 +1,97 @@
 "use client";
 
 import { useState } from "react";
-import { Star, Send, CheckCircle } from "lucide-react";
+import { Star, Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 type ReviewFormProps = {
   productName: string;
-  onSubmit?: (review: { rating: number; comment: string; name: string }) => void;
+  onSubmit?: (review: { rating: number; comment: string; name: string; phone?: string }) => void;
 };
 
 export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState(5);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [comment, setComment] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (rating === 0 || !comment.trim() || !name.trim()) return;
+    if (rating === 0 || !comment.trim() || !name.trim()) {
+      setError("Vui lòng chọn số sao và nhập đầy đủ thông tin.");
+      return;
+    }
+
     setSubmitting(true);
+    setError(null);
 
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 800));
+    try {
+      // If phone is provided, post to contact/feedback system
+      if (phone.trim()) {
+        await fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name.trim(),
+            phone: phone.trim(),
+            message: `[Đánh giá ${rating}⭐ sản phẩm: ${productName}]: ${comment.trim()}`,
+          }),
+        }).catch(() => {});
+      }
 
-    onSubmit?.({ rating, comment: comment.trim(), name: name.trim() });
-    setSubmitted(true);
-    setSubmitting(false);
+      onSubmit?.({ rating, comment: comment.trim(), name: name.trim(), phone: phone.trim() });
+      setSubmitted(true);
+    } catch {
+      setError("Có lỗi xảy ra khi gửi đánh giá. Vui lòng thử lại!");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
-        <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-        <h3 className="text-lg font-bold text-green-800 mb-1">Cảm ơn bạn đã đánh giá!</h3>
-        <p className="text-sm text-green-600">
-          Đánh giá {rating} sao cho &quot;{productName}&quot; đã được gửi thành công.
+      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center">
+        <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+        <h3 className="text-lg font-bold text-emerald-900 mb-1">Cảm ơn bạn đã đánh giá!</h3>
+        <p className="text-sm text-emerald-700">
+          Đánh giá {rating} sao cho &quot;{productName}&quot; đã được gửi thành công. Đội ngũ CitiLap chân thành cảm ơn đóng góp của bạn!
         </p>
+        <button
+          type="button"
+          onClick={() => {
+            setSubmitted(false);
+            setComment("");
+            setPhone("");
+          }}
+          className="text-xs font-semibold text-emerald-800 hover:underline pt-3 block mx-auto"
+        >
+          Viết đánh giá khác →
+        </button>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6">
-      <h3 className="text-lg font-bold text-gray-900 mb-4">Viết đánh giá của bạn</h3>
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+      <h3 className="text-lg font-bold text-slate-900 mb-1">Viết đánh giá của bạn</h3>
+      <p className="text-xs text-slate-500 mb-5">
+        Chia sẻ cảm nhận thực tế khi sử dụng sản phẩm để giúp cộng đồng có lựa chọn chính xác nhất.
+      </p>
+
+      {error && (
+        <div className="p-3 mb-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       {/* Star Rating */}
-      <div className="mb-4">
-        <label className="block text-sm font-bold text-gray-700 mb-2">Đánh giá sao *</label>
-        <div className="flex gap-1">
+      <div className="mb-5">
+        <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Đánh giá số sao *</label>
+        <div className="flex items-center gap-1">
           {[1, 2, 3, 4, 5].map((star) => (
             <button
               key={star}
@@ -56,52 +99,68 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
               onClick={() => setRating(star)}
               onMouseEnter={() => setHoveredStar(star)}
               onMouseLeave={() => setHoveredStar(0)}
-              className="p-0.5 transition-transform hover:scale-110"
+              className="p-1 transition-transform hover:scale-110 cursor-pointer"
             >
               <Star
                 className={`w-7 h-7 transition-colors ${
                   star <= (hoveredStar || rating)
-                    ? "text-yellow-400 fill-yellow-400"
-                    : "text-gray-300"
+                    ? "text-amber-400 fill-amber-400"
+                    : "text-slate-300"
                 }`}
               />
             </button>
           ))}
           {rating > 0 && (
-            <span className="ml-2 text-sm text-gray-500 self-center">
-              {rating === 1 && "Rất tệ"}
-              {rating === 2 && "Tệ"}
-              {rating === 3 && "Bình thường"}
-              {rating === 4 && "Tốt"}
-              {rating === 5 && "Rất tốt"}
+            <span className="ml-3 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">
+              {rating === 1 && "1/5 - Rất tệ"}
+              {rating === 2 && "2/5 - Chưa ưng ý"}
+              {rating === 3 && "3/5 - Bình thường"}
+              {rating === 4 && "4/5 - Tốt, hài lòng"}
+              {rating === 5 && "5/5 - Rất tốt, xuất sắc!"}
             </span>
           )}
         </div>
       </div>
 
-      {/* Name */}
-      <div className="mb-4">
-        <label className="block text-sm font-bold text-gray-700 mb-2">Họ tên *</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nguyễn Văn A"
-          required
-          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        {/* Name */}
+        <div>
+          <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Họ và tên *</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ví dụ: Hoàng Nam"
+            required
+            className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+            Số điện thoại (để nhận quà tri ân)
+          </label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="Ví dụ: 0912 345 678"
+            className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
       </div>
 
       {/* Comment */}
-      <div className="mb-4">
-        <label className="block text-sm font-bold text-gray-700 mb-2">Nội dung đánh giá *</label>
+      <div className="mb-5">
+        <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Nội dung đánh giá chi tiết *</label>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này..."
+          placeholder="Bạn cảm nhận thế nào về thiết kế, tốc độ, màn hình và thời lượng pin của máy?"
           required
-          rows={4}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-y"
+          rows={3}
+          className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-y"
         />
       </div>
 
@@ -109,10 +168,17 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
       <button
         type="submit"
         disabled={rating === 0 || !comment.trim() || !name.trim() || submitting}
-        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl transition flex items-center gap-2 cursor-pointer text-sm"
       >
-        <Send className="w-4 h-4" />
-        {submitting ? "Đang gửi..." : "Gửi đánh giá"}
+        {submitting ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" /> Đang gửi đánh giá...
+          </>
+        ) : (
+          <>
+            <Send className="w-4 h-4" /> Gửi đánh giá ngay
+          </>
+        )}
       </button>
     </form>
   );

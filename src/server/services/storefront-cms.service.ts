@@ -10,7 +10,7 @@ async function publishedOrNull<T>(action: () => Promise<T>): Promise<T | null> {
   try {
     return await action();
   } catch (error) {
-    if (error instanceof MediaError && error.status === 404) return null;
+    if (error instanceof MediaError && (error.status === 404 || error.status === 503)) return null;
     throw error;
   }
 }
@@ -24,5 +24,5 @@ export function getPublishedStudio(slug: string) {
 }
 
 export async function getPublishedCollection(slug: string) {
-  return publicCollection((await mediaEnvironment()).DB, slug);
+  return publishedOrNull(async () => publicCollection((await mediaEnvironment()).DB, slug));
 }

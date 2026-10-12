@@ -10,9 +10,11 @@ type PageProps = { params: Promise<{ slug: string }> };
 
 async function collectionOr404(slug: string) {
   try {
-    return await getPublishedCollection(slug);
+    const collection = await getPublishedCollection(slug);
+    if (!collection) notFound();
+    return collection;
   } catch (error) {
-    if (error instanceof MediaError && error.status === 404) notFound();
+    if (error instanceof MediaError && (error.status === 404 || error.status === 503)) notFound();
     throw error;
   }
 }

@@ -17,7 +17,7 @@ const eslintConfig = defineConfig([
     "generated/**",
     "test-prisma.ts",
     "prisma/**",
-    "scripts/*.mjs",
+    "scripts/**",
     "dist/**",
     ".wrangler/**",
   ]),

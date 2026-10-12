@@ -33,12 +33,13 @@ export default function AdminLayout({
     { name: "Thư viện ảnh & video", href: "/admin/media", icon: Images },
     { name: "Tổng quan", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Đơn hàng", href: "/admin/orders", icon: ShoppingCart },
-    { name: "Hộp thư liên hệ", href: "/admin/contacts", icon: Mail },
-    { name: "Product Studio", href: "/admin/product-studio", icon: Package },
+    { name: "Quản lý sản phẩm", href: "/admin/products", icon: Package },
+    { name: "Product Studio", href: "/admin/product-studio", icon: FolderTree },
     { name: "Danh mục", href: "/admin/categories", icon: FolderTree },
     { name: "Menu & bộ sưu tập", href: "/admin/navigation", icon: Menu },
+    { name: "Hộp thư liên hệ", href: "/admin/contacts", icon: Mail },
     { name: "Khách hàng", href: "/admin/customers", icon: Users },
-    { name: "Cài đặt", href: "/admin/settings", icon: Settings },
+    { name: "Cấu hình & Giao diện", href: "/admin/settings", icon: Settings },
   ];
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
