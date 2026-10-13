@@ -90,141 +90,32 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireAdminMutation(_request);
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = requireAdminMutation(request);
   if (denied) return denied;
-  try {
-    const { id } = await params;
-    if (!hasDatabase) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
-    const { prisma } = await import("@/lib/prisma");
-    if (await prisma.productStudio.findUnique({ where: { productId: id } })) return NextResponse.json({ success: false, error: 'Use Product Studio to edit this product.' }, { status: 409 });
 
-    await prisma.product.delete({ where: { id } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Failed to delete product:", error);
-    return NextResponse.json({ success: false, error: "Không thể xóa sản phẩm" }, { status: 500 });
-  }
+  const { id } = await params;
+  return NextResponse.json(
+    {
+      success: false,
+      code: 'LEGACY_WRITER_DISABLED',
+      error: `Endpoint xóa sản phẩm legacy đã ngừng hoạt động để bảo vệ toàn vẹn lịch sử đơn hàng. Vui lòng sử dụng DELETE /api/admin/products/${id} để lưu trữ/ẩn sản phẩm an toàn.`,
+    },
+    { status: 409 }
+  );
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = requireAdminMutation(request);
   if (denied) return denied;
-  try {
-    const { id } = await params;
-    if (!hasDatabase) return NextResponse.json({ success: false, error: "Database not configured" }, { status: 503 });
-    const { prisma } = await import("@/lib/prisma");
-    if (await prisma.productStudio.findUnique({ where: { productId: id } })) return NextResponse.json({ success: false, error: 'Use Product Studio to edit this product.' }, { status: 409 });
 
-    const data = await request.json();
-    if (!data || typeof data !== "object" || Array.isArray(data)) return NextResponse.json({ success: false, error: "Invalid request body" }, { status: 400 });
-    if (typeof data.categoryId !== "string" || !data.categoryId.trim()) return NextResponse.json({ success: false, error: "Category is invalid" }, { status: 400 });
-    const existingProduct = await prisma.product.findUnique({ where: { id }, select: { id: true, status: true } });
-    if (!existingProduct) return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
-    const requestedStatus = data.status === undefined ? existingProduct.status : String(data.status);
-    if (!PRODUCT_STATUSES.has(requestedStatus)) return NextResponse.json({ success: false, error: "Invalid product status" }, { status: 400 });
-    const name = typeof data.name === "string" ? data.name.trim() : "";
-    const slug = typeof data.slug === "string" ? data.slug.trim() : "";
-    const price = Number(data.price);
-    const originalPrice = data.originalPrice === null || data.originalPrice === undefined || data.originalPrice === "" ? null : Number(data.originalPrice);
-    const stock = Number(data.stock ?? 0);
-    const minOrderQty = Number(data.minOrderQty ?? 1);
-    const maxOrderRaw = toNullableNumber(data.maxOrderQty);
-    const maxOrderQty = maxOrderRaw === null ? null : maxOrderRaw;
-    const variantResult = normalizeVariants(data.variants);
-    if (!name || !slug || !Number.isFinite(price) || price < 0 || !Number.isInteger(stock) || stock < 0 || !Number.isInteger(minOrderQty) || minOrderQty < 1 || (maxOrderQty !== null && (!Number.isInteger(maxOrderQty) || maxOrderQty < minOrderQty)) || (originalPrice !== null && (!Number.isFinite(originalPrice) || originalPrice < price)) || !data.categoryId || variantResult.error || hasInvalidDate(data.publishAt) || hasInvalidDate(data.unpublishAt) || ["isFeatured", "isNewArrival", "isFlashSale", "isBestSeller", "allowBackorder"].some((field) => !isBooleanLike(data[field]))) {
-      return NextResponse.json({ success: false, error: variantResult.error || "Dữ liệu sản phẩm không hợp lệ" }, { status: 400 });
-    }
-    const publishAt = toNullableIso(data.publishAt);
-    const unpublishAt = toNullableIso(data.unpublishAt);
-    if (publishAt && unpublishAt && unpublishAt <= publishAt) return NextResponse.json({ success: false, error: "unpublishAt must be after publishAt" }, { status: 400 });
-    const category = await prisma.category.findUnique({ where: { id: String(data.categoryId) }, select: { id: true } });
-    if (!category) return NextResponse.json({ success: false, error: "Category not found" }, { status: 404 });
-    const variants = variantResult.variants;
-    const product = await prisma.$transaction(async (tx) => {
-      const updated = await tx.product.update({
-        where: { id },
-        data: {
-          name, slug, description: String(data.description || ""), contentHtml: data.contentHtml == null ? null : sanitizeHtml(String(data.contentHtml)).slice(0, 100000),
-          brand: toNullableString(data.brand), model: toNullableString(data.model), series: toNullableString(data.series),
-          warranty: toNullableString(data.warranty), condition: toNullableString(data.condition) ?? undefined, origin: toNullableString(data.origin),
-          seoTitle: toNullableString(data.seoTitle), seoDescription: toNullableString(data.seoDescription), canonicalSlug: toNullableString(data.canonicalSlug),
-          isFeatured: toBooleanFlag(data.isFeatured), isNewArrival: toBooleanFlag(data.isNewArrival), isFlashSale: toBooleanFlag(data.isFlashSale), isBestSeller: toBooleanFlag(data.isBestSeller),
-          allowBackorder: toBooleanFlag(data.allowBackorder), minOrderQty, maxOrderQty, lowestPrice30d: data.lowestPrice30d != null ? Math.round(Number(data.lowestPrice30d)) : null,
-          publishAt, unpublishAt,
-          price: Math.round(price), originalPrice: originalPrice != null ? Math.round(originalPrice) : null,
-          images: typeof data.images === "string" ? data.images : JSON.stringify(data.images || []), stock,
-          status: requestedStatus,
-          specs: data.specs ? (typeof data.specs === "string" ? data.specs : JSON.stringify(data.specs)) : null,
-          tags: data.tags == null ? "" : String(data.tags), categoryId: String(data.categoryId),
-        },
-      });
-
-      if (data.images !== undefined) {
-        const rawImages: string[] = Array.isArray(data.images)
-          ? data.images
-          : typeof data.images === "string"
-          ? (() => { try { const p = JSON.parse(data.images); return Array.isArray(p) ? p : [data.images]; } catch { return [data.images]; } })()
-          : [];
-
-        if (rawImages.length > 0) {
-          const { extractR2Key, getPublicMediaUrl } = await import("@/infra/cloudflare/r2/storage");
-          const existingImages = await tx.productImage.findMany({ where: { productId: id } });
-          const existingKeyMap = new Map(existingImages.map((img) => [img.r2Key, img]));
-
-          for (let i = 0; i < rawImages.length; i++) {
-            const item = String(rawImages[i]).trim();
-            if (!item) continue;
-            const key = extractR2Key(item);
-            const existing = existingKeyMap.get(key);
-            if (!existing) {
-              await tx.productImage.create({
-                data: {
-                  productId: id,
-                  r2Key: key,
-                  url: getPublicMediaUrl(key),
-                  sortOrder: i,
-                  isPrimary: i === 0,
-                },
-              });
-            } else {
-              await tx.productImage.update({
-                where: { id: existing.id },
-                data: { sortOrder: i, isPrimary: i === 0 },
-              });
-            }
-          }
-        }
-      }
-      if (variants) {
-        const keepIds = variants.filter((v) => v.id).map((v) => v.id as string);
-        if (keepIds.length) {
-          const owned = await tx.productVariant.findMany({ where: { id: { in: keepIds }, productId: id }, select: { id: true } });
-          if (owned.length !== keepIds.length) throw new Error("VARIANT_OWNERSHIP");
-        }
-        await tx.productVariant.deleteMany({ where: { productId: id, ...(keepIds.length ? { id: { notIn: keepIds } } : {}) } });
-        for (const variant of variants) {
-          const { id: variantId, ...variantData } = variant;
-          if (variantId) {
-            const existingVariant = await tx.productVariant.findUnique({ where: { id: variantId }, select: { id: true, productId: true } });
-            if (existingVariant && existingVariant.productId === id) {
-              await tx.productVariant.update({ where: { id: variantId }, data: variantData });
-            }
-          } else {
-            await tx.productVariant.create({ data: { product: { connect: { id } }, sku: variantData.sku, name: variantData.name, options: variantData.options, price: variantData.price, originalPrice: variantData.originalPrice, stock: variantData.stock, image: variantData.image, status: variantData.status } });
-          }
-        }
-      }
-      await saveEditLog(tx, id, "update_product", { name, slug, status: updated.status, categoryId: updated.categoryId, price, originalPrice });
-      return tx.product.findUnique({ where: { id: updated.id }, include: { category: true, variants: { orderBy: { createdAt: "asc" } } } });
-    });
-    return NextResponse.json({ success: true, data: product });
-  } catch (error) {
-    if (error instanceof Error && error.message === "VARIANT_OWNERSHIP") return NextResponse.json({ success: false, error: "Variant does not belong to this product" }, { status: 400 });
-    if (error instanceof Error && error.message === "INVALID_BOOLEAN") return NextResponse.json({ success: false, error: "Boolean field is invalid" }, { status: 400 });
-    console.error("Failed to update product:", error);
-    const message = error instanceof Error && error.message.includes("Unique constraint") ? "Slug hoặc SKU đã tồn tại" : "Không thể cập nhật sản phẩm";
-    if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "P2002") return NextResponse.json({ success: false, error: "Slug or SKU already exists" }, { status: 409 });
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
-  }
+  const { id } = await params;
+  return NextResponse.json(
+    {
+      success: false,
+      code: 'LEGACY_WRITER_DISABLED',
+      error: `Endpoint sửa sản phẩm legacy đã ngừng hoạt động để bảo vệ phiên bản và lịch sử chỉnh sửa CMS. Vui lòng sử dụng PUT /api/admin/products/${id} hoặc giao diện biên tập sản phẩm tại /admin/products/${id}.`,
+    },
+    { status: 409 }
+  );
 }

@@ -15,11 +15,13 @@ export async function POST(request: Request) {
     let published = 0;
     let unpublished = 0;
 
-    // Publish products whose publishAt has passed and status is not already active
+    // Publish legacy products whose publishAt has passed and status is not already active
+    // CMS-owned products are managed exclusively by ProductStudio and must not be touched by legacy scheduler
     const toPublish = await prisma.product.findMany({
       where: {
         publishAt: { not: null, lte: now },
         status: "draft",
+        studio: null,
       },
       select: { id: true },
       take: 100,
@@ -32,11 +34,12 @@ export async function POST(request: Request) {
       console.log(`[Scheduler] Published ${published} products`);
     }
 
-    // Unpublish products whose unpublishAt has passed and status is still active
+    // Unpublish legacy products whose unpublishAt has passed and status is still active
     const toUnpublish = await prisma.product.findMany({
       where: {
         unpublishAt: { not: null, lte: now },
         status: "active",
+        studio: null,
       },
       select: { id: true },
       take: 100,

@@ -28,6 +28,8 @@ model Brand {
   slug        String    @unique
   logo        String?   // R2 media key or image path
   description String?
+  seoTitle    String?
+  seoDescription String?
   status      String    @default("ACTIVE") // ACTIVE, INACTIVE
   products    Product[]
   createdAt   DateTime  @default(now())
@@ -501,5 +503,20 @@ model MediaUsage {
   @@unique([assetId, ownerType, ownerId, slot])
   @@index([ownerType, ownerId], map: "MediaUsage_owner_idx")
   @@index([assetId])
+}
+
+model SiteSettings {
+  id        String   @id @default("site")
+  revision  Int      @default(0)
+  document  String
+  updatedAt DateTime @default(now())
+}
+
+model SiteSettingsRevision {
+  revision  Int      @id
+  document  String
+  action    String
+  actor     String   @default("admin")
+  createdAt DateTime @default(now())
 }
 

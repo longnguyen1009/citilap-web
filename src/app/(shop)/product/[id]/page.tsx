@@ -23,7 +23,10 @@ import {
   getRelatedProducts,
 } from "@/server/services/catalog.service";
 import { businessProfile } from "@/config/business-profile";
-import { getPublishedStudio } from "@/server/services/storefront-cms.service";
+import {
+  getPublishedStudio,
+  classifyProductPublication,
+} from "@/server/services/storefront-cms.service";
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -43,7 +46,21 @@ export async function generateMetadata({
       ? query.variant
       : undefined;
 
-  const product = await getProductDetail(id, skuParam);
+  const pub = await classifyProductPublication(id);
+  if (
+    pub.kind === "NOT_FOUND" ||
+    pub.kind === "DELETED" ||
+    pub.kind === "CMS_NOT_PUBLIC" ||
+    pub.kind === "LEGACY_INACTIVE"
+  ) {
+    return {
+      title: "Không tìm thấy sản phẩm | CITILAP.VN",
+      description: "Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã ngừng kinh doanh.",
+    };
+  }
+
+  const resolvedSlug = pub.slug;
+  const product = await getProductDetail(resolvedSlug, skuParam);
   if (!product) {
     return {
       title: "Không tìm thấy sản phẩm | CITILAP.VN",
@@ -51,7 +68,7 @@ export async function generateMetadata({
     };
   }
 
-  const studio = await getPublishedStudio(product.slug);
+  const studio = pub.kind === "CMS_PUBLISHED" ? await getPublishedStudio(resolvedSlug) : null;
   const displayName = studio?.name || product.name;
   const primaryImage = studio?.media.find((item) => item.kind === "IMAGE")?.url || product.primaryImageUrl;
   const title = studio?.seoTitle || product.seoTitle || `${displayName} | CITILAP.VN`;
@@ -98,23 +115,32 @@ export default async function ProductDetailPage({
       ? query.variant
       : undefined;
 
-  // 1. Query D1 for Product Detail data
-  const product = await getProductDetail(id, skuParam);
+  // 1. Phân loại ấn phẩm chính xác trên D1:
+  const pub = await classifyProductPublication(id);
+  if (
+    pub.kind === "NOT_FOUND" ||
+    pub.kind === "DELETED" ||
+    pub.kind === "CMS_NOT_PUBLIC" ||
+    pub.kind === "LEGACY_INACTIVE"
+  ) {
+    notFound();
+  }
 
-  // 2. 404 if product does not exist or is inactive/draft/archived
+  const resolvedSlug = pub.slug;
+
+  // 2. Canonical URL Redirect: Nếu truy cập qua ID thay vì slug, redirect canonical
+  if (id !== resolvedSlug) {
+    const searchString = skuParam ? `?sku=${encodeURIComponent(skuParam)}` : "";
+    redirect(`/product/${resolvedSlug}${searchString}`);
+  }
+
+  // 3. Query D1 for Product Detail data
+  const product = await getProductDetail(resolvedSlug, skuParam);
   if (!product) {
     notFound();
   }
 
-  // 3. Backward Compatibility & Canonical URL Redirect:
-  // If user accesses via legacy database ID (e.g. /product/p-legion-5-pro) instead of slug,
-  // redirect them to the canonical slug while preserving query parameters.
-  if (product.slug && id !== product.slug) {
-    const searchString = skuParam ? `?sku=${encodeURIComponent(skuParam)}` : "";
-    redirect(`/product/${product.slug}${searchString}`);
-  }
-
-  const studio = await getPublishedStudio(product.slug);
+  const studio = pub.kind === "CMS_PUBLISHED" ? await getPublishedStudio(resolvedSlug) : null;
   const studioVariant = studio?.variants.find((v) => v.sku === skuParam) || studio?.variants[0];
   const studioImages = studio?.media.filter((m): m is typeof m & { url: string } => m.kind === "IMAGE" && Boolean(m.url)) || [];
   const galleryImages = studio ? studioImages.map((m) => ({
@@ -130,12 +156,14 @@ export default async function ProductDetailPage({
     : studio ? "https://schema.org/OutOfStock"
     : product.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock";
 
-  // 4. Fetch related products from D1 (excluding current product)
+  // 4. Fetch related products from D1 (prioritizing manual curated items)
+  const manualRelatedIds = (studio?.relatedProductIds || []).filter((rid) => rid && rid !== product.id);
   const relatedProducts = await getRelatedProducts(
     product.id,
     product.categoryId,
     product.brandId,
-    4
+    4,
+    manualRelatedIds
   );
 
   // 5. Active selected variant reference

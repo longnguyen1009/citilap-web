@@ -315,8 +315,10 @@ export async function createOrder(
 
     // Published CMS availability is authoritative for Storefront requests,
     // including carts saved before an item was switched to CONTACT/UNAVAILABLE.
-    // A stale CMS variant must not remain orderable after it was removed.
-    assertPublishedStudioOrderable(product.studio?.published, variantId);
+    assertPublishedStudioOrderable(
+      { hasStudio: product.studio !== null, published: product.studio?.published },
+      variantId
+    );
 
     let price = product.price;
     let sku: string | null = null;

@@ -1,129 +1,109 @@
-import { NextResponse } from 'next/server';
-import { mockOrders, mockProducts, mockUsers } from '@/lib/mock-data';
-import { requireAdmin } from '@/lib/auth';
-
-const hasDatabase = !!process.env.DATABASE_URL;
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/auth";
+import { mediaEnvironment } from "@/server/media-http";
 
 export async function GET(request: Request) {
   const denied = requireAdmin(request);
   if (denied) return denied;
+
   try {
-    if (!hasDatabase) {
-      // Return mock dashboard data
-      const totalRevenue = mockOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-      const now = new Date();
-      const months = Array.from({ length: 12 }, (_, i) => {
-        const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
-        return { label: `T${d.getMonth() + 1}`, revenue: Math.floor(Math.random() * 200000000) + 50000000 };
-      });
+    const env = await mediaEnvironment();
+    const db = env.DB;
 
-      return NextResponse.json({
-        success: true,
-        data: {
-          stats: {
-            totalRevenue,
-            monthRevenue: 125000000,
-            monthOrders: 23,
-            revenueChange: 0.15,
-            totalOrders: mockOrders.length,
-            pendingOrders: 1,
-            totalCustomers: mockUsers.length,
-            newCustomersThisMonth: 5,
-            lowStockProducts: 2,
-          },
-          recentOrders: mockOrders.map((order) => ({
-            id: order.id,
-            customer: mockUsers.find(u => u.id === order.userId)?.name || 'Khách hàng',
-            product: 'Laptop mẫu',
-            itemCount: 1,
-            date: order.createdAt,
-            amount: order.totalAmount,
-            status: order.status,
-          })),
-          monthlyRevenue: months,
-          statusCounts: [
-            { status: 'Chờ xác nhận', count: 1 },
-            { status: 'Đang vận chuyển', count: 1 },
-            { status: 'Đã hoàn thành', count: 1 },
-          ],
-          topProducts: mockProducts.slice(0, 5).map(p => ({ id: p.id, name: p.name, sold: Math.floor(Math.random() * 50) + 10 })),
+    // 1. Đếm đơn hàng cần xử lý (status PENDING hoặc 'Chờ xác nhận')
+    const pendingOrdersRow = await db
+      .prepare(`SELECT COUNT(*) as count FROM "Order" WHERE status IN ('PENDING', 'Chờ xác nhận')`)
+      .first<{ count: number }>()
+      .catch(() => ({ count: 0 }));
+    const pendingOrdersCount = pendingOrdersRow?.count ?? 0;
+
+    // 2. Đếm tổng số đơn hàng tiếp nhận
+    const totalOrdersRow = await db
+      .prepare(`SELECT COUNT(*) as count FROM "Order"`)
+      .first<{ count: number }>()
+      .catch(() => ({ count: 0 }));
+    const totalOrdersCount = totalOrdersRow?.count ?? 0;
+
+    // 3. Đếm sản phẩm đang ở bản nháp Studio (chưa xuất bản)
+    const draftStudioRow = await db
+      .prepare(`SELECT COUNT(*) as count FROM ProductStudio WHERE published IS NULL`)
+      .first<{ count: number }>()
+      .catch(() => ({ count: 0 }));
+    const draftStudioCount = draftStudioRow?.count ?? 0;
+
+    // 4. Đếm sản phẩm Studio đã xuất bản trên Storefront
+    const publishedStudioRow = await db
+      .prepare(`SELECT COUNT(*) as count FROM ProductStudio WHERE published IS NOT NULL`)
+      .first<{ count: number }>()
+      .catch(() => ({ count: 0 }));
+    const publishedStudioCount = publishedStudioRow?.count ?? 0;
+
+    // 5. Đếm số file media hoạt động trong Thư viện
+    const mediaCountRow = await db
+      .prepare(`SELECT COUNT(*) as count FROM MediaAsset WHERE archivedAt IS NULL`)
+      .first<{ count: number }>()
+      .catch(() => ({ count: 0 }));
+    const mediaCount = mediaCountRow?.count ?? 0;
+
+    // 6. Danh sách 6 đơn hàng mới nhất cần tiếp nhận & xử lý
+    const recentOrdersResult = await db
+      .prepare(
+        `SELECT id, orderNumber, customerName, customerPhone, totalAmount, status, createdAt
+         FROM "Order"
+         ORDER BY createdAt DESC
+         LIMIT 6`
+      )
+      .all<{
+        id: string;
+        orderNumber: string | null;
+        customerName: string;
+        customerPhone: string;
+        totalAmount: number;
+        status: string;
+        createdAt: string;
+      }>()
+      .catch(() => ({ results: [] }));
+
+    // 7. Danh sách 5 sản phẩm Studio gần nhất để tiếp tục biên tập
+    const recentStudioProductsResult = await db
+      .prepare(
+        `SELECT s.productId, s.revision, s.published, s.updatedAt,
+                p.name as catalogName, p.slug as catalogSlug, p.status as catalogStatus
+         FROM ProductStudio s
+         JOIN Product p ON p.id = s.productId
+         ORDER BY s.updatedAt DESC
+         LIMIT 5`
+      )
+      .all<{
+        productId: string;
+        revision: number;
+        published: string | null;
+        updatedAt: string;
+        catalogName: string;
+        catalogSlug: string;
+        catalogStatus: string;
+      }>()
+      .catch(() => ({ results: [] }));
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        summary: {
+          pendingOrders: pendingOrdersCount,
+          totalOrders: totalOrdersCount,
+          draftStudioCount,
+          publishedStudioCount,
+          mediaCount,
         },
-      });
-    }
-
-    const { prisma } = await import('@/lib/prisma');
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-    const [
-      totalRevenue, monthRevenue, prevMonthRevenue, totalOrders, pendingOrders,
-      totalCustomers, newCustomersThisMonth, lowStockProducts,
-      recentOrders, monthlyRevenue, statusCounts, topProducts,
-    ] = await Promise.all([
-      prisma.order.aggregate({ _sum: { totalAmount: true }, where: { status: { not: 'Đã hủy' } } }),
-      prisma.order.aggregate({ _sum: { totalAmount: true }, _count: { _all: true }, where: { status: { not: 'Đã hủy' }, createdAt: { gte: startOfMonth } } }),
-      prisma.order.aggregate({ _sum: { totalAmount: true }, where: { status: { not: 'Đã hủy' }, createdAt: { gte: startOfPrevMonth, lt: startOfMonth } } }),
-      prisma.order.count(),
-      prisma.order.count({ where: { status: 'Chờ xác nhận' } }),
-      prisma.user.count(),
-      prisma.user.count({ where: { createdAt: { gte: startOfMonth } } }),
-      prisma.product.count({ where: { stock: { lte: 5 } } }),
-      prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 5, include: { user: { select: { name: true, email: true } }, items: { include: { product: { select: { name: true } } } } } }),
-      prisma.order.findMany({ select: { createdAt: true, totalAmount: true }, where: { status: { not: 'Đã hủy' }, createdAt: { gte: new Date(now.getFullYear() - 1, now.getMonth() + 1, 1) } } }),
-      prisma.order.groupBy({ by: ['status'], _count: { _all: true } }),
-      prisma.orderItem.groupBy({ by: ['productId'], _sum: { quantity: true }, orderBy: { _sum: { quantity: 'desc' } }, take: 5 }),
-    ]);
-
-    const months: { label: string; revenue: number }[] = [];
-    for (let i = 11; i >= 0; i--) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push({ label: `T${monthDate.getMonth() + 1}`, revenue: 0 });
-    }
-    for (const row of monthlyRevenue) {
-      const d = new Date(row.createdAt);
-      const diff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
-      if (diff >= 0 && diff <= 11) months[11 - diff].revenue += row.totalAmount;
-    }
-
-    const topProductIds = topProducts.map((item) => item.productId);
-    const products = topProductIds.length ? await prisma.product.findMany({ where: { id: { in: topProductIds } } }) : [];
-
-    const revenueChange = prevMonthRevenue._sum.totalAmount && prevMonthRevenue._sum.totalAmount > 0
-      ? ((monthRevenue._sum.totalAmount ?? 0) - prevMonthRevenue._sum.totalAmount) / prevMonthRevenue._sum.totalAmount
-      : null;
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          stats: {
-          totalRevenue: totalRevenue._sum.totalAmount ?? 0,
-          monthRevenue: monthRevenue._sum.totalAmount ?? 0,
-          monthOrders: monthRevenue._count._all,
-          revenueChange, totalOrders, pendingOrders, totalCustomers, newCustomersThisMonth, lowStockProducts,
-        },
-        recentOrders: recentOrders.map((order) => ({
-          id: order.id, customer: order.user?.name || order.user?.email || 'Khách vãng lai',
-          product: order.items[0]?.product?.name || '—', itemCount: order.items.length,
-          date: order.createdAt, amount: order.totalAmount, status: order.status,
-        })),
-        monthlyRevenue: months,
-        statusCounts: statusCounts.map((row) => ({ status: row.status, count: row._count._all })),
-        topProducts: topProducts.map((item) => ({
-          id: item.productId, name: products.find((p) => p.id === item.productId)?.name ?? item.productId,
-          sold: item._sum.quantity ?? 0,
-        })),
+        recentOrders: recentOrdersResult.results || [],
+        recentStudioProducts: recentStudioProductsResult.results || [],
       },
-    },
-    {
-      headers: {
-        'Cache-Control': 'private, no-store, no-cache, must-revalidate',
-      },
-    }
-  );
+    });
   } catch (error) {
-    console.error('Failed to fetch dashboard stats:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch dashboard stats' }, { status: 500 });
+    console.error("[Dashboard API] Error fetching dashboard data from D1:", error);
+    return NextResponse.json(
+      { success: false, error: "Không thể tải dữ liệu điều hành từ D1." },
+      { status: 500 }
+    );
   }
 }

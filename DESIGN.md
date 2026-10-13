@@ -53,3 +53,43 @@ Controls 8px, cards 12px, modal 16px. Preview geometry remains reserved on image
 ## Do's and Don'ts
 
 Use explicit Vietnamese verbs, visible labels, status live regions and retry. Never show fake progress percentages (XHR upload bytes only), native alert/confirm, random image URLs, or a destructive delete action. Archiving preserves public URLs and is described as library organization, not privacy revocation.
+
+## Admin R02 Conventions & UI Standards
+
+### 1. Information Hierarchy & Page Structure
+- **PageHeader (`src/components/admin/ui/PageHeader.tsx`)**: Every admin page has a single clear H1 heading, concise sub-description, contextual badge (e.g. revision count, active status), and one primary action button (e.g., "Lưu cấu hình", "Thêm sản phẩm").
+- **AdminBreadcrumbs (`src/components/admin/ui/AdminBreadcrumbs.tsx`)**: Route-aware navigational trail rendered in the topbar and above page headers, maintaining operator context at all times.
+
+### 2. Density & Spacing
+- **Content Max-Width**: `max-w-7xl` for listing, dashboard, and tables; `max-w-5xl` for focused form pages (e.g., Settings).
+- **Controls & Form Groups**: Compact 38–42px control height; `gap-4` between sibling fields; `gap-6` between fieldset cards.
+- **Card Panels (`src/components/admin/ui/AdminCard.tsx`)**: Flat white background (`bg-white`), subtle 1px border (`border-slate-200/80`), rounded 12px (`rounded-xl`), with distinct header/body/footer divisions.
+
+### 3. Button Hierarchy (`src/components/admin/ui/AdminButton.tsx`)
+- **Primary**: `bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm` — Reserved strictly for the single main action per view.
+- **Secondary**: `bg-white hover:bg-slate-50 text-slate-700 border border-slate-300` — For dismiss, back, or auxiliary actions.
+- **Destructive**: `bg-rose-600 hover:bg-rose-700 text-white` — For irreversible or archive actions.
+- **Ghost**: `hover:bg-slate-100 text-slate-600` — For inline or toolbar triggers.
+
+### 4. Semantic Status Colors (`src/components/admin/ui/StatusBadge.tsx`)
+Never communicate state by color alone; always pair with explicit Vietnamese text and semantic dot indicator:
+- **Emerald (Success / Published / Hoàn thành)**: `bg-emerald-50 text-emerald-700 border-emerald-200/60`
+- **Amber (Pending / Draft / Chờ xử lý)**: `bg-amber-50 text-amber-700 border-amber-200/60`
+- **Rose (Failed / Cancelled / Ngừng nhận đơn)**: `bg-rose-50 text-rose-700 border-rose-200/60`
+- **Blue (In Progress / Đang xử lý)**: `bg-blue-50 text-blue-700 border-blue-200/60`
+- **Slate (Draft / Hidden / Lưu trữ)**: `bg-slate-100 text-slate-600 border-slate-200`
+
+### 5. Feedback & Alerts (`src/components/admin/ui/InlineAlert.tsx`)
+- Critical validation or server errors must never rely solely on auto-dismissing toasts.
+- Use persistent `InlineAlert` banners with structured title, message, and action (e.g. "Tải bản mới từ server" on 409 conflict).
+- Never display raw technical jargon (`D1`, `revision #`, `SQL constraint`) as primary user messages.
+
+### 6. Responsive & Accessibility Shell
+- **Desktop (1440px)**: Persistent 64-width sidebar divided into 3 functional groups (Tổng quan & Bán hàng, Catalog & Biên tập, Nội dung & Hệ thống).
+- **Mobile (390px / 768px)**: Accessible off-canvas drawer with keyboard `Escape` handler, `aria-modal="true"`, focus entrapment and restoration to the open trigger.
+- **Zoom 200%**: Layout adapts fluidly without toolbar overlap or hiding primary save actions.
+
+### 7. CSS Scoping
+- All admin components utilize scoped Tailwind utility classes targeting slate/zinc neutrals.
+- Zero mutation of global design tokens or Storefront CSS rules in `src/app/globals.css`. Storefront styling remains 100% isolated.
+

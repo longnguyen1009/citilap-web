@@ -1,10 +1,12 @@
 {
-  "passed": 11,
+  "passed": 17,
+  "totalTests": 16,
   "viewports": [
     1440,
     768,
     390
   ],
-  "runtime": "Cloudflare Vite local D1/R2",
-  "errors": []
+  "runtime": "Microsoft Edge + Isolated Miniflare D1",
+  "errors": [],
+  "timestamp": "2026-10-13T02:53:06.478Z"
 }

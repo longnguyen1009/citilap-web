@@ -810,6 +810,14 @@ export async function getCategoryFilteredProducts(
         baseMatch.gpuSeries = { in: gpuList };
       }
 
+      // Enforce strict price alignment: the SAME variant that matches specs must satisfy price criteria
+      if (options.minPrice !== undefined && options.minPrice > 0) {
+        variantMatch.price = { ...(variantMatch.price || {}), gte: Math.round(Number(options.minPrice)) };
+      }
+      if (options.maxPrice !== undefined && options.maxPrice > 0) {
+        variantMatch.price = { ...(variantMatch.price || {}), lte: Math.round(Number(options.maxPrice)) };
+      }
+
       where.AND = [
         ...(where.AND || []),
         {
@@ -1304,27 +1312,60 @@ export async function getProductDetail(
 }
 
 /**
- * Fetches related products from D1 by category or brand, excluding the current product.
+/**
+ * Fetches related products from D1.
+ * Prioritizes manually curated relatedProductIds (preserving manual order, public only).
+ * Falls back to category/brand if manual items are fewer than limit.
  */
 export async function getRelatedProducts(
   productId: string,
   categoryId?: string | null,
   brandId?: string | null,
   limit = 4,
+  manualIds: string[] = [],
   client: PrismaClient = prisma
 ): Promise<HomepageProduct[]> {
   try {
+    const validManualIds = (manualIds || []).filter((id) => id && id !== productId).slice(0, limit);
+    let resolvedManual: HomepageProduct[] = [];
+
+    if (validManualIds.length > 0) {
+      const manualRows = await client.product.findMany({
+        where: {
+          id: { in: validManualIds },
+          status: { in: ["ACTIVE", "active"] },
+          deletedAt: null,
+        },
+        include: defaultInclude,
+      });
+
+      const manualMap = new Map(
+        manualRows.map((r) => [r.id, mapD1ProductToHomepageProduct(r as unknown as ProductDbRow)])
+      );
+
+      resolvedManual = validManualIds
+        .map((id) => manualMap.get(id))
+        .filter((item): item is HomepageProduct => Boolean(item));
+    }
+
+    if (resolvedManual.length >= limit) {
+      return resolvedManual.slice(0, limit);
+    }
+
+    // Top up with category/brand fallbacks if needed
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const orConditions: any[] = [];
     if (categoryId) orConditions.push({ categoryId });
     if (brandId) orConditions.push({ brandId });
 
-    if (orConditions.length === 0) return [];
+    if (orConditions.length === 0) return resolvedManual;
 
-    const rows = await client.product.findMany({
+    const excludedIds = [productId, ...resolvedManual.map((m) => m.id)];
+    const fallbackRows = await client.product.findMany({
       where: {
-        id: { not: productId },
+        id: { notIn: excludedIds },
         status: { in: ["ACTIVE", "active"] },
+        deletedAt: null,
         OR: orConditions,
       },
       include: defaultInclude,
@@ -1332,10 +1373,14 @@ export async function getRelatedProducts(
         { isFeatured: "desc" },
         { createdAt: "desc" },
       ],
-      take: limit,
+      take: limit - resolvedManual.length,
     });
 
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+    const fallbackProducts = fallbackRows.map((r) =>
+      mapD1ProductToHomepageProduct(r as unknown as ProductDbRow)
+    );
+
+    return [...resolvedManual, ...fallbackProducts];
   } catch (error) {
     console.error("[CatalogService] Failed to getRelatedProducts on D1:", error);
     return [];

@@ -1,11 +1,34 @@
 /**
  * Published Product Studio controls whether an item can enter checkout.
  * Draft edits never change ordering until they are published.
+ * CMS-owned products that are unpublished or in draft state can NEVER enter checkout.
  */
+export type StudioOrderContext =
+  | string
+  | null
+  | undefined
+  | { hasStudio: boolean; published?: string | null | undefined };
+
 export function assertPublishedStudioOrderable(
-  publishedJson: string | null | undefined,
+  context: StudioOrderContext,
   variantId: string | null,
 ): void {
+  let hasStudio = false;
+  let publishedJson: string | null | undefined = null;
+
+  if (typeof context === 'object' && context !== null) {
+    hasStudio = context.hasStudio;
+    publishedJson = context.published;
+  } else {
+    publishedJson = context;
+  }
+
+  // If item is managed by CMS ProductStudio, it MUST have a published snapshot to be orderable.
+  // Drafts or unpublished items can never enter checkout.
+  if (hasStudio && !publishedJson) {
+    throw new Error('PRODUCT_UNAVAILABLE');
+  }
+
   if (!publishedJson) return;
 
   let document: unknown;

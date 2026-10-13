@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Save,
   Store,
@@ -9,57 +9,80 @@ import {
   Truck,
   CreditCard,
   ShieldCheck,
-  CheckCircle2,
-  AlertCircle,
   RefreshCw,
+  RotateCcw,
+  Info,
+  AlertCircle,
 } from "lucide-react";
-import type { StorefrontSettings } from "@/app/api/admin/settings/route";
-import { DEFAULT_SETTINGS } from "@/app/api/admin/settings/route";
+import { PageHeader, InlineAlert } from "@/components/admin/ui";
+import type { AdminSettingsDocument as StorefrontSettings } from "@/contracts/cms/settings";
+import { DEFAULT_ADMIN_SETTINGS as DEFAULT_SETTINGS } from "@/contracts/cms/settings";
 
-const STORAGE_KEY = "citilap_admin_settings_v2";
+const STORAGE_KEY = "citilap_admin_settings_v2_draft";
 
 type TabId = "store" | "flashsale" | "banners" | "features" | "shipping";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("store");
   const [settings, setSettings] = useState<StorefrontSettings>(DEFAULT_SETTINGS);
+  const [revision, setRevision] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const [localDraftStatus, setLocalDraftStatus] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
+
+  const loadSettingsData = useCallback(async (isMounted?: () => boolean) => {
+    try {
+      const res = await fetch("/api/admin/settings", {
+        credentials: "same-origin",
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("Chưa đăng nhập quản trị hoặc phiên làm việc đã hết hạn (401).");
+        if (res.status === 403) throw new Error("Không đủ quyền truy cập quản trị hoặc vi phạm CSRF (403).");
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Lỗi máy chủ khi tải cài đặt (${res.status}).`);
+      }
+
+      const json = await res.json();
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "Không nhận được dữ liệu cấu hình hợp lệ.");
+      }
+
+      if (!isMounted || isMounted()) {
+        setSettings({ ...DEFAULT_SETTINGS, ...json.data.document });
+        setRevision(json.data.revision ?? 0);
+      }
+    } catch (err) {
+      if (!isMounted || isMounted()) {
+        const errMsg = err instanceof Error ? err.message : "Mất kết nối tới máy chủ.";
+        setLoadError(errMsg);
+      }
+    } finally {
+      if (!isMounted || isMounted()) {
+        setLoading(false);
+      }
+    }
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    setConflict(false);
+    setMessage(null);
+    await loadSettingsData();
+  }, [loadSettingsData]);
 
   useEffect(() => {
-    let canceled = false;
-    const fetchSettings = async () => {
-      try {
-        const res = await fetch("/api/admin/settings");
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && json.data && !canceled) {
-            setSettings({ ...DEFAULT_SETTINGS, ...json.data });
-            return;
-          }
-        }
-      } catch {
-        // Fallback to localStorage
-      }
-
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw && !canceled) {
-          setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
-        }
-      } catch {
-        // Ignore JSON error
-      } finally {
-        if (!canceled) setLoading(false);
-      }
-    };
-
-    void fetchSettings();
+    let active = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadSettingsData() calls setState after async fetch, safe pattern
+    void loadSettingsData(() => active);
     return () => {
-      canceled = true;
+      active = false;
     };
-  }, []);
+  }, [loadSettingsData]);
 
   const update = <K extends keyof StorefrontSettings>(key: K, value: StorefrontSettings[K]) => {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -67,33 +90,118 @@ export default function SettingsPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving || loading || loadError) return;
+
     setSaving(true);
     setMessage(null);
+    setConflict(false);
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
       const res = await fetch("/api/admin/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          expectedRevision: revision,
+          document: settings,
+        }),
       });
 
-      if (!res.ok) throw new Error("Lỗi máy chủ khi lưu cài đặt");
+      if (res.status === 409) {
+        const json = await res.json().catch(() => ({}));
+        setConflict(true);
+        setMessage({
+          type: "error",
+          text:
+            json.error ||
+            "Xung đột phiên bản (409): Cài đặt đã được người khác chỉnh sửa. Giữ nguyên nội dung bạn đang sửa và không tự động ghi đè.",
+        });
+        return;
+      }
 
-      setMessage({ type: "success", text: "Đã lưu và đồng bộ cài đặt Storefront thành công!" });
-    } catch {
-      setMessage({ type: "success", text: "Đã lưu cài đặt trên trình duyệt (chế độ dự phòng)." });
+      if (res.status === 401) {
+        setMessage({
+          type: "error",
+          text: "Phiên đăng nhập đã hết hạn (401). Giữ nguyên nội dung đã nhập, vui lòng đăng nhập lại ở tab khác rồi thử Lưu lại.",
+        });
+        return;
+      }
+
+      if (res.status === 403) {
+        setMessage({
+          type: "error",
+          text: "Lỗi kiểm tra bảo mật CSRF (403). Yêu cầu cùng Origin để bảo vệ hệ thống.",
+        });
+        return;
+      }
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || `Lỗi máy chủ (${res.status}) khi lưu cài đặt.`);
+      }
+
+      const json = await res.json();
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "Phản hồi máy chủ không hợp lệ.");
+      }
+
+      // Xác nhận thành công và cập nhật revision mới từ server
+      setRevision(json.data.revision);
+      setSettings({ ...DEFAULT_SETTINGS, ...json.data.document });
+      setLocalDraftStatus(null);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+
+      setMessage({
+        type: "success",
+        text: "Đã lưu cấu hình thành công.",
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Mất kết nối mạng khi lưu.";
+      setMessage({ type: "error", text: msg });
+
+      // Lưu bản nháp cục bộ phục hồi tạm thời, hiển thị rõ "Bản chưa đồng bộ"
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+        setLocalDraftStatus("Bản chưa đồng bộ với máy chủ (đã lưu tạm trên trình duyệt khi xảy ra sự cố).");
+      } catch {
+        // ignore storage errors
+      }
     } finally {
       setSaving(false);
-      setTimeout(() => setMessage(null), 4000);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px] text-slate-500">
-        <RefreshCw className="w-6 h-6 animate-spin mr-2 text-blue-600" />
-        Đang tải cấu hình Storefront...
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-slate-500 gap-3">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="font-medium text-slate-600">Đang tải cấu hình Storefront từ cơ sở dữ liệu D1...</span>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-2xl mx-auto my-12 p-8 bg-red-50 border border-red-200 rounded-2xl shadow-sm text-center">
+        <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-red-900 mb-2">Không thể tải cấu hình Storefront</h2>
+        <p className="text-sm text-red-700 mb-6">{loadError}</p>
+        <p className="text-xs text-red-600 mb-6 bg-red-100/60 p-3 rounded-lg text-left">
+          Hệ thống bảo vệ dữ liệu đã khóa chức năng lưu cấu hình mặc định để ngăn việc vô tình ghi đè dữ liệu thật trên cơ sở dữ liệu D1.
+        </p>
+        <button
+          type="button"
+          onClick={() => void fetchSettings()}
+          className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition cursor-pointer"
+        >
+          <RotateCcw className="w-4 h-4" /> Thử lại
+        </button>
       </div>
     );
   }
@@ -106,53 +214,84 @@ export default function SettingsPage() {
     { id: "shipping", label: "Vận chuyển & Thanh toán", icon: Truck },
   ];
 
+  const handleReloadLatest = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.confirm(
+        "Tải phiên bản mới từ máy chủ sẽ ghi đè các nội dung bạn đang chỉnh sửa chưa lưu. Bạn có chắc chắn muốn tải lại không?"
+      )
+    ) {
+      void fetchSettings();
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto pb-16">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Cấu hình & Quản lý Giao diện Storefront
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Quản trị toàn bộ thông tin hiển thị, banner quảng cáo, giờ vàng khuyến mãi và thanh toán.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition flex items-center gap-2 cursor-pointer shrink-0 self-start sm:self-auto"
-        >
-          {saving ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" /> Đang lưu...
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4" /> Lưu cấu hình
-            </>
-          )}
-        </button>
-      </div>
+      <PageHeader
+        title="Cài đặt hệ thống"
+        description="Quản lý thông tin cửa hàng, chính sách bán hàng và nội dung website."
+        breadcrumbs={[{ label: "Hệ thống" }, { label: "Cài đặt hệ thống" }]}
+        badge={
+          <span
+            className="text-xs font-semibold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-full border border-slate-200"
+            title={`Phiên bản lưu trữ: #${revision}`}
+          >
+            Bản ghi #{revision}
+          </span>
+        }
+        actions={
+          <>
+            {conflict && (
+              <button
+                type="button"
+                onClick={handleReloadLatest}
+                className="bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold py-2 px-3.5 rounded-lg border border-amber-300 transition flex items-center gap-2 cursor-pointer text-xs sm:text-sm"
+              >
+                <RotateCcw className="w-4 h-4 text-amber-700" /> Tải bản mới từ server
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving || loading || Boolean(loadError)}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-2 px-5 rounded-lg shadow-xs transition flex items-center gap-2 cursor-pointer shrink-0 text-xs sm:text-sm"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" /> Đang lưu...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" /> Lưu cấu hình
+                </>
+              )}
+            </button>
+          </>
+        }
+      />
 
-      {/* Toast alert */}
-      {message && (
-        <div
-          className={`p-4 rounded-xl mb-6 flex items-center gap-3 text-sm font-semibold transition shadow-sm ${
-            message.type === "success"
-              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-              : "bg-red-50 text-red-800 border border-red-200"
-          }`}
-        >
-          {message.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-          )}
-          <span>{message.text}</span>
+      {/* Local draft warning if present */}
+      {localDraftStatus && (
+        <div className="mb-4">
+          <InlineAlert variant="warning">
+            {localDraftStatus}
+          </InlineAlert>
         </div>
       )}
+
+      {/* Status feedback alert */}
+      {message && (
+        <div className="mb-6">
+          <InlineAlert
+            variant={message.type === "error" ? "error" : message.type === "warning" ? "warning" : "success"}
+            onClose={() => setMessage(null)}
+          >
+            {message.text}
+          </InlineAlert>
+        </div>
+      )}
+
 
       {/* Tabs navigation */}
       <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar border-b border-slate-200 mb-8 pb-px">
@@ -287,6 +426,11 @@ export default function SettingsPage() {
               </p>
             </div>
 
+            <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-800 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <span>Cấu hình Flash Sale được lưu trữ an toàn tại hệ thống quản trị; tính năng hiển thị đếm ngược tự động trên Storefront sẽ được kết nối ở giai đoạn R07.</span>
+            </div>
+
             <div className="space-y-5">
               <label className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition">
                 <input
@@ -350,6 +494,11 @@ export default function SettingsPage() {
                 <p className="text-xs text-slate-500 mt-1">
                   Banner ấn tượng đầu tiên khi khách hàng bước vào website CitiLap.
                 </p>
+              </div>
+
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-800 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <span>Cấu hình Banner và Slogan được lưu trữ an toàn tại hệ thống quản trị; việc kết nối trực tiếp lên giao diện trang chủ Storefront sẽ được hoàn tất ở giai đoạn R07.</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -637,6 +786,11 @@ export default function SettingsPage() {
               <p className="text-xs text-slate-500 mt-1">
                 Thiết lập phí giao hàng và hướng dẫn khách chuyển khoản khi đặt hàng tại bước Checkout.
               </p>
+            </div>
+
+            <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-800 flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+              <span>Chính sách phí giao hàng mặc định được lưu để hỗ trợ quy trình tư vấn và tạo đơn; cơ chế tự động tính phí tại giỏ hàng Storefront sẽ được kết nối ở giai đoạn R08.</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

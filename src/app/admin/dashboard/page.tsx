@@ -1,333 +1,424 @@
 "use client";
 
+import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { DollarSign, ShoppingCart, Users, AlertTriangle, Package, RefreshCw, Clock } from "lucide-react";
+import {
+  ShoppingCart,
+  Package,
+  Images,
+  FolderTree,
+  Settings,
+  Sparkles,
+  ExternalLink,
+  PlusCircle,
+  RotateCcw,
+  ArrowRight,
+  Eye,
+} from "lucide-react";
+import {
+  PageHeader,
+  AdminCard,
+  AdminButton,
+  StatusBadge,
+  AdminLoadingState,
+  AdminErrorState,
+} from "@/components/admin/ui";
 
-type DashboardData = {
-  stats: {
-    totalRevenue: number;
-    monthRevenue: number;
-    monthOrders: number;
-    revenueChange: number | null;
-    totalOrders: number;
+interface DashboardData {
+  summary: {
     pendingOrders: number;
-    totalCustomers: number;
-    newCustomersThisMonth: number;
-    lowStockProducts: number;
+    totalOrders: number;
+    draftStudioCount: number;
+    publishedStudioCount: number;
+    mediaCount: number;
   };
   recentOrders: {
     id: string;
-    customer: string;
-    product: string;
-    itemCount: number;
-    date: string;
-    amount: number;
+    orderNumber: string | null;
+    customerName: string;
+    customerPhone: string;
+    totalAmount: number;
     status: string;
+    createdAt: string;
   }[];
-  monthlyRevenue: { label: string; revenue: number }[];
-  statusCounts: { status: string; count: number }[];
-  topProducts: { id: string; name: string; sold: number }[];
-};
+  recentStudioProducts: {
+    productId: string;
+    revision: number;
+    published: string | null;
+    updatedAt: string;
+    catalogName: string;
+    catalogSlug: string;
+    catalogStatus: string;
+  }[];
+}
 
-const formatVnd = (value: number) => `${value.toLocaleString("vi-VN")}đ`;
-
-const statusColor: Record<string, string> = {
-  "Chờ xác nhận": "text-yellow-600",
-  "Đang xử lý": "text-blue-600",
-  "Đang vận chuyển": "text-purple-600",
-  "Đã hoàn thành": "text-green-600",
-  "Đã hủy": "text-red-600",
-};
+const formatCurrency = (val: number) => `${val.toLocaleString("vi-VN")}đ`;
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [schedulerResult, setSchedulerResult] = useState<string | null>(null);
-  const [schedulerRunning, setSchedulerRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const load = async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setError(null);
     try {
-      const response = await fetch("/api/dashboard");
-      const result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.error);
-      setData(result.data);
-    } catch {
-      setError("Không thể tải dữ liệu tổng quan.");
+      const res = await fetch("/api/dashboard", { credentials: "same-origin" });
+      if (!res.ok) {
+        throw new Error(`Lỗi máy chủ (${res.status}) khi tải dữ liệu tổng quan.`);
+      }
+      const json = await res.json();
+      if (!json.success || !json.data) {
+        throw new Error(json.error || "Dữ liệu trả về không hợp lệ.");
+      }
+      setData(json.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Mất kết nối mạng.");
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load() calls setState after async fetch, safe pattern
-    void load();
   }, []);
 
-  const runScheduler = async () => {
-    setSchedulerRunning(true);
-    setSchedulerResult(null);
-    try {
-      const token = typeof window !== "undefined" ? window.sessionStorage.getItem("admin_token") : null;
-      const headers: Record<string, string> = {};
-      if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch("/api/cron/publish-scheduler", { method: "POST", headers });
-      const result = await res.json();
-      if (result.success) {
-        const parts = [];
-        if (result.published > 0) parts.push(`${result.published} sản phẩm đã xuất bản`);
-        if (result.unpublished > 0) parts.push(`${result.unpublished} sản phẩm đã ẩn`);
-        if (result.cleanedVersions > 0) parts.push(`${result.cleanedVersions} version cũ đã dọn`);
-        setSchedulerResult(parts.length > 0 ? `✅ ${parts.join(", ")}` : "✅ Không có thay đổi nào cần thực hiện.");
-      } else {
-        setSchedulerResult("❌ Lỗi khi chạy scheduler.");
-      }
-    } catch {
-      setSchedulerResult("❌ Không thể kết nối scheduler.");
-    } finally {
-      setSchedulerRunning(false);
-      void load();
-    }
-  };
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load initial operational stats
+    void loadDashboard();
+  }, [loadDashboard]);
 
   if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto flex items-center justify-center py-32 text-gray-500">
-        <RefreshCw className="w-5 h-5 animate-spin mr-3" /> Đang tải dữ liệu...
-      </div>
-    );
+    return <AdminLoadingState message="Đang kiểm tra tình trạng công việc cửa hàng..." />;
   }
 
   if (error || !data) {
     return (
-      <div className="max-w-7xl mx-auto py-32 text-center">
-        <p className="text-gray-500 mb-4">{error || "Không có dữ liệu."}</p>
-        <button onClick={() => void load()} className="text-blue-600 font-bold hover:underline">Thử lại</button>
-      </div>
+      <AdminErrorState
+        title="Không thể tải bảng điều hành"
+        message={error || "Không thể kết nối đến cơ sở dữ liệu."}
+        onRetry={() => void loadDashboard()}
+      />
     );
   }
 
-  const { stats, recentOrders, monthlyRevenue, statusCounts, topProducts } = data;
-  const maxRevenue = Math.max(...monthlyRevenue.map((m) => m.revenue), 1);
+  const { summary, recentOrders, recentStudioProducts } = data;
 
-  const cards = [
+  const quickActions = [
     {
-      name: "Doanh thu tháng này",
-      value: formatVnd(stats.monthRevenue),
-      sub: stats.revenueChange !== null
-        ? `${stats.revenueChange >= 0 ? "+" : ""}${(stats.revenueChange * 100).toFixed(1)}% so với tháng trước`
-        : "Chưa có dữ liệu tháng trước",
-      icon: DollarSign,
-      color: "text-green-600",
-      bg: "bg-green-100",
+      title: "Tạo sản phẩm mới",
+      desc: "Thêm thông tin laptop hoặc phụ kiện vào danh mục",
+      href: "/admin/products/new",
+      icon: PlusCircle,
+      accent: "text-blue-600 bg-blue-50 border-blue-200",
     },
     {
-      name: "Đơn hàng",
-      value: stats.totalOrders.toLocaleString("vi-VN"),
-      sub: `${stats.pendingOrders} đơn chờ xác nhận`,
-      icon: ShoppingCart,
-      color: "text-blue-600",
-      bg: "bg-blue-100",
+      title: "Quản lý sản phẩm",
+      desc: "Xem danh sách, thông số kỹ thuật và trạng thái xuất bản",
+      href: "/admin/products",
+      icon: Package,
+      accent: "text-indigo-600 bg-indigo-50 border-indigo-200",
     },
     {
-      name: "Khách hàng",
-      value: stats.totalCustomers.toLocaleString("vi-VN"),
-      sub: `+${stats.newCustomersThisMonth} khách mới tháng này`,
-      icon: Users,
-      color: "text-indigo-600",
-      bg: "bg-indigo-100",
+      title: "Thư viện Media",
+      desc: "Tải lên và quản lý hình ảnh sản phẩm chất lượng cao",
+      href: "/admin/media",
+      icon: Images,
+      accent: "text-sky-600 bg-sky-50 border-sky-200",
     },
     {
-      name: "Sản phẩm sắp hết hàng",
-      value: stats.lowStockProducts.toLocaleString("vi-VN"),
-      sub: "Tồn kho ≤ 5 sản phẩm",
-      icon: AlertTriangle,
-      color: "text-orange-600",
-      bg: "bg-orange-100",
+      title: "Menu & Bộ sưu tập",
+      desc: "Cấu hình thanh điều hướng và nhóm sản phẩm trang chủ",
+      href: "/admin/navigation",
+      icon: FolderTree,
+      accent: "text-emerald-600 bg-emerald-50 border-emerald-200",
+    },
+    {
+      title: "Cài đặt hệ thống",
+      desc: "Thông tin liên hệ hotline, showroom và cấu hình bán hàng",
+      href: "/admin/settings",
+      icon: Settings,
+      accent: "text-slate-700 bg-slate-100 border-slate-300",
+    },
+    {
+      title: "Xem website cửa hàng",
+      desc: "Kiểm tra hiển thị thực tế trên giao diện khách hàng",
+      href: "/",
+      external: true,
+      icon: ExternalLink,
+      accent: "text-amber-700 bg-amber-50 border-amber-200",
     },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Tổng quan cửa hàng</h1>
-        <p className="text-sm text-gray-500">Theo dõi hoạt động kinh doanh và các đơn hàng mới nhất.</p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-8 pb-12">
+      {/* 1. Page Header */}
+      <PageHeader
+        title="Tổng quan điều hành"
+        description="Trung tâm điều phối công việc: theo dõi đơn hàng mới, tiếp tục biên tập sản phẩm và truy cập nhanh các tính năng quản trị."
+        breadcrumbs={[{ label: "Tổng quan" }]}
+        actions={
+          <AdminButton
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => void loadDashboard()}
+            icon={<RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />}
+          >
+            Làm mới
+          </AdminButton>
+        }
+      />
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-        {cards.map((item) => (
-          <div key={item.name} className="bg-white overflow-hidden rounded-xl border border-gray-200 shadow-sm">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className={`flex-shrink-0 rounded-md p-3 ${item.bg}`}>
-                  <item.icon className={`h-6 w-6 ${item.color}`} aria-hidden="true" />
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">{item.name}</dt>
-                    <dd className="text-2xl font-semibold text-gray-900">{item.value}</dd>
-                    <dd className="text-xs text-gray-400 mt-0.5">{item.sub}</dd>
-                  </dl>
-                </div>
-              </div>
+      {/* 2. Operational Work Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Pending Orders */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Đơn cần xử lý</span>
+            <div className="p-2 rounded-lg bg-amber-50 text-amber-600 border border-amber-200">
+              <ShoppingCart className="w-4 h-4" aria-hidden="true" />
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Revenue Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="text-base font-semibold leading-6 text-gray-900">Doanh thu 12 tháng gần nhất</h3>
-            <span className="text-sm text-gray-500">Tổng: <span className="font-bold text-gray-900">{formatVnd(stats.totalRevenue)}</span></span>
-          </div>
-          <div className="p-6">
-            <div className="h-72 w-full flex items-end gap-1 sm:gap-2 justify-between">
-              {monthlyRevenue.map((month, i) => (
-                <div key={i} className="w-full flex flex-col items-center justify-end h-full group cursor-pointer relative">
-                  {/* Tooltip */}
-                  <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
-                    {formatVnd(month.revenue)}
-                  </div>
-                  <div
-                    className="w-full bg-blue-600 rounded-t-sm transition-all duration-300 group-hover:bg-indigo-600 min-h-[2px]"
-                    style={{ height: `${(month.revenue / maxRevenue) * 100}%` }}
-                  />
-                </div>
-              ))}
+          <div className="my-3">
+            <div className="text-3xl font-black text-slate-900 tracking-tight">
+              {summary.pendingOrders}
             </div>
-            <div className="mt-4 flex justify-between text-[10px] sm:text-xs text-gray-400">
-              {monthlyRevenue.map((month, i) => (
-                <span key={i}>{month.label}</span>
-              ))}
+            <div className="text-xs text-slate-500 mt-1">
+              yêu cầu mua hàng chờ xác nhận
             </div>
           </div>
+          <Link
+            href="/admin/orders"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 transition"
+          >
+            <span>Mở danh sách đơn</span>
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
         </div>
 
-        {/* Recent Orders */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-5 border-b border-gray-200">
-            <h3 className="text-base font-semibold leading-6 text-gray-900">Đơn hàng gần đây</h3>
+        {/* Draft Products */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Bản nháp sản phẩm</span>
+            <div className="p-2 rounded-lg bg-blue-50 text-blue-600 border border-blue-200">
+              <Sparkles className="w-4 h-4" aria-hidden="true" />
+            </div>
           </div>
-          <div className="px-6 py-2">
+          <div className="my-3">
+            <div className="text-3xl font-black text-slate-900 tracking-tight">
+              {summary.draftStudioCount}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              sản phẩm đang lưu nháp (chưa xuất bản)
+            </div>
+          </div>
+          <Link
+            href="/admin/products?publicationStatus=DRAFT"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 transition"
+          >
+            <span>Xem bản nháp</span>
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+
+        {/* Published Studio Products */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Đã xuất bản web</span>
+            <div className="p-2 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200">
+              <Package className="w-4 h-4" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="my-3">
+            <div className="text-3xl font-black text-slate-900 tracking-tight">
+              {summary.publishedStudioCount}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              sản phẩm hiển thị trực tiếp Storefront
+            </div>
+          </div>
+          <Link
+            href="/admin/products"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 transition"
+          >
+            <span>Quản lý catalog</span>
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+
+        {/* Media Library Assets */}
+        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-slate-500 tracking-wider">Thư viện Media</span>
+            <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-200">
+              <Images className="w-4 h-4" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="my-3">
+            <div className="text-3xl font-black text-slate-900 tracking-tight">
+              {summary.mediaCount}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              tệp hình ảnh & video đã lưu trữ
+            </div>
+          </div>
+          <Link
+            href="/admin/media"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 transition"
+          >
+            <span>Mở thư viện ảnh</span>
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+
+      {/* 3. Quick Actions Grid */}
+      <div>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-slate-500 mb-3">
+          Lối tắt thao tác nhanh
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {quickActions.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link
+                key={action.title}
+                href={action.href}
+                target={action.external ? "_blank" : undefined}
+                rel={action.external ? "noopener noreferrer" : undefined}
+                className="bg-white hover:bg-slate-50/80 rounded-xl border border-slate-200 p-4 transition shadow-xs flex items-start gap-3.5 group"
+              >
+                <div className={`p-2.5 rounded-lg border shrink-0 ${action.accent}`}>
+                  <Icon className="w-5 h-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition flex items-center gap-1.5">
+                    <span>{action.title}</span>
+                    {action.external && <ExternalLink className="w-3 h-3 text-slate-400" aria-hidden="true" />}
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{action.desc}</div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. Two Operational Focus Columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Recent Orders (2 cols) */}
+        <div className="lg:col-span-2">
+          <AdminCard
+            title="Đơn hàng mới tiếp nhận"
+            subtitle="Danh sách các yêu cầu mua hàng cần liên hệ tư vấn và xác nhận"
+            action={
+              <Link
+                href="/admin/orders"
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 transition"
+              >
+                <span>Xem tất cả ({summary.totalOrders})</span>
+                <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+              </Link>
+            }
+            bodyClassName="p-0 overflow-x-auto"
+          >
             {recentOrders.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-500">Chưa có đơn hàng nào.</p>
+              <div className="py-12 text-center text-xs text-slate-500">
+                Chưa có đơn hàng nào được gửi đến hệ thống.
+              </div>
             ) : (
-              <ul className="divide-y divide-gray-200">
-                {recentOrders.map((order) => (
-                  <li key={order.id} className="py-4">
-                    <Link href={`/admin/orders/${order.id}`} className="block hover:bg-gray-50 -mx-2 px-2 py-1 rounded-lg transition">
-                      <div className="flex items-center justify-between">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{order.customer}</p>
-                          <p className="text-xs text-gray-500 truncate">{order.product}</p>
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase">
+                    <th className="py-3 px-4">Mã đơn</th>
+                    <th className="py-3 px-4">Khách hàng</th>
+                    <th className="py-3 px-4">Điện thoại</th>
+                    <th className="py-3 px-4 text-right">Tổng tiền</th>
+                    <th className="py-3 px-4 text-center">Trạng thái</th>
+                    <th className="py-3 px-4 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {recentOrders.map((order) => (
+                    <tr key={order.id} className="hover:bg-slate-50/70 transition">
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-800">
+                        {order.orderNumber || order.id.slice(0, 8)}
+                      </td>
+                      <td className="py-3 px-4 font-medium text-slate-900">
+                        {order.customerName}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 font-mono">
+                        {order.customerPhone}
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-slate-900">
+                        {formatCurrency(order.totalAmount)}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <Link
+                          href={`/admin/orders/${order.id}`}
+                          className="inline-flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium transition"
+                          title="Xem chi tiết đơn hàng"
+                        >
+                          <Eye className="w-3.5 h-3.5" aria-hidden="true" />
+                          <span>Chi tiết</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </AdminCard>
+        </div>
+
+        {/* Right Column: Continue Editing */}
+        <div>
+          <AdminCard
+            title="Tiếp tục biên tập"
+            subtitle="Các sản phẩm vừa cập nhật gần đây"
+            action={
+              <Link
+                href="/admin/products"
+                className="text-xs font-bold text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 transition"
+              >
+                <span>Xem tất cả</span>
+                <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+              </Link>
+            }
+            bodyClassName="p-0"
+          >
+            {recentStudioProducts.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-500">
+                Chưa có sản phẩm nào được biên tập gần đây.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 text-xs">
+                {recentStudioProducts.map((p) => {
+                  const isPublished = Boolean(p.published);
+                  return (
+                    <div key={p.productId} className="p-4 hover:bg-slate-50/70 transition flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-900 truncate">
+                          {p.catalogName}
                         </div>
-                        <div className="text-right ml-3 flex-shrink-0">
-                          <p className="text-sm font-semibold text-gray-900">{formatVnd(order.amount)}</p>
-                          <p className={`text-xs font-medium ${statusColor[order.status] || "text-gray-500"}`}>
-                            {order.status}
-                          </p>
+                        <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-2">
+                          <span>Phiên bản #{p.revision}</span>
+                          <span>•</span>
+                          <span>{isPublished ? "Đã xuất bản" : "Bản nháp"}</span>
                         </div>
                       </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-            <Link href="/admin/orders" className="text-sm font-medium text-blue-600 hover:text-blue-500">
-              Xem tất cả đơn hàng &rarr;
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom row: order status distribution + top products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-5 border-b border-gray-200">
-            <h3 className="text-base font-semibold leading-6 text-gray-900">Phân bố trạng thái đơn hàng</h3>
-          </div>
-          <div className="p-6 space-y-4">
-            {statusCounts.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">Chưa có dữ liệu.</p>
-            ) : (
-              statusCounts.map((row) => {
-                const total = statusCounts.reduce((sum, r) => sum + r.count, 0) || 1;
-                const percent = (row.count / total) * 100;
-                return (
-                  <div key={row.status}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className={`font-medium ${statusColor[row.status] || "text-gray-600"}`}>{row.status}</span>
-                      <span className="text-gray-500">{row.count} đơn ({percent.toFixed(0)}%)</span>
+                      <Link
+                        href={`/admin/products/${p.productId}`}
+                        className="shrink-0 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition"
+                      >
+                        Sửa
+                      </Link>
                     </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${
-                          row.status === "Đã hoàn thành" ? "bg-green-500" :
-                          row.status === "Đã hủy" ? "bg-red-400" :
-                          row.status === "Chờ xác nhận" ? "bg-yellow-400" :
-                          row.status === "Đang vận chuyển" ? "bg-purple-500" : "bg-blue-500"
-                        }`}
-                        style={{ width: `${percent}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="px-6 py-5 border-b border-gray-200">
-            <h3 className="text-base font-semibold leading-6 text-gray-900">Sản phẩm bán chạy</h3>
-          </div>
-          <div className="p-6">
-            {topProducts.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">Chưa có dữ liệu bán hàng.</p>
-            ) : (
-              <ul className="divide-y divide-gray-200">
-                {topProducts.map((product, index) => (
-                  <li key={product.id} className="py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-50 text-blue-600 text-sm font-bold flex items-center justify-center">
-                        {index + 1}
-                      </span>
-                      <span className="text-sm font-medium text-gray-900 truncate">{product.name}</span>
-                    </div>
-                    <span className="text-sm text-gray-500 flex-shrink-0 ml-3 flex items-center gap-1">
-                      <Package className="w-4 h-4" /> {product.sold} đã bán
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Scheduler Section */}
-      <div className="mt-8 bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-indigo-100 rounded-lg"><Clock className="w-5 h-5 text-indigo-600" /></div>
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">Lên lịch xuất bản tự động</h3>
-            <p className="text-xs text-gray-500">Kiểm tra và thực hiện lịch xuất bản/ẩn sản phẩm theo thời gian đã设定</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => void runScheduler()} disabled={schedulerRunning} className="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg text-sm flex items-center gap-2 hover:bg-indigo-700 disabled:opacity-60">
-            {schedulerRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
-            {schedulerRunning ? "Đang chạy..." : "Chạy scheduler ngay"}
-          </button>
-          {schedulerResult && <span className="text-sm text-gray-700">{schedulerResult}</span>}
+          </AdminCard>
         </div>
       </div>
     </div>

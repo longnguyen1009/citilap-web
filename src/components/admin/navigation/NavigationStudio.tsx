@@ -45,6 +45,9 @@ export default function NavigationStudio({initialTab='menus'}: {initialTab?:Tab}
     <p role="status" aria-live="polite" className="nav-message">{message}</p>
     {!doc?<button onClick={load} disabled={busy}>{busy?'Đang tải…':'Tải lại dữ liệu'}</button>:<>
       <div className="nav-toolbar"><span>{dirty?'Chưa lưu':'Đã đồng bộ'} · Bản {detail?.revision} · {detail?.publishedRevision?'Đang hiển thị bản '+detail.publishedRevision:'Chưa xuất bản'}</span><div><button disabled={busy} onClick={()=>void save('save')}>Lưu nháp</button><button disabled={busy} onClick={()=>void showPreview()}>Xem trước</button><button className="nav-primary" disabled={busy} onClick={()=>void save('publish')}>Xuất bản</button></div></div>
+      <div style={{ padding: '10px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '12px', color: '#1e40af', margin: '12px 0' }}>
+        <strong>Phạm vi xuất bản chung:</strong> Menu, Danh mục và Bộ sưu tập thuộc cùng một bộ cấu hình điều hướng. Thao tác Lưu nháp hoặc Xuất bản sẽ áp dụng đồng thời cho tất cả các tab bên dưới.
+      </div>
       <nav className="nav-tabs" aria-label="Khu vực biên tập">{(['menus','categories','collections'] as Tab[]).map(t=><button aria-pressed={tab===t} key={t} onClick={()=>setTab(t)}>{t==='menus'?'Menu':t==='categories'?'Danh mục':'Bộ sưu tập'}</button>)}</nav>
       <fieldset disabled={busy}>
       {tab==='categories'&&<section><div className="nav-section-heading"><div><h2>Danh mục sản phẩm</h2><p>Thứ tự bên dưới cũng là thứ tự hiển thị. Dùng “Hiển thị” để ẩn mà vẫn giữ sản phẩm.</p></div><button onClick={()=>update('categories',[...doc.categories,{id:crypto.randomUUID(),name:'Danh mục mới',slug:'',description:'',parentId:null,visible:true,image:'',assetId:'',alt:''}])}>+ Thêm danh mục</button></div>

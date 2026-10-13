@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { DEFAULT_SETTINGS, type StorefrontSettings } from "@/app/api/admin/settings/route";
+import { DEFAULT_SETTINGS, type StorefrontSettings } from "@/contracts/cms/settings";
 
 interface HeroSectionProps {
   settings?: Partial<StorefrontSettings>;
