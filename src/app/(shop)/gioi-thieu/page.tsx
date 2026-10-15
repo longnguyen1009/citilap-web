@@ -12,21 +12,56 @@ import {
 } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
 
-export const metadata: Metadata = {
-  title: `Giới thiệu | ${businessProfile.brandName}`,
-  description: `Tìm hiểu về ${businessProfile.brandName} - Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng. Thành lập từ 07/2024. ${businessProfile.traditionalMotto}.`,
-  alternates: {
-    canonical: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
-  },
-  openGraph: {
-    title: `Giới thiệu ${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
-    description: `Tìm hiểu về ${businessProfile.brandName} - Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp. Thành lập từ 07/2024.`,
-    url: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
-  },
-};
+import { mediaEnvironment } from "@/server/media-http";
+import { getSystemPageResolution } from "@/server/services/page.service";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
-export default function AboutPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const env = await mediaEnvironment();
+    const resolution = await getSystemPageResolution(env.DB, "ABOUT");
+    if (resolution.state === "PUBLISHED") {
+      const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
+      const description = resolution.page.seo.description || `Tìm hiểu về ${businessProfile.brandName}.`;
+      return {
+        title,
+        description,
+        alternates: {
+          canonical: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
+        },
+        openGraph: {
+          title,
+          description,
+          url: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
+          images: resolution.page.seo.ogImageUrl ? [{ url: resolution.page.seo.ogImageUrl }] : undefined,
+        },
+      };
+    }
+  } catch {
+    // Fail-safe static metadata fallback
+  }
+
+  return {
+    title: `Giới thiệu | ${businessProfile.brandName}`,
+    description: `Tìm hiểu về ${businessProfile.brandName} - Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng. Thành lập từ 07/2024. ${businessProfile.traditionalMotto}.`,
+    alternates: {
+      canonical: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
+    },
+    openGraph: {
+      title: `Giới thiệu ${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
+      description: `Tìm hiểu về ${businessProfile.brandName} - Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp. Thành lập từ 07/2024.`,
+      url: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
+    },
+  };
+}
+
+export default async function AboutPage() {
   const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+
+  // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors)
+  const env = await mediaEnvironment();
+  const resolution = await getSystemPageResolution(env.DB, "ABOUT");
+  const cmsPage = resolution.state === "PUBLISHED" ? resolution.page : null;
 
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
@@ -51,7 +86,7 @@ export default function AboutPage() {
               <Sparkles className="w-3.5 h-3.5" /> Thành lập từ tháng {businessProfile.founded}
             </div>
             <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-tight">
-              {businessProfile.brandName}
+              {cmsPage?.title || businessProfile.brandName}
             </h1>
             <p className="text-blue-200 text-lg md:text-xl font-medium">
               {businessProfile.primaryTagline}
@@ -75,6 +110,15 @@ export default function AboutPage() {
             </div>
           </div>
         </div>
+
+        {cmsPage?.contentHtml && (
+          <div className="bg-white rounded-3xl border border-gray-200/90 shadow-2xs p-6 sm:p-10 md:p-12 mb-12">
+            <div
+              className="prose prose-sm sm:prose-base md:prose-lg max-w-none text-slate-700 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(cmsPage.contentHtml) }}
+            />
+          </div>
+        )}
 
         {/* 3. Core Values Grid */}
         <div className="mb-16">

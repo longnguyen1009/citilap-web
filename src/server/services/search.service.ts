@@ -3,6 +3,8 @@ import { getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import {
   type HomepageProduct,
   type FacetOption,
+  buildRamClauses,
+  buildStorageClauses,
 } from "./catalog.service";
 
 export interface SearchFilterOptions {
@@ -10,6 +12,8 @@ export interface SearchFilterOptions {
   brand?: string | string[];
   category?: string | string[];
   condition?: string | string[];
+  connection?: string | string[];
+  power?: string | string[];
   minPrice?: number;
   maxPrice?: number;
   cpu?: string | string[];
@@ -483,30 +487,17 @@ export async function searchProducts(
     });
   }
 
-  // Condition filter (NEW, LIKE_NEW, USED, ...)
+  // Condition, specs, price & accessory atomic matching
   const conditionList = options.condition
     ? (Array.isArray(options.condition) ? options.condition : [options.condition]).filter(Boolean)
     : [];
-  if (conditionList.length > 0) {
-    andConditions.push({
-      condition: { in: conditionList },
-    });
-  }
+  const connectionList = options.connection
+    ? (Array.isArray(options.connection) ? options.connection : [options.connection]).filter(Boolean)
+    : [];
+  const powerList = options.power
+    ? (Array.isArray(options.power) ? options.power : [options.power]).filter(Boolean)
+    : [];
 
-  // Price range filter
-  if (options.minPrice !== undefined || options.maxPrice !== undefined) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const priceCondition: any = {};
-    if (options.minPrice !== undefined && options.minPrice > 0) {
-      priceCondition.gte = Math.round(Number(options.minPrice));
-    }
-    if (options.maxPrice !== undefined && options.maxPrice > 0) {
-      priceCondition.lte = Math.round(Number(options.maxPrice));
-    }
-    andConditions.push({ price: priceCondition });
-  }
-
-  // Spec filters
   const ramList = options.ram
     ? (Array.isArray(options.ram) ? options.ram : [options.ram]).map(Number).filter((n) => !isNaN(n))
     : [];
@@ -520,43 +511,165 @@ export async function searchProducts(
     ? (Array.isArray(options.gpu) ? options.gpu : [options.gpu]).filter(Boolean)
     : [];
 
-  if (ramList.length > 0) {
-    andConditions.push({
-      OR: [
-        { ramGb: { in: ramList } },
-        { variants: { some: { status: "ACTIVE", OR: ramList.map((r) => ({ ram: { contains: `${r}GB` } })) } } },
-      ],
-    });
-  }
+  const hasPriceFilter =
+    (options.minPrice !== undefined && options.minPrice > 0) ||
+    (options.maxPrice !== undefined && options.maxPrice > 0);
+  const hasSpecFilters = ramList.length > 0 || storageList.length > 0 || gpuList.length > 0;
+  const hasAccessoryFilters = connectionList.length > 0 || powerList.length > 0;
+  const hasConditionFilter = conditionList.length > 0;
 
-  if (storageList.length > 0) {
-    const storageClauses = storageList.map((s) => ({
-      storage: { contains: s >= 1024 ? `${s / 1024}TB` : `${s}GB` },
-    }));
-    andConditions.push({
-      OR: [
-        { storageGb: { in: storageList } },
-        { variants: { some: { status: "ACTIVE", OR: storageClauses } } },
-      ],
-    });
-  }
-
+  // CPU filter: Enforced at the Product level (and variant if variant has CPU)
   if (cpuList.length > 0) {
     andConditions.push({
       OR: [
         { cpuSeries: { in: cpuList } },
         { cpu: { in: cpuList } },
-        { variants: { some: { status: "ACTIVE", cpu: { in: cpuList } } } },
+        { variants: { some: { status: { in: ["ACTIVE", "active"] }, cpu: { in: cpuList } } } },
       ],
     });
   }
 
-  if (gpuList.length > 0) {
+  // Atomic Variant vs Legacy Product filtering:
+  if (hasPriceFilter || hasSpecFilters || hasAccessoryFilters || hasConditionFilter) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const variantMatch: any = { status: { in: ["ACTIVE", "active"] } };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const baseMatch: any = {};
+
+    // 1. Price alignment
+    if (hasPriceFilter) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const priceCond: any = {};
+      if (options.minPrice !== undefined && options.minPrice > 0) {
+        priceCond.gte = Math.round(Number(options.minPrice));
+      }
+      if (options.maxPrice !== undefined && options.maxPrice > 0) {
+        priceCond.lte = Math.round(Number(options.maxPrice));
+      }
+      variantMatch.price = priceCond;
+      baseMatch.price = priceCond;
+    }
+
+    // 2. RAM alignment
+    if (ramList.length > 0) {
+      baseMatch.ramGb = { in: ramList };
+      const ramClauses = buildRamClauses(ramList);
+      variantMatch.OR = ramClauses;
+    }
+
+    // 3. Storage alignment
+    if (storageList.length > 0) {
+      baseMatch.storageGb = { in: storageList };
+      const storageClauses = buildStorageClauses(storageList);
+      if (variantMatch.OR) {
+        const prev = variantMatch.OR;
+        delete variantMatch.OR;
+        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: storageClauses }];
+      } else {
+        variantMatch.OR = storageClauses;
+      }
+    }
+
+    // 4. GPU alignment
+    if (gpuList.length > 0) {
+      baseMatch.gpuSeries = { in: gpuList };
+      const gpuClauses = gpuList.map((g) => ({ gpu: { contains: g } }));
+      if (variantMatch.OR) {
+        const prev = variantMatch.OR;
+        delete variantMatch.OR;
+        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: gpuClauses }];
+      } else {
+        variantMatch.OR = gpuClauses;
+      }
+    }
+
+    // 5. Condition alignment on variant options & base product
+    if (hasConditionFilter) {
+      baseMatch.condition = { in: conditionList };
+      const condClauses = conditionList.map((c) => ({
+        options: { contains: `"condition":"${c}"` },
+      }));
+      if (variantMatch.OR) {
+        const prev = variantMatch.OR;
+        delete variantMatch.OR;
+        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: condClauses }];
+      } else {
+        variantMatch.OR = condClauses;
+      }
+    }
+
+    // 6. Accessory options (connection, power)
+    if (connectionList.length > 0) {
+      const baseConnClauses = connectionList.map((conn) => ({
+        specs: { contains: conn },
+      }));
+      if (baseMatch.OR) {
+        const prevBase = baseMatch.OR;
+        delete baseMatch.OR;
+        baseMatch.AND = [...(baseMatch.AND || []), { OR: prevBase }, { OR: baseConnClauses }];
+      } else {
+        baseMatch.OR = baseConnClauses;
+      }
+
+      const connClauses = connectionList.map((conn) => ({
+        OR: [
+          { options: { contains: `"connection":"${conn}"` } },
+          { options: { contains: `"Kết nối":"${conn}"` } },
+          { options: { contains: conn } },
+        ],
+      }));
+      if (variantMatch.OR) {
+        const prev = variantMatch.OR;
+        delete variantMatch.OR;
+        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: connClauses }];
+      } else {
+        variantMatch.OR = connClauses;
+      }
+    }
+
+    if (powerList.length > 0) {
+      const basePowerClauses = powerList.map((p) => ({
+        specs: { contains: p },
+      }));
+      if (baseMatch.OR) {
+        const prevBase = baseMatch.OR;
+        delete baseMatch.OR;
+        baseMatch.AND = [...(baseMatch.AND || []), { OR: prevBase }, { OR: basePowerClauses }];
+      } else {
+        baseMatch.OR = basePowerClauses;
+      }
+
+      const powerClauses = powerList.map((p) => ({
+        OR: [
+          { options: { contains: `"power":"${p}"` } },
+          { options: { contains: `"Công suất":"${p}"` } },
+          { options: { contains: p } },
+        ],
+      }));
+      if (variantMatch.OR) {
+        const prev = variantMatch.OR;
+        delete variantMatch.OR;
+        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: powerClauses }];
+      } else {
+        variantMatch.OR = powerClauses;
+      }
+    }
+
     andConditions.push({
       OR: [
-        { gpuSeries: { in: gpuList } },
-        { gpu: { in: gpuList } },
-        { variants: { some: { status: "ACTIVE", gpu: { in: gpuList } } } },
+        // Branch 1: Variant-backed products (evaluated atomically on the SAME active variant)
+        {
+          variants: {
+            some: variantMatch,
+          },
+        },
+        // Branch 2: Legacy products without active variants (evaluated on Product level)
+        {
+          variants: {
+            none: { status: { in: ["ACTIVE", "active"] } },
+          },
+          ...baseMatch,
+        },
       ],
     });
   }

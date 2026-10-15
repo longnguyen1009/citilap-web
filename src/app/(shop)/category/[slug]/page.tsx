@@ -105,6 +105,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     condition: getStringOrArray(sp.condition),
     accessoryType: typeParam,
     type: typeParam,
+    connection: getStringOrArray(sp.connection),
+    power: getStringOrArray(sp.power),
     minPrice,
     maxPrice,
     cpu: getStringOrArray(sp.cpu),

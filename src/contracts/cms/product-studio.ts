@@ -197,7 +197,7 @@ export const productDocumentSchema = z.object({
   // Prevent duplicate variant options/spec combinations
   const variantCombinations = d.variants.map(v => {
     const optSorted = Object.entries(v.options || {}).sort(([a], [b]) => a.localeCompare(b)).map(([k, val]) => `${k}:${val}`).join('|');
-    return `${v.condition}_${v.ram || ''}_${v.storage || ''}_${v.gpu || ''}_${optPairs(v.options)}`;
+    return `${v.condition}_${v.ram || ''}_${v.storage || ''}_${v.gpu || ''}_${optSorted}`;
   });
   if (new Set(variantCombinations).size !== variantCombinations.length) {
     issue('Hai biến thể không được có cùng tổ hợp cấu hình và tùy chọn.');
@@ -218,14 +218,6 @@ export const productDocumentSchema = z.object({
     issue('Giá sau bảo hành không được âm.');
   }
 });
-
-function optPairs(options?: Record<string, string>): string {
-  if (!options) return '';
-  return Object.entries(options)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${k}:${v}`)
-    .join(';');
-}
 
 export type ProductDocument = z.infer<typeof productDocumentSchema>;
 

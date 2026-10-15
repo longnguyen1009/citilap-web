@@ -32,12 +32,15 @@ const categoryIconMap: Record<string, React.ElementType> = {
   "linh-kien": Cpu,
 };
 
+import type { PublicStorefrontSettings } from "@/contracts/cms/settings";
+
 interface MobileBottomNavProps {
   categories?: CategorySummary[];
   navigation?: ResolvedNavigation | null;
+  settings?: PublicStorefrontSettings | null;
 }
 
-export default function MobileBottomNav({ categories = [], navigation }: MobileBottomNavProps) {
+export default function MobileBottomNav({ categories = [], navigation, settings }: MobileBottomNavProps) {
   const pathname = usePathname();
   const { cartCount } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -314,7 +317,7 @@ export default function MobileBottomNav({ categories = [], navigation }: MobileB
             {/* Bottom Support Call */}
             <div className="p-4 border-t border-border-default bg-surface-subtle">
               <div className="text-caption text-text-muted text-center">
-                Hotline tư vấn: <span className="font-bold text-brand-primary">0987.654.321</span>
+                Hotline tư vấn: <span className="font-bold text-brand-primary">{settings?.storePhone || "0987.654.321"}</span>
               </div>
             </div>
           </div>

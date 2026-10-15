@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireAdminMutation } from '@/lib/auth';
-import { getOrderById, updateOrderStatus, validateOrderConfirmationToken } from '@/server/services/order.service';
+import {
+  getOrderById,
+  transitionOrderStatus,
+  addOrderInternalNote,
+  validateOrderConfirmationToken,
+  OrderConflictError,
+  OrderStatus,
+} from '@/server/services/order.service';
 
 export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
   try {
@@ -31,7 +38,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
         );
       }
 
-      // Return sanitized order data for customer (masking sensitive parts)
+      // Return sanitized order data for customer (masking sensitive parts, completely excluding internal notes and audit events)
       const sanitizedPhone = order.customerPhone.length > 4
         ? order.customerPhone.slice(0, 3) + '****' + order.customerPhone.slice(-3)
         : '***';
@@ -50,16 +57,25 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
           subtotalAmount: order.subtotalAmount,
           shippingFee: order.shippingFee,
           totalAmount: order.totalAmount,
-          items: order.items.map((item) => ({
-            id: item.id,
-            productId: item.productId,
-            productName: item.productNameSnapshot || item.productName,
-            sku: item.skuSnapshot || item.sku,
-            price: item.priceSnapshot || item.price,
-            quantity: item.quantity,
-            lineTotal: item.lineTotal,
-            image: item.product ? (Array.isArray(JSON.parse(item.product.images || '[]')) ? JSON.parse(item.product.images || '[]')[0] : '') : '',
-          })),
+          items: order.items.map((item) => {
+            let image = '';
+            try {
+              const parsedImages = JSON.parse(item.product?.images || '[]');
+              image = Array.isArray(parsedImages) ? parsedImages[0] : '';
+            } catch {
+              image = '';
+            }
+            return {
+              id: item.id,
+              productId: item.productId,
+              productName: item.productNameSnapshot || item.productName,
+              sku: item.skuSnapshot || item.sku,
+              price: item.priceSnapshot || item.price,
+              quantity: item.quantity,
+              lineTotal: item.lineTotal,
+              image,
+            };
+          }),
         },
       },
       {
@@ -69,7 +85,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
       });
     }
 
-    // Admin view has full access
+    // Admin view has full access (including events, internalNotes, revision)
     return NextResponse.json(
       { success: true, data: order },
       {
@@ -96,30 +112,100 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
       return NextResponse.json({ success: false, error: 'Invalid request body' }, { status: 400 });
     }
 
-    const rawStatus = String(data.status || '').trim();
-    let status: 'PENDING' | 'COMPLETED';
+    // Handle internal note addition shortcut (server enforces SHARED_ADMIN_ACTOR)
+    if (data.action === 'ADD_NOTE' && typeof data.content === 'string') {
+      const note = await addOrderInternalNote(params.id, data.content);
+      return NextResponse.json({ success: true, data: note });
+    }
 
-    if (rawStatus === 'COMPLETED' || rawStatus === 'Đã hoàn thành') {
-      status = 'COMPLETED';
-    } else if (rawStatus === 'PENDING' || rawStatus === 'Chờ xác nhận' || rawStatus === 'Đang xử lý') {
-      status = 'PENDING';
-    } else {
+    // Enforce valid integer expectedRevision for all state transitions (non-negative integer >= 0)
+    if (typeof data.expectedRevision !== 'number' || !Number.isInteger(data.expectedRevision) || data.expectedRevision < 0) {
       return NextResponse.json(
-        { success: false, error: 'Trạng thái đơn hàng không hợp lệ. Chỉ chấp nhận PENDING hoặc COMPLETED.' },
+        {
+          success: false,
+          error: {
+            code: 'INVALID_REVISION',
+            message: 'expectedRevision là bắt buộc và phải là số nguyên không âm hợp lệ',
+          },
+        },
         { status: 400 }
       );
     }
 
-    const updated = await updateOrderStatus(params.id, status);
+    const rawStatus = String(data.status || '').trim().toUpperCase();
+    let targetStatus: OrderStatus;
+
+    if (rawStatus === 'COMPLETED' || rawStatus === 'ĐÃ HOÀN THÀNH') {
+      targetStatus = 'COMPLETED';
+    } else if (rawStatus === 'NEW' || rawStatus === 'PENDING' || rawStatus === 'CHỜ XÁC NHẬN' || rawStatus === 'ĐANG XỬ LÝ') {
+      targetStatus = 'NEW';
+    } else if (rawStatus === 'CONTACTED' || rawStatus === 'ĐÃ LIÊN HỆ') {
+      targetStatus = 'CONTACTED';
+    } else if (rawStatus === 'CONFIRMED' || rawStatus === 'ĐÃ XÁC NHẬN') {
+      targetStatus = 'CONFIRMED';
+    } else if (rawStatus === 'CANCELLED' || rawStatus === 'ĐÃ HỦY') {
+      targetStatus = 'CANCELLED';
+    } else {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_STATUS',
+            message: `Trạng thái không hợp lệ: "${rawStatus}". Chấp nhận: NEW, CONTACTED, CONFIRMED, COMPLETED, CANCELLED.`,
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    const updated = await transitionOrderStatus({
+      orderId: params.id,
+      targetStatus,
+      expectedRevision: data.expectedRevision,
+      reason: typeof data.reason === 'string' ? data.reason : null,
+      note: typeof data.note === 'string' ? data.note : null,
+    });
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    if (err?.message === 'ORDER_NOT_FOUND') {
+    if (error instanceof OrderConflictError) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'CONFLICT_REVISION_MISMATCH',
+            message: error.message,
+            currentRevision: error.currentRevision,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
+    const err = error as { code?: string; message?: string };
+    const code = err?.code || '';
+    const message = err?.message || 'Failed to update order';
+
+    if (code === 'SAME_STATUS_NOOP') {
+      return NextResponse.json(
+        { success: false, error: { code, message: 'Đơn hàng đã ở trạng thái này' } },
+        { status: 400 }
+      );
+    }
+
+    if (code === 'INVALID_TRANSITION' || code === 'REASON_REQUIRED' || code === 'INVALID_REVISION') {
+      return NextResponse.json(
+        { success: false, error: { code, message } },
+        { status: 400 }
+      );
+    }
+
+    if (message === 'ORDER_NOT_FOUND') {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
-    console.error('Failed to update order:', error);
-    return NextResponse.json({ success: false, error: 'Failed to update order' }, { status: 500 });
+
+    console.error('Failed to update order status:', error);
+    return NextResponse.json({ success: false, error: { message } }, { status: 500 });
   }
 }
 

@@ -51,7 +51,10 @@ export default async function CollectionPage({ params }: PageProps) {
                 name: product.name,
                 price: product.price,
                 originalPrice: product.originalPrice,
-                image: product.images.length ? getProductImageUrl(product.images[0], product.images[0]) : null,
+                discount: product.discount,
+                condition: product.condition || 'NEW',
+                image: product.image || product.primaryImage || null,
+                specs: product.specs || {},
               }} />
             ))}
           </div>

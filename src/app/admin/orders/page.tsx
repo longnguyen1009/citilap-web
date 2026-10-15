@@ -1,13 +1,16 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Download,
   Search,
   RefreshCw,
   Eye,
-  CheckCircle2,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   PageHeader,
@@ -39,30 +42,83 @@ type Order = {
   customerEmail?: string | null;
   shippingAddress?: string | null;
   items: OrderItemSummary[];
+  _count?: {
+    events: number;
+    internalNotes: number;
+  };
 };
 
-export default function OrdersPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
+function OrdersContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Read initial filter values from URL search params
+  const initialSearch = searchParams.get("search") || "";
+  const initialStatus = searchParams.get("status") || "ALL";
+  const initialStartDate = searchParams.get("startDate") || "";
+  const initialEndDate = searchParams.get("endDate") || "";
+  const initialPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [startDate, setStartDate] = useState(initialStartDate);
+  const [endDate, setEndDate] = useState(initialEndDate);
+  const [page, setPage] = useState(initialPage);
+
   const [orders, setOrders] = useState<Order[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // Sync state changes into URL query params
+  const updateUrlParams = useCallback(
+    (newSearch: string, newStatus: string, newStart: string, newEnd: string, newPage: number) => {
+      const params = new URLSearchParams();
+      if (newSearch.trim()) params.set("search", newSearch.trim());
+      if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
+      if (newStart) params.set("startDate", newStart);
+      if (newEnd) params.set("endDate", newEnd);
+      if (newPage > 1) params.set("page", String(newPage));
+
+      const queryStr = params.toString();
+      const targetUrl = queryStr ? `${pathname}?${queryStr}` : pathname;
+      router.replace(targetUrl, { scroll: false });
+    },
+    [pathname, router]
+  );
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     const query = new URLSearchParams();
     if (searchTerm.trim()) query.set("search", searchTerm.trim());
     if (statusFilter && statusFilter !== "ALL") query.set("status", statusFilter);
+    if (startDate) query.set("startDate", startDate);
+    if (endDate) query.set("endDate", endDate);
+    query.set("page", String(page));
+    query.set("limit", "25");
 
     try {
-      const res = await fetch(`/api/orders?${query}`, { credentials: "same-origin" });
+      const res = await fetch(`/api/orders?${query.toString()}`, {
+        credentials: "same-origin",
+        headers: { "Cache-Control": "no-cache" },
+      });
       const result = await res.json();
       if (result.success && Array.isArray(result.data)) {
         setOrders(result.data);
+        if (result.pagination) {
+          setTotal(result.pagination.total);
+          setTotalPages(result.pagination.totalPages);
+        }
+      } else {
+        setFeedback({
+          type: "error",
+          message: result?.error?.message || "Không thể tải danh sách đơn hàng.",
+        });
       }
     } catch {
       setFeedback({
@@ -72,88 +128,25 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, startDate, endDate, page]);
 
   useEffect(() => {
-    let canceled = false;
     const timer = setTimeout(() => {
-      if (!canceled) {
-        void fetchOrders();
-      }
+      fetchOrders();
+      updateUrlParams(searchTerm, statusFilter, startDate, endDate, page);
     }, 250);
 
-    return () => {
-      canceled = true;
-      clearTimeout(timer);
-    };
-  }, [fetchOrders]);
+    return () => clearTimeout(timer);
+  }, [fetchOrders, updateUrlParams, searchTerm, statusFilter, startDate, endDate, page]);
 
-  const handleMarkComplete = async (orderId: string) => {
-    if (updatingId) return;
-    setUpdatingId(orderId);
-    setFeedback(null);
+  const handleExport = () => {
+    const query = new URLSearchParams();
+    if (searchTerm.trim()) query.set("search", searchTerm.trim());
+    if (statusFilter && statusFilter !== "ALL") query.set("status", statusFilter);
+    if (startDate) query.set("startDate", startDate);
+    if (endDate) query.set("endDate", endDate);
 
-    try {
-      const response = await fetch(`/api/orders/${orderId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ status: "COMPLETED" }),
-      });
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setOrders((prev) =>
-          prev.map((o) =>
-            o.id === orderId
-              ? { ...o, status: "COMPLETED", completedAt: new Date().toISOString() }
-              : o
-          )
-        );
-        setFeedback({
-          type: "success",
-          message: `Đã cập nhật trạng thái đơn hàng #${orderId.slice(0, 8)} sang hoàn thành.`,
-        });
-      } else {
-        setFeedback({
-          type: "error",
-          message: data?.error || "Không thể cập nhật trạng thái đơn hàng.",
-        });
-      }
-    } catch {
-      setFeedback({
-        type: "error",
-        message: "Lỗi kết nối khi cập nhật đơn hàng.",
-      });
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const exportOrders = () => {
-    const csv = [
-      "Mã đơn,Mã hệ thống,Khách hàng,Số điện thoại,Ngày đặt,Số lượng SP,Tổng tiền,Trạng thái",
-      ...orders.map((o) =>
-        [
-          o.orderNumber || o.id,
-          o.id,
-          o.customerName,
-          o.customerPhone,
-          new Date(o.createdAt).toLocaleString("vi-VN"),
-          o.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
-          o.totalAmount,
-          o.status,
-        ]
-          .map((val) => `"${String(val).replaceAll('"', '""')}"`)
-          .join(",")
-      ),
-    ].join("\n");
-
-    const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `citilap-don-hang-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    window.open(`/api/admin/orders/export?${query.toString()}`, "_blank");
   };
 
   return (
@@ -161,28 +154,24 @@ export default function OrdersPage() {
       {/* 1. Page Header */}
       <PageHeader
         title="Quản lý Đơn hàng"
-        description="Tiếp nhận yêu cầu mua hàng từ khách hàng, theo dõi tiến độ tư vấn và cập nhật trạng thái xử lý."
+        description="Tiếp nhận yêu cầu mua hàng, theo dõi tiến độ tư vấn và lịch sử trạng thái theo thời gian thực."
         breadcrumbs={[{ label: "Bán hàng" }, { label: "Đơn hàng" }]}
         actions={
           <AdminButton
             type="button"
             variant="secondary"
             size="sm"
-            onClick={exportOrders}
-            disabled={orders.length === 0}
+            onClick={handleExport}
+            disabled={loading || total === 0}
             icon={<Download className="w-4 h-4" aria-hidden="true" />}
           >
-            Xuất danh sách (CSV)
+            Xuất danh sách ({total} đơn)
           </AdminButton>
         }
       />
 
-      {/* Inline Feedback Banner if present */}
       {feedback && (
-        <InlineAlert
-          variant={feedback.type}
-          onClose={() => setFeedback(null)}
-        >
+        <InlineAlert variant={feedback.type} onClose={() => setFeedback(null)}>
           {feedback.message}
         </InlineAlert>
       )}
@@ -190,31 +179,70 @@ export default function OrdersPage() {
       {/* 2. Main Card with Search, Filter & Table */}
       <AdminCard bodyClassName="p-0">
         {/* Filters bar */}
-        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 justify-between bg-slate-50/60">
-          <div className="relative flex-1 max-w-md">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-              <Search className="w-4 h-4" aria-hidden="true" />
+        <div className="p-4 border-b border-slate-200 flex flex-col lg:flex-row gap-3 justify-between bg-slate-50/60">
+          <div className="flex-1 flex flex-col sm:flex-row gap-2.5">
+            <div className="relative flex-1 max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-4 h-4" aria-hidden="true" />
+              </div>
+              <input
+                type="text"
+                placeholder="Tìm theo mã đơn, tên khách, số điện thoại..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg bg-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Tìm theo mã đơn, tên khách, số điện thoại..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-            />
+
+            <div className="flex items-center gap-2">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+                aria-label="Lọc theo trạng thái"
+                className="border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm bg-white font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="NEW">Mới (Chờ tiếp nhận)</option>
+                <option value="CONTACTED">Đã liên hệ tư vấn</option>
+                <option value="CONFIRMED">Đã xác nhận</option>
+                <option value="COMPLETED">Hoàn tất xử lý</option>
+                <option value="CANCELLED">Đã hủy</option>
+              </select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              aria-label="Lọc theo trạng thái"
-              className="border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm bg-white font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="PENDING">Chờ xác nhận (PENDING)</option>
-              <option value="COMPLETED">Đã hoàn thành (COMPLETED)</option>
-            </select>
+          {/* Date range filter & refresh */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1 text-xs text-slate-600 bg-white border border-slate-300 rounded-lg px-2 py-1.5">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPage(1);
+                }}
+                className="text-xs outline-hidden text-slate-700 bg-transparent"
+                title="Từ ngày"
+              />
+              <span className="text-slate-300">-</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPage(1);
+                }}
+                className="text-xs outline-hidden text-slate-700 bg-transparent"
+                title="Đến ngày"
+              />
+            </div>
 
             <button
               type="button"
@@ -235,7 +263,7 @@ export default function OrdersPage() {
                 <th className="py-3 px-4">Mã đơn hàng</th>
                 <th className="py-3 px-4">Khách hàng</th>
                 <th className="py-3 px-4">Ngày đặt</th>
-                <th className="py-3 px-4 text-center">Số lượng</th>
+                <th className="py-3 px-4 text-center">Sản phẩm</th>
                 <th className="py-3 px-4 text-right">Tổng tiền</th>
                 <th className="py-3 px-4 text-center">Trạng thái</th>
                 <th className="py-3 px-4 text-right">Thao tác</th>
@@ -259,10 +287,6 @@ export default function OrdersPage() {
                 orders.map((order) => {
                   const itemCount =
                     order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-                  const isPending =
-                    order.status === "PENDING" ||
-                    order.status === "Chờ xác nhận" ||
-                    order.status === "Đang xử lý";
 
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/70 transition">
@@ -306,23 +330,10 @@ export default function OrdersPage() {
                       </td>
 
                       <td className="py-3.5 px-4 whitespace-nowrap text-right space-x-2">
-                        {isPending && (
-                          <button
-                            type="button"
-                            onClick={() => void handleMarkComplete(order.id)}
-                            disabled={updatingId === order.id}
-                            className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-semibold px-2.5 py-1 rounded text-xs transition disabled:opacity-50 cursor-pointer"
-                            title="Xác nhận đã xử lý hoàn thành đơn hàng"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                            <span>{updatingId === order.id ? "Đang lưu..." : "Hoàn thành"}</span>
-                          </button>
-                        )}
-
                         <Link
                           href={`/admin/orders/${order.id}`}
                           className="inline-flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium text-xs py-1 px-2.5 border border-slate-200 rounded hover:bg-slate-100 transition"
-                          title="Xem chi tiết đơn hàng"
+                          title="Xem chi tiết và xử lý đơn hàng"
                         >
                           <Eye className="w-3.5 h-3.5" aria-hidden="true" />
                           <span>Chi tiết</span>
@@ -335,7 +346,45 @@ export default function OrdersPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Server Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50/60 text-xs text-slate-600">
+            <div>
+              Trang <span className="font-bold text-slate-900">{page}</span> /{" "}
+              <span className="font-bold text-slate-900">{totalPages}</span> (Tổng {total} đơn)
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="p-1.5 border border-slate-300 rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Trang trước"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="p-1.5 border border-slate-300 rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Trang tiếp theo"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </AdminCard>
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400">Đang tải trang đơn hàng...</div>}>
+      <OrdersContent />
+    </Suspense>
   );
 }

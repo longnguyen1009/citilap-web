@@ -15,6 +15,7 @@ import SearchAutocomplete from "@/components/search/SearchAutocomplete";
 import type { CategorySummary, BrandSummary } from "@/server/services/catalog.service";
 import { businessProfile } from "@/config/business-profile";
 import type { ResolvedNavigation } from "@/contracts/cms/navigation";
+import type { PublicStorefrontSettings } from "@/contracts/cms/settings";
 
 const categoryIcons: Record<string, React.ElementType> = {
   "laptop-gaming": Gamepad2,
@@ -56,9 +57,10 @@ export interface HeaderProps {
   categories?: CategorySummary[];
   brands?: BrandSummary[];
   navigation?: ResolvedNavigation | null;
+  settings?: PublicStorefrontSettings | null;
 }
 
-export default function Header({ categories = [], brands = [], navigation }: HeaderProps) {
+export default function Header({ categories = [], brands = [], navigation, settings }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const [hoveredNav, setHoveredNav] = useState<number | null>(null);
@@ -209,11 +211,25 @@ export default function Header({ categories = [], brands = [], navigation }: Hea
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <Monitor className="w-8 h-8 sm:w-10 sm:h-10 text-blue-400" />
-            <div className="flex flex-col">
-              <span className="text-xl sm:text-2xl font-black leading-none tracking-wider text-white">CITILAP.VN</span>
-              <span className="text-[8px] sm:text-[9px] tracking-[0.2em] text-blue-400 font-medium uppercase mt-0.5 sm:mt-1 hidden sm:block">Một chữ tín - Vạn niềm tin</span>
-            </div>
+            {settings?.logoUrl ? (
+              <img
+                src={settings.logoUrl}
+                alt={settings.storeName || "CitiLap"}
+                className="h-8 sm:h-10 w-auto max-w-[160px] object-contain rounded"
+              />
+            ) : (
+              <>
+                <Monitor className="w-8 h-8 sm:w-10 sm:h-10 text-blue-400" />
+                <div className="flex flex-col">
+                  <span className="text-xl sm:text-2xl font-black leading-none tracking-wider text-white">
+                    {settings?.storeName || "CITILAP.VN"}
+                  </span>
+                  <span className="text-[8px] sm:text-[9px] tracking-[0.2em] text-blue-400 font-medium uppercase mt-0.5 sm:mt-1 hidden sm:block">
+                    {settings?.motto || "Một chữ tín - Vạn niềm tin"}
+                  </span>
+                </div>
+              </>
+            )}
           </Link>
 
           {/* Danh mục & Search */}
@@ -370,14 +386,14 @@ export default function Header({ categories = [], brands = [], navigation }: Hea
           {/* Action Links */}
           <div className="hidden lg:flex items-center gap-8 ml-4">
             <a
-              href={businessProfile.telHref}
+              href={settings?.storePhone ? `tel:${settings.storePhone.replace(/\s+/g, "")}` : businessProfile.telHref}
               className="flex items-center gap-2 hover:text-blue-400 transition"
-              title={`Gọi Hotline tư vấn ${businessProfile.displayPhone}`}
+              title={`Gọi Hotline tư vấn ${settings?.storePhone || businessProfile.displayPhone}`}
             >
               <PhoneCall className="w-5 h-5 text-gray-300" />
               <div className="flex flex-col">
                 <span className="text-[11px] text-gray-400">Hotline</span>
-                <span className="text-sm font-bold">{businessProfile.displayPhone}</span>
+                <span className="text-sm font-bold">{settings?.storePhone || businessProfile.displayPhone}</span>
               </div>
             </a>
 

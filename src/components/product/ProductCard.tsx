@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, ShieldCheck, Laptop, Cpu } from "lucide-react";
+import { Heart, ShieldCheck, Laptop, Cpu, Scale } from "lucide-react";
 import { useWishlist } from "@/context/WishlistContext";
+import { useCompare } from "@/context/CompareContext";
 import { Badge } from "@/components/ui/Badge";
 import { PriceTag } from "@/components/ui/PriceTag";
 import { SpecChip } from "@/components/ui/SpecChip";
@@ -125,7 +126,9 @@ export default function ProductCard({
   className = "",
 }: ProductCardProps) {
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
+  const { isInCompare, addToCompare, removeFromCompare } = useCompare();
   const liked = isInWishlist(product.id);
+  const inCompare = isInCompare(product.id);
   const [imageError, setImageError] = useState(false);
 
   const toggleWishlist = (e: React.MouseEvent) => {
@@ -140,6 +143,26 @@ export default function ProductCard({
         price: typeof product.price === "number" ? `${product.price.toLocaleString("vi-VN")}đ` : product.price,
         image: product.image || "/images/placeholder-laptop.svg",
       });
+    }
+  };
+
+  const toggleCompare = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inCompare) {
+      removeFromCompare(product.id);
+    } else {
+      const res = addToCompare({
+        id: product.id,
+        name: product.name,
+        slug: product.slug || product.id,
+        price: Number(product.price) || 0,
+        image: product.image,
+        kind: product.specs?.cpu ? "LAPTOP" : "ACCESSORY",
+      });
+      if (!res.success && res.message) {
+        alert(res.message);
+      }
     }
   };
 
@@ -190,22 +213,42 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* Wishlist Button (Accessible, not nested inside Link) */}
-        <button
-          type="button"
-          onClick={toggleWishlist}
-          aria-pressed={liked}
-          aria-label={
-            liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
-          }
-          className={`pointer-events-auto w-8 h-8 rounded-pill flex items-center justify-center transition-colors shadow-xs ${
-            liked
-              ? "bg-red-50 text-error border border-red-200"
-              : "bg-white/90 backdrop-blur-xs text-text-muted hover:text-error hover:bg-red-50/80 border border-border-default"
-          }`}
-        >
-          <Heart className="w-4 h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
-        </button>
+        <div className="flex items-center gap-1.5 pointer-events-auto">
+          {/* Compare Button */}
+          <button
+            type="button"
+            onClick={toggleCompare}
+            aria-pressed={inCompare}
+            aria-label={
+              inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
+            }
+            title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
+            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-colors shadow-xs cursor-pointer ${
+              inCompare
+                ? "bg-blue-600 text-white border border-blue-600"
+                : "bg-white/90 backdrop-blur-xs text-text-muted hover:text-blue-600 hover:bg-blue-50/80 border border-border-default"
+            }`}
+          >
+            <Scale className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Wishlist Button (Accessible, not nested inside Link) */}
+          <button
+            type="button"
+            onClick={toggleWishlist}
+            aria-pressed={liked}
+            aria-label={
+              liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
+            }
+            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-colors shadow-xs cursor-pointer ${
+              liked
+                ? "bg-red-50 text-error border border-red-200"
+                : "bg-white/90 backdrop-blur-xs text-text-muted hover:text-error hover:bg-red-50/80 border border-border-default"
+            }`}
+          >
+            <Heart className="w-4 h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
+          </button>
+        </div>
       </div>
 
       {/* Product Image Container */}

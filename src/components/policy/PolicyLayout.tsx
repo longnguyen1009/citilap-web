@@ -62,6 +62,8 @@ interface PolicyLayoutProps {
   currentSlug: string;
   title: string;
   subtitle?: string;
+  isPublished?: boolean;
+  lastUpdated?: string;
   children: React.ReactNode;
 }
 
@@ -69,6 +71,8 @@ export default function PolicyLayout({
   currentSlug,
   title,
   subtitle,
+  isPublished = false,
+  lastUpdated,
   children,
 }: PolicyLayoutProps) {
   return (
@@ -136,18 +140,32 @@ export default function PolicyLayout({
           {/* 3. Main Content Area (8 cols) */}
           <div className="lg:col-span-8">
             <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-10 md:p-12">
-              {/* Draft Status Banner */}
-              <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 md:p-5 mb-8 flex items-start gap-3.5 text-xs text-amber-900 shadow-xs">
-                <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <h3 className="font-bold text-sm text-amber-950">
-                    Bản dự thảo — Đang chờ phê duyệt chính thức
-                  </h3>
-                  <p className="leading-relaxed text-amber-800">
-                    Nội dung dưới đây được biên tập từ thông tin chủ cửa hàng cung cấp và đang trong giai đoạn rà soát nội bộ theo pháp luật hiện hành. Văn bản được đánh dấu không lập chỉ mục công khai (NOINDEX).
-                  </p>
+              {/* Publication Status Banner */}
+              {isPublished ? (
+                <div className="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-4 md:p-5 mb-8 flex items-start gap-3.5 text-xs text-emerald-900 shadow-xs">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-sm text-emerald-950">
+                      Văn bản chính sách chính thức đã ban hành
+                    </h3>
+                    <p className="leading-relaxed text-emerald-800">
+                      Nội dung chính sách được cập nhật và áp dụng chính thức tại hệ thống cửa hàng và website CITILAP.VN.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 md:p-5 mb-8 flex items-start gap-3.5 text-xs text-amber-900 shadow-xs">
+                  <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-sm text-amber-950">
+                      Bản dự thảo — Đang chờ phê duyệt chính thức
+                    </h3>
+                    <p className="leading-relaxed text-amber-800">
+                      Nội dung dưới đây được biên tập từ thông tin chủ cửa hàng cung cấp và đang trong giai đoạn rà soát nội bộ theo pháp luật hiện hành. Văn bản được đánh dấu không lập chỉ mục công khai (NOINDEX).
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Title & Subtitle */}
               <div className="border-b border-gray-100 pb-6 mb-8">
@@ -160,7 +178,7 @@ export default function PolicyLayout({
                   </p>
                 )}
                 <div className="text-[11px] text-gray-400 mt-2">
-                  Cập nhật lần cuối: 09/10/2026 • Đơn vị phụ trách: {businessProfile.brandName}
+                  Cập nhật lần cuối: {lastUpdated || "09/10/2026"} • Đơn vị phụ trách: {businessProfile.brandName}
                 </div>
               </div>
 

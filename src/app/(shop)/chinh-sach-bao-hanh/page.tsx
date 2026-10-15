@@ -1,24 +1,101 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy/PolicyLayout";
 import { businessProfile } from "@/config/business-profile";
+import { mediaEnvironment } from "@/server/media-http";
+import { getSystemPageResolution } from "@/server/services/page.service";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
-export const metadata: Metadata = {
-  title: `Chính sách bảo hành (Dự thảo) | ${businessProfile.brandName}`,
-  description: `Thông tin dự thảo về quy trình và thời hạn bảo hành laptop mới, laptop like-new và linh kiện tại ${businessProfile.brandName}.`,
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const env = await mediaEnvironment();
+    const resolution = await getSystemPageResolution(env.DB, "WARRANTY");
+    if (resolution.state === "PUBLISHED") {
+      const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
+      const description = resolution.page.seo.description || `Quy định về bảo hành laptop tại ${businessProfile.brandName}.`;
+      return {
+        title,
+        description,
+        openGraph: {
+          title,
+          description,
+          type: "article",
+          publishedTime: resolution.page.publishedAt,
+          modifiedTime: resolution.page.updatedAt,
+          images: resolution.page.seo.ogImageUrl ? [{ url: resolution.page.seo.ogImageUrl }] : undefined,
+        },
+        alternates: {
+          canonical: `${businessProfile.canonicalSiteUrl}/chinh-sach-bao-hanh`,
+        },
+      };
+    }
+  } catch {
+    // Infrastructure error or uninitialized DB: fallback to static metadata
+  }
 
-export default function WarrantyPolicyPage() {
+  return {
+    title: `Chính sách bảo hành sản phẩm | ${businessProfile.brandName}`,
+    description: `Thông tin quy định về thời hạn, điều kiện tiếp nhận và quy trình bảo hành laptop tại ${businessProfile.brandName}.`,
+    robots: {
+      index: true,
+      follow: true,
+    },
+  };
+}
+
+export default async function WarrantyPolicyPage() {
   const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
 
+  // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors as static content)
+  const env = await mediaEnvironment();
+  const resolution = await getSystemPageResolution(env.DB, "WARRANTY");
+
+  // State C: Published CMS content
+  if (resolution.state === "PUBLISHED") {
+    const cmsPage = resolution.page;
+    return (
+      <PolicyLayout
+        currentSlug="chinh-sach-bao-hanh"
+        title={cmsPage.title}
+        subtitle={cmsPage.seo.description || undefined}
+        isPublished={true}
+        lastUpdated={new Date(cmsPage.updatedAt).toLocaleDateString("vi-VN")}
+      >
+        <div
+          className="prose prose-sm sm:prose-base max-w-none text-slate-700 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(cmsPage.contentHtml) }}
+        />
+      </PolicyLayout>
+    );
+  }
+
+  // State D: Intentionally unpublished by operator (Must NOT resurrect legacy hard-coded content)
+  if (resolution.state === "UNPUBLISHED") {
+    return (
+      <PolicyLayout
+        currentSlug="chinh-sach-bao-hanh"
+        title="Chính sách đang cập nhật"
+        subtitle="Nội dung chính sách bảo hành đang được rà soát và cập nhật bởi ban quản trị CitiLap"
+        isPublished={false}
+      >
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-8 text-center text-amber-900 space-y-2">
+          <p className="font-bold text-base">Chính sách bảo hành hiện đang tạm ẩn</p>
+          <p className="text-xs text-amber-700">
+            Nội dung đang được cập nhật để phù hợp với quy định mới. Quý khách vui lòng liên hệ hotline{" "}
+            <strong>{businessProfile.displayPhone}</strong> để được hỗ trợ thông tin chi tiết.
+          </p>
+        </div>
+      </PolicyLayout>
+    );
+  }
+
+  // State A (NO_CMS_RECORD) & State B (DRAFT_ONLY):
+  // Transitional fallback to verified legacy policy until official CMS version is published.
   return (
     <PolicyLayout
       currentSlug="chinh-sach-bao-hanh"
       title="Chính sách bảo hành sản phẩm"
       subtitle="Quy định về thời hạn, điều kiện tiếp nhận và quy trình bảo hành laptop tại CitiLap"
+      isPublished={false}
     >
       <section className="space-y-6">
         <div>

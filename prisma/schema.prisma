@@ -228,7 +228,8 @@ model Order {
   payloadHash     String?
   userId          String?
   user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  status          String      @default("PENDING") // PENDING, COMPLETED
+  status          String      @default("NEW") // Stable status codes: NEW, CONTACTED, CONFIRMED, COMPLETED, CANCELLED
+  revision        Int         @default(0) // Concurrency CAS version
   subtotalAmount  Int         @default(0) // Integer VND
   shippingFee     Int         @default(0) // Integer VND
   discountAmount  Int         @default(0) // Integer VND
@@ -243,6 +244,8 @@ model Order {
   paymentStatus   String      @default("PENDING")
   confirmationTokenHash String?
   items           OrderItem[]
+  events          OrderEvent[]
+  internalNotes   OrderNote[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   completedAt     DateTime?
@@ -276,6 +279,34 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@index([serialUnitId])
+}
+
+model OrderEvent {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  action     String   // CREATED, STATUS_CHANGE, NOTE_ADDED, CANCELLED, REOPENED
+  fromStatus String?
+  toStatus   String?
+  reason     String?
+  note       String?
+  actor      String   @default("Hệ thống")
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+model OrderNote {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  content   String
+  actor     String   @default("Nhân viên vận hành")
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 model Warehouse {
@@ -416,8 +447,44 @@ model ContactSubmission {
   ipHash    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  internalNote String?
+  handledAt DateTime?
+  handledBy String?
+  revision  Int      @default(1)
+  startedProcessingAt DateTime?
+  events    ContactEvent[]
 
   @@index([status])
+  @@index([createdAt])
+}
+
+model ContactEvent {
+  id         String            @id @default(cuid())
+  contactId  String
+  contact    ContactSubmission @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  action     String            // STATUS_CHANGE, NOTE_ADDED
+  fromStatus String?
+  toStatus   String?
+  note       String?
+  actor      String            @default("Admin vận hành (Phiên dùng chung)")
+  createdAt  DateTime          @default(now())
+
+  @@index([contactId])
+  @@index([createdAt])
+}
+
+model AdminNotification {
+  id          String    @id @default(cuid())
+  type        String    // NEW_ORDER, ORDER_STATUS_CHANGED, NEW_CONTACT
+  referenceId String
+  title       String
+  message     String
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([type, referenceId])
+  @@index([isRead])
   @@index([createdAt])
 }
 
@@ -518,5 +585,133 @@ model SiteSettingsRevision {
   action    String
   actor     String   @default("admin")
   createdAt DateTime @default(now())
+}
+
+
+// R05 content foundation; migration 0014_content_cms.sql.
+// Article categories are independent from product Category by business requirement.
+model PostCategory {
+  revision Int @default(1)
+  id String @id
+  name String
+  slug String @unique
+  sortOrder Int @default(0)
+  status String @default("ACTIVE")
+  createdAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  updatedAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  posts Post[]
+}
+
+// Post identity only; editorial fields (title, excerpt, body, SEO, relatedProductIds...)
+// live in PostStudio.draft/published JSON, same shape as ProductStudio.
+model Post {
+  id String @id
+  slug String @unique
+  categoryId String?
+  category PostCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  updatedAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  deletedAt String?
+  studio PostStudio?
+}
+
+model PostStudio {
+  publishedRevision Int?
+  publishedAt String?
+  publicUpdatedAt String?
+  postId String @id
+  post Post @relation(fields: [postId], references: [id], onDelete: Restrict)
+  revision Int @default(0)
+  draft String
+  published String?
+  updatedAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  revisions PostStudioRevision[]
+}
+
+model PostStudioRevision {
+  postId String
+  studio PostStudio @relation(fields: [postId], references: [postId], onDelete: Restrict)
+  revision Int
+  document String
+  action String
+  actor String @default("admin")
+  createdAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  @@id([postId, revision])
+}
+
+// Static/system pages (warranty, returns, shipping, about, stores...).
+model Page {
+  id String @id
+  slug String @unique
+  pageType String?
+  createdAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  updatedAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  deletedAt String?
+  studio PageStudio?
+}
+
+model PageStudio {
+  publishedRevision Int?
+  publishedAt String?
+  publicUpdatedAt String?
+  pageId String @id
+  page Page @relation(fields: [pageId], references: [id], onDelete: Restrict)
+  revision Int @default(0)
+  draft String
+  published String?
+  updatedAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  revisions PageStudioRevision[]
+}
+
+model PageStudioRevision {
+  pageId String
+  studio PageStudio @relation(fields: [pageId], references: [pageId], onDelete: Restrict)
+  revision Int
+  document String
+  action String
+  actor String @default("admin")
+  createdAt String @default(dbgenerated("CURRENT_TIMESTAMP"))
+  @@id([pageId, revision])
+}
+
+// R07A Site Builder: Structured Page Builder for Homepage and Landing Pages.
+model LandingPage {
+  id        String   @id
+  slug      String
+  isHome    Int      @default(0)
+  name      String
+  status    String   @default("DRAFT")
+  createdAt String   @default(dbgenerated("CURRENT_TIMESTAMP"))
+  updatedAt String   @default(dbgenerated("CURRENT_TIMESTAMP"))
+  deletedAt String?
+  studio    LandingPageStudio?
+
+  @@index([status])
+  @@index([isHome])
+}
+
+model LandingPageStudio {
+  pageId            String      @id
+  page              LandingPage @relation(fields: [pageId], references: [id], onDelete: Restrict)
+  publishedRevision Int?
+  publishedAt       String?
+  publicUpdatedAt   String?
+  revision          Int         @default(0)
+  draft             String
+  published         String?
+  updatedAt         String      @default(dbgenerated("CURRENT_TIMESTAMP"))
+  revisions         LandingPageRevision[]
+}
+
+model LandingPageRevision {
+  pageId    String
+  studio    LandingPageStudio @relation(fields: [pageId], references: [pageId], onDelete: Restrict)
+  revision  Int
+  document  String
+  action    String
+  actor     String   @default("admin")
+  createdAt String   @default(dbgenerated("CURRENT_TIMESTAMP"))
+
+  @@id([pageId, revision])
 }
 

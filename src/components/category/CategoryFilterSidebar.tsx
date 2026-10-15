@@ -12,6 +12,8 @@ export interface CategoryFilterSidebarProps {
     brands: FacetOption[];
     conditions: FacetOption[];
     accessoryTypes?: FacetOption[];
+    connections?: FacetOption[];
+    powers?: FacetOption[];
     cpuSeries: FacetOption[];
     gpuSeries: FacetOption[];
     ramOptions: FacetOption<number>[];
@@ -36,14 +38,21 @@ export default function CategoryFilterSidebar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  const isAccessory = categorySlug === "linh-kien";
+  const isAccessory =
+    categorySlug === "linh-kien" ||
+    categorySlug === "chuot" ||
+    categorySlug === "cu-sac" ||
+    categorySlug === "phu-kien" ||
+    Boolean(facets.connections && facets.connections.length > 0) ||
+    Boolean(facets.powers && facets.powers.length > 0);
   const currentPricePresets = isAccessory ? ACCESSORY_PRICE_PRESETS : LAPTOP_PRICE_PRESETS;
 
   // Current active params
   const activeType = searchParams.get("type") || "";
   const activeCategories = searchParams.getAll("category");
   const activeBrands = searchParams.getAll("brand");
+  const activeConnections = searchParams.getAll("connection");
+  const activePowers = searchParams.getAll("power");
   const activePricePreset = searchParams.get("pricePreset") || "";
   const activeConditions = searchParams.getAll("condition");
   const activeRams = searchParams.getAll("ram").map(Number);
@@ -55,6 +64,8 @@ export default function CategoryFilterSidebar({
     Boolean(activeType) ||
     activeCategories.length > 0 ||
     activeBrands.length > 0 ||
+    activeConnections.length > 0 ||
+    activePowers.length > 0 ||
     Boolean(activePricePreset) ||
     activeConditions.length > 0 ||
     activeRams.length > 0 ||
@@ -218,6 +229,70 @@ export default function CategoryFilterSidebar({
                   {b.count > 0 && (
                     <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
                       ({b.count})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Chuẩn kết nối (Phụ kiện: Chuột, Bàn phím, Tai nghe, Hub...) */}
+      {isAccessory && facets.connections && facets.connections.length > 0 && (
+        <div className="pb-5 border-b border-border-subtle">
+          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
+            Chuẩn kết nối
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {facets.connections.map((c) => {
+              const isSelected = activeConnections.includes(c.value);
+              return (
+                <button
+                  key={c.value}
+                  onClick={() => updateParam("connection", c.value, true)}
+                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                    isSelected
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm"
+                      : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
+                  }`}
+                >
+                  <span>{c.label}</span>
+                  {c.count > 0 && (
+                    <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
+                      ({c.count})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Công suất sạc (Phụ kiện: Sạc, Hub, Cáp...) */}
+      {isAccessory && facets.powers && facets.powers.length > 0 && (
+        <div className="pb-5 border-b border-border-subtle">
+          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
+            Công suất sạc
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {facets.powers.map((p) => {
+              const isSelected = activePowers.includes(p.value);
+              return (
+                <button
+                  key={p.value}
+                  onClick={() => updateParam("power", p.value, true)}
+                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                    isSelected
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm"
+                      : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
+                  }`}
+                >
+                  <span>{p.label}</span>
+                  {p.count > 0 && (
+                    <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
+                      ({p.count})
                     </span>
                   )}
                 </button>

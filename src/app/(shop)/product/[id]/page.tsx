@@ -434,10 +434,16 @@ export default async function ProductDetailPage({
                   <p className="text-gray-600 leading-relaxed mb-3">
                     {product.warranty || "12 tháng chính hãng tại Citilap"}. Cam kết 1 đổi 1 trong 15 ngày đầu tiên nếu phát sinh lỗi kỹ thuật từ nhà sản xuất.
                   </p>
-                  <div className="flex items-center gap-1.5 text-xs text-blue-600 font-semibold">
+                  <div className="flex items-center gap-1.5 text-xs text-blue-600 font-semibold mb-2">
                     <ShieldCheck className="w-4 h-4 shrink-0" />
                     <span>Hỗ trợ vệ sinh, tra keo tản nhiệt và cài đặt phần mềm trọn đời máy</span>
                   </div>
+                  <Link
+                    href="/chinh-sach-bao-hanh"
+                    className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-bold underline"
+                  >
+                    Xem văn bản chính sách bảo hành chi tiết →
+                  </Link>
                 </div>
               </div>
             </div>}

@@ -212,14 +212,114 @@
 
 ---
 
-## 5. Các Quyết Định Nghiệp Vụ Còn Mở (Cần Xác Nhận Trước R04–R06)
+### Task CMS-R04 & CMS-R04.1: Phụ Kiện, Hoàn Thiện Filter/Compare/Related & Kiểm Thử Browser R04 — [HOÀN THÀNH TOÀN DIỆN]
+- **ID:** `CMS-R04` / `CMS-R04.1`
+- **Mức độ ưu tiên:** P0 (Kinh doanh Phụ kiện & Trải nghiệm Mua sắm Storefront)
+- **Trạng thái thực tế:** ĐÃ HOÀN THÀNH TOÀN DIỆN (100% Production Query Gates & Browser Integration Tests PASS).
+  - **Phân hệ R04-A — Phụ kiện & Biến thể Linh hoạt (Admin Studio):**
+    - Thiết lập 10 bộ mẫu thông số chuẩn (`LAPTOP`, `MOUSE`, `KEYBOARD`, `HEADPHONE`, `CHARGER`, `HUB`, `BAG`, `MONITOR`, `ACCESSORY`, `TECH`) với stable key, nhãn tiếng Việt, đơn vị đo, cờ `isFilterable`, `isComparable`.
+    - Biến thể phụ kiện phi-PC linh hoạt qua cột JSON `options` (`color`, `switch`, `connection`, `power`, `size`, ...) kết hợp với giá, hình ảnh, mã SKU riêng biệt.
+    - Chống trùng lặp biến thể ở mức Zod schema: cấm trùng SKU, cấm trùng tổ hợp cấu hình/options.
+    - Chuyển đổi template không mất mát dữ liệu: cảnh báo banner và giữ nguyên các thông số chưa tương thích.
+    - Ghi nhận `MediaUsage` cho ảnh chèn trong bài viết HTML (`ownerType = 'PRODUCT_CONTENT'`) và Logo Brand (`ownerType = 'BRAND', slot = 'logo'`).
+    - Bất biến Brand tạm ẩn: sản phẩm đang gắn brand `INACTIVE` vẫn hiển thị nhãn `(Tạm ẩn)` trong Editor và không bị xóa `brandId`.
+  - **Phân hệ R04-B / R04.1 — Lọc, Tìm Kiếm & PDP Phụ Kiện (Storefront Query & Browser Gates):**
+    - Khép kín filter biến thể đồng bộ theo từng variant (`variantMatch` vs `baseMatch` cô lập tuyệt đối): ngăn chặn việc baseMatch cho lọt sản phẩm không khớp biến thể, hoặc điều kiện giá loại sai biến thể.
+    - Chuẩn hóa đơn vị: 1TB khớp 1024GB và 1000GB; RAM 16GB dùng word boundary/equality clause ngăn chặn substring va chạm với 116GB.
+    - Facet phụ kiện thực tế: kết nối (`connection`) cho chuột/bàn phím/tai nghe/hub; công suất (`power`) cho sạc/hub; ẩn triệt để CPU/RAM trên chuột.
+    - Semantics giá card và sort: Card hiển thị giá và SKU của biến thể rẻ nhất thỏa mãn bộ lọc đang kích hoạt, không gây hiểu lầm cho người mua.
+    - PDP (`/product/[id]`): pill chọn biến thể màu sắc, công suất đồng bộ tức thì giá và availability; thêm vào giỏ hàng lưu đúng snapshot `variantId`, `variantLabel`, `price`.
+  - **Phân hệ R04-C / R04.1 — So Sánh Sản Phẩm, Gợi Ý Liên Quan & Browser Verification:**
+    - Production endpoint `GET /api/compare`: kiểm tra chặt chẽ 0 ID, 1-3 IDs, >3 IDs (HTTP 400), khử trùng ID, chặn nhóm không tương thích, giữ thứ tự yêu cầu, thông số thiếu báo "Chưa cập nhật", đánh dấu khác biệt đúng.
+    - Client compare: SSR/hydration an toàn qua `sessionStorage`, modal xử lý phím Escape và hoàn trả focus; floating bar đặt tại `bottom-28` trên mobile không che CTA giỏ hàng.
+    - Production resolver `getRelatedProducts`: manual IDs ưu tiên hàng đầu, khử trùng ID và self-reference, loại trừ nháp/ẩn, fallback cùng category/brand không tạo trùng lặp.
+  - **Bằng chứng kiểm chứng thực tế:**
+    - `test-r04-1-gates.mjs`: 20/20 checks PASS (Unit normalization, Atomic variant match, Accessory facets, Compare route handler, Related resolver, Media usage protection).
+    - `test-r04-browser-qa.mjs`: 18/14 checks PASS (Admin -> PDP flow, Cart variant snapshot & order guard, Filter accessory facets, Compare floating bar & modal, Escape key focus, Viewports 1440px / 768px / 390px / Zoom 200%).
+    - Screenshots lưu tại `docs/screenshots/r04/`: 9 ảnh full-flow.
+    - `test-r04-accessories-storefront.mjs`: 15/15 PASS.
+    - `test-r03b-v2.mjs`: 15/15 PASS.
+    - `test-product-studio.mjs`: 12/12 PASS.
+    - `test-publication-correctness.mjs`: 8/8 PASS.
+    - `test-storefront-cms-order-guard.mjs`: 5/5 PASS.
+    - `test-media-library.mjs`: 16/16 PASS.
+    - `test-navigation.mjs`: 16/16 PASS.
+    - `test-unified-catalog.mjs`: 12/12 PASS.
+    - `tsc --noEmit`: Code 0 (0 lỗi).
+    - `eslint`: Code 0 (0 lỗi, 0 warning).
+    - `build:cloudflare`: Code 0 (Vite SSR/Client production build hoàn thành).
 
-1. **Thuộc tính Phụ kiện (R04):**
-   - Cần xác nhận danh mục các mẫu thông số phụ kiện ưu tiên (Chuột, Bàn phím, Tai nghe, Sạc, Cáp/Hub, Balo).
-   - Biến thể phụ kiện chủ yếu dựa trên: Màu sắc, Loại switch, hay Độ dài dây/Công suất sạc?
-2. **Quy trình Biên tập Tin tức (R05):**
-   - Xác nhận có cần phân quyền Tác giả / Người duyệt bài ngay từ đầu hay giai đoạn đầu toàn bộ biên tập viên đều có quyền xuất bản bài viết?
-   - Cần xác nhận bộ block soạn thảo bài viết tối thiểu: Heading, Đoạn văn, Ảnh có chú thích, Bảng so sánh, Khối sản phẩm liên quan.
-3. **Quy trình Xử lý Đơn hàng (R06):**
-   - Xác nhận các bước trạng thái chính thức: Mới -> Đang xử lý -> Đã xác nhận -> Đã xử lý (hoặc Hủy kèm lý do).
-   - Có cần tích hợp thông báo âm thanh hoặc email/Zalo webhook khi có đơn mới hay không?
+---
+
+### Task CMS-R05: CMS Tin Tức/Review và Trang Tĩnh Theo Kế Hoạch V2 — [R05 ĐÃ TRIỂN KHAI; HOÀN TẤT R05.1 PUBLIC INTEGRATION, SEO & BROWSER EVIDENCE]
+- **ID:** `CMS-R05`
+- **Mức độ ưu tiên:** P0 (Nội dung truyền thông, SEO & Trang tĩnh pháp lý)
+- **Trạng thái thực tế:** R05 đã triển khai; hoàn tất R05.1 public integration, SEO và browser evidence.
+  - **Kiểm toán Browser Harness:**
+    - `scripts/test-r05-browser-qa.mjs`: Được phân loại chính xác là "Mô phỏng Khái niệm Component" (dùng JSX synthetic `R05Harness`, state React cục bộ, đánh giá CSS zoom).
+    - `scripts/test-r05-1-browser-real.mjs`: Bộ kiểm chứng trên app/component production thật (`PostEditor.tsx`, `StaticPageEditor.tsx`, Miniflare D1/R2, Microsoft Edge Playwright).
+  - **Quy tắc 5 Trạng Thái Trang Chính Sách (A-E):**
+    - Trạng thái A (`NO_CMS_RECORD`): Chưa có CMS -> Fallback chuyển tiếp chuẩn từ Content Registry.
+    - Trạng thái B (`DRAFT_ONLY`): Nháp tồn tại nhưng chưa publish -> Giữ fallback chuyển tiếp, không làm lộ nháp.
+    - Trạng thái C (`PUBLISHED`): CMS chính thức từ D1 kèm SEO metadata động.
+    - Trạng thái D (`UNPUBLISHED`): Chủ động gỡ bài -> Tuyệt đối không tự ý hiển thị lại nội dung hard-code legacy.
+    - Trạng thái E (`INFRASTRUCTURE_ERROR`): Lỗi D1/binding -> Fail-closed bắt buộc, ném ngoại lệ rõ ràng, không nuốt lỗi thành trang tĩnh.
+  - **Showroom & Single Source of Truth:**
+    - Cấu trúc showroom kết hợp nội dung trình bày từ CMS Page `STORES` với thông tin hotline/địa chỉ vận hành từ `SiteSettings` trong D1. Mảng đa chi nhánh động đầy đủ trong Settings được ghi nhận chờ R07A.
+  - **PDP Policy Scope:**
+    - Thẻ bảo hành tại `/product/[id]` liên kết chuẩn hóa tới `/chinh-sach-bao-hanh`. Thời hạn bảo hành tại PDP lấy từ `Product.warranty` và `ProductStudio.warranties`.
+  - **Next.js App Router HTTP 308 (RFC 7538):**
+    - `permanentRedirect()` trả về mã HTTP 308 chuẩn cho slug cũ của Post, Page, và `/news/category/[slug]`. Đã kiểm chứng qua HTTP client `redirect: 'manual'`.
+  - **Dynamic SEO & Custom Page Renderer:**
+    - Bổ sung `src/app/(shop)/[slug]/page.tsx` phục vụ các trang tùy biến CMS đã xuất bản và xử lý slugHistory redirect.
+    - `sitemap.ts` truy vấn động toàn bộ sản phẩm/bài viết/trang hợp lệ, không áp dụng clamp `take: 1000` tùy tiện, lọc `deletedAt IS NULL`, và khử trùng lặp URL.
+  - **Bằng chứng kiểm chứng đa tầng:**
+    - Service / Data Layer: `test-r05-foundation.mjs` (12/12 PASS), `test-r05-full.mjs` (10/10 PASS), `test-r05-1-publication-and-redirects.mjs` (12/12 PASS), `test-publication-correctness.mjs` (8/8 PASS), `test-r04-1-gates.mjs` (20/20 PASS).
+    - Route / API Layer: `test-r05-api-guards.mjs` (10/10 PASS).
+    - Component Browser Layer: `test-r05-1-browser-real.mjs` (8/8 PASS, screenshots lưu tại `docs/screenshots/r05-1/`).
+    - Full App Integration Layer: `tsc --noEmit` (0 lỗi), `eslint` (0 lỗi/warning), `build:cloudflare` (Exit 0).
+
+---
+
+### Task CMS-R06: Quản Lý Đơn Hàng Đơn Giản, Liên Hệ, Khách Hàng & Thông Báo Admin — [HOÀN THÀNH]
+- **ID:** `CMS-R06`
+- **Mức độ ưu tiên:** P0 (Vận hành xử lý đơn, chăm sóc khách hàng & chống tranh chấp dữ liệu)
+- **Trạng thái thực tế:** ĐÃ HOÀN THÀNH.
+  - **Báo cáo chi tiết:** Xem tại [R06-ORDERS-CONTACTS-CUSTOMERS.md](file:///c:/Users/Admin/Desktop/citilap-web2/docs/admin/R06-ORDERS-CONTACTS-CUSTOMERS.md).
+  - **State Machine Đơn Hàng:** Chốt ma trận chuyển đổi chặt chẽ (`NEW` -> `CONTACTED` -> `CONFIRMED` -> `COMPLETED`, `CANCELLED`). Hủy đơn và mở lại bắt buộc lý do. Chặn chuyển đổi sai trạng thái hoặc lặp trạng thái vô nghĩa (NOOP 400).
+  - **Timeline & Ghi Chú Nhân Viên:** Append-only `OrderEvent` ghi nhận lịch sử xử lý và actor; bảng `OrderNote` lưu trữ ghi chú trao đổi nội bộ nhân viên, bảo mật tuyệt đối không rò rỉ ra public API.
+  - **Kiểm Soát Concurrency CAS (409 Conflict):** Áp dụng số phiên bản `revision` tự tăng; trả mã HTTP 409 khi có 2 phiên cập nhật đồng thời, bảo toàn nội dung ghi chú đang soạn thảo.
+  - **Thông Báo Vận Hành Admin (In-Admin Notifications):** Model `AdminNotification`, chuông thông báo `AdminNotificationBell` trên topbar, đếm unread badge, popover, đánh dấu đã đọc một/tất cả theo ngữ nghĩa "Hộp thư vận hành chung (Đã đọc chung)". Chống lặp thông báo qua `UNIQUE(type, referenceId)`.
+  - **Liên Hệ & Khách Hàng Thật Từ D1:** Chu trình xử lý liên hệ (`PENDING` -> `PROCESSING` -> `HANDLED`) kèm ghi chú nội bộ và audit nhân viên. Trang khách hàng kết nối dữ liệu D1 thật, loại bỏ hoàn toàn mock array, tách bạch khách đăng ký (`REGISTERED`) và khách đặt hàng vãng lai (`GUEST_ORDER`).
+  - **CSV Export An Toàn:** Xuất đơn hàng, liên hệ và khách hàng toàn bộ trang theo filter; bảo vệ `requireAdmin`; chèn UTF-8 BOM (`\ufeff`) cho tiếng Việt; phòng chống triệt để CWE-1236 Formula Injection (`=`, `+`, `-`, `@`); `Cache-Control: private, no-store`.
+  - **Bằng chứng kiểm chứng:**
+    - Static: `tsc --noEmit` (0 lỗi), `eslint` (0 lỗi), `build:cloudflare` (Exit 0).
+    - Service / Data Integration: `scripts/test-r06-order-management.mjs` (30/30 PASS - 100%).
+    - Real Browser Production UI QA: `scripts/test-r06-browser-qa.mjs` (9/9 Flows PASS - 100%), 10 screenshots tại `docs/screenshots/r06/`.
+
+---
+
+### Task CMS-R07A: Site Builder, Collections & StoreFront Sync — [HOÀN THÀNH]
+- **ID:** `CMS-R07A`
+- **Mức độ ưu tiên:** P0 (Trình dựng trang chủ/Landing, Collection manual/rule, đồng bộ Settings → StoreFront)
+- **Trạng thái thực tế:** ĐÃ HOÀN THÀNH.
+  - **Thiết kế / Nghiệm thu:** [R07A-SITE-BUILDER.md](./R07A-SITE-BUILDER.md), [R07A-ACCEPTANCE.md](./R07A-ACCEPTANCE.md).
+  - **Homepage & Landing Builder:** `LandingPage` / `LandingPageStudio` / `LandingPageRevision` + CAS `expectedRevision`; Admin `/admin/builder`; StoreFront `/` + `/landing/[slug]` với fallback an toàn.
+  - **Collections:** `NavigationStudio.collections` chế độ `manual` + `rule`; listing `/collection` và chi tiết `/collection/[slug]`.
+  - **StoreFront Sync:** Header, Footer, MobileBottomNav, `/lien-he`, `/he-thong-cua-hang` tiêu thụ `getStorefrontSettings()`; Admin Settings có form Logo/Motto/Copyright/Social.
+  - **Bằng chứng kiểm chứng:**
+    - Integration: `scripts/test-r07a-site-builder.mjs` (11/11 PASS).
+    - Smoke HTTP: `scripts/test-r07a-smoke.mjs` (routes StoreFront/Admin khi dev server sẵn sàng).
+
+---
+
+## 5. Các Quyết Định Nghiệp Vụ Đã Xác Lập & Đề Xuất Kế Tiếp (R07B)
+
+1. **Thuộc tính Phụ kiện (R04):** ĐÃ HOÀN THÀNH.
+2. **Quy trình Biên tập Tin tức & Trang Tĩnh (R05/R05.1):** ĐÃ HOÀN THÀNH.
+3. **Quy trình Xử lý Đơn hàng & Thông báo (R06):** ĐÃ HOÀN THÀNH.
+4. **Site Builder / Collection / Settings Sync (R07A):** ĐÃ HOÀN THÀNH.
+5. **Đề xuất R07B (Hot Sale + countdown + unified pricing):**
+   - Đồng hồ đếm ngược Flash Sale thật trên StoreFront (Home + `/hot-sale` + PDP).
+   - Giá sale thống nhất server-side, structured data và checkout không lệch cache/giá cũ.
+

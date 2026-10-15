@@ -61,19 +61,35 @@ export const ModelName = {
   ProductVersion: 'ProductVersion',
   Order: 'Order',
   OrderItem: 'OrderItem',
+  OrderEvent: 'OrderEvent',
+  OrderNote: 'OrderNote',
   Warehouse: 'Warehouse',
   SerialUnit: 'SerialUnit',
   InventoryBalance: 'InventoryBalance',
   InventoryTransaction: 'InventoryTransaction',
   InventoryReservation: 'InventoryReservation',
   ContactSubmission: 'ContactSubmission',
+  ContactEvent: 'ContactEvent',
+  AdminNotification: 'AdminNotification',
   RateLimitRecord: 'RateLimitRecord',
   NavigationStudio: 'NavigationStudio',
   NavigationRevision: 'NavigationRevision',
   ProductStudio: 'ProductStudio',
   ProductStudioRevision: 'ProductStudioRevision',
   MediaAsset: 'MediaAsset',
-  MediaUsage: 'MediaUsage'
+  MediaUsage: 'MediaUsage',
+  SiteSettings: 'SiteSettings',
+  SiteSettingsRevision: 'SiteSettingsRevision',
+  PostCategory: 'PostCategory',
+  Post: 'Post',
+  PostStudio: 'PostStudio',
+  PostStudioRevision: 'PostStudioRevision',
+  Page: 'Page',
+  PageStudio: 'PageStudio',
+  PageStudioRevision: 'PageStudioRevision',
+  LandingPage: 'LandingPage',
+  LandingPageStudio: 'LandingPageStudio',
+  LandingPageRevision: 'LandingPageRevision'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -111,6 +127,8 @@ export const BrandScalarFieldEnum = {
   slug: 'slug',
   logo: 'logo',
   description: 'description',
+  seoTitle: 'seoTitle',
+  seoDescription: 'seoDescription',
   status: 'status',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
@@ -263,6 +281,7 @@ export const OrderScalarFieldEnum = {
   payloadHash: 'payloadHash',
   userId: 'userId',
   status: 'status',
+  revision: 'revision',
   subtotalAmount: 'subtotalAmount',
   shippingFee: 'shippingFee',
   discountAmount: 'discountAmount',
@@ -304,6 +323,32 @@ export const OrderItemScalarFieldEnum = {
 } as const
 
 export type OrderItemScalarFieldEnum = (typeof OrderItemScalarFieldEnum)[keyof typeof OrderItemScalarFieldEnum]
+
+
+export const OrderEventScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  action: 'action',
+  fromStatus: 'fromStatus',
+  toStatus: 'toStatus',
+  reason: 'reason',
+  note: 'note',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type OrderEventScalarFieldEnum = (typeof OrderEventScalarFieldEnum)[keyof typeof OrderEventScalarFieldEnum]
+
+
+export const OrderNoteScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  content: 'content',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type OrderNoteScalarFieldEnum = (typeof OrderNoteScalarFieldEnum)[keyof typeof OrderNoteScalarFieldEnum]
 
 
 export const WarehouseScalarFieldEnum = {
@@ -404,10 +449,43 @@ export const ContactSubmissionScalarFieldEnum = {
   status: 'status',
   ipHash: 'ipHash',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  internalNote: 'internalNote',
+  handledAt: 'handledAt',
+  handledBy: 'handledBy',
+  revision: 'revision',
+  startedProcessingAt: 'startedProcessingAt'
 } as const
 
 export type ContactSubmissionScalarFieldEnum = (typeof ContactSubmissionScalarFieldEnum)[keyof typeof ContactSubmissionScalarFieldEnum]
+
+
+export const ContactEventScalarFieldEnum = {
+  id: 'id',
+  contactId: 'contactId',
+  action: 'action',
+  fromStatus: 'fromStatus',
+  toStatus: 'toStatus',
+  note: 'note',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type ContactEventScalarFieldEnum = (typeof ContactEventScalarFieldEnum)[keyof typeof ContactEventScalarFieldEnum]
+
+
+export const AdminNotificationScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  referenceId: 'referenceId',
+  title: 'title',
+  message: 'message',
+  isRead: 'isRead',
+  readAt: 'readAt',
+  createdAt: 'createdAt'
+} as const
+
+export type AdminNotificationScalarFieldEnum = (typeof AdminNotificationScalarFieldEnum)[keyof typeof AdminNotificationScalarFieldEnum]
 
 
 export const RateLimitRecordScalarFieldEnum = {
@@ -496,6 +574,157 @@ export const MediaUsageScalarFieldEnum = {
 } as const
 
 export type MediaUsageScalarFieldEnum = (typeof MediaUsageScalarFieldEnum)[keyof typeof MediaUsageScalarFieldEnum]
+
+
+export const SiteSettingsScalarFieldEnum = {
+  id: 'id',
+  revision: 'revision',
+  document: 'document',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SiteSettingsScalarFieldEnum = (typeof SiteSettingsScalarFieldEnum)[keyof typeof SiteSettingsScalarFieldEnum]
+
+
+export const SiteSettingsRevisionScalarFieldEnum = {
+  revision: 'revision',
+  document: 'document',
+  action: 'action',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type SiteSettingsRevisionScalarFieldEnum = (typeof SiteSettingsRevisionScalarFieldEnum)[keyof typeof SiteSettingsRevisionScalarFieldEnum]
+
+
+export const PostCategoryScalarFieldEnum = {
+  revision: 'revision',
+  id: 'id',
+  name: 'name',
+  slug: 'slug',
+  sortOrder: 'sortOrder',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PostCategoryScalarFieldEnum = (typeof PostCategoryScalarFieldEnum)[keyof typeof PostCategoryScalarFieldEnum]
+
+
+export const PostScalarFieldEnum = {
+  id: 'id',
+  slug: 'slug',
+  categoryId: 'categoryId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt'
+} as const
+
+export type PostScalarFieldEnum = (typeof PostScalarFieldEnum)[keyof typeof PostScalarFieldEnum]
+
+
+export const PostStudioScalarFieldEnum = {
+  publishedRevision: 'publishedRevision',
+  publishedAt: 'publishedAt',
+  publicUpdatedAt: 'publicUpdatedAt',
+  postId: 'postId',
+  revision: 'revision',
+  draft: 'draft',
+  published: 'published',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PostStudioScalarFieldEnum = (typeof PostStudioScalarFieldEnum)[keyof typeof PostStudioScalarFieldEnum]
+
+
+export const PostStudioRevisionScalarFieldEnum = {
+  postId: 'postId',
+  revision: 'revision',
+  document: 'document',
+  action: 'action',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type PostStudioRevisionScalarFieldEnum = (typeof PostStudioRevisionScalarFieldEnum)[keyof typeof PostStudioRevisionScalarFieldEnum]
+
+
+export const PageScalarFieldEnum = {
+  id: 'id',
+  slug: 'slug',
+  pageType: 'pageType',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt'
+} as const
+
+export type PageScalarFieldEnum = (typeof PageScalarFieldEnum)[keyof typeof PageScalarFieldEnum]
+
+
+export const PageStudioScalarFieldEnum = {
+  publishedRevision: 'publishedRevision',
+  publishedAt: 'publishedAt',
+  publicUpdatedAt: 'publicUpdatedAt',
+  pageId: 'pageId',
+  revision: 'revision',
+  draft: 'draft',
+  published: 'published',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PageStudioScalarFieldEnum = (typeof PageStudioScalarFieldEnum)[keyof typeof PageStudioScalarFieldEnum]
+
+
+export const PageStudioRevisionScalarFieldEnum = {
+  pageId: 'pageId',
+  revision: 'revision',
+  document: 'document',
+  action: 'action',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type PageStudioRevisionScalarFieldEnum = (typeof PageStudioRevisionScalarFieldEnum)[keyof typeof PageStudioRevisionScalarFieldEnum]
+
+
+export const LandingPageScalarFieldEnum = {
+  id: 'id',
+  slug: 'slug',
+  isHome: 'isHome',
+  name: 'name',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  deletedAt: 'deletedAt'
+} as const
+
+export type LandingPageScalarFieldEnum = (typeof LandingPageScalarFieldEnum)[keyof typeof LandingPageScalarFieldEnum]
+
+
+export const LandingPageStudioScalarFieldEnum = {
+  pageId: 'pageId',
+  publishedRevision: 'publishedRevision',
+  publishedAt: 'publishedAt',
+  publicUpdatedAt: 'publicUpdatedAt',
+  revision: 'revision',
+  draft: 'draft',
+  published: 'published',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LandingPageStudioScalarFieldEnum = (typeof LandingPageStudioScalarFieldEnum)[keyof typeof LandingPageStudioScalarFieldEnum]
+
+
+export const LandingPageRevisionScalarFieldEnum = {
+  pageId: 'pageId',
+  revision: 'revision',
+  document: 'document',
+  action: 'action',
+  actor: 'actor',
+  createdAt: 'createdAt'
+} as const
+
+export type LandingPageRevisionScalarFieldEnum = (typeof LandingPageRevisionScalarFieldEnum)[keyof typeof LandingPageRevisionScalarFieldEnum]
 
 
 export const SortOrder = {

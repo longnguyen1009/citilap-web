@@ -64,7 +64,7 @@ function safeRequire<T>(moduleName: string): T | undefined {
  * 2. Official Cloudflare Workers nodejs_compat env (cloudflare:workers)
  * 3. Worker global env fallback (when passed via runtime context)
  */
-function resolveD1Binding(): D1Database | undefined {
+export function resolveD1Binding(): D1Database | undefined {
   if (explicitlyConfiguredD1) return explicitlyConfiguredD1;
 
   // 1. Official Cloudflare Workers nodejs_compat env access
@@ -75,7 +75,16 @@ function resolveD1Binding(): D1Database | undefined {
   const workerGlobalEnv = (globalThis as unknown as { env?: Env }).env;
   if (workerGlobalEnv?.DB) return workerGlobalEnv.DB;
 
+  // 3. Global binding fallback
+  if ((globalThis as unknown as { DB?: D1Database }).DB) {
+    return (globalThis as unknown as { DB?: D1Database }).DB;
+  }
+
   return undefined;
+}
+
+export function getD1Database(): D1Database | undefined {
+  return resolveD1Binding();
 }
 
 /**

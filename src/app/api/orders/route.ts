@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
-import { createOrder, listOrders, CreateOrderInput } from '@/server/services/order.service';
+import { createOrder, listOrders, CreateOrderInput, toPublicOrderDto } from '@/server/services/order.service';
 import { checkRateLimit, rateLimitExceededResponse, getClientIp } from '@/lib/rate-limiter';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 
@@ -108,13 +108,13 @@ export async function POST(request: Request) {
 
     const result = await createOrder(payload, idempotencyKey);
 
-    const orderObj = result.order as { id: string; orderNumber: string };
+    const publicOrder = toPublicOrderDto(result.order);
     return NextResponse.json(
       {
         success: true,
-        data: result.order,
-        orderId: orderObj.id,
-        orderNumber: orderObj.orderNumber,
+        data: publicOrder,
+        orderId: publicOrder.id,
+        orderNumber: publicOrder.orderNumber,
         confirmationToken: result.confirmationToken,
         isIdempotentReplay: result.isIdempotentReplay || false,
       },

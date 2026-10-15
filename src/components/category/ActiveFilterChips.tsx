@@ -10,6 +10,8 @@ interface ActiveFilterChipsProps {
     categories?: FacetOption[];
     brands: FacetOption[];
     conditions: FacetOption[];
+    connections?: FacetOption[];
+    powers?: FacetOption[];
     cpuSeries: FacetOption[];
     gpuSeries: FacetOption[];
   };
@@ -23,6 +25,8 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
   const activeType = searchParams.get("type");
   const activeCategories = searchParams.getAll("category");
   const activeBrands = searchParams.getAll("brand");
+  const activeConnections = searchParams.getAll("connection");
+  const activePowers = searchParams.getAll("power");
   const activePricePreset = searchParams.get("pricePreset");
   const activeConditions = searchParams.getAll("condition");
   const activeRams = searchParams.getAll("ram");
@@ -49,6 +53,14 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
   activeBrands.forEach((b) => {
     const brandObj = facets.brands.find((item) => item.value === b);
     chips.push({ key: "brand", value: b, label: `Hãng: ${brandObj ? brandObj.label : b}` });
+  });
+
+  activeConnections.forEach((conn) => {
+    chips.push({ key: "connection", value: conn, label: `Kết nối: ${conn}` });
+  });
+
+  activePowers.forEach((pow) => {
+    chips.push({ key: "power", value: pow, label: `Công suất: ${pow}` });
   });
 
   if (activePricePreset) {

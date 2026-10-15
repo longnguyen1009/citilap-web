@@ -17,9 +17,12 @@ import {
   LogOut,
   ExternalLink,
   X,
-  Sparkles,
+  Newspaper,
+  FileText,
+  LayoutTemplate,
 } from "lucide-react";
 import AdminBreadcrumbs, { type BreadcrumbItem } from "@/components/admin/ui/AdminBreadcrumbs";
+import AdminNotificationBell from "@/components/admin/notifications/AdminNotificationBell";
 
 interface NavItem {
   name: string;
@@ -52,7 +55,16 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    groupName: "Nội dung & Hệ thống",
+    groupName: "Giao diện & Nội dung",
+    items: [
+      { name: "Trang chủ & Landing", href: "/admin/builder", icon: LayoutTemplate },
+      { name: "Bài viết / Review", href: "/admin/posts", icon: Newspaper },
+      { name: "Chuyên mục bài viết", href: "/admin/post-categories", icon: FolderTree },
+      { name: "Trang thông tin", href: "/admin/pages", icon: FileText },
+    ],
+  },
+  {
+    groupName: "Hệ thống",
     items: [
       { name: "Danh mục sản phẩm", href: "/admin/categories", icon: FolderTree },
       { name: "Menu & Bộ sưu tập", href: "/admin/navigation", icon: Menu },
@@ -97,6 +109,33 @@ function getBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
   }
   if (pathname === "/admin/navigation") {
     return [{ label: "Nội dung" }, { label: "Menu & Bộ sưu tập" }];
+  }
+  if (pathname === "/admin/builder") {
+    return [{ label: "Giao diện" }, { label: "Trang chủ & Landing" }];
+  }
+  if (pathname.startsWith("/admin/builder/")) {
+    return [{ label: "Trang chủ & Landing", href: "/admin/builder" }, { label: "Biên tập giao diện" }];
+  }
+  if (pathname === "/admin/posts") {
+    return [{ label: "Tin tức & Review" }, { label: "Danh sách bài viết" }];
+  }
+  if (pathname === "/admin/posts/new") {
+    return [{ label: "Bài viết", href: "/admin/posts" }, { label: "Viết bài mới" }];
+  }
+  if (pathname.startsWith("/admin/posts/")) {
+    return [{ label: "Bài viết", href: "/admin/posts" }, { label: "Biên tập bài viết" }];
+  }
+  if (pathname === "/admin/post-categories") {
+    return [{ label: "Tin tức & Review" }, { label: "Chuyên mục bài viết" }];
+  }
+  if (pathname === "/admin/pages") {
+    return [{ label: "Trang tĩnh" }, { label: "Danh sách trang thông tin" }];
+  }
+  if (pathname === "/admin/pages/new") {
+    return [{ label: "Trang thông tin", href: "/admin/pages" }, { label: "Tạo trang mới" }];
+  }
+  if (pathname.startsWith("/admin/pages/")) {
+    return [{ label: "Trang thông tin", href: "/admin/pages" }, { label: "Biên tập trang" }];
   }
   if (pathname === "/admin/settings") {
     return [{ label: "Hệ thống" }, { label: "Cài đặt hệ thống" }];
@@ -317,8 +356,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
 
-          {/* Right actions: Quick Storefront link & User info */}
+          {/* Right actions: Notifications, Quick Storefront link & User info */}
           <div className="flex items-center gap-2.5 shrink-0">
+            <AdminNotificationBell />
+
             <Link
               href="/"
               target="_blank"

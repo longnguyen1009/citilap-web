@@ -12,10 +12,34 @@ import {
 } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
 import type { ResolvedNavigation } from "@/contracts/cms/navigation";
+import type { PublicStorefrontSettings } from "@/contracts/cms/settings";
 
-export default function Footer({ navigation }: { navigation?: ResolvedNavigation | null }) {
+export default function Footer({
+  navigation,
+  settings,
+}: {
+  navigation?: ResolvedNavigation | null;
+  settings?: PublicStorefrontSettings | null;
+}) {
   const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
   const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
+
+  const brandName = settings?.storeName || businessProfile.brandName;
+  const motto = settings?.motto || businessProfile.traditionalMotto;
+  const phone = settings?.storePhone || businessProfile.displayPhone;
+  const telHref = settings?.storePhone ? `tel:${settings.storePhone.replace(/\s+/g, "")}` : businessProfile.telHref;
+  const email = settings?.storeEmail || businessProfile.email;
+  const hours = settings?.openingHours || "T2 - T7: 09:00 - 20:00 (Chủ nhật: Theo lịch hẹn trước)";
+  const copyright = settings?.copyrightText || `© 2024 - ${new Date().getFullYear()} ${brandName}. ${businessProfile.primaryTagline}. Tất cả quyền được bảo lưu.`;
+
+  const fb = settings ? settings.facebookUrl : businessProfile.socialProfiles.facebook;
+  const tiktok = settings ? settings.tiktokUrl : businessProfile.socialProfiles.tiktok;
+  const zalo = settings ? settings.zaloUrl : businessProfile.socialProfiles.zalo;
+  const youtube = settings?.youtubeUrl;
+
+  const hanoiAddr = settings?.addressHanoi || hanoi.address;
+  const bacNinhAddr = settings ? settings.addressBacNinh : bacNinh.address;
+  const bacNinhPhone = settings?.storePhoneBacNinh || bacNinh.displayPhone;
 
   return (
     <footer className="bg-[#0b1221] text-gray-300">
@@ -63,10 +87,10 @@ export default function Footer({ navigation }: { navigation?: ResolvedNavigation
             <div className="space-y-4">
               <Link href="/" className="flex flex-col">
                 <span className="text-3xl font-extrabold text-blue-500 leading-tight tracking-tight">
-                  {businessProfile.brandName}
+                  {brandName}
                 </span>
                 <span className="text-gray-400 text-[10px] tracking-widest uppercase font-semibold mt-0.5">
-                  {businessProfile.traditionalMotto}
+                  {motto}
                 </span>
               </Link>
               <p className="text-xs text-gray-400 leading-relaxed">
@@ -77,56 +101,71 @@ export default function Footer({ navigation }: { navigation?: ResolvedNavigation
                 <li className="flex gap-3 items-center">
                   <Phone className="w-4 h-4 text-blue-500 shrink-0" />
                   <a
-                    href={businessProfile.telHref}
+                    href={telHref}
                     className="hover:text-blue-400 font-bold text-white transition"
                   >
-                    Hotline: {businessProfile.displayPhone}
+                    Hotline: {phone}
                   </a>
                 </li>
                 <li className="flex gap-3 items-center">
                   <Mail className="w-4 h-4 text-blue-500 shrink-0" />
                   <a
-                    href={`mailto:${businessProfile.email}`}
+                    href={`mailto:${email}`}
                     className="hover:text-blue-400 transition"
                   >
-                    {businessProfile.email}
+                    {email}
                   </a>
                 </li>
                 <li className="flex gap-3 items-start">
                   <Clock className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                   <div className="text-xs">
-                    <p className="font-medium text-gray-300">T2 - T7: 09:00 - 20:00</p>
-                    <p className="text-gray-400">Chủ nhật: Theo lịch hẹn trước</p>
+                    <p className="font-medium text-gray-300">{hours}</p>
                   </div>
                 </li>
               </ul>
 
               {/* Social links */}
-              <div className="pt-2 flex items-center gap-3 text-xs">
-                <a
-                  href={businessProfile.socialProfiles.facebook}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1 rounded bg-gray-800 hover:bg-blue-600 text-gray-300 hover:text-white transition"
-                >
-                  Facebook
-                </a>
-                <a
-                  href={businessProfile.socialProfiles.tiktok}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1 rounded bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white transition"
-                >
-                  TikTok
-                </a>
-                <a
-                  href={businessProfile.socialProfiles.zalo}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-2.5 py-1 rounded bg-gray-800 hover:bg-blue-500 text-gray-300 hover:text-white transition"
-                >
-                  Zalo
-                </a>
+              <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
+                {fb && (
+                  <a
+                    href={fb}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-blue-600 text-gray-300 hover:text-white transition"
+                  >
+                    Facebook
+                  </a>
+                )}
+                {tiktok && (
+                  <a
+                    href={tiktok}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white transition"
+                  >
+                    TikTok
+                  </a>
+                )}
+                {zalo && (
+                  <a
+                    href={zalo}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-blue-500 text-gray-300 hover:text-white transition"
+                  >
+                    Zalo
+                  </a>
+                )}
+                {youtube && (
+                  <a
+                    href={youtube}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-red-600 text-gray-300 hover:text-white transition"
+                  >
+                    YouTube
+                  </a>
+                )}
               </div>
             </div>
 
@@ -140,8 +179,8 @@ export default function Footer({ navigation }: { navigation?: ResolvedNavigation
                 {/* Cơ sở Hà Nội */}
                 <div className="border-l-2 border-blue-500 pl-3 space-y-1">
                   <div className="font-bold text-gray-200">{hanoi.name} (Trụ sở chính)</div>
-                  <p className="text-gray-400">{hanoi.address}</p>
-                  <p className="text-blue-400 font-semibold">ĐT: {hanoi.displayPhone}</p>
+                  <p className="text-gray-400">{hanoiAddr}</p>
+                  <p className="text-blue-400 font-semibold">ĐT: {phone}</p>
                   {hanoi.mapsUrl && (
                     <a
                       href={hanoi.mapsUrl}
@@ -154,22 +193,24 @@ export default function Footer({ navigation }: { navigation?: ResolvedNavigation
                   )}
                 </div>
 
-                {/* Cơ sở Bắc Ninh */}
-                <div className="border-l-2 border-emerald-500 pl-3 space-y-1">
-                  <div className="font-bold text-gray-200">{bacNinh.name}</div>
-                  <p className="text-gray-400">{bacNinh.address}</p>
-                  <p className="text-emerald-400 font-semibold">ĐT: {bacNinh.displayPhone}</p>
-                  {bacNinh.mapsUrl && (
-                    <a
-                      href={bacNinh.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-white underline mt-0.5"
-                    >
-                      <MapPin className="w-3 h-3 text-red-400" /> Chỉ đường Google Maps <ExternalLink className="w-2.5 h-2.5" />
-                    </a>
-                  )}
-                </div>
+                {/* Cơ sở Bắc Ninh (nếu có cấu hình) */}
+                {bacNinhAddr && (
+                  <div className="border-l-2 border-emerald-500 pl-3 space-y-1">
+                    <div className="font-bold text-gray-200">{bacNinh.name}</div>
+                    <p className="text-gray-400">{bacNinhAddr}</p>
+                    <p className="text-emerald-400 font-semibold">ĐT: {bacNinhPhone}</p>
+                    {bacNinh.mapsUrl && (
+                      <a
+                        href={bacNinh.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-white underline mt-0.5"
+                      >
+                        <MapPin className="w-3 h-3 text-red-400" /> Chỉ đường Google Maps <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 <div className="pt-1">
                   <Link
@@ -270,9 +311,7 @@ export default function Footer({ navigation }: { navigation?: ResolvedNavigation
       {/* 3. Bottom Copyright & Notice */}
       <div className="bg-[#050a14] pt-4 pb-20 md:pb-4 text-center text-gray-500 text-xs border-t border-gray-800">
         <div className="container mx-auto px-4 max-w-[1370px] space-y-1">
-          <p>
-            &copy; 2024 - {new Date().getFullYear()} CitiLap. {businessProfile.primaryTagline}. Tất cả quyền được bảo lưu.
-          </p>
+          <p>{copyright}</p>
           <p className="text-[11px] text-gray-600">
             Website phục vụ giới thiệu sản phẩm và tiếp nhận yêu cầu mua hàng. Không thực hiện giao dịch thanh toán trực tuyến trên trang.
           </p>

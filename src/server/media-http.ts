@@ -7,6 +7,9 @@ export async function mediaEnvironment(): Promise<MediaEnvironment> {
     const { env } = await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ 'cloudflare:workers');
     if (env.DB && env.PRODUCT_MEDIA) return env as unknown as MediaEnvironment;
   } catch { /* Node dev has no Workers bindings; do not return mock data. */ }
+  // Fallback to globalThis.env if explicitly set (e.g. test harness / custom worker wrapper)
+  const globalEnv = (globalThis as unknown as { env?: MediaEnvironment }).env;
+  if (globalEnv?.DB && globalEnv?.PRODUCT_MEDIA) return globalEnv;
   throw new MediaError('Thư viện cần D1/R2. Chạy môi trường Cloudflare và áp migration local.', 503);
 }
 export function mediaFailure(error: unknown) {

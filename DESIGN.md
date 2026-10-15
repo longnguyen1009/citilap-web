@@ -93,3 +93,16 @@ Never communicate state by color alone; always pair with explicit Vietnamese tex
 - All admin components utilize scoped Tailwind utility classes targeting slate/zinc neutrals.
 - Zero mutation of global design tokens or Storefront CSS rules in `src/app/globals.css`. Storefront styling remains 100% isolated.
 
+### 8. Storefront Catalog & Comparison UX Conventions (R04)
+- **Floating Compare Bar (`src/components/product/CompareFloatingBar.tsx`)**:
+  - Docked at screen bottom (`fixed bottom-6 left-1/2 -translate-x-1/2 z-40`), elevated shadow (`shadow-2xl ring-1 ring-slate-900/10`), rounded-2xl with white glassmorphic background (`bg-white/95 backdrop-blur-md`).
+  - Limits comparison to max 3 products (`MAX_COMPARE_PRODUCTS = 3`), shows product thumbnail, name, remove button, count badge, and high-visibility "So sánh ngay" action button (`bg-blue-600 text-white`).
+- **Compare Modal (`src/components/product/CompareModal.tsx`)**:
+  - Accessible dialog with difference toggle ("Chỉ xem điểm khác biệt"), side-by-side spec comparison matrix, and highlighting for diverging attributes (`bg-blue-50/60`).
+  - Incompatible categories are prevented client-side and validated on server `/api/compare`.
+- **Accessory Variant Options Selector (`src/components/product/StudioPurchaseSection.tsx`)**:
+  - Dynamically renders option pills for non-PC items (Color, Switch, Connection, Power, Size) alongside Laptop RAM/SSD.
+  - Active selection uses `border-blue-600 bg-blue-50/50 text-blue-700 font-medium ring-2 ring-blue-600/20`.
+  - Inactive/unavailable variants clearly communicated with reduced opacity and availability badges.
+
+

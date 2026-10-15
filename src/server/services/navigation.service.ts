@@ -2,14 +2,17 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { navigationWriteSchema, type NavigationDocument, type NavigationDetail, type NavigationTarget, type ResolvedNavigation } from '../../contracts/cms/navigation';
 import { MediaError, getAsset, type MediaEnvironment } from './media-library.service';
 import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
+import { resolveProductsByIds, resolveProductsByCriteria, type HomepageProduct } from './catalog.service';
 
 type Row = { revision: number; draft: string; published: string | null; publishedRevision: number | null };
 type CategoryRow = { id: string; name: string; slug: string; description: string | null; parentId: string | null; image: string | null; status: string; sortOrder: number };
+
 const categoryRows = async (db: D1Database) => (await db.prepare('SELECT * FROM Category ORDER BY sortOrder,name').all<CategoryRow>()).results.map(c => ({
   ...c,
   // Existing seed/catalog rows store R2 keys, whereas CMS authoring uses URLs.
   image: c.image && !c.image.startsWith('/') ? getPublicMediaUrl(c.image) : c.image,
 }));
+
 export async function navigationDetail(db: D1Database): Promise<NavigationDetail> {
   const row = await db.prepare("SELECT * FROM NavigationStudio WHERE id='site'").first<Row>();
   const rows = await categoryRows(db), productNames: Record<string,string> = {};
@@ -21,78 +24,235 @@ export async function navigationDetail(db: D1Database): Promise<NavigationDetail
     }
     return { revision:row.revision,publishedRevision:row.publishedRevision,document,productNames,categoryIds:rows.map(c=>c.id) };
   }
-  return { revision: 0, publishedRevision: null, productNames, categoryIds:rows.map(c=>c.id), document: { schemaVersion: 1, categories: rows.map(c => ({ id:c.id,name:c.name,slug:c.slug,description:c.description || '',parentId:c.parentId,visible:c.status==='ACTIVE',image:c.image || '',assetId:'',alt:c.name })), collections: [], menus: { main: [], footer: [] } } };
+  return {
+    revision: 0,
+    publishedRevision: null,
+    productNames,
+    categoryIds: rows.map(c => c.id),
+    document: {
+      schemaVersion: 1,
+      categories: rows.map(c => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description || '',
+        parentId: c.parentId,
+        visible: c.status === 'ACTIVE',
+        image: c.image || '',
+        assetId: '',
+        alt: c.name
+      })),
+      collections: [],
+      menus: { main: [], footer: [] }
+    }
+  };
 }
+
 export async function navigationProducts(db: D1Database, q = '', page = 1) {
   page = Number.isSafeInteger(page) && page > 0 ? Math.min(page, 10000) : 1;
   const rows = await db.prepare("SELECT id,name,slug,status FROM Product WHERE deletedAt IS NULL AND instr(lower(name),lower(?))>0 ORDER BY name,id LIMIT 26 OFFSET ?").bind(q.slice(0,120), (page-1)*25).all<{id:string;name:string;slug:string;status:string}>();
   return { items: rows.results.slice(0,25), page, hasMore: rows.results.length > 25 };
 }
-const referencedProducts = (d: NavigationDocument) => [...new Set([...d.collections.flatMap(c => c.productIds), ...Object.values(d.menus).flatMap(items => items.flatMap(i => [i,...i.children])).flatMap(i => i.target.kind === 'product' ? [i.target.id] : [])])];
+
+const referencedProducts = (d: NavigationDocument) => [
+  ...new Set([
+    ...d.collections.flatMap(c => c.productIds || []),
+    ...Object.values(d.menus).flatMap(items => items.flatMap(i => [i, ...i.children])).flatMap(i => i.target.kind === 'product' ? [i.target.id] : [])
+  ])
+];
+
 export async function writeNavigation(env: MediaEnvironment, input: unknown) {
   const { expectedRevision, action, document: d } = navigationWriteSchema.parse(input);
   const db = env.DB;
   const current = await navigationDetail(db);
   if (current.revision !== expectedRevision) throw new MediaError('Nội dung đã được sửa ở nơi khác. Tải lại trước khi lưu.',409);
+  
   // Preserve every existing identity, including categories referenced by older products.
   const existing = await categoryRows(db);
   if (existing.some(c => !d.categories.some(x => x.id === c.id))) throw new MediaError('Không xóa danh mục đã có. Hãy ẩn danh mục để giữ liên kết sản phẩm.');
+  
   for (const id of referencedProducts(d)) {
     const p = await db.prepare('SELECT status FROM Product WHERE id=? AND deletedAt IS NULL').bind(id).first<{status:string}>();
     if (!p || (action === 'publish' && !['ACTIVE','active'].includes(p.status))) throw new MediaError('Sản phẩm tham chiếu không tồn tại hoặc chưa xuất bản.');
   }
+
   for (const c of d.categories.filter(c => c.assetId)) {
     const a = await getAsset(db,c.assetId);
     if (a.kind !== 'IMAGE' || a.state !== 'READY' || !a.storageKey) throw new MediaError('Chọn ảnh sẵn sàng trong Thư viện.');
     if (action === 'publish' && (!c.alt.trim() || !await env.PRODUCT_MEDIA.head(a.storageKey))) throw new MediaError('Ảnh danh mục cần ALT và tệp tồn tại trong R2.');
   }
+
   const revision = expectedRevision+1, snapshot = JSON.stringify(d);
   const statements = [
     db.prepare("INSERT OR IGNORE INTO NavigationStudio(id,draft) VALUES('site',?)").bind(snapshot),
     db.prepare('INSERT INTO NavigationRevision(revision,document,action) VALUES(?,?,?)').bind(revision,snapshot,action),
     db.prepare("UPDATE NavigationStudio SET draft=?,revision=?,published=CASE WHEN ?='publish' THEN ? ELSE published END,publishedRevision=CASE WHEN ?='publish' THEN ? ELSE publishedRevision END,updatedAt=CURRENT_TIMESTAMP WHERE id='site'").bind(snapshot,revision,action,snapshot,action,revision),
   ];
-  for (const assetId of new Set(d.categories.map(c => c.assetId).filter(Boolean))) statements.push(db.prepare("INSERT INTO MediaUsage(id,assetId,ownerType,ownerId,slot) VALUES(?,?,'NAVIGATION_REVISION','site',?)").bind(crypto.randomUUID(),assetId,`${revision}:${assetId}`));
+
+  for (const assetId of new Set(d.categories.map(c => c.assetId).filter(Boolean))) {
+    statements.push(db.prepare("INSERT INTO MediaUsage(id,assetId,ownerType,ownerId,slot) VALUES(?,?,'NAVIGATION_REVISION','site',?)").bind(crypto.randomUUID(),assetId,`${revision}:${assetId}`));
+  }
+
   if (action === 'publish') {
     // Insert/update identities first, then parents so array order does not affect FK checks.
-    for (const [i,c] of d.categories.entries()) statements.push(db.prepare(`INSERT INTO Category(id,name,slug,description,image,sortOrder,status,updatedAt) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name=excluded.name,slug=excluded.slug,description=excluded.description,image=excluded.image,sortOrder=excluded.sortOrder,status=excluded.status,updatedAt=CURRENT_TIMESTAMP`).bind(c.id,c.name,c.slug,c.description,c.assetId ? '/api/library/'+c.assetId : c.image || null,i,c.visible?'ACTIVE':'INACTIVE'));
-    for (const c of d.categories) statements.push(db.prepare('UPDATE Category SET parentId=? WHERE id=?').bind(c.parentId,c.id));
+    for (const [i,c] of d.categories.entries()) {
+      statements.push(db.prepare(`INSERT INTO Category(id,name,slug,description,image,sortOrder,status,updatedAt) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name=excluded.name,slug=excluded.slug,description=excluded.description,image=excluded.image,sortOrder=excluded.sortOrder,status=excluded.status,updatedAt=CURRENT_TIMESTAMP`).bind(c.id,c.name,c.slug,c.description,c.assetId ? '/api/library/'+c.assetId : c.image || null,i,c.visible?'ACTIVE':'INACTIVE'));
+    }
+    for (const c of d.categories) {
+      statements.push(db.prepare('UPDATE Category SET parentId=? WHERE id=?').bind(c.parentId,c.id));
+    }
   }
-  try { await db.batch(statements); } catch (e) {
-    if (e instanceof Error && /NAVIGATION_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) throw new MediaError('Xung đột phiên bản, tên, slug hoặc ảnh. Tải lại trước khi lưu.',409);
+
+  try {
+    await db.batch(statements);
+  } catch (e) {
+    if (e instanceof Error && /NAVIGATION_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
+      throw new MediaError('Xung đột phiên bản, tên, slug hoặc ảnh. Tải lại trước khi lưu.',409);
+    }
     throw e;
   }
   return navigationDetail(db);
 }
+
 export async function resolveNavigation(db: D1Database, d: NavigationDocument, revision: number): Promise<ResolvedNavigation> {
-  const categories = d.categories.filter(c => c.visible).map(c => ({ id:c.id,name:c.name,slug:c.slug,description:c.description,parentId:c.parentId,image:c.assetId?'/api/library/'+c.assetId:c.image||null,alt:c.alt,href:'/category/'+c.slug }));
-  const collections = d.collections.filter(c => c.visible).map(c => ({ id:c.id,name:c.name,slug:c.slug,description:c.description,href:'/collection/'+c.slug }));
-  const products = new Map<string,string>();
-  const menuProducts = new Set(Object.values(d.menus).flatMap(items=>items.flatMap(i=>[i,...i.children])).flatMap(i=>i.target.kind==='product'?[i.target.id]:[]));
-  for (const id of menuProducts) if (await db.prepare("SELECT id FROM Product WHERE id=? AND deletedAt IS NULL AND status IN ('ACTIVE','active')").bind(id).first()) products.set(id,'/product/'+id);
-  const href = (t: NavigationTarget) => t.kind==='path'?t.path:t.kind==='category'?categories.find(c=>c.id===t.id)?.href:t.kind==='collection'?collections.find(c=>c.id===t.id)?.href:products.get(t.id);
-  const menu = (items: NavigationDocument['menus']['main']) => items.flatMap(i => { const url=href(i.target); return url ? [{id:i.id,label:i.label,href:url,children:i.children.flatMap(c=>{const childUrl=href(c.target);return childUrl?[{id:c.id,label:c.label,href:childUrl}]:[];})}] : []; });
-  return { schemaVersion:1,revision,categories,collections,menus:{main:menu(d.menus.main),footer:menu(d.menus.footer)} };
+  const categories = d.categories.filter(c => c.visible).map(c => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    description: c.description,
+    parentId: c.parentId,
+    image: c.assetId ? '/api/library/'+c.assetId : c.image || null,
+    alt: c.alt,
+    href: '/category/' + c.slug
+  }));
+
+  const collections = d.collections.filter(c => c.visible).map(c => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    description: c.description,
+    image: c.image || undefined,
+    href: '/collection/' + c.slug,
+    mode: c.mode,
+  }));
+
+  const products = new Map<string, string>();
+  const menuProducts = new Set(Object.values(d.menus).flatMap(items => items.flatMap(i => [i, ...i.children])).flatMap(i => i.target.kind === 'product' ? [i.target.id] : []));
+  for (const id of menuProducts) {
+    if (await db.prepare("SELECT id FROM Product WHERE id=? AND deletedAt IS NULL AND status IN ('ACTIVE','active')").bind(id).first()) {
+      products.set(id, '/product/' + id);
+    }
+  }
+
+  const href = (t: NavigationTarget): string | undefined => {
+    if (t.kind === 'path') return t.path;
+    if (t.kind === 'category') return categories.find(c => c.id === t.id)?.href;
+    if (t.kind === 'collection') return collections.find(c => c.id === t.id)?.href;
+    if (t.kind === 'product') return products.get(t.id);
+    if (t.kind === 'brand') return '/brand/' + t.id;
+    if (t.kind === 'landing') return '/landing/' + t.id;
+    if (t.kind === 'page') return '/' + t.id;
+    if (t.kind === 'external') return t.url;
+    return undefined;
+  };
+
+  const menu = (items: NavigationDocument['menus']['main']) =>
+    items.flatMap(i => {
+      const url = href(i.target);
+      return url ? [{
+        id: i.id,
+        label: i.label,
+        href: url,
+        children: i.children.flatMap(c => {
+          const childUrl = href(c.target);
+          return childUrl ? [{ id: c.id, label: c.label, href: childUrl }] : [];
+        })
+      }] : [];
+    });
+
+  return {
+    schemaVersion: 1,
+    revision,
+    categories,
+    collections,
+    menus: {
+      main: menu(d.menus.main),
+      footer: menu(d.menus.footer)
+    }
+  };
 }
+
 export async function publicNavigation(db: D1Database) {
   const row = await db.prepare("SELECT published,publishedRevision FROM NavigationStudio WHERE id='site'").first<Row>();
-  if (!row?.published) throw new MediaError('Chưa xuất bản điều hướng.',404);
-  return resolveNavigation(db,JSON.parse(row.published),row.publishedRevision!);
+  if (!row?.published) throw new MediaError('Chưa xuất bản điều hướng.', 404);
+  return resolveNavigation(db, JSON.parse(row.published), row.publishedRevision!);
 }
+
 export async function publicCollection(db: D1Database, slug: string) {
   const row = await db.prepare("SELECT published,publishedRevision FROM NavigationStudio WHERE id='site'").first<Row>();
   const d: NavigationDocument | null = row?.published ? JSON.parse(row.published) : null;
-  const c = d?.collections.find(c=>c.slug===slug && c.visible);
-  if (!c) throw new MediaError('Không tìm thấy bộ sưu tập.',404);
-  const products = [];
-  for (const id of c.productIds) {
-    const p = await db.prepare("SELECT id,name,slug,description,price,originalPrice,images,categoryId FROM Product WHERE id=? AND deletedAt IS NULL AND status IN ('ACTIVE','active')").bind(id).first<{id:string;name:string;slug:string;description:string;price:number;originalPrice:number|null;images:string;categoryId:string}>();
-    if (p) { let images: string[] = []; try { const value: unknown=JSON.parse(p.images); if (Array.isArray(value)) images=value.filter((v): v is string=>typeof v==='string'); } catch { /* Legacy empty images. */ } products.push({...p,images,href:'/product/'+p.id}); }
+  const c = d?.collections.find(c => c.slug === slug && c.visible);
+  if (!c) throw new MediaError('Không tìm thấy bộ sưu tập.', 404);
+
+  let products: HomepageProduct[] = [];
+  if (c.mode === 'rule' && c.rule) {
+    products = await resolveProductsByCriteria(c.rule);
+  } else {
+    products = await resolveProductsByIds(c.productIds || []);
   }
-  return { schemaVersion:1,revision:row!.publishedRevision,id:c.id,name:c.name,slug:c.slug,description:c.description,products };
+
+  return {
+    schemaVersion: 1,
+    revision: row!.publishedRevision,
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    description: c.description,
+    image: c.image || null,
+    seo: c.seo || null,
+    mode: c.mode || 'manual',
+    products,
+  };
 }
+
+export async function publicCollectionList(db: D1Database) {
+  const row = await db.prepare("SELECT published,publishedRevision FROM NavigationStudio WHERE id='site'").first<Row>();
+  const d: NavigationDocument | null = row?.published ? JSON.parse(row.published) : null;
+  if (!d) return [];
+
+  const visibleCollections = d.collections.filter(c => c.visible);
+  return Promise.all(
+    visibleCollections.map(async (c) => {
+      let productCount = (c.productIds || []).length;
+      if (c.mode === 'rule' && c.rule) {
+        try {
+          const matched = await resolveProductsByCriteria(c.rule);
+          productCount = matched.length;
+        } catch {
+          productCount = 0;
+        }
+      }
+      return {
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        description: c.description,
+        image: c.image || null,
+        href: '/collection/' + c.slug,
+        mode: c.mode || 'manual',
+        productCount,
+      };
+    })
+  );
+}
+
 export async function publicCategories(db: D1Database) {
-  const rows = (await categoryRows(db)).filter(c=>c.status==='ACTIVE');
+  const rows = (await categoryRows(db)).filter(c => c.status === 'ACTIVE');
   const counts = (await db.prepare("SELECT categoryId,count(*) AS count FROM Product WHERE deletedAt IS NULL AND status IN ('ACTIVE','active') GROUP BY categoryId").all<{categoryId:string;count:number}>()).results;
-  return rows.map(c=>({...c,parent:rows.find(p=>p.id===c.parentId)||null,subCategories:rows.filter(p=>p.parentId===c.id),_count:{products:counts.find(p=>p.categoryId===c.id)?.count||0}}));
+  return rows.map(c => ({
+    ...c,
+    parent: rows.find(p => p.id === c.parentId) || null,
+    subCategories: rows.filter(p => p.parentId === c.id),
+    _count: { products: counts.find(p => p.categoryId === c.id)?.count || 0 }
+  }));
 }

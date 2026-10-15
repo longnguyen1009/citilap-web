@@ -18,7 +18,8 @@ import MediaSection from "@/components/home/MediaSection";
 import TestimonialSection from "@/components/home/TestimonialSection";
 import ContactSection from "@/components/home/ContactSection";
 import BrandSection from "@/components/home/BrandSection";
-import { getPublishedNavigation } from "@/server/services/storefront-cms.service";
+import { getPublishedNavigation, getPublishedHomepage } from "@/server/services/storefront-cms.service";
+import BlockRenderer from "@/components/builder/BlockRenderer";
 import { ProductGridSkeleton } from "@/components/ui/Skeleton";
 
 export const metadata: Metadata = {
@@ -61,7 +62,11 @@ function ProductSectionSkeleton() {
 }
 
 export default async function Home() {
-  const navigation = await getPublishedNavigation();
+  const [navigation, cmsHomepage] = await Promise.all([
+    getPublishedNavigation(),
+    getPublishedHomepage(),
+  ]);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
@@ -73,6 +78,19 @@ export default async function Home() {
       "query-input": "required name=search_term_string",
     },
   };
+
+  // If a CMS homepage is published, render dynamic sections via BlockRenderer
+  if (cmsHomepage && cmsHomepage.sections && cmsHomepage.sections.length > 0) {
+    return (
+      <div className="bg-surface-subtle min-h-screen">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <BlockRenderer sections={cmsHomepage.sections} />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface-subtle min-h-screen">

@@ -11,9 +11,7 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
-  RefreshCw,
   Image as ImageIcon,
-  CheckCircle2,
   AlertTriangle,
   Layers,
   Cpu,
@@ -21,13 +19,9 @@ import {
   FileText,
   Search,
   ExternalLink,
-  ChevronDown,
   History,
-  RotateCcw,
   ArrowUp,
   ArrowDown,
-  X,
-  Sparkles,
 } from 'lucide-react';
 import {
   PageHeader,
@@ -35,7 +29,6 @@ import {
   AdminButton,
   StatusBadge,
   InlineAlert,
-  AdminBreadcrumbs,
   AdminLoadingState,
   AdminErrorState,
 } from '@/components/admin/ui';
@@ -119,7 +112,6 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [contentMediaPickerOpen, setContentMediaPickerOpen] = useState<boolean>(false);
   const [mediaRefresh, setMediaRefresh] = useState<number>(0);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
-  const [previewVariantId, setPreviewVariantId] = useState<string>('');
 
   // Revision & Restore states
   const [revisions, setRevisions] = useState<RevisionItem[]>([]);
@@ -2035,6 +2027,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         {candidate.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={candidate.image}
                             alt=""

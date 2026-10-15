@@ -175,6 +175,34 @@ export async function getPublishedCollection(slug: string) {
   return publishedOrNull(async () => publicCollection((await mediaEnvironment()).DB, slug));
 }
 
+export async function getPublishedCollectionList() {
+  return publishedOrNull(async () => {
+    const { publicCollectionList } = await import('@/server/services/navigation.service');
+    return publicCollectionList((await mediaEnvironment()).DB);
+  });
+}
+
+export async function getPublishedHomepage() {
+  return publishedOrNull(async () => {
+    const { getPublicHomepage } = await import('@/server/services/site-builder.service');
+    return getPublicHomepage((await mediaEnvironment()).DB);
+  });
+}
+
+export async function getPublishedLandingPage(slug: string) {
+  return publishedOrNull(async () => {
+    const { getPublicLandingPage } = await import('@/server/services/site-builder.service');
+    return getPublicLandingPage((await mediaEnvironment()).DB, slug);
+  });
+}
+
+export async function getStorefrontSettings() {
+  return publishedOrNull(async () => {
+    const { getPublicStorefrontSettings } = await import('@/server/services/settings.service');
+    return getPublicStorefrontSettings((await mediaEnvironment()).DB);
+  });
+}
+
 export function classifyProductPublicationById(
   productId: string,
   explicitDb?: import('@cloudflare/workers-types').D1Database
@@ -188,3 +216,4 @@ export function classifyProductPublicationBySlug(
 ) {
   return classifyProductPublication(slug, { lookupType: 'slug', explicitDb });
 }
+

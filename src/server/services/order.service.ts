@@ -1,5 +1,5 @@
 import type { D1Database } from '@cloudflare/workers-types';
-import { getPrismaClient } from '@/lib/prisma';
+import { getPrismaClient, getD1Database } from '@/lib/prisma';
 import { assertPublishedStudioOrderable } from './storefront-order-guard';
 
 export interface OrderItemInput {
@@ -41,6 +41,7 @@ export interface OrderRecord {
   payloadHash: string | null;
   userId: string | null;
   status: string;
+  revision?: number;
   subtotalAmount: number;
   shippingFee: number;
   discountAmount: number;
@@ -73,6 +74,24 @@ export interface OrderRecord {
     createdAt: Date;
     updatedAt: Date;
   }>;
+  events?: Array<{
+    id: string;
+    orderId: string;
+    action: string;
+    fromStatus: string | null;
+    toStatus: string | null;
+    reason: string | null;
+    note: string | null;
+    actor: string;
+    createdAt: Date;
+  }>;
+  internalNotes?: Array<{
+    id: string;
+    orderId: string;
+    content: string;
+    actor: string;
+    createdAt: Date;
+  }>;
 }
 
 export interface CreateOrderResult {
@@ -82,10 +101,116 @@ export interface CreateOrderResult {
   confirmationToken: string;
 }
 
+export interface PublicOrderItemDto {
+  id: string;
+  productId: string;
+  productName: string | null;
+  variantName?: string | null;
+  sku: string | null;
+  price: number;
+  quantity: number;
+  lineTotal: number;
+}
+
+export interface PublicOrderDto {
+  id: string;
+  orderNumber: string | null;
+  status: string;
+  createdAt: Date | string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string | null;
+  shippingAddress: string | null;
+  shippingMethod: string | null;
+  paymentMethod: string;
+  paymentStatus: string;
+  subtotalAmount: number;
+  shippingFee: number;
+  discountAmount: number;
+  totalAmount: number;
+  note: string | null;
+  items: PublicOrderItemDto[];
+}
+
+export function toPublicOrderDto(order: OrderRecord): PublicOrderDto {
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    createdAt: order.createdAt,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    customerEmail: order.customerEmail,
+    shippingAddress: order.shippingAddress,
+    shippingMethod: order.shippingMethod,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    subtotalAmount: order.subtotalAmount,
+    shippingFee: order.shippingFee,
+    discountAmount: order.discountAmount || 0,
+    totalAmount: order.totalAmount,
+    note: order.note,
+    items: (order.items || []).map((item) => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.productNameSnapshot || item.productName,
+      variantName: item.variantNameSnapshot || null,
+      sku: item.skuSnapshot || item.sku,
+      price: item.priceSnapshot ?? item.price,
+      quantity: item.quantity,
+      lineTotal: item.lineTotal,
+    })),
+  };
+}
+
+export class OrderConflictError extends Error {
+  currentRevision: number;
+  constructor(message: string, currentRevision: number) {
+    super(message);
+    this.name = 'OrderConflictError';
+    this.currentRevision = currentRevision;
+  }
+}
+
+export const SHARED_ADMIN_ACTOR = 'Admin vận hành (Phiên dùng chung)';
+
+export type OrderStatus = 'NEW' | 'CONTACTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
+
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  NEW: 'Mới',
+  CONTACTED: 'Đã liên hệ',
+  CONFIRMED: 'Đã xác nhận',
+  COMPLETED: 'Hoàn tất',
+  CANCELLED: 'Đã hủy',
+  // Legacy aliases
+  PENDING: 'Mới',
+  'Chờ xác nhận': 'Mới',
+  'Đang xử lý': 'Mới',
+  'Đã hoàn thành': 'Hoàn tất',
+};
+
+/**
+ * Server-enforced State Transition Matrix:
+ * - NEW -> CONTACTED, CONFIRMED, CANCELLED
+ * - CONTACTED -> CONFIRMED, CANCELLED
+ * - CONFIRMED -> COMPLETED, CANCELLED
+ * - CANCELLED -> NEW (Reopen)
+ * - COMPLETED -> [] (Terminal: completed processing)
+ */
+export const VALID_ORDER_TRANSITIONS: Record<string, string[]> = {
+  NEW: ['CONTACTED', 'CONFIRMED', 'CANCELLED'],
+  PENDING: ['CONTACTED', 'CONFIRMED', 'CANCELLED'], // legacy alias
+  'Chờ xác nhận': ['CONTACTED', 'CONFIRMED', 'CANCELLED'],
+  'Đang xử lý': ['CONTACTED', 'CONFIRMED', 'CANCELLED'],
+  CONTACTED: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['COMPLETED', 'CANCELLED'],
+  CANCELLED: ['NEW'],
+  COMPLETED: [],
+  'Đã hoàn thành': [],
+};
+
 /**
  * Generate CSPRNG-backed confirmation token (STORE-14 Hardened).
- * Provides 192 bits of entropy via Web Crypto CSPRNG.
- * Only the SHA-256 token hash is stored in D1 database.
  */
 export async function generateOrderConfirmationToken(
   orderId: string,
@@ -93,7 +218,6 @@ export async function generateOrderConfirmationToken(
 ): Promise<{ token: string; tokenHash: string }> {
   let token: string;
   if (idempotencyKey && idempotencyKey.trim()) {
-    // High-entropy token derived via HMAC-SHA256 from secret + idempotencyKey + orderId
     const secret = process.env.CONFIRMATION_TOKEN_SECRET || process.env.ADMIN_JWT_SECRET || 'citilap-csprng-token-secret-2026';
     const keyData = new TextEncoder().encode(secret);
     const key = await crypto.subtle.importKey(
@@ -110,7 +234,6 @@ export async function generateOrderConfirmationToken(
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
   } else {
-    // Pure Web Crypto CSPRNG (24 bytes = 48 hex chars = 192 bits entropy)
     const bytes = new Uint8Array(24);
     crypto.getRandomValues(bytes);
     token = Array.from(bytes)
@@ -139,12 +262,6 @@ export function timingSafeEqualString(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/**
- * Validates a confirmation token against an order:
- * 1. Checks CSPRNG hash stored in D1 (Order.confirmationTokenHash).
- * 2. If confirmationTokenHash is null (legacy orders), falls back to legacy deterministic hash calculation.
- * 3. Uses timing-safe string comparison.
- */
 export async function validateOrderConfirmationToken(
   order: { id: string; createdAt: string | Date; confirmationTokenHash?: string | null },
   token: string | null | undefined
@@ -154,20 +271,15 @@ export async function validateOrderConfirmationToken(
   }
   const cleanToken = token.trim();
 
-  // 1. New CSPRNG hash path
   if (order.confirmationTokenHash) {
     const computedHash = await hashConfirmationToken(cleanToken);
     return timingSafeEqualString(computedHash, order.confirmationTokenHash);
   }
 
-  // 2. Backward-compatibility fallback for pre-STORE-14 legacy orders
   const legacyToken = await createConfirmationToken(order.id, order.createdAt);
   return timingSafeEqualString(cleanToken, legacyToken);
 }
 
-/**
- * Legacy deterministic SHA-256 confirmation token generator (maintained for backward-compatibility)
- */
 export async function createConfirmationToken(orderId: string, createdAt: string | Date): Promise<string> {
   const enc = new TextEncoder().encode(`${orderId}:${new Date(createdAt).getTime()}:citilap-confirm-salt`);
   const buf = await crypto.subtle.digest('SHA-256', enc);
@@ -177,9 +289,6 @@ export async function createConfirmationToken(orderId: string, createdAt: string
     .join('');
 }
 
-/**
- * Deterministic SHA-256 payload hasher for idempotency verification.
- */
 export async function computeOrderPayloadHash(payload: CreateOrderInput): Promise<string> {
   const normalized = {
     customerName: payload.customerName.trim(),
@@ -215,13 +324,7 @@ function generateOrderNumber(): string {
 
 /**
  * Validates and creates a new Customer Order in Cloudflare D1.
- * 
- * Strict Guarantees:
- * 1. Clean Guest Checkout: Does NOT create fake guest users.
- * 2. Server Price Enforcement: Prices are fetched directly from D1, never trusted from client.
- * 3. Scope Reset (STORE-10): NEVER decrements stock (Product.stock, ProductVariant.stock, InventoryBalance),
- *    never changes SerialUnit status, never creates inventory reservations.
- * 4. Idempotency Protection: Replaying the same key returns the existing order; altered payload is rejected.
+ * Atomically persists Order, OrderItems, initial OrderEvent, and AdminNotification in a single D1 batch.
  */
 export async function createOrder(
   payload: CreateOrderInput,
@@ -229,7 +332,11 @@ export async function createOrder(
   d1Database?: D1Database,
   simulateFailureOnItemIndex?: number
 ): Promise<CreateOrderResult> {
-  const prisma = getPrismaClient(d1Database);
+  const db = d1Database || getD1Database();
+  if (!db) {
+    throw new Error('D1_BINDING_REQUIRED: Cloudflare D1 database binding is required for atomic order creation');
+  }
+  const prisma = getPrismaClient(db);
 
   // 1. Validate customer information
   const customerName = payload.customerName?.trim();
@@ -284,7 +391,7 @@ export async function createOrder(
     }
   }
 
-  // 4. Resolve products & variants from D1 (Authoritative Price & Existence Verification)
+  // 4. Resolve products & variants from D1
   const resolvedItems: ResolvedOrderItem[] = [];
   let subtotalAmount = 0;
 
@@ -300,7 +407,6 @@ export async function createOrder(
       throw new Error('INVALID_ITEM');
     }
 
-    // Fetch product from D1
     const product = await prisma.product.findUnique({
       where: { id: productId },
       select: {
@@ -313,8 +419,6 @@ export async function createOrder(
       throw new Error('PRODUCT_UNAVAILABLE');
     }
 
-    // Published CMS availability is authoritative for Storefront requests,
-    // including carts saved before an item was switched to CONTACT/UNAVAILABLE.
     assertPublishedStudioOrderable(
       { hasStudio: product.studio !== null, published: product.studio?.published },
       variantId
@@ -357,188 +461,168 @@ export async function createOrder(
     });
   }
 
-  const shippingFee = 0; // Phí giao hàng sẽ được nhân viên tư vấn xác nhận cụ thể với khách hàng
+  const shippingFee = 0;
   const totalAmount = subtotalAmount + shippingFee;
   const orderNumber = generateOrderNumber();
   const orderId = 'c' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
-  const now = new Date().toISOString();
+  const eventId = 'e' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+  const now = new Date().toISOString().replace('Z', '+00:00');
 
-  // Generate CSPRNG-backed confirmation token (192-bit entropy).
-  // Only the SHA-256 hash is stored in D1 database.
   const { token: confirmationToken, tokenHash: confirmationTokenHash } =
     await generateOrderConfirmationToken(orderId, cleanIdempotencyKey);
 
-  // 5. Atomic Order Persistence
-  // In Cloudflare D1, d1.batch([stmt1, stmt2, ...]) guarantees an atomic SQLite transaction.
-  // If any statement fails, the entire batch is rolled back leaving ZERO partial rows.
-  if (d1Database) {
-    try {
-      const orderStmt = d1Database.prepare(`
-        INSERT INTO "Order" (
-          "id", "orderNumber", "idempotencyKey", "payloadHash", "userId", "status",
-          "subtotalAmount", "shippingFee", "discountAmount", "totalAmount",
-          "customerName", "customerPhone", "customerEmail", "shippingAddress",
-          "shippingMethod", "note", "paymentMethod", "paymentStatus",
-          "confirmationTokenHash", "createdAt", "updatedAt"
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).bind(
+  // 5. Atomic Order Persistence via single Cloudflare D1 batch
+  const orderStmt = db.prepare(`
+    INSERT INTO "Order" (
+      "id", "orderNumber", "idempotencyKey", "payloadHash", "userId", "status", "revision",
+      "subtotalAmount", "shippingFee", "discountAmount", "totalAmount",
+      "customerName", "customerPhone", "customerEmail", "shippingAddress",
+      "shippingMethod", "note", "paymentMethod", "paymentStatus",
+      "confirmationTokenHash", "createdAt", "updatedAt"
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    orderId,
+    orderNumber,
+    cleanIdempotencyKey,
+    payloadHash,
+    null,
+    'NEW',
+    0,
+    subtotalAmount,
+    shippingFee,
+    0,
+    totalAmount,
+    customerName,
+    customerPhone,
+    customerEmail,
+    shippingAddress,
+    payload.shippingMethod || 'standard',
+    note,
+    payload.paymentMethod || 'COD',
+    'PENDING',
+    confirmationTokenHash,
+    now,
+    now
+  );
+
+  const itemStmts = resolvedItems.map((item, idx) => {
+    const itemId = 'c' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10) + idx;
+    if (simulateFailureOnItemIndex !== undefined && idx === simulateFailureOnItemIndex) {
+      return db.prepare('INSERT INTO "OrderItem" ("id", "orderId", "non_existent_column_simulated_fail") VALUES (?, ?, ?)')
+        .bind(itemId, orderId, 'fail');
+    }
+    return db.prepare(`
+      INSERT INTO "OrderItem" (
+        "id", "orderId", "productId", "variantId", "productName", "sku",
+        "productNameSnapshot", "skuSnapshot", "variantNameSnapshot",
+        "price", "priceSnapshot", "quantity", "lineTotal", "createdAt", "updatedAt"
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      itemId,
+      orderId,
+      item.productId,
+      item.variantId,
+      item.productName,
+      item.sku,
+      item.productNameSnapshot,
+      item.skuSnapshot,
+      item.variantNameSnapshot,
+      item.price,
+      item.priceSnapshot,
+      item.quantity,
+      item.lineTotal,
+      now,
+      now
+    );
+  });
+
+  const initialEventStmt = db.prepare(`
+    INSERT INTO "OrderEvent" (
+      "id", "orderId", "action", "fromStatus", "toStatus", "reason", "note", "actor", "createdAt"
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    eventId,
+    orderId,
+    'CREATED',
+    null,
+    'NEW',
+    'Khách đặt hàng qua website',
+    note,
+    'Khách hàng',
+    now
+  );
+
+  const formattedTotal = new Intl.NumberFormat('vi-VN').format(totalAmount) + 'đ';
+  const notifStmt = db.prepare(`
+    INSERT INTO "AdminNotification" ("id", "type", "referenceId", "title", "message", "isRead", "createdAt")
+    VALUES (?, 'NEW_ORDER', ?, ?, ?, 0, ?)
+    ON CONFLICT("type", "referenceId") DO NOTHING
+  `).bind(
+    `notif-${orderId}`,
+    orderId,
+    `Đơn hàng mới #${orderNumber}`,
+    `Khách hàng ${customerName} đã đặt đơn hàng trị giá ${formattedTotal}.`,
+    now
+  );
+
+  await db.batch([orderStmt, ...itemStmts, initialEventStmt, notifStmt]);
+
+  // Read back committed order using the same DB
+  const createdOrder = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true },
+  });
+
+  return {
+    success: true,
+    order: createdOrder || ({
+      id: orderId,
+      orderNumber,
+      idempotencyKey: cleanIdempotencyKey,
+      payloadHash,
+      userId: null,
+      status: 'NEW',
+      revision: 0,
+      subtotalAmount,
+      shippingFee,
+      discountAmount: 0,
+      totalAmount,
+      shippingAddress,
+      customerName,
+      customerPhone,
+      customerEmail,
+      shippingMethod: payload.shippingMethod || 'standard',
+      note,
+      paymentMethod: payload.paymentMethod || 'COD',
+      paymentStatus: 'PENDING',
+      createdAt: new Date(now),
+      updatedAt: new Date(now),
+      completedAt: null,
+      items: resolvedItems.map((item, idx) => ({
+        id: 'item-' + idx,
         orderId,
-        orderNumber,
-        cleanIdempotencyKey,
-        payloadHash,
-        null,
-        'PENDING',
-        subtotalAmount,
-        shippingFee,
-        0,
-        totalAmount,
-        customerName,
-        customerPhone,
-        customerEmail,
-        shippingAddress,
-        payload.shippingMethod || 'standard',
-        note,
-        payload.paymentMethod || 'COD',
-        'PENDING',
-        confirmationTokenHash,
-        now,
-        now
-      );
-
-      const itemStmts = resolvedItems.map((item, idx) => {
-        const itemId = 'c' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10) + idx;
-        if (simulateFailureOnItemIndex !== undefined && idx === simulateFailureOnItemIndex) {
-          // Intentionally invalid statement to trigger atomic rollback in D1
-          return d1Database.prepare('INSERT INTO "OrderItem" ("id", "orderId", "non_existent_column_simulated_fail") VALUES (?, ?, ?)')
-            .bind(itemId, orderId, 'fail');
-        }
-
-        return d1Database.prepare(`
-          INSERT INTO "OrderItem" (
-            "id", "orderId", "productId", "variantId", "productName", "sku",
-            "productNameSnapshot", "skuSnapshot", "variantNameSnapshot",
-            "price", "priceSnapshot", "quantity", "lineTotal", "createdAt", "updatedAt"
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).bind(
-          itemId,
-          orderId,
-          item.productId,
-          item.variantId,
-          item.productName,
-          item.sku,
-          item.productNameSnapshot,
-          item.skuSnapshot,
-          item.variantNameSnapshot,
-          item.price,
-          item.priceSnapshot,
-          item.quantity,
-          item.lineTotal,
-          now,
-          now
-        );
-      });
-
-      // Atomic SQLite transaction execution via D1 batch
-      await d1Database.batch([orderStmt, ...itemStmts]);
-
-      const createdOrder = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: { items: true },
-      });
-
-      if (!createdOrder || createdOrder.items.length !== resolvedItems.length) {
-        // Compensating cleanup if unexpected partial state detected
-        await d1Database.batch([
-          d1Database.prepare('DELETE FROM "OrderItem" WHERE "orderId" = ?').bind(orderId),
-          d1Database.prepare('DELETE FROM "Order" WHERE "id" = ?').bind(orderId),
-        ]);
-        throw new Error('ORDER_CREATION_FAILED');
-      }
-
-      return { success: true, order: createdOrder, isIdempotentReplay: false, confirmationToken };
-    } catch (batchError) {
-      // In case D1 partially recorded anything, ensure complete cleanup
-      try {
-        await d1Database.batch([
-          d1Database.prepare('DELETE FROM "OrderItem" WHERE "orderId" = ?').bind(orderId),
-          d1Database.prepare('DELETE FROM "Order" WHERE "id" = ?').bind(orderId),
-        ]);
-      } catch {
-        // Ignore secondary cleanup error
-      }
-      throw batchError;
-    }
-  }
-
-  // Fallback persistence with compensating rollback (e.g. Node local SQLite)
-  let createdOrderId: string | null = null;
-  try {
-    if (simulateFailureOnItemIndex !== undefined && simulateFailureOnItemIndex === 1) {
-      throw new Error('SIMULATED_ITEM_FAILURE');
-    }
-
-    const order = await prisma.order.create({
-      data: {
-        id: orderId,
-        orderNumber,
-        idempotencyKey: cleanIdempotencyKey,
-        payloadHash,
-        userId: null, // Pure guest checkout
-        status: 'PENDING',
-        subtotalAmount,
-        shippingFee,
-        discountAmount: 0,
-        totalAmount,
-        customerName,
-        customerPhone,
-        customerEmail,
-        shippingAddress,
-        shippingMethod: payload.shippingMethod || 'standard',
-        note,
-        paymentMethod: payload.paymentMethod || 'COD',
-        paymentStatus: 'PENDING',
-        confirmationTokenHash,
-        items: {
-          create: resolvedItems.map((item) => ({
-            productId: item.productId,
-            variantId: item.variantId,
-            productName: item.productName,
-            sku: item.sku,
-            productNameSnapshot: item.productNameSnapshot,
-            skuSnapshot: item.skuSnapshot,
-            variantNameSnapshot: item.variantNameSnapshot,
-            price: item.price,
-            priceSnapshot: item.priceSnapshot,
-            quantity: item.quantity,
-            lineTotal: item.lineTotal,
-          })),
-        },
-      },
-      include: { items: true },
-    });
-
-    createdOrderId = order.id;
-
-    if (!order || order.items.length !== resolvedItems.length) {
-      throw new Error('ORDER_ITEMS_INCOMPLETE');
-    }
-
-    return { success: true, order, isIdempotentReplay: false, confirmationToken };
-  } catch (error) {
-    if (createdOrderId) {
-      try {
-        await prisma.orderItem.deleteMany({ where: { orderId: createdOrderId } });
-        await prisma.order.delete({ where: { id: createdOrderId } });
-      } catch (cleanupError) {
-        console.error('Failed compensating rollback for order:', cleanupError);
-      }
-    }
-    throw error;
-  }
+        productId: item.productId,
+        variantId: item.variantId,
+        productName: item.productName,
+        sku: item.sku,
+        productNameSnapshot: item.productNameSnapshot,
+        skuSnapshot: item.skuSnapshot,
+        variantNameSnapshot: item.variantNameSnapshot,
+        price: item.price,
+        priceSnapshot: item.priceSnapshot,
+        quantity: item.quantity,
+        lineTotal: item.lineTotal,
+        createdAt: new Date(now),
+        updatedAt: new Date(now),
+      })),
+    } as unknown as OrderRecord),
+    isIdempotentReplay: false,
+    confirmationToken,
+  };
 }
 
 /**
- * Retrieve an order by its unique ID.
+ * Retrieve an order by its unique ID with full admin details.
  */
 export async function getOrderById(orderId: string, d1Database?: D1Database) {
   const prisma = getPrismaClient(d1Database);
@@ -552,12 +636,18 @@ export async function getOrderById(orderId: string, d1Database?: D1Database) {
           },
         },
       },
+      events: {
+        orderBy: { createdAt: 'desc' },
+      },
+      internalNotes: {
+        orderBy: { createdAt: 'desc' },
+      },
     },
   });
 }
 
 /**
- * Retrieve an order by its human-readable order number.
+ * Retrieve an order by its order number.
  */
 export async function getOrderByOrderNumber(orderNumber: string, d1Database?: D1Database) {
   const prisma = getPrismaClient(d1Database);
@@ -571,20 +661,44 @@ export async function getOrderByOrderNumber(orderNumber: string, d1Database?: D1
           },
         },
       },
+      events: {
+        orderBy: { createdAt: 'desc' },
+      },
+      internalNotes: {
+        orderBy: { createdAt: 'desc' },
+      },
     },
   });
+}
+
+/**
+ * Strip sensitive internal operational data before sending to public customers.
+ */
+export function sanitizeOrderForPublic(order: OrderRecord | Record<string, unknown> | null) {
+  if (!order) return null;
+  const copy = { ...order } as Record<string, unknown>;
+  delete copy.internalNotes;
+  delete copy.events;
+  delete copy.payloadHash;
+  delete copy.confirmationTokenHash;
+  delete copy.revision;
+  return copy;
+}
+
+export interface ListOrdersFilters {
+  status?: string | null;
+  search?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  page?: number;
+  limit?: number;
 }
 
 /**
  * List orders with pagination, search, and status filtering for Admin.
  */
 export async function listOrders(
-  filters: {
-    status?: string | null;
-    search?: string | null;
-    page?: number;
-    limit?: number;
-  },
+  filters: ListOrdersFilters,
   d1Database?: D1Database
 ) {
   const prisma = getPrismaClient(d1Database);
@@ -594,9 +708,8 @@ export async function listOrders(
   const where: Record<string, unknown> = {};
 
   if (filters.status && filters.status !== 'ALL') {
-    // Map legacy status strings if needed
-    if (filters.status === 'PENDING') {
-      where.status = { in: ['PENDING', 'Chờ xác nhận', 'Đang xử lý', 'Đang vận chuyển'] };
+    if (filters.status === 'NEW' || filters.status === 'PENDING') {
+      where.status = { in: ['NEW', 'PENDING', 'Chờ xác nhận', 'Đang xử lý', 'Đang vận chuyển'] };
     } else if (filters.status === 'COMPLETED') {
       where.status = { in: ['COMPLETED', 'Đã hoàn thành'] };
     } else {
@@ -612,6 +725,24 @@ export async function listOrders(
       { customerPhone: { contains: q } },
       { customerEmail: { contains: q } },
     ];
+  }
+
+  if (filters.startDate || filters.endDate) {
+    const createdAtFilter: Record<string, Date> = {};
+    if (filters.startDate) {
+      const d = new Date(filters.startDate);
+      if (!isNaN(d.getTime())) createdAtFilter.gte = d;
+    }
+    if (filters.endDate) {
+      const d = new Date(filters.endDate);
+      if (!isNaN(d.getTime())) {
+        d.setHours(23, 59, 59, 999);
+        createdAtFilter.lte = d;
+      }
+    }
+    if (Object.keys(createdAtFilter).length > 0) {
+      where.createdAt = createdAtFilter;
+    }
   }
 
   const [total, orders] = await Promise.all([
@@ -630,6 +761,12 @@ export async function listOrders(
             lineTotal: true,
           },
         },
+        _count: {
+          select: {
+            events: true,
+            internalNotes: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
@@ -643,39 +780,373 @@ export async function listOrders(
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / limit) || 1,
     },
   };
 }
 
 /**
- * Updates order status (e.g. Admin marks PENDING -> COMPLETED).
+ * Retrieve all orders matching filters for CSV export without arbitrary cutoffs.
+ * Uses cursor-based chunking with deterministic tie-breaker ([createdAt desc, id desc]).
  */
-export async function updateOrderStatus(
-  orderId: string,
-  newStatus: 'PENDING' | 'COMPLETED',
-  d1Database?: D1Database
+export async function getAllOrdersForExport(
+  filters: Omit<ListOrdersFilters, 'page' | 'limit'>,
+  d1Database?: D1Database,
+  chunkSize = 500
 ) {
   const prisma = getPrismaClient(d1Database);
+  const where: Record<string, unknown> = {};
 
+  // Export time horizon boundary: createdAt cutoff limits records selected to the point when export started.
+  // Semantics: This is a query time horizon filter, not a database transaction snapshot isolation lock.
+  const exportSnapshotTime = new Date();
+
+  if (filters.status && filters.status !== 'ALL') {
+    if (filters.status === 'NEW' || filters.status === 'PENDING') {
+      where.status = { in: ['NEW', 'PENDING', 'Chờ xác nhận', 'Đang xử lý', 'Đang vận chuyển'] };
+    } else if (filters.status === 'COMPLETED') {
+      where.status = { in: ['COMPLETED', 'Đã hoàn thành'] };
+    } else {
+      where.status = filters.status;
+    }
+  }
+
+  if (filters.search?.trim()) {
+    const q = filters.search.trim();
+    where.OR = [
+      { orderNumber: { contains: q } },
+      { customerName: { contains: q } },
+      { customerPhone: { contains: q } },
+      { customerEmail: { contains: q } },
+    ];
+  }
+
+  const createdAtFilter: Record<string, Date> = { lte: exportSnapshotTime };
+  if (filters.startDate) {
+    const d = new Date(filters.startDate);
+    if (!isNaN(d.getTime())) createdAtFilter.gte = d;
+  }
+  if (filters.endDate) {
+    const d = new Date(filters.endDate);
+    if (!isNaN(d.getTime())) {
+      d.setHours(23, 59, 59, 999);
+      if (d < exportSnapshotTime) {
+        createdAtFilter.lte = d;
+      }
+    }
+  }
+  where.createdAt = createdAtFilter;
+
+  const allOrders: Array<{
+    id: string;
+    orderNumber: string | null;
+    createdAt: Date;
+    customerName: string;
+    customerPhone: string;
+    customerEmail: string | null;
+    shippingAddress: string | null;
+    status: string;
+    paymentMethod: string;
+    subtotalAmount: number;
+    shippingFee: number;
+    totalAmount: number;
+    note: string | null;
+    items: Array<{
+      productName: string | null;
+      productNameSnapshot: string | null;
+      variantNameSnapshot: string | null;
+      sku: string | null;
+      quantity: number;
+      price: number;
+      lineTotal: number;
+    }>;
+  }> = [];
+
+  type OrderExportItem = (typeof allOrders)[number];
+  let lastRecord: { id: string; createdAt: Date } | null = null;
+
+  while (true) {
+    let currentWhere: Record<string, unknown> = { ...where };
+    if (lastRecord) {
+      currentWhere = {
+        ...where,
+        AND: [
+          {
+            OR: [
+              { createdAt: { lt: lastRecord.createdAt } },
+              { createdAt: lastRecord.createdAt, id: { lt: lastRecord.id } },
+            ],
+          },
+        ],
+      };
+    }
+
+    const chunk: OrderExportItem[] = await prisma.order.findMany({
+      where: currentWhere,
+      include: {
+        items: {
+          select: {
+            productName: true,
+            productNameSnapshot: true,
+            variantNameSnapshot: true,
+            sku: true,
+            quantity: true,
+            price: true,
+            lineTotal: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: chunkSize,
+    });
+
+    allOrders.push(...chunk);
+    if (chunk.length < chunkSize) break;
+    const last = chunk[chunk.length - 1];
+    if (lastRecord && last.id === lastRecord.id) break;
+    lastRecord = { id: last.id, createdAt: last.createdAt };
+  }
+
+  return allOrders;
+}
+
+export interface TransitionOrderInput {
+  orderId: string;
+  targetStatus: OrderStatus;
+  expectedRevision: number;
+  reason?: string | null;
+  note?: string | null;
+  actor?: string | null;
+}
+
+/**
+ * Server-enforced Order Status Transition with Optimistic Concurrency Control (CAS).
+ * 
+ * Rules:
+ * 1. Target status must be valid according to VALID_ORDER_TRANSITIONS.
+ * 2. Same-status transitions are blocked as SAME_STATUS_NOOP.
+ * 3. Cancelation requires non-empty reason (min 3 chars).
+ * 4. Reopen (CANCELLED -> NEW) requires non-empty reason (min 3 chars).
+ * 5. expectedRevision is REQUIRED (positive integer). Checked directly at UPDATE SQL WHERE clause.
+ * 6. CAS failure returns OrderConflictError (HTTP 409) with zero side effects.
+ * 7. Server decides the actor strictly (SHARED_ADMIN_ACTOR), ignoring untrusted request payloads.
+ * 8. Any event write error triggers compensating rollback of status & revision.
+ */
+export async function transitionOrderStatus(
+  input: TransitionOrderInput,
+  d1Database?: D1Database
+) {
+  const db = d1Database || getD1Database();
+  if (!db) {
+    throw new Error('D1_BINDING_REQUIRED: Cloudflare D1 database binding is required for atomic order status transition');
+  }
+  const prisma = getPrismaClient(db);
+  const { orderId, targetStatus, expectedRevision, reason, note } = input;
+
+  // 1. Validate required expectedRevision (non-negative integer)
+  if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 0) {
+    const err = new Error('INVALID_REVISION: expectedRevision là bắt buộc và phải là số nguyên không âm hợp lệ');
+    (err as unknown as { code: string }).code = 'INVALID_REVISION';
+    throw err;
+  }
+
+  // 2. Fetch existing order to inspect transition rules
   const existing = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, status: true },
   });
 
   if (!existing) {
     throw new Error('ORDER_NOT_FOUND');
   }
 
-  const isCompleted = newStatus === 'COMPLETED';
+  // 3. Stale revision check FIRST before transition or no-op checks
+  if (existing.revision !== expectedRevision) {
+    throw new OrderConflictError(
+      `Đơn hàng đã được chỉnh sửa bởi phiên khác (phiên bản hiện tại: ${existing.revision}, gửi lên: ${expectedRevision})`,
+      existing.revision
+    );
+  }
 
-  return prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: newStatus,
-      completedAt: isCompleted ? new Date() : null,
-      updatedAt: new Date(),
+  const currentStatus = existing.status;
+
+  // 4. Same status is a no-op / error
+  if (currentStatus === targetStatus || (currentStatus === 'PENDING' && targetStatus === 'NEW')) {
+    const err = new Error('SAME_STATUS_NOOP');
+    (err as unknown as { code: string }).code = 'SAME_STATUS_NOOP';
+    throw err;
+  }
+
+  // 5. Validate transition validity
+  const allowedTargets = VALID_ORDER_TRANSITIONS[currentStatus] || [];
+  if (!allowedTargets.includes(targetStatus)) {
+    const err = new Error(`INVALID_TRANSITION: Cannot transition from ${currentStatus} to ${targetStatus}`);
+    (err as unknown as { code: string }).code = 'INVALID_TRANSITION';
+    throw err;
+  }
+
+  // 6. Reason requirements
+  const cleanReason = reason?.trim() || null;
+  if (targetStatus === 'CANCELLED' && (!cleanReason || cleanReason.length < 3)) {
+    const err = new Error('REASON_REQUIRED_FOR_CANCEL: Lý do hủy đơn là bắt buộc (tối thiểu 3 ký tự)');
+    (err as unknown as { code: string }).code = 'REASON_REQUIRED';
+    throw err;
+  }
+
+  if (currentStatus === 'CANCELLED' && targetStatus === 'NEW' && (!cleanReason || cleanReason.length < 3)) {
+    const err = new Error('REASON_REQUIRED_FOR_REOPEN: Lý do mở lại đơn là bắt buộc (tối thiểu 3 ký tự)');
+    (err as unknown as { code: string }).code = 'REASON_REQUIRED';
+    throw err;
+  }
+
+  // 7. Execute atomic CAS UPDATE and append OrderEvent in the same single transaction
+  const nextRevision = expectedRevision + 1;
+  const isCompleted = targetStatus === 'COMPLETED';
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const nextCompletedAt = isCompleted ? now : (currentStatus === 'COMPLETED' ? null : existing.completedAt);
+  const nextCompletedAtIso = nextCompletedAt ? nextCompletedAt.toISOString() : null;
+
+  const eventId = 'e' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+  const action = targetStatus === 'CANCELLED'
+    ? 'CANCELLED'
+    : currentStatus === 'CANCELLED'
+    ? 'REOPENED'
+    : 'STATUS_CHANGE';
+
+  const updateStmt = db.prepare(
+    `UPDATE "Order" SET "status" = ?, "revision" = ?, "completedAt" = ?, "updatedAt" = ? WHERE "id" = ? AND "revision" = ?`
+  ).bind(targetStatus, nextRevision, nextCompletedAtIso, nowIso, orderId, expectedRevision);
+
+  // Event append strictly depends on CAS update succeeding (changes() = 1) in the exact same transaction!
+  const eventStmt = db.prepare(
+    `INSERT INTO "OrderEvent" (
+      "id", "orderId", "action", "fromStatus", "toStatus", "reason", "note", "actor", "createdAt"
+    )
+    SELECT ?, "id", ?, ?, ?, ?, ?, ?, ?
+    FROM "Order"
+    WHERE "id" = ? AND changes() = 1`
+  ).bind(
+    eventId,
+    action,
+    currentStatus,
+    targetStatus,
+    cleanReason,
+    note?.trim() || null,
+    SHARED_ADMIN_ACTOR,
+    nowIso,
+    orderId
+  );
+
+  const [updateRes] = await db.batch([updateStmt, eventStmt]);
+  if ((updateRes.meta?.changes ?? 0) === 0) {
+    const fresh = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!fresh) {
+      throw new Error('ORDER_NOT_FOUND');
+    }
+    throw new OrderConflictError(
+      `Đơn hàng đã được chỉnh sửa bởi phiên khác (phiên bản hiện tại: ${fresh.revision}, gửi lên: ${expectedRevision})`,
+      fresh.revision
+    );
+  }
+
+  // 8. Return freshly committed order reflecting committed status, incremented revision, and new event
+  const updatedOrder = await getOrderById(orderId, db);
+  if (!updatedOrder) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  return updatedOrder;
+}
+
+/**
+ * Add an internal staff note to an order.
+ * Server strictly enforces SHARED_ADMIN_ACTOR to avoid spoofing.
+ * Commits note and event atomically in the same batch transaction.
+ */
+export async function addOrderInternalNote(
+  orderId: string,
+  content: string,
+  _untrustedActor?: string,
+  d1Database?: D1Database
+) {
+  const db = d1Database || getD1Database();
+  if (!db) {
+    throw new Error('D1_BINDING_REQUIRED: Cloudflare D1 database binding is required for atomic order note creation');
+  }
+  const prisma = getPrismaClient(db);
+  const cleanContent = content?.trim();
+
+  if (!cleanContent || cleanContent.length < 2 || cleanContent.length > 2000) {
+    throw new Error('NOTE_LENGTH_INVALID: Ghi chú nội bộ phải từ 2 đến 2000 ký tự');
+  }
+
+  const existing = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!existing) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  const noteId = 'n' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+  const eventId = 'e' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const noteStmt = db.prepare(
+    `INSERT INTO "OrderNote" ("id", "orderId", "content", "actor", "createdAt")
+     VALUES (?, ?, ?, ?, ?)`
+  ).bind(noteId, orderId, cleanContent, SHARED_ADMIN_ACTOR, nowIso);
+
+  const eventNoteSummary = cleanContent.length > 150 ? `${cleanContent.slice(0, 150)}...` : cleanContent;
+  const eventStmt = db.prepare(
+    `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+     VALUES (?, ?, 'NOTE_ADDED', ?, ?, ?, ?, ?)`
+  ).bind(eventId, orderId, existing.status, existing.status, eventNoteSummary, SHARED_ADMIN_ACTOR, nowIso);
+
+  await db.batch([noteStmt, eventStmt]);
+
+  return {
+    id: noteId,
+    orderId,
+    content: cleanContent,
+    actor: SHARED_ADMIN_ACTOR,
+    createdAt: now,
+  };
+}
+
+/**
+ * Backward compatibility alias for legacy updateOrderStatus.
+ * Enforces expectedRevision to prevent CAS bypass.
+ */
+export async function updateOrderStatus(
+  orderId: string,
+  newStatus: 'PENDING' | 'COMPLETED',
+  expectedRevisionOrDb?: number | D1Database,
+  d1Database?: D1Database
+) {
+  let db = d1Database;
+  let rev: number | undefined;
+
+  if (typeof expectedRevisionOrDb === 'object' && expectedRevisionOrDb !== null) {
+    db = expectedRevisionOrDb as D1Database;
+    rev = undefined;
+  } else if (typeof expectedRevisionOrDb === 'number') {
+    rev = expectedRevisionOrDb;
+  }
+
+  if (rev === undefined) {
+    const prisma = getPrismaClient(db);
+    const existing = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!existing) throw new Error('ORDER_NOT_FOUND');
+    rev = existing.revision;
+  }
+
+  const targetStatus = newStatus === 'COMPLETED' ? 'COMPLETED' : 'NEW';
+  return transitionOrderStatus(
+    {
+      orderId,
+      targetStatus: targetStatus as OrderStatus,
+      expectedRevision: rev,
+      reason: 'Cập nhật trạng thái đơn hàng (legacy alias)',
     },
-    include: { items: true },
-  });
+    db
+  );
 }

@@ -68,6 +68,16 @@ export type Order = Prisma.OrderModel
  */
 export type OrderItem = Prisma.OrderItemModel
 /**
+ * Model OrderEvent
+ * 
+ */
+export type OrderEvent = Prisma.OrderEventModel
+/**
+ * Model OrderNote
+ * 
+ */
+export type OrderNote = Prisma.OrderNoteModel
+/**
  * Model Warehouse
  * 
  */
@@ -97,6 +107,16 @@ export type InventoryReservation = Prisma.InventoryReservationModel
  * 
  */
 export type ContactSubmission = Prisma.ContactSubmissionModel
+/**
+ * Model ContactEvent
+ * 
+ */
+export type ContactEvent = Prisma.ContactEventModel
+/**
+ * Model AdminNotification
+ * 
+ */
+export type AdminNotification = Prisma.AdminNotificationModel
 /**
  * Model RateLimitRecord
  * 
@@ -132,3 +152,63 @@ export type MediaAsset = Prisma.MediaAssetModel
  * 
  */
 export type MediaUsage = Prisma.MediaUsageModel
+/**
+ * Model SiteSettings
+ * 
+ */
+export type SiteSettings = Prisma.SiteSettingsModel
+/**
+ * Model SiteSettingsRevision
+ * 
+ */
+export type SiteSettingsRevision = Prisma.SiteSettingsRevisionModel
+/**
+ * Model PostCategory
+ * 
+ */
+export type PostCategory = Prisma.PostCategoryModel
+/**
+ * Model Post
+ * 
+ */
+export type Post = Prisma.PostModel
+/**
+ * Model PostStudio
+ * 
+ */
+export type PostStudio = Prisma.PostStudioModel
+/**
+ * Model PostStudioRevision
+ * 
+ */
+export type PostStudioRevision = Prisma.PostStudioRevisionModel
+/**
+ * Model Page
+ * 
+ */
+export type Page = Prisma.PageModel
+/**
+ * Model PageStudio
+ * 
+ */
+export type PageStudio = Prisma.PageStudioModel
+/**
+ * Model PageStudioRevision
+ * 
+ */
+export type PageStudioRevision = Prisma.PageStudioRevisionModel
+/**
+ * Model LandingPage
+ * 
+ */
+export type LandingPage = Prisma.LandingPageModel
+/**
+ * Model LandingPageStudio
+ * 
+ */
+export type LandingPageStudio = Prisma.LandingPageStudioModel
+/**
+ * Model LandingPageRevision
+ * 
+ */
+export type LandingPageRevision = Prisma.LandingPageRevisionModel

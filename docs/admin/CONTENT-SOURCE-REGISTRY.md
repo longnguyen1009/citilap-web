@@ -14,8 +14,16 @@
 | **Sản phẩm (Laptop & Phụ kiện)** | Bảng `ProductStudio` (JSON draft/published) + bảng `Product` & `ProductVariant` (chiếu tìm kiếm & Storefront) | `src/server/services/product-studio.service.ts` | `/api/admin/products` | `/api/products` (chỉ đọc), `/product/[id]` | **Chỉ có `writeStudio`** qua `/api/admin/products`. Khóa 409 toàn bộ 5 legacy writers. |
 | **Lịch sử Phiên bản (Product Revisions)** | Bảng `ProductStudioRevision` (Append-only JSON snapshot, không sửa/xóa) | `src/server/services/product-studio.service.ts` | `/api/admin/products/[id]/revisions`, `/revisions/[rId]/restore` | Không công khai | **Tự động sinh bởi `writeStudio`** khi Lưu nháp hoặc Xuất bản. Khôi phục tạo revision mới `expectedRevision + 1`. |
 | **Thương hiệu (Brands)** | Bảng `Brand` (D1 canonical: id, name, slug, logo, description, seoTitle, seoDescription, status) | `src/server/services/brand.service.ts` | `/api/admin/brands`, `/api/admin/brands/[id]` | `/api/brands`, `/brand/[slug]` | **Chỉ có `writeBrand`** qua `/api/admin/brands`. Có bảo vệ khóa ngoại (không xóa Brand khi còn sản phẩm liên kết). |
-| **Tài nguyên Media (Hình ảnh, Video)** | Cloudflare R2 Bucket + Bảng `MediaAsset` (metadata, alt, sizes, sha256) | `src/server/services/media-library.service.ts` | `/api/admin/media` | CDN R2 Public URL | **Chỉ có Media Library**. Khi xóa kiểm tra tham chiếu `MediaUsage` trong Catalog. |
-| **Cài đặt Website (Settings)** | Bảng `SiteSettings` (D1 canonical id='site', bảng lịch sử `SiteSettingsRevision`) | `src/server/services/settings.service.ts` | `/api/admin/settings` | `/api/settings` (chỉ đọc cache) | **Chỉ có `writeSettings`**. Kiểm tra CSRF và Schema Zod nghiêm ngặt. |
+| **Bài viết & Đánh giá (Posts/Reviews)** | Bảng `PostStudio` (draft/published JSON snapshot) + bảng `Post` (chiếu công khai & tìm kiếm) | `src/server/services/post.service.ts` | `/api/admin/posts`, `/api/admin/posts/[id]` | `/api/news`, `/news/[slug]` | **Chỉ có `post.service.ts`**. Đảm bảo cô lập nháp 100%, slug redirect 301, và phân giải live catalog cho sản phẩm liên quan. |
+| **Lịch sử Bài viết (Post Revisions)** | Bảng `PostStudioRevision` (Append-only JSON snapshot, không sửa/xóa) | `src/server/services/post.service.ts` | `/api/admin/posts/[id]/revisions`, `.../restore` | Không công khai | **Tự động sinh bởi `post.service.ts`** khi Lưu nháp hoặc Xuất bản. Khôi phục tạo revision mới `expectedRevision + 1`. |
+| **Chuyên mục Tin tức (Post Categories)** | Bảng `PostCategory` (D1: id, name, slug, description, sortOrder) | `src/server/services/post.service.ts` | `/api/admin/post-categories`, `.../[id]` | `/news?category=[slug]` (301 từ `/news/category/[slug]`) | **Chỉ có `post.service.ts`**. Bảo vệ CAS `expectedRevision`, chặn xóa khi có bài viết đang liên kết (`POST_CATEGORY_IN_USE`). |
+| **Trang Tĩnh & Chính sách (Pages/Policies)** | Bảng `PageStudio` (draft/published JSON snapshot) + bảng `Page` (chiếu công khai) | `src/server/services/page.service.ts` | `/api/admin/pages`, `/api/admin/pages/[id]` | Các route chính sách (`/chinh-sach-bao-hanh`, `/chinh-sach-doi-tra`, `/gioi-thieu`...) | **Chỉ có `page.service.ts`**. Partial unique index cho `pageType` hệ thống (`WARRANTY`, `RETURNS`, `SHIPPING`, `ABOUT`, `STORES`). |
+| **Lịch sử Trang Tĩnh (Page Revisions)** | Bảng `PageStudioRevision` (Append-only JSON snapshot, không sửa/xóa) | `src/server/services/page.service.ts` | `/api/admin/pages/[id]/revisions`, `.../restore` | Không công khai | **Tự động sinh bởi `page.service.ts`** khi Lưu nháp hoặc Xuất bản. Khôi phục tạo revision mới `expectedRevision + 1`. |
+| **Trình Dựng Trang Chủ & Landing Page (Site Builder)** | Bảng `LandingPage` (metadata, slug, status, isHome) + `LandingPageStudio` (draft/published JSON snapshot) | `src/server/services/site-builder.service.ts` | `/api/admin/builder`, `/api/admin/builder/[id]`, `/preview`, `/revisions`, `/restore` | `/` (Trang chủ StoreFront), `/landing/[slug]` | **Chỉ có `writeLandingPage`**. Kiểm soát CAS `expectedRevision`, DB trigger `landing_page_revision_guard`, cô lập nháp 100%. |
+| **Lịch sử Site Builder (LandingPageRevision)** | Bảng `LandingPageRevision` (Append-only JSON snapshot) | `src/server/services/site-builder.service.ts` | `/api/admin/builder/[id]/revisions`, `.../restore` | Không công khai | **Tự động ghi lại** mọi thao tác lưu nháp/xuất bản/hủy xuất bản. Khôi phục tạo revision nháp mới. |
+| **Bộ Sưu Tập Sản Phẩm (Collections)** | Bảng `NavigationStudio` (mảng `collections[]` chế độ `manual` / `rule`) | `src/server/services/navigation.service.ts` | `/api/admin/navigation` | `/collection`, `/collection/[slug]`, `/api/catalog/collections`, `.../[slug]` | **Chỉ có `navigation.service.ts`**. Lọc sản phẩm `ACTIVE` thời gian thực, cấm xuất bản bộ sưu tập thủ công chứa sản phẩm nháp. |
+| **Tài nguyên Media (Hình ảnh, Video)** | Cloudflare R2 Bucket + Bảng `MediaAsset` (metadata, alt, sizes, sha256) | `src/server/services/media-library.service.ts` | `/api/admin/media` | CDN R2 Public URL | **Chỉ có Media Library**. Khi xóa kiểm tra tham chiếu `MediaUsage` trong Catalog và Post/Page revisions. |
+| **Cài đặt Website & Nhận diện (Settings)** | Bảng `SiteSettings` (D1 canonical id='site', bảng lịch sử `SiteSettingsRevision`) | `src/server/services/settings.service.ts` | `/api/admin/settings` | Header, Footer, MobileBottomNav, `/lien-he` qua `getStorefrontSettings()` | **Chỉ có `writeSettings`**. Kiểm tra CSRF, Zod Schema nghiêm ngặt, cung cấp logo, motto, hotline, showroom cho toàn bộ StoreFront. |
 | **Hệ thống Điều hướng (Navigation)** | Bảng `NavigationMenu` & `NavigationItem` (D1) | `src/server/services/navigation.service.ts` | `/api/admin/navigation` | Gắn trực tiếp vào layout server-side | **Chỉ có Navigation Studio**. Có kiểm tra liên kết hợp lệ. |
 
 ---
@@ -73,3 +81,111 @@ Hệ thống CitiLap V2 phân định độc lập 3 trục trạng thái sản 
 2. **Khôi phục thành bản nháp (Restore as Draft):** Thao tác khôi phục một revision cũ sẽ tạo ra một revision mới (`expectedRevision + 1`) với `action = 'restore'` và ghi vào `ProductStudio.draft`.
 3. **Bảo toàn Storefront:** Bản snapshot công khai `ProductStudio.published` và các cột tìm kiếm trên bảng `Product` tuyệt đối **không bị thay đổi** cho đến khi quản trị viên bấm nút Xuất bản.
 4. **Chống xung đột ghi đè (Optimistic Concurrency 409):** Mọi thao tác lưu và khôi phục đều yêu cầu `expectedRevision`. Nếu hai quản trị viên cùng thao tác đồng thời, thao tác sau sẽ nhận `HTTP 409 Conflict`.
+
+---
+
+## 5. Quy Tắc Lọc & Khớp Biến Thể Chuẩn (Query & Variant Filter Invariants)
+
+Nhằm đảm bảo người dùng Storefront không bao giờ nhận kết quả sai hoặc giá gây hiểu lầm:
+
+1. **Atomic Variant Isolation:**
+   - Sản phẩm có biến thể: Điều kiện lọc (RAM, SSD, GPU, Condition, Price) bắt buộc phải được thỏa mãn **đồng thời trên cùng một biến thể** (`variants: { some: variantMatch }`).
+   - Mệnh đề `baseMatch` tuyệt đối không được phép làm lọt sản phẩm có biến thể nếu không có bất kỳ biến thể nào đáp ứng đủ điều kiện.
+   - Sản phẩm legacy không biến thể: Lọc qua `baseMatch` với điều kiện cô lập `{ variants: { none: { status: "ACTIVE" } } }`.
+2. **Chuẩn hóa Đơn vị & Ngăn va chạm Substring:**
+   - Bộ lọc RAM 16GB dùng word boundary/equality clause, tuyệt đối không dùng substring lỏng lẻo gây khớp nhầm "116GB".
+   - Bộ lọc dung lượng 1TB tự động mở rộng khớp cả `1024GB`, `1000GB`, `1TB`.
+3. **Semantics Giá Card & Sort:**
+   - Khi một biến thể đáp ứng bộ lọc (ví dụ lọc RAM 32GB trên laptop có bản 16GB giá 20tr và 32GB giá 35tr), thẻ card sản phẩm (`ProductCard`) bắt buộc hiển thị giá của biến thể 32GB (35 triệu), không hiển thị giá của bản 16GB gây hiểu lầm là cấu hình đang lọc rẻ hơn thực tế.
+4. **Phụ kiện Facet thích ứng:**
+   - Chỉ hiển thị các nhóm facet thực sự có dữ liệu (Chuột: Chuẩn kết nối `connection`; Sạc/Hub: Công suất `power`). Ẩn hoàn toàn facet CPU/RAM trên danh mục chuột, bàn phím, phụ kiện.
+
+---
+
+## 6. Phân Hệ So Sánh & Sản Phẩm Liên Quan (Compare & Related Invariants)
+
+1. **So Sánh Công Cộng (Compare Endpoint `/api/compare`):**
+   - Giới hạn tối đa 3 sản phẩm (`MAX_COMPARE_PRODUCTS = 3`). Yêu cầu vượt quá 3 ID trả về HTTP 400 rõ ràng.
+   - Chỉ so sánh các sản phẩm đã xuất bản (`PUBLISHED`) và đang `ACTIVE`. Sản phẩm bị ẩn sau khi chọn sẽ tự động bị loại bỏ khỏi bảng so sánh.
+   - Chặn so sánh giữa các nhóm sản phẩm không tương thích (ví dụ Laptop vs Chuột).
+   - Chỉ hiển thị thuộc tính có cờ `isComparable = true`. Thuộc tính bị thiếu hiển thị `"Chưa cập nhật"`. Đánh dấu `isDifferent = true` chính xác khi có sự khác biệt giữa các sản phẩm.
+2. **Sản Phẩm Liên Quan (Related Resolver `getRelatedProducts`):**
+   - Danh sách thủ công do Admin cấu hình được ưu tiên hàng đầu theo đúng thứ tự mảng.
+   - Luôn loại bỏ sản phẩm hiện tại (`self-reference`) và khử trùng lặp ID.
+   - Tự động loại bỏ sản phẩm `DRAFT` hoặc `INACTIVE`.
+   - Cơ chế Fallback: Tự động bổ sung sản phẩm cùng danh mục/thương hiệu cho đủ limit mà không bao giờ trùng với các sản phẩm đã có.
+
+---
+
+## 7. Phân Hệ CMS Tin Tức & Trang Tĩnh (Content CMS & Invariants)
+
+1. **Bất biến Cô lập Bản nháp (Strict Draft Isolation):**
+   - Lưu nháp bài viết (`Post`) hoặc trang tĩnh (`Page`) chỉ ghi vào bảng `PostStudio.draft` / `PageStudio.draft` và thêm bản ghi snapshot vào bảng lịch sử append-only `PostStudioRevision` / `PageStudioRevision`.
+   - Tuyệt đối **không thay đổi** bảng công khai `Post` / `Page`, không thay đổi slug công khai và không ảnh hưởng đến bất kỳ trang người dùng nào trên Storefront.
+   - Chỉ khi quản trị viên thực hiện hành động **Xuất bản (Publish)** thì hệ thống mới cập nhật bản ghi `Post` / `Page` công khai.
+
+2. **Lịch sử Slug & Điều Hướng 301 (Slug History & 301 Redirects):**
+   - Khi một bài viết hoặc trang đã xuất bản được đổi slug và tái xuất bản, slug cũ được tự động lưu vào mảng `slugHistory` trong `PostStudio.published` / `PageStudio.published`.
+   - Khi người dùng hoặc bot tìm kiếm truy cập URL cũ (ví dụ `/news/slug-cu`), service `publicPostBySlug` / `publicPageBySlug` phát hiện slug nằm trong `slugHistory` và trả về cờ chuyển hướng 301 (`permanentRedirect('/news/slug-moi')`).
+
+3. **Bảo Vệ Từ Khóa Cấm & Xung Đột Slug (Reserved Slugs & Guard):**
+   - Hệ thống từ chối mọi bài viết hoặc trang tĩnh sử dụng slug trùng với các route cốt lõi của website (`RESERVED_SLUGS`: `api`, `admin`, `news`, `product`, `category`, `brand`, `cart`, `checkout`, `account`, `search`, `login`, `gioi-thieu`, `chinh-sach-bao-hanh`, `chinh-sach-doi-tra`, `chinh-sach-van-chuyen`, `he-thong-cua-hang`).
+   - Ngăn chặn xóa danh mục bài viết (`PostCategory`) nếu đang có bài viết sử dụng (`POST_CATEGORY_IN_USE`), trả về HTTP 400 kèm hướng dẫn chuyển danh mục.
+
+4. **Phân Giải Sản Phẩm Liên Quan Động (Live Catalog Related Products):**
+   - Bài viết lưu danh sách `relatedProductIds` (thủ công, có thứ tự).
+   - Khi hiển thị Storefront, service phân giải trực tiếp với catalog D1 (`catalogService.getProductSummaryByIds`).
+   - Tự động loại bỏ sản phẩm nháp (`DRAFT`), ẩn (`ARCHIVED`), hoặc đã bị xóa mềm (`deletedAt IS NOT NULL`).
+   - Bảo toàn chính xác thứ tự sắp xếp do người biên tập chỉ định.
+   - Nguyên tắc Fail-Closed: Không bao giờ dùng mock hay đánh giá giả định khi kết nối DB lỗi.
+
+5. **Theo Dõi Tài Nguyên Media (`MediaUsage`):**
+   - Mọi ảnh đại diện (`coverImage`) và ảnh chèn trong nội dung HTML của Post/Page đều được ghi nhận vào bảng `MediaUsage` với `ownerType = 'POST_REVISION' | 'PAGE_REVISION'` và `slot = '${revision}:${assetId}'`.
+   - Parser phân giải an toàn các đường dẫn tương đối `/api/media/:storageKey`, `/api/library/:id` và cùng tên miền.
+   - Bỏ qua an toàn các CDN bên ngoài mà không làm crash luồng lưu/xuất bản.
+   - Khi unpublish hoặc khôi phục, xử lý bao dung (tolerant) không làm gián đoạn hệ thống nếu tệp media vật lý đã bị xóa khỏi R2.
+
+6. **Đơn Nhất Nguồn Dữ Liệu Chi Nhánh (Single Source of Truth for Store Locations):**
+   - Trang tĩnh `/he-thong-cua-hang` (`STORES`) sử dụng CMS Page để quản lý nội dung giới thiệu, hình ảnh không gian cửa hàng và hướng dẫn khách mua.
+   - Dữ liệu vận hành chi nhánh (địa chỉ Hà Nội, hotline, địa chỉ Bắc Ninh...) kế thừa trực tiếp từ `SiteSettings` trong D1 (`getAdminSettings`).
+   - Ghi chú phân tách phạm vi: Hiện cấu trúc mảng đa chi nhánh động đầy đủ trong Settings thuộc phạm vi R07A. Trong R05/R05.1, trang cửa hàng lấy thông tin hotline/địa chỉ vận hành từ `SiteSettings` trong D1 hợp nhất với cấu trúc showroom, đảm bảo không lệch hotline giữa trang cửa hàng, footer và trang liên hệ.
+
+7. **Quy Tắc 5 Trạng Thái Trang Chính Sách & Fail-Closed (5-State Policy Resolution):**
+   - Toàn bộ 5 trang chính sách (`/chinh-sach-bao-hanh`, `/chinh-sach-doi-tra`, `/chinh-sach-van-chuyen`, `/gioi-thieu`, `/he-thong-cua-hang`) tuân thủ nghiêm ngặt 5 trạng thái thông qua `getSystemPageResolution`:
+     - **Trạng thái A (`NO_CMS_RECORD`):** Chưa từng có bản ghi CMS trong D1. Áp dụng fallback chuyển tiếp hiển thị nội dung tĩnh chuẩn được ghi nhận trong Content Registry.
+     - **Trạng thái B (`DRAFT_ONLY`):** Có bản nháp trong D1 nhưng chưa từng xuất bản (`publishedAt IS NULL`). Tiếp tục hiển thị fallback chuyển tiếp; tuyệt đối không để rò rỉ nội dung bản nháp ra Storefront công khai.
+     - **Trạng thái C (`PUBLISHED`):** Đã xuất bản chính thức. Hiển thị 100% nội dung CMS từ D1, áp dụng thẻ meta SEO động (`seo.title`, `seo.description`, `ogImageUrl`).
+     - **Trạng thái D (`UNPUBLISHED`):** Đã chủ động hủy xuất bản (`publishedAt` bị null sau khi đã publish). **Tuyệt đối không tự ý hiển thị lại bản hard-code legacy**. Hiển thị thông báo chính sách tạm thời cập nhật hoặc ẩn khỏi sitemap công khai.
+     - **Trạng thái E (`INFRASTRUCTURE_ERROR`):** Lỗi kết nối D1 / binding / migration. **Fail-Closed bắt buộc**: Không nuốt ngoại lệ (catch-all) để biến lỗi hạ tầng thành nội dung tĩnh chính thức; hệ thống ném ngoại lệ rõ ràng để cơ chế bảo vệ hạ tầng xử lý.
+
+8. **Phạm Vi Chính Sách Trên Trang Chi Tiết Sản Phẩm (PDP Policy Scope):**
+   - PDP (`/product/[id]`) cung cấp liên kết chuẩn hóa trỏ trực tiếp đến trang chính sách bảo hành công khai `/chinh-sach-bao-hanh`.
+   - Nội dung thông số thời hạn bảo hành hiển thị tại PDP (ví dụ "12 tháng", "24 tháng") lấy từ trường `Product.warranty` và `ProductStudio.warranties` của sản phẩm đó.
+   - Ghi nhận rõ: PDP không phải là nơi render nhúng toàn văn CMS policy động; liên kết policy đảm bảo trỏ đúng trang CMS đã xuất bản.
+
+9. **Giao Thức Điều Hướng Vĩnh Viễn Next.js App Router (HTTP 308 Permanent Redirect):**
+   - Next.js App Router triển khai `permanentRedirect()` trả về mã trạng thái chuẩn **HTTP 308 (RFC 7538 Permanent Redirect)** nhằm bảo toàn phương thức HTTP của request ban đầu.
+   - Mọi liên kết slug cũ của bài viết (`Post`), slug cũ của trang tĩnh (`Page`), và chuyên mục tin tức `/news/category/[slug]` chuyển hướng sang URL mới với mã HTTP 308, được kiểm chứng thực tế qua HTTP client với `redirect: 'manual'`.
+
+10. **Quy Tắc Kiến Trúc Site Builder & Bộ Sưu Tập (R07A Architecture Rules):**
+    - **Phân định Trang chủ và Landing Page:** Trang chủ (`id = 'home'`) là duy nhất và đại diện cho root `/`. Các landing page tùy biến có `isHome = 0`, slug hợp lệ (không trùng `RESERVED_SLUGS`), phục vụ tại `/landing/[slug]`.
+    - **9 Loại Khối Giao Diện Chuẩn Hóa:**
+      1. `banner`: Hero banner hoặc sub-banner quảng bá.
+      2. `intro`: Giới thiệu thương hiệu & dải cam kết giá trị.
+      3. `featured_categories`: Hệ sinh thái danh mục sản phẩm.
+      4. `product_grid`: Lưới sản phẩm động (hỗ trợ phân giải live catalog theo ID thủ công hoặc tiêu chí rule).
+      5. `collection_slider`: Khối trình chiếu dựa trên bộ sưu tập CMS.
+      6. `news_reviews`: Tin tức & đánh giá media mới nhất.
+      7. `faq`: Câu hỏi thường gặp có hỗ trợ schema JSON-LD.
+      8. `cta`: Khối kích thích chuyển đổi (Chat Zalo, Hotline, Đăng ký).
+      9. `featured_brands`: Logo thương hiệu đối tác liên kết.
+    - **Nguyên tắc Phân Giải Live Catalog & Cách Ly Bản Nháp:**
+      - Chỉ những sản phẩm có `status = 'ACTIVE'` và `deletedAt IS NULL` mới được trả về trên StoreFront.
+      - Sản phẩm bị chuyển sang `DRAFT` hoặc xóa mềm sẽ tự động biến mất khỏi các khối trên StoreFront mà không gây vỡ giao diện.
+      - Tuyệt đối không để lộ dữ liệu bản nháp (draft) của Trang chủ hay Landing Page ra trang công khai trước khi quản trị viên thực hiện hành động **Xuất bản (Publish)**.
+    - **Bộ Sưu Tập Thủ Công & Tự Động (Collections Manual vs Rule):**
+      - **Thủ công (`manual`):** Admin chọn danh sách ID sản phẩm cụ thể. Kiểm tra nghiêm ngặt không cho phép xuất bản nếu danh sách chứa sản phẩm đang ở trạng thái `DRAFT`.
+      - **Tự động (`rule`):** Lọc theo loại sản phẩm (`laptop` / `accessory`), danh mục, thương hiệu, tag (`isFeatured`, `isNewArrival`, `isBestSeller`), độ khả dụng và sắp xếp. Tự động cập nhật sản phẩm mới phù hợp tiêu chí.
+    - **Đồng Bộ Dữ Liệu StoreFront Toàn Diện (StoreFront Sync):**
+      - `Header.tsx`, `Footer.tsx`, `MobileBottomNav.tsx`, và `/lien-he` đều tiêu thụ dữ liệu tập trung qua facade `getStorefrontSettings()` trong `src/server/services/storefront-cms.service.ts`.
+      - Mọi thay đổi về Logo, Favicon, Slogan/Motto, Hotline, Email, Giờ mở cửa, Địa chỉ chi nhánh Hà Nội & Bắc Ninh, Bản quyền và Mạng xã hội trong Admin Settings được phản ánh tức thì trên toàn bộ các thành phần StoreFront.

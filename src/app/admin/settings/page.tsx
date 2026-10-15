@@ -13,6 +13,8 @@ import {
   RotateCcw,
   Info,
   AlertCircle,
+  Image as ImageIcon,
+  Share2,
 } from "lucide-react";
 import { PageHeader, InlineAlert } from "@/components/admin/ui";
 import type { AdminSettingsDocument as StorefrontSettings } from "@/contracts/cms/settings";
@@ -409,6 +411,102 @@ export default function SettingsPage() {
                   onChange={(e) => update("addressBacNinh", e.target.value)}
                   className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-6 space-y-5">
+              <div className="border-b border-slate-100 pb-4">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4 text-blue-600" /> Nhận diện thương hiệu
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Logo, slogan và bản quyền đồng bộ Header, Footer và trang Liên hệ trên StoreFront.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">URL Logo</label>
+                  <input
+                    type="text"
+                    value={settings.logoUrl}
+                    onChange={(e) => update("logoUrl", e.target.value)}
+                    placeholder="/brand/brand-logo-original.jpg"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">URL Favicon</label>
+                  <input
+                    type="text"
+                    value={settings.faviconUrl}
+                    onChange={(e) => update("faviconUrl", e.target.value)}
+                    placeholder="/favicon.ico"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Câu khẩu hiệu (Motto)</label>
+                  <input
+                    type="text"
+                    value={settings.motto}
+                    onChange={(e) => update("motto", e.target.value)}
+                    placeholder="Một chữ tín - Vạn niềm tin"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Dòng bản quyền Footer</label>
+                  <input
+                    type="text"
+                    value={settings.copyrightText}
+                    onChange={(e) => update("copyrightText", e.target.value)}
+                    placeholder="© 2024 - 2026 CitiLap. Tất cả quyền được bảo lưu."
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="border-b border-slate-100 pb-4 pt-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-blue-600" /> Mạng xã hội
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Để trống để ẩn icon tương ứng trên Footer. Zalo nằm ở phần hotline phía trên.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Facebook</label>
+                  <input
+                    type="text"
+                    value={settings.facebookUrl}
+                    onChange={(e) => update("facebookUrl", e.target.value)}
+                    placeholder="https://facebook.com/citilapvn"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">TikTok</label>
+                  <input
+                    type="text"
+                    value={settings.tiktokUrl}
+                    onChange={(e) => update("tiktokUrl", e.target.value)}
+                    placeholder="https://tiktok.com/@citilapvn"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">YouTube</label>
+                  <input
+                    type="text"
+                    value={settings.youtubeUrl}
+                    onChange={(e) => update("youtubeUrl", e.target.value)}
+                    placeholder="https://youtube.com/@citilap"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
           </div>

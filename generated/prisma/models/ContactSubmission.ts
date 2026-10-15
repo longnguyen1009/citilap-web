@@ -20,8 +20,18 @@ export type ContactSubmissionModel = runtime.Types.Result.DefaultSelection<Prism
 
 export type AggregateContactSubmission = {
   _count: ContactSubmissionCountAggregateOutputType | null
+  _avg: ContactSubmissionAvgAggregateOutputType | null
+  _sum: ContactSubmissionSumAggregateOutputType | null
   _min: ContactSubmissionMinAggregateOutputType | null
   _max: ContactSubmissionMaxAggregateOutputType | null
+}
+
+export type ContactSubmissionAvgAggregateOutputType = {
+  revision: number | null
+}
+
+export type ContactSubmissionSumAggregateOutputType = {
+  revision: number | null
 }
 
 export type ContactSubmissionMinAggregateOutputType = {
@@ -34,6 +44,11 @@ export type ContactSubmissionMinAggregateOutputType = {
   ipHash: string | null
   createdAt: Date | null
   updatedAt: Date | null
+  internalNote: string | null
+  handledAt: Date | null
+  handledBy: string | null
+  revision: number | null
+  startedProcessingAt: Date | null
 }
 
 export type ContactSubmissionMaxAggregateOutputType = {
@@ -46,6 +61,11 @@ export type ContactSubmissionMaxAggregateOutputType = {
   ipHash: string | null
   createdAt: Date | null
   updatedAt: Date | null
+  internalNote: string | null
+  handledAt: Date | null
+  handledBy: string | null
+  revision: number | null
+  startedProcessingAt: Date | null
 }
 
 export type ContactSubmissionCountAggregateOutputType = {
@@ -58,9 +78,22 @@ export type ContactSubmissionCountAggregateOutputType = {
   ipHash: number
   createdAt: number
   updatedAt: number
+  internalNote: number
+  handledAt: number
+  handledBy: number
+  revision: number
+  startedProcessingAt: number
   _all: number
 }
 
+
+export type ContactSubmissionAvgAggregateInputType = {
+  revision?: true
+}
+
+export type ContactSubmissionSumAggregateInputType = {
+  revision?: true
+}
 
 export type ContactSubmissionMinAggregateInputType = {
   id?: true
@@ -72,6 +105,11 @@ export type ContactSubmissionMinAggregateInputType = {
   ipHash?: true
   createdAt?: true
   updatedAt?: true
+  internalNote?: true
+  handledAt?: true
+  handledBy?: true
+  revision?: true
+  startedProcessingAt?: true
 }
 
 export type ContactSubmissionMaxAggregateInputType = {
@@ -84,6 +122,11 @@ export type ContactSubmissionMaxAggregateInputType = {
   ipHash?: true
   createdAt?: true
   updatedAt?: true
+  internalNote?: true
+  handledAt?: true
+  handledBy?: true
+  revision?: true
+  startedProcessingAt?: true
 }
 
 export type ContactSubmissionCountAggregateInputType = {
@@ -96,6 +139,11 @@ export type ContactSubmissionCountAggregateInputType = {
   ipHash?: true
   createdAt?: true
   updatedAt?: true
+  internalNote?: true
+  handledAt?: true
+  handledBy?: true
+  revision?: true
+  startedProcessingAt?: true
   _all?: true
 }
 
@@ -137,6 +185,18 @@ export type ContactSubmissionAggregateArgs<ExtArgs extends runtime.Types.Extensi
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: ContactSubmissionAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: ContactSubmissionSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: ContactSubmissionMinAggregateInputType
@@ -167,6 +227,8 @@ export type ContactSubmissionGroupByArgs<ExtArgs extends runtime.Types.Extension
   take?: number
   skip?: number
   _count?: ContactSubmissionCountAggregateInputType | true
+  _avg?: ContactSubmissionAvgAggregateInputType
+  _sum?: ContactSubmissionSumAggregateInputType
   _min?: ContactSubmissionMinAggregateInputType
   _max?: ContactSubmissionMaxAggregateInputType
 }
@@ -181,7 +243,14 @@ export type ContactSubmissionGroupByOutputType = {
   ipHash: string | null
   createdAt: Date
   updatedAt: Date
+  internalNote: string | null
+  handledAt: Date | null
+  handledBy: string | null
+  revision: number
+  startedProcessingAt: Date | null
   _count: ContactSubmissionCountAggregateOutputType | null
+  _avg: ContactSubmissionAvgAggregateOutputType | null
+  _sum: ContactSubmissionSumAggregateOutputType | null
   _min: ContactSubmissionMinAggregateOutputType | null
   _max: ContactSubmissionMaxAggregateOutputType | null
 }
@@ -214,6 +283,12 @@ export type ContactSubmissionWhereInput = {
   ipHash?: Prisma.StringNullableFilter<"ContactSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ContactSubmission"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ContactSubmission"> | Date | string
+  internalNote?: Prisma.StringNullableFilter<"ContactSubmission"> | string | null
+  handledAt?: Prisma.DateTimeNullableFilter<"ContactSubmission"> | Date | string | null
+  handledBy?: Prisma.StringNullableFilter<"ContactSubmission"> | string | null
+  revision?: Prisma.IntFilter<"ContactSubmission"> | number
+  startedProcessingAt?: Prisma.DateTimeNullableFilter<"ContactSubmission"> | Date | string | null
+  events?: Prisma.ContactEventListRelationFilter
 }
 
 export type ContactSubmissionOrderByWithRelationInput = {
@@ -226,6 +301,12 @@ export type ContactSubmissionOrderByWithRelationInput = {
   ipHash?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  internalNote?: Prisma.SortOrderInput | Prisma.SortOrder
+  handledAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  handledBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
+  startedProcessingAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  events?: Prisma.ContactEventOrderByRelationAggregateInput
 }
 
 export type ContactSubmissionWhereUniqueInput = Prisma.AtLeast<{
@@ -241,6 +322,12 @@ export type ContactSubmissionWhereUniqueInput = Prisma.AtLeast<{
   ipHash?: Prisma.StringNullableFilter<"ContactSubmission"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ContactSubmission"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ContactSubmission"> | Date | string
+  internalNote?: Prisma.StringNullableFilter<"ContactSubmission"> | string | null
+  handledAt?: Prisma.DateTimeNullableFilter<"ContactSubmission"> | Date | string | null
+  handledBy?: Prisma.StringNullableFilter<"ContactSubmission"> | string | null
+  revision?: Prisma.IntFilter<"ContactSubmission"> | number
+  startedProcessingAt?: Prisma.DateTimeNullableFilter<"ContactSubmission"> | Date | string | null
+  events?: Prisma.ContactEventListRelationFilter
 }, "id">
 
 export type ContactSubmissionOrderByWithAggregationInput = {
@@ -253,9 +340,16 @@ export type ContactSubmissionOrderByWithAggregationInput = {
   ipHash?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  internalNote?: Prisma.SortOrderInput | Prisma.SortOrder
+  handledAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  handledBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  revision?: Prisma.SortOrder
+  startedProcessingAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.ContactSubmissionCountOrderByAggregateInput
+  _avg?: Prisma.ContactSubmissionAvgOrderByAggregateInput
   _max?: Prisma.ContactSubmissionMaxOrderByAggregateInput
   _min?: Prisma.ContactSubmissionMinOrderByAggregateInput
+  _sum?: Prisma.ContactSubmissionSumOrderByAggregateInput
 }
 
 export type ContactSubmissionScalarWhereWithAggregatesInput = {
@@ -271,6 +365,11 @@ export type ContactSubmissionScalarWhereWithAggregatesInput = {
   ipHash?: Prisma.StringNullableWithAggregatesFilter<"ContactSubmission"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ContactSubmission"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"ContactSubmission"> | Date | string
+  internalNote?: Prisma.StringNullableWithAggregatesFilter<"ContactSubmission"> | string | null
+  handledAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ContactSubmission"> | Date | string | null
+  handledBy?: Prisma.StringNullableWithAggregatesFilter<"ContactSubmission"> | string | null
+  revision?: Prisma.IntWithAggregatesFilter<"ContactSubmission"> | number
+  startedProcessingAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ContactSubmission"> | Date | string | null
 }
 
 export type ContactSubmissionCreateInput = {
@@ -283,6 +382,12 @@ export type ContactSubmissionCreateInput = {
   ipHash?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  internalNote?: string | null
+  handledAt?: Date | string | null
+  handledBy?: string | null
+  revision?: number
+  startedProcessingAt?: Date | string | null
+  events?: Prisma.ContactEventCreateNestedManyWithoutContactInput
 }
 
 export type ContactSubmissionUncheckedCreateInput = {
@@ -295,6 +400,12 @@ export type ContactSubmissionUncheckedCreateInput = {
   ipHash?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  internalNote?: string | null
+  handledAt?: Date | string | null
+  handledBy?: string | null
+  revision?: number
+  startedProcessingAt?: Date | string | null
+  events?: Prisma.ContactEventUncheckedCreateNestedManyWithoutContactInput
 }
 
 export type ContactSubmissionUpdateInput = {
@@ -307,6 +418,12 @@ export type ContactSubmissionUpdateInput = {
   ipHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  internalNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  handledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  handledBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  startedProcessingAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  events?: Prisma.ContactEventUpdateManyWithoutContactNestedInput
 }
 
 export type ContactSubmissionUncheckedUpdateInput = {
@@ -319,6 +436,12 @@ export type ContactSubmissionUncheckedUpdateInput = {
   ipHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  internalNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  handledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  handledBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  startedProcessingAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  events?: Prisma.ContactEventUncheckedUpdateManyWithoutContactNestedInput
 }
 
 export type ContactSubmissionCreateManyInput = {
@@ -331,6 +454,11 @@ export type ContactSubmissionCreateManyInput = {
   ipHash?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  internalNote?: string | null
+  handledAt?: Date | string | null
+  handledBy?: string | null
+  revision?: number
+  startedProcessingAt?: Date | string | null
 }
 
 export type ContactSubmissionUpdateManyMutationInput = {
@@ -343,6 +471,11 @@ export type ContactSubmissionUpdateManyMutationInput = {
   ipHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  internalNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  handledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  handledBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  startedProcessingAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type ContactSubmissionUncheckedUpdateManyInput = {
@@ -355,6 +488,11 @@ export type ContactSubmissionUncheckedUpdateManyInput = {
   ipHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  internalNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  handledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  handledBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  startedProcessingAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type ContactSubmissionCountOrderByAggregateInput = {
@@ -367,6 +505,15 @@ export type ContactSubmissionCountOrderByAggregateInput = {
   ipHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  internalNote?: Prisma.SortOrder
+  handledAt?: Prisma.SortOrder
+  handledBy?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
+  startedProcessingAt?: Prisma.SortOrder
+}
+
+export type ContactSubmissionAvgOrderByAggregateInput = {
+  revision?: Prisma.SortOrder
 }
 
 export type ContactSubmissionMaxOrderByAggregateInput = {
@@ -379,6 +526,11 @@ export type ContactSubmissionMaxOrderByAggregateInput = {
   ipHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  internalNote?: Prisma.SortOrder
+  handledAt?: Prisma.SortOrder
+  handledBy?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
+  startedProcessingAt?: Prisma.SortOrder
 }
 
 export type ContactSubmissionMinOrderByAggregateInput = {
@@ -391,8 +543,149 @@ export type ContactSubmissionMinOrderByAggregateInput = {
   ipHash?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  internalNote?: Prisma.SortOrder
+  handledAt?: Prisma.SortOrder
+  handledBy?: Prisma.SortOrder
+  revision?: Prisma.SortOrder
+  startedProcessingAt?: Prisma.SortOrder
 }
 
+export type ContactSubmissionSumOrderByAggregateInput = {
+  revision?: Prisma.SortOrder
+}
+
+export type ContactSubmissionScalarRelationFilter = {
+  is?: Prisma.ContactSubmissionWhereInput
+  isNot?: Prisma.ContactSubmissionWhereInput
+}
+
+export type ContactSubmissionCreateNestedOneWithoutEventsInput = {
+  create?: Prisma.XOR<Prisma.ContactSubmissionCreateWithoutEventsInput, Prisma.ContactSubmissionUncheckedCreateWithoutEventsInput>
+  connectOrCreate?: Prisma.ContactSubmissionCreateOrConnectWithoutEventsInput
+  connect?: Prisma.ContactSubmissionWhereUniqueInput
+}
+
+export type ContactSubmissionUpdateOneRequiredWithoutEventsNestedInput = {
+  create?: Prisma.XOR<Prisma.ContactSubmissionCreateWithoutEventsInput, Prisma.ContactSubmissionUncheckedCreateWithoutEventsInput>
+  connectOrCreate?: Prisma.ContactSubmissionCreateOrConnectWithoutEventsInput
+  upsert?: Prisma.ContactSubmissionUpsertWithoutEventsInput
+  connect?: Prisma.ContactSubmissionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ContactSubmissionUpdateToOneWithWhereWithoutEventsInput, Prisma.ContactSubmissionUpdateWithoutEventsInput>, Prisma.ContactSubmissionUncheckedUpdateWithoutEventsInput>
+}
+
+export type ContactSubmissionCreateWithoutEventsInput = {
+  id?: string
+  name: string
+  phone: string
+  email?: string | null
+  message?: string | null
+  status?: string
+  ipHash?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  internalNote?: string | null
+  handledAt?: Date | string | null
+  handledBy?: string | null
+  revision?: number
+  startedProcessingAt?: Date | string | null
+}
+
+export type ContactSubmissionUncheckedCreateWithoutEventsInput = {
+  id?: string
+  name: string
+  phone: string
+  email?: string | null
+  message?: string | null
+  status?: string
+  ipHash?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  internalNote?: string | null
+  handledAt?: Date | string | null
+  handledBy?: string | null
+  revision?: number
+  startedProcessingAt?: Date | string | null
+}
+
+export type ContactSubmissionCreateOrConnectWithoutEventsInput = {
+  where: Prisma.ContactSubmissionWhereUniqueInput
+  create: Prisma.XOR<Prisma.ContactSubmissionCreateWithoutEventsInput, Prisma.ContactSubmissionUncheckedCreateWithoutEventsInput>
+}
+
+export type ContactSubmissionUpsertWithoutEventsInput = {
+  update: Prisma.XOR<Prisma.ContactSubmissionUpdateWithoutEventsInput, Prisma.ContactSubmissionUncheckedUpdateWithoutEventsInput>
+  create: Prisma.XOR<Prisma.ContactSubmissionCreateWithoutEventsInput, Prisma.ContactSubmissionUncheckedCreateWithoutEventsInput>
+  where?: Prisma.ContactSubmissionWhereInput
+}
+
+export type ContactSubmissionUpdateToOneWithWhereWithoutEventsInput = {
+  where?: Prisma.ContactSubmissionWhereInput
+  data: Prisma.XOR<Prisma.ContactSubmissionUpdateWithoutEventsInput, Prisma.ContactSubmissionUncheckedUpdateWithoutEventsInput>
+}
+
+export type ContactSubmissionUpdateWithoutEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  phone?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  ipHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  internalNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  handledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  handledBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  startedProcessingAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+}
+
+export type ContactSubmissionUncheckedUpdateWithoutEventsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  phone?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  ipHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  internalNote?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  handledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  handledBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  revision?: Prisma.IntFieldUpdateOperationsInput | number
+  startedProcessingAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+}
+
+
+/**
+ * Count Type ContactSubmissionCountOutputType
+ */
+
+export type ContactSubmissionCountOutputType = {
+  events: number
+}
+
+export type ContactSubmissionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  events?: boolean | ContactSubmissionCountOutputTypeCountEventsArgs
+}
+
+/**
+ * ContactSubmissionCountOutputType without action
+ */
+export type ContactSubmissionCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ContactSubmissionCountOutputType
+   */
+  select?: Prisma.ContactSubmissionCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * ContactSubmissionCountOutputType without action
+ */
+export type ContactSubmissionCountOutputTypeCountEventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ContactEventWhereInput
+}
 
 
 export type ContactSubmissionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -405,6 +698,13 @@ export type ContactSubmissionSelect<ExtArgs extends runtime.Types.Extensions.Int
   ipHash?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  internalNote?: boolean
+  handledAt?: boolean
+  handledBy?: boolean
+  revision?: boolean
+  startedProcessingAt?: boolean
+  events?: boolean | Prisma.ContactSubmission$eventsArgs<ExtArgs>
+  _count?: boolean | Prisma.ContactSubmissionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["contactSubmission"]>
 
 export type ContactSubmissionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -417,6 +717,11 @@ export type ContactSubmissionSelectCreateManyAndReturn<ExtArgs extends runtime.T
   ipHash?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  internalNote?: boolean
+  handledAt?: boolean
+  handledBy?: boolean
+  revision?: boolean
+  startedProcessingAt?: boolean
 }, ExtArgs["result"]["contactSubmission"]>
 
 export type ContactSubmissionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -429,6 +734,11 @@ export type ContactSubmissionSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   ipHash?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  internalNote?: boolean
+  handledAt?: boolean
+  handledBy?: boolean
+  revision?: boolean
+  startedProcessingAt?: boolean
 }, ExtArgs["result"]["contactSubmission"]>
 
 export type ContactSubmissionSelectScalar = {
@@ -441,13 +751,26 @@ export type ContactSubmissionSelectScalar = {
   ipHash?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  internalNote?: boolean
+  handledAt?: boolean
+  handledBy?: boolean
+  revision?: boolean
+  startedProcessingAt?: boolean
 }
 
-export type ContactSubmissionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "phone" | "email" | "message" | "status" | "ipHash" | "createdAt" | "updatedAt", ExtArgs["result"]["contactSubmission"]>
+export type ContactSubmissionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "phone" | "email" | "message" | "status" | "ipHash" | "createdAt" | "updatedAt" | "internalNote" | "handledAt" | "handledBy" | "revision" | "startedProcessingAt", ExtArgs["result"]["contactSubmission"]>
+export type ContactSubmissionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  events?: boolean | Prisma.ContactSubmission$eventsArgs<ExtArgs>
+  _count?: boolean | Prisma.ContactSubmissionCountOutputTypeDefaultArgs<ExtArgs>
+}
+export type ContactSubmissionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
+export type ContactSubmissionIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
 
 export type $ContactSubmissionPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ContactSubmission"
-  objects: {}
+  objects: {
+    events: Prisma.$ContactEventPayload<ExtArgs>[]
+  }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     name: string
@@ -458,6 +781,11 @@ export type $ContactSubmissionPayload<ExtArgs extends runtime.Types.Extensions.I
     ipHash: string | null
     createdAt: Date
     updatedAt: Date
+    internalNote: string | null
+    handledAt: Date | null
+    handledBy: string | null
+    revision: number
+    startedProcessingAt: Date | null
   }, ExtArgs["result"]["contactSubmission"]>
   composites: {}
 }
@@ -852,6 +1180,7 @@ readonly fields: ContactSubmissionFieldRefs;
  */
 export interface Prisma__ContactSubmissionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  events<T extends Prisma.ContactSubmission$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ContactSubmission$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ContactEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -890,6 +1219,11 @@ export interface ContactSubmissionFieldRefs {
   readonly ipHash: Prisma.FieldRef<"ContactSubmission", 'String'>
   readonly createdAt: Prisma.FieldRef<"ContactSubmission", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"ContactSubmission", 'DateTime'>
+  readonly internalNote: Prisma.FieldRef<"ContactSubmission", 'String'>
+  readonly handledAt: Prisma.FieldRef<"ContactSubmission", 'DateTime'>
+  readonly handledBy: Prisma.FieldRef<"ContactSubmission", 'String'>
+  readonly revision: Prisma.FieldRef<"ContactSubmission", 'Int'>
+  readonly startedProcessingAt: Prisma.FieldRef<"ContactSubmission", 'DateTime'>
 }
     
 
@@ -906,6 +1240,10 @@ export type ContactSubmissionFindUniqueArgs<ExtArgs extends runtime.Types.Extens
    * Omit specific fields from the ContactSubmission
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
   /**
    * Filter, which ContactSubmission to fetch.
    */
@@ -925,6 +1263,10 @@ export type ContactSubmissionFindUniqueOrThrowArgs<ExtArgs extends runtime.Types
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
+  /**
    * Filter, which ContactSubmission to fetch.
    */
   where: Prisma.ContactSubmissionWhereUniqueInput
@@ -942,6 +1284,10 @@ export type ContactSubmissionFindFirstArgs<ExtArgs extends runtime.Types.Extensi
    * Omit specific fields from the ContactSubmission
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
   /**
    * Filter, which ContactSubmission to fetch.
    */
@@ -991,6 +1337,10 @@ export type ContactSubmissionFindFirstOrThrowArgs<ExtArgs extends runtime.Types.
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
+  /**
    * Filter, which ContactSubmission to fetch.
    */
   where?: Prisma.ContactSubmissionWhereInput
@@ -1038,6 +1388,10 @@ export type ContactSubmissionFindManyArgs<ExtArgs extends runtime.Types.Extensio
    * Omit specific fields from the ContactSubmission
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
   /**
    * Filter, which ContactSubmissions to fetch.
    */
@@ -1087,6 +1441,10 @@ export type ContactSubmissionCreateArgs<ExtArgs extends runtime.Types.Extensions
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
+  /**
    * The data needed to create a ContactSubmission.
    */
   data: Prisma.XOR<Prisma.ContactSubmissionCreateInput, Prisma.ContactSubmissionUncheckedCreateInput>
@@ -1132,6 +1490,10 @@ export type ContactSubmissionUpdateArgs<ExtArgs extends runtime.Types.Extensions
    * Omit specific fields from the ContactSubmission
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
   /**
    * The data needed to update a ContactSubmission.
    */
@@ -1199,6 +1561,10 @@ export type ContactSubmissionUpsertArgs<ExtArgs extends runtime.Types.Extensions
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
+  /**
    * The filter to search for the ContactSubmission to update in case it exists.
    */
   where: Prisma.ContactSubmissionWhereUniqueInput
@@ -1225,6 +1591,10 @@ export type ContactSubmissionDeleteArgs<ExtArgs extends runtime.Types.Extensions
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
+  /**
    * Filter which ContactSubmission to delete.
    */
   where: Prisma.ContactSubmissionWhereUniqueInput
@@ -1245,6 +1615,30 @@ export type ContactSubmissionDeleteManyArgs<ExtArgs extends runtime.Types.Extens
 }
 
 /**
+ * ContactSubmission.events
+ */
+export type ContactSubmission$eventsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ContactEvent
+   */
+  select?: Prisma.ContactEventSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ContactEvent
+   */
+  omit?: Prisma.ContactEventOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactEventInclude<ExtArgs> | null
+  where?: Prisma.ContactEventWhereInput
+  orderBy?: Prisma.ContactEventOrderByWithRelationInput | Prisma.ContactEventOrderByWithRelationInput[]
+  cursor?: Prisma.ContactEventWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ContactEventScalarFieldEnum | Prisma.ContactEventScalarFieldEnum[]
+}
+
+/**
  * ContactSubmission without action
  */
 export type ContactSubmissionDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1256,4 +1650,8 @@ export type ContactSubmissionDefaultArgs<ExtArgs extends runtime.Types.Extension
    * Omit specific fields from the ContactSubmission
    */
   omit?: Prisma.ContactSubmissionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ContactSubmissionInclude<ExtArgs> | null
 }

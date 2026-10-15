@@ -3,6 +3,9 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
+import { CompareProvider } from "@/context/CompareContext";
+import CompareFloatingBar from "@/components/product/CompareFloatingBar";
+import CompareModal from "@/components/product/CompareModal";
 import ScrollToTop from "@/components/layout/ScrollToTop";
 import { businessProfile } from "@/config/business-profile";
 import {
@@ -111,8 +114,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full flex flex-col">
         <CartProvider>
           <WishlistProvider>
-            {children}
-            <ScrollToTop />
+            <CompareProvider>
+              {children}
+              <CompareFloatingBar />
+              <CompareModal />
+              <ScrollToTop />
+            </CompareProvider>
           </WishlistProvider>
         </CartProvider>
       </body>

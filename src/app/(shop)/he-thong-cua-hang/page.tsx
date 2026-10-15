@@ -10,23 +10,86 @@ import {
 } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
 
-export const metadata: Metadata = {
-  title: `Hệ thống showroom & chi nhánh | ${businessProfile.brandName}`,
-  description: `Hệ thống cơ sở ${businessProfile.brandName} tại Hà Nội và Bắc Ninh. Địa chỉ, hotline, giờ mở cửa Thứ 2 – Thứ 7: 09:00 – 20:00 (Chủ nhật hẹn trước). Trải nghiệm trực tiếp laptop gaming & ultrabook.`,
-  alternates: {
-    canonical: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
-  },
-  openGraph: {
-    title: `Hệ thống cơ sở ${businessProfile.brandName}`,
-    description: `Cơ sở Hà Nội: Số 23/40 Tạ Quang Bửu • Cơ sở Bắc Ninh: Số 40 Trần Hưng Đạo. Giờ làm việc: 09:00 - 20:00.`,
-    url: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
-  },
-};
+import { mediaEnvironment } from "@/server/media-http";
+import { getSystemPageResolution } from "@/server/services/page.service";
+import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
-export default function StoresPage() {
-  const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
-  const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const env = await mediaEnvironment();
+    const resolution = await getSystemPageResolution(env.DB, "STORES");
+    if (resolution.state === "PUBLISHED") {
+      const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
+      const description = resolution.page.seo.description || `Hệ thống showroom & chi nhánh ${businessProfile.brandName}.`;
+      return {
+        title,
+        description,
+        alternates: {
+          canonical: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
+        },
+        openGraph: {
+          title,
+          description,
+          url: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
+          images: resolution.page.seo.ogImageUrl ? [{ url: resolution.page.seo.ogImageUrl }] : undefined,
+        },
+      };
+    }
+  } catch {
+    // Fail-safe static metadata fallback
+  }
+
+  return {
+    title: `Hệ thống showroom & chi nhánh | ${businessProfile.brandName}`,
+    description: `Hệ thống cơ sở ${businessProfile.brandName} tại Hà Nội và Bắc Ninh. Địa chỉ, hotline, giờ mở cửa Thứ 2 – Thứ 7: 09:00 – 20:00 (Chủ nhật hẹn trước). Trải nghiệm trực tiếp laptop gaming & ultrabook.`,
+    alternates: {
+      canonical: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
+    },
+    openGraph: {
+      title: `Hệ thống cơ sở ${businessProfile.brandName}`,
+      description: `Cơ sở Hà Nội: Số 23/40 Tạ Quang Bửu • Cơ sở Bắc Ninh: Số 40 Trần Hưng Đạo. Giờ làm việc: 09:00 - 20:00.`,
+      url: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
+    },
+  };
+}
+
+export default async function StoresPage() {
+  const env = await mediaEnvironment();
+
+  // 1. Resolve structured location overrides from published SiteSettings (D1)
+  let settingsDoc = null;
+  try {
+    settingsDoc = await getStorefrontSettings();
+  } catch {
+    // Fall back to base businessProfile defaults if settings table query fails
+  }
+
+  const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const baseBacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
   const hcm = businessProfile.locations.find((l) => l.id === "hcm")!;
+
+  const hanoi = {
+    ...baseHanoi,
+    address: settingsDoc?.addressHanoi || baseHanoi.address,
+    displayPhone: settingsDoc?.storePhone || baseHanoi.displayPhone,
+    telHref: settingsDoc?.storePhone
+      ? `tel:${settingsDoc.storePhone.replace(/[^0-9+]/g, "")}`
+      : baseHanoi.telHref,
+  };
+
+  const bacNinh = {
+    ...baseBacNinh,
+    address: settingsDoc?.addressBacNinh || baseBacNinh.address,
+    displayPhone: settingsDoc?.storePhoneBacNinh || baseBacNinh.displayPhone,
+    telHref: settingsDoc?.storePhoneBacNinh
+      ? `tel:${settingsDoc.storePhoneBacNinh.replace(/[^0-9+]/g, "")}`
+      : baseBacNinh.telHref,
+  };
+
+  // 2. Resolve editorial intro / presentation from CMS STORES Page
+  const resolution = await getSystemPageResolution(env.DB, "STORES");
+  const cmsPage = resolution.state === "PUBLISHED" ? resolution.page : null;
 
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
@@ -49,12 +112,21 @@ export default function StoresPage() {
             <Store className="w-3.5 h-3.5" /> Điểm trải nghiệm sản phẩm thực tế
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">
-            Hệ thống cơ sở & Showroom
+            {cmsPage?.title || "Hệ thống cơ sở & Showroom"}
           </h1>
           <p className="text-sm text-gray-600 mt-2">
             Quý khách có thể đến trực tiếp trải nghiệm máy, kiểm tra ngoại hình và nhận tư vấn cấu hình từ các kỹ thuật viên giàu kinh nghiệm.
           </p>
         </div>
+
+        {cmsPage?.contentHtml && (
+          <div className="bg-white rounded-3xl border border-gray-200/90 shadow-2xs p-6 sm:p-8 mb-12">
+            <div
+              className="prose prose-sm sm:prose-base max-w-none text-slate-700 leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(cmsPage.contentHtml) }}
+            />
+          </div>
+        )}
 
         {/* 2. Stores Grid */}
         <div className="space-y-12 mb-16">

@@ -35,10 +35,23 @@ export const adminSettingsDocumentSchema = z.object({
   addressBacNinh: safeText(255),
   openingHours: safeText(120),
 
+  // Brand visual identity & social
+  logoUrl: safeUrlOrPath.default(""),
+  faviconUrl: safeUrlOrPath.default(""),
+  motto: safeText(200).default("Một chữ tín - Vạn niềm tin"),
+  copyrightText: safeText(300).default(""),
+  facebookUrl: safeUrlOrPath.default("https://facebook.com/citilapvn"),
+  tiktokUrl: safeUrlOrPath.default("https://tiktok.com/@citilapvn"),
+  youtubeUrl: safeUrlOrPath.default(""),
+
+  // SEO defaults
+  defaultSeoTitle: safeText(200).default("CitiLap - Laptop Gaming, Ultrabook & Like New Chính Hãng"),
+  defaultSeoDescription: safeText(500).default("CitiLap chuyên cung cấp Laptop Gaming, Ultrabook, Máy Trạm và Like New chính hãng."),
+
   // Flash sale
   flashSaleEnabled: z.boolean(),
   flashSaleTitle: safeText(120),
-  flashSaleEndAt: safeText(64), // Chuỗi ISO cố định hoặc rỗng, không tự tạo Date.now()
+  flashSaleEndAt: safeText(64), // Chuỗi ISO cố định hoặc rỗng
 
   // Hero & Banners
   heroBadge: safeText(100),
@@ -92,16 +105,26 @@ const hanoi = businessProfile.locations.find((l) => l.id === "hanoi");
 const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh");
 
 // Default settings based on confirmed businessProfile.
-// No fictitious bank accounts or auto-extending Date.now() countdowns.
 export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   storeName: businessProfile.brandName,
   storeEmail: businessProfile.email,
   storePhone: businessProfile.displayPhone,
   storePhoneBacNinh: bacNinh?.displayPhone || "0988.234.567",
   zaloUrl: businessProfile.socialProfiles.zalo,
-  addressHanoi: hanoi?.address || "Hà Nội",
-  addressBacNinh: bacNinh?.address || "Bắc Ninh",
+  addressHanoi: hanoi?.address || "Số 23/40 Tạ Quang Bửu, P. Bách Khoa, Q. Hai Bà Trưng, Hà Nội",
+  addressBacNinh: bacNinh?.address || "Số 40 Trần Hưng Đạo, P. Đại Phúc, TP. Bắc Ninh",
   openingHours: "T2 - T7: 09:00 - 20:00 (CN hẹn trước)",
+
+  logoUrl: "/brand/brand-logo-original.jpg",
+  faviconUrl: "/favicon.ico",
+  motto: "Một chữ tín - Vạn niềm tin",
+  copyrightText: "© 2024 - 2026 CitiLap. Tất cả quyền được bảo lưu.",
+  facebookUrl: businessProfile.socialProfiles.facebook || "https://facebook.com/citilapvn",
+  tiktokUrl: businessProfile.socialProfiles.tiktok || "https://tiktok.com/@citilapvn",
+  youtubeUrl: "",
+
+  defaultSeoTitle: "CitiLap - Laptop Gaming, Ultrabook & Like New Chính Hãng",
+  defaultSeoDescription: "CitiLap chuyên cung cấp các dòng Laptop Gaming, Ultrabook, Máy Trạm (Workstation) và Laptop Like New chính hãng.",
 
   flashSaleEnabled: true,
   flashSaleTitle: "Giá Sốc Giờ Vàng",
@@ -140,14 +163,14 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   shippingFee: 30000,
   codEnabled: true,
   bankTransferEnabled: true,
-  bankAccountInfo: "", // Cần quản trị viên cấu hình thông tin thanh toán thật
+  bankAccountInfo: "",
 };
 
-// Backward-compatible alias for existing imports
+// Backward-compatible alias
 export type StorefrontSettings = AdminSettingsDocument;
 export const DEFAULT_SETTINGS = DEFAULT_ADMIN_SETTINGS;
 
-// Public DTO: Only fields needed by the Storefront UI
+// Public DTO: Whitelist fields needed by Storefront UI (No admin secrets or billing accounts)
 export const publicStorefrontSettingsSchema = z.object({
   storeName: z.string(),
   storeEmail: z.string(),
@@ -157,9 +180,21 @@ export const publicStorefrontSettingsSchema = z.object({
   addressHanoi: z.string(),
   addressBacNinh: z.string(),
   openingHours: z.string(),
+
+  logoUrl: z.string(),
+  faviconUrl: z.string(),
+  motto: z.string(),
+  copyrightText: z.string(),
+  facebookUrl: z.string(),
+  tiktokUrl: z.string(),
+  youtubeUrl: z.string(),
+  defaultSeoTitle: z.string(),
+  defaultSeoDescription: z.string(),
+
   flashSaleEnabled: z.boolean(),
   flashSaleTitle: z.string(),
   flashSaleEndAt: z.string(),
+
   heroBadge: z.string(),
   heroTitle: z.string(),
   heroHighlight: z.string(),
@@ -169,6 +204,7 @@ export const publicStorefrontSettingsSchema = z.object({
   heroCtaPrimaryLink: z.string(),
   heroCtaSecondaryText: z.string(),
   heroCtaSecondaryLink: z.string(),
+
   subBanner1Title: z.string(),
   subBanner1Subtitle: z.string(),
   subBanner1Link: z.string(),
@@ -177,6 +213,7 @@ export const publicStorefrontSettingsSchema = z.object({
   subBanner2Subtitle: z.string(),
   subBanner2Link: z.string(),
   subBanner2Image: z.string(),
+
   feature1Title: z.string(),
   feature1Desc: z.string(),
   feature2Title: z.string(),
@@ -185,6 +222,7 @@ export const publicStorefrontSettingsSchema = z.object({
   feature3Desc: z.string(),
   feature4Title: z.string(),
   feature4Desc: z.string(),
+
   freeShippingThreshold: z.number(),
   shippingFee: z.number(),
   codEnabled: z.boolean(),
