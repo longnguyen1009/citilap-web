@@ -1,12 +1,13 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { getCustomerDetail } from '@/server/services/customer.service';
 
-export async function GET(
+async function GETHandler(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -24,3 +25,5 @@ export async function GET(
     return NextResponse.json({ success: false, error: 'Lỗi tải chi tiết khách hàng' }, { status: 500 });
   }
 }
+
+export const GET = withAdminContext(GETHandler);

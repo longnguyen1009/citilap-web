@@ -1,3 +1,4 @@
+import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   adminSettingsDocumentSchema,
@@ -87,14 +88,14 @@ export async function saveAdminSettings(
       .bind(snapshot),
     db
       .prepare("INSERT INTO SiteSettingsRevision(revision, document, action, actor) VALUES(?, ?, 'save', ?)")
-      .bind(nextRevision, snapshot, actor),
+      .bind(nextRevision, snapshot, adminActor()),
     db
       .prepare("UPDATE SiteSettings SET revision = ?, document = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = 'site'")
       .bind(nextRevision, snapshot),
   ];
 
   try {
-    await db.batch(statements);
+    await db.batch([...statements, ...adminAuditStatements(db, 'settings.save', 'site', 'CMS mutation')]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/SETTINGS_CONFLICT|UNIQUE constraint failed/.test(msg)) {

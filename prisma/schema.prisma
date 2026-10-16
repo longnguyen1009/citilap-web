@@ -14,7 +14,10 @@ model User {
   password   String
   name       String?
   phone      String?
-  role       String   @default("USER") // USER, ADMIN
+  role       String   @default("USER") // USER, legacy ADMIN, OWNER, EDITOR, SALES
+  adminDisabled Int   @default(0)
+  adminVersion  Int   @default(0)
+  piiExport     Int   @default(0)
   tier       String   @default("Mới") // Vàng, Bạc, Mới
   totalSpend Int      @default(0) // Integer VND
   orders     Order[]

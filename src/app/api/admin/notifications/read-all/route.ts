@@ -1,13 +1,15 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
-import { requireAdminMutation } from '@/lib/auth';
-import { markAllNotificationsAsRead } from '@/server/services/notification.service';
+import { authenticatedAdmin, requireAdminMutation } from '@/lib/auth';
+import { markPersonalNotificationsRead } from '@/server/services/notification.service';
+import { mediaEnvironment } from '@/server/media-http';
 
-export async function POST(request: Request) {
-  const denied = requireAdminMutation(request);
+async function POSTHandler(request: Request) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
-    const result = await markAllNotificationsAsRead();
+    const result = await markPersonalNotificationsRead((await mediaEnvironment()).DB, authenticatedAdmin(request).id);
     return NextResponse.json(
       { success: true, count: result.count },
       { headers: { 'Cache-Control': 'private, no-store' } }
@@ -20,3 +22,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const POST = withAdminContext(POSTHandler);

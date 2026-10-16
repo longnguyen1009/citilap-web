@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from "next/server";
 import { requireAdmin, requireAdminMutation } from "@/lib/auth";
 
@@ -23,8 +24,8 @@ function parseDate(value: unknown): Date | null | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
   if (!hasDatabase) return fail("Database not configured", 503);
   try {
@@ -45,8 +46,8 @@ export async function GET(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
-  const denied = requireAdminMutation(request);
+async function PATCHHandler(request: Request) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   return NextResponse.json(
@@ -59,3 +60,6 @@ export async function PATCH(request: Request) {
   );
 }
 
+
+export const GET = withAdminContext(GETHandler);
+export const PATCH = withAdminContext(PATCHHandler);

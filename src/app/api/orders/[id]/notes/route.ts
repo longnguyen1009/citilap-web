@@ -1,9 +1,10 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdminMutation } from '@/lib/auth';
 import { addOrderInternalNote } from '@/server/services/order.service';
 
-export async function POST(request: Request, props: { params: Promise<{ id: string }> }) {
-  const denied = requireAdminMutation(request);
+async function POSTHandler(request: Request, props: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
@@ -35,3 +36,5 @@ export async function POST(request: Request, props: { params: Promise<{ id: stri
     );
   }
 }
+
+export const POST = withAdminContext(POSTHandler);

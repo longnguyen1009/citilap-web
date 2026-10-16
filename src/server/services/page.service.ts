@@ -1,3 +1,4 @@
+import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { pageStudioWriteSchema, type PageDocument, type PageType } from '../../contracts/cms/page';
 import { RESERVED_SLUGS } from '../../contracts/cms/post';
@@ -116,7 +117,7 @@ export async function writePage(env: MediaEnvironment, id: string | null, input:
   statements.push(db.prepare('INSERT INTO PageStudio(pageId,draft,published) VALUES(?,?,?) ON CONFLICT(pageId) DO NOTHING').bind(
     pageId, snapshot, action === 'publish' ? snapshot : null
   ));
-  statements.push(db.prepare('INSERT INTO PageStudioRevision(pageId,revision,document,action) VALUES(?,?,?,?)').bind(pageId, version, snapshot, action));
+  statements.push(db.prepare('INSERT INTO PageStudioRevision(pageId,revision,document,action,actor) VALUES(?,?,?,?,?)').bind(pageId, version, snapshot, action, adminActor()));
 
   statements.push(db.prepare(`
     UPDATE PageStudio
@@ -139,7 +140,7 @@ export async function writePage(env: MediaEnvironment, id: string | null, input:
   }
 
   try {
-    await db.batch(statements);
+    await db.batch([...statements, ...adminAuditStatements(db, 'page.' + action, pageId, 'CMS mutation')]);
   } catch (e) {
     if (e instanceof Error && /PAGE_STUDIO_CONFLICT|UNIQUE constraint/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản hoặc đường dẫn trùng. Tải lại và kiểm tra dữ liệu.', 409);

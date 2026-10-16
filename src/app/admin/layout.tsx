@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import AdminBreadcrumbs, { type BreadcrumbItem } from "@/components/admin/ui/AdminBreadcrumbs";
 import AdminNotificationBell from "@/components/admin/notifications/AdminNotificationBell";
+import { adminCapability, canAdmin, type AdminPrincipal } from '@/lib/admin-permissions';
 
 interface NavItem {
   name: string;
@@ -71,6 +72,8 @@ const navGroups: NavGroup[] = [
       { name: "Danh mục sản phẩm", href: "/admin/categories", icon: FolderTree },
       { name: "Menu & Bộ sưu tập", href: "/admin/navigation", icon: Menu },
       { name: "Cài đặt hệ thống", href: "/admin/settings", icon: Settings },
+      { name: "Tài khoản và quyền", href: "/admin/users", icon: Users },
+      { name: "Nhật ký quản trị", href: "/admin/audit", icon: FileText },
     ],
   },
 ];
@@ -149,6 +152,17 @@ function getBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [principal, setPrincipal] = useState<AdminPrincipal | null>(null);
+  const [sessionError, setSessionError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/admin/session', { cache: 'no-store', signal: controller.signal }).then(async response => {
+      if (response.status === 401) { window.location.replace('/login'); return; }
+      if (!response.ok) throw new Error();
+      setPrincipal((await response.json()).data);
+    }).catch(error => { if (error.name !== 'AbortError') setSessionError('Không thể kiểm tra phiên. Vui lòng tải lại.'); });
+    return () => controller.abort();
+  }, []);
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -190,16 +204,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
-    router.replace("/login");
-    router.refresh();
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+      if (!response.ok) throw new Error('LOGOUT_FAILED');
+      router.replace("/login");
+      router.refresh();
+    } catch { setSessionError('Đăng xuất chưa thành công. Thử lại.'); }
   };
 
   const breadcrumbs = getBreadcrumbsFromPath(pathname);
 
   const renderNavLinks = () => (
     <div className="space-y-6">
-      {navGroups.map((group) => (
+      {navGroups.map(group => ({ ...group, items: group.items.filter(item => principal && canAdmin(principal, adminCapability(item.href))) })).filter(group => group.items.length).map((group) => (
         <div key={group.groupName}>
           <div className="px-3 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
             {group.groupName}
@@ -269,8 +286,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </div>
   );
 
+  if (!principal) return <p role="status" className="p-6">{sessionError || 'Đang kiểm tra phiên…'}</p>;
+  if (!canAdmin(principal, adminCapability(pathname))) return <p role="alert" className="p-6">Bạn không có quyền mở màn hình này.</p>;
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      {sessionError && <p role="alert" className="fixed top-2 right-2 z-50 bg-red-50 text-red-800 p-3 rounded">{sessionError}</p>}
       {/* Desktop Sidebar */}
       <aside
         className="w-64 bg-slate-900 text-white flex-shrink-0 hidden md:flex flex-col border-r border-slate-800 select-none"
@@ -363,7 +383,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           {/* Right actions: Notifications, Quick Storefront link & User info */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <AdminNotificationBell />
+            {principal && canAdmin(principal, 'orders') && <AdminNotificationBell />}
 
             <Link
               href="/"

@@ -1,20 +1,21 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { mediaAdmin } from '@/server/media-http';
 import { getLandingPageDetail, writeLandingPage } from '@/server/services/site-builder.service';
 import { MediaError } from '@/server/services/media-library.service';
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function GET(request: Request, context: Context) {
+async function GETHandler(request: Request, context: Context) {
   const { id } = await context.params;
   return mediaAdmin(request, false, (env) => getLandingPageDetail(env.DB, id));
 }
 
-export async function PUT(request: Request, context: Context) {
+async function PUTHandler(request: Request, context: Context) {
   const { id } = await context.params;
   return mediaAdmin(request, true, async (env) => writeLandingPage(env, id, await request.json()));
 }
 
-export async function DELETE(request: Request, context: Context) {
+async function DELETEHandler(request: Request, context: Context) {
   const { id } = await context.params;
   return mediaAdmin(request, true, async (env) => {
     if (id === 'home') {
@@ -29,3 +30,7 @@ export async function DELETE(request: Request, context: Context) {
     return { success: true, message: 'Đã xóa landing page.' };
   });
 }
+
+export const GET = withAdminContext(GETHandler);
+export const PUT = withAdminContext(PUTHandler);
+export const DELETE = withAdminContext(DELETEHandler);

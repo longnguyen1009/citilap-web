@@ -1,56 +1,35 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
+import { adminCapability, canAdmin, type AdminPrincipal } from './admin-permissions';
+import { resolveAdmin } from '../server/services/admin-identity.service';
 
-/** Protects server-side admin mutations with a bearer token or HttpOnly cookie.
- * Set ADMIN_API_TOKEN in the deployment environment. Never use a fallback token.
- */
-export function isAdminRequest(request: Request): boolean {
-  const configured = process.env.ADMIN_API_TOKEN;
-  if (!configured || configured.length < 32) return false;
-
-  const authorization = request.headers.get("authorization");
-  const bearer = authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
-  const cookie = request.headers.get("cookie")?.match(/(?:^|;\s*)admin_session=([^;]+)/)?.[1];
-  if (!bearer && cookie && verifyAdminSession(cookie, configured)) return true;
-  const supplied = bearer;
-  if (!supplied || supplied.length !== configured.length) return false;
-
+const principals = new WeakMap<Request, AdminPrincipal>();
+export function authenticatedAdmin(request: Request): AdminPrincipal {
+  const principal = principals.get(request);
+  if (!principal) throw new Error('ADMIN_PRINCIPAL_REQUIRED');
+  return principal;
+}
+export async function isAdminRequest(request: Request): Promise<boolean> {
+  const principal = await resolveAdmin(request);
+  return Boolean(principal && canAdmin(principal, adminCapability(new URL(request.url).pathname)));
+}
+export async function requireAdmin(request: Request): Promise<Response | null> {
   try {
-    return timingSafeEqual(Buffer.from(supplied), Buffer.from(configured));
+    const principal = await resolveAdmin(request);
+    if (!principal) return Response.json({success:false,error:'Unauthorized'}, {status:401});
+    if (!canAdmin(principal, adminCapability(new URL(request.url).pathname))) {
+      return Response.json({success:false,error:'Forbidden'}, {status:403});
+    }
+    principals.set(request, principal);
+    return null;
   } catch {
-    return false;
+    return Response.json({success:false,error:'Authentication unavailable'}, {status:503});
   }
-}
-
-export function createAdminSession(configured = process.env.ADMIN_API_TOKEN): string {
-  if (!configured || configured.length < 32) throw new Error("ADMIN_API_TOKEN is not configured");
-  const expires = Math.floor(Date.now() / 1000) + 60 * 60 * 8;
-  const signature = createHmac("sha256", configured).update(String(expires)).digest("base64url");
-  return `${expires}.${signature}`;
-}
-
-function verifyAdminSession(value: string, configured: string): boolean {
-  const [expiresText, signature] = value.split(".");
-  const expires = Number(expiresText);
-  if (!Number.isInteger(expires) || expires < Math.floor(Date.now() / 1000) || !signature) return false;
-  const expected = createHmac("sha256", configured).update(String(expires)).digest("base64url");
-  return signature.length === expected.length && timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-}
-
-export function requireAdmin(request: Request): Response | null {
-  if (isAdminRequest(request)) return null;
-  return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
 }
 
 /**
  * Validates Origin and Fetch Metadata headers to prevent CSRF on cookie-authenticated admin mutations.
  */
 export function validateMutationOrigin(request: Request): boolean {
-  // If authorization is via Bearer token (API client), ambient cookie CSRF does not apply
-  const authorization = request.headers.get("authorization");
-  if (authorization?.startsWith("Bearer ")) {
-    return true;
-  }
-
   // Fetch Metadata defense: modern browsers strictly identify cross-site requests
   const secFetchSite = request.headers.get("sec-fetch-site");
   if (secFetchSite && secFetchSite === "cross-site") {
@@ -104,8 +83,8 @@ export function validateMutationOrigin(request: Request): boolean {
 /**
  * Enforces admin authorization AND CSRF protection (Origin & Fetch Metadata validation) for mutations.
  */
-export function requireAdminMutation(request: Request): Response | null {
-  const authDenied = requireAdmin(request);
+export async function requireAdminMutation(request: Request): Promise<Response | null> {
+  const authDenied = await requireAdmin(request);
   if (authDenied) return authDenied;
 
   if (!validateMutationOrigin(request)) {

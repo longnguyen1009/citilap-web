@@ -43,7 +43,7 @@ export default function LoginPage() {
         return;
       }
       if (result.role === "ADMIN") {
-        router.push("/admin/dashboard");
+        router.push(result.redirect || "/admin/dashboard");
       } else {
         router.push("/");
       }

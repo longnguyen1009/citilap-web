@@ -1,9 +1,11 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
-import { listAdminNotifications } from '@/server/services/notification.service';
+import { authenticatedAdmin, requireAdmin } from '@/lib/auth';
+import { listPersonalNotifications } from '@/server/services/notification.service';
+import { mediaEnvironment } from '@/server/media-http';
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -11,7 +13,7 @@ export async function GET(request: Request) {
     const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20));
     const onlyUnread = searchParams.get('unread') === 'true';
 
-    const result = await listAdminNotifications({ limit, onlyUnread });
+    const result = await listPersonalNotifications((await mediaEnvironment()).DB, authenticatedAdmin(request).id, limit, onlyUnread);
 
     return NextResponse.json(
       {
@@ -33,3 +35,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = withAdminContext(GETHandler);

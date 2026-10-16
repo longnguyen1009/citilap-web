@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdminMutation } from '@/lib/auth';
 import { sanitizeHtml } from '@/lib/sanitize-html';
@@ -5,7 +6,7 @@ import { sanitizeHtml } from '@/lib/sanitize-html';
 // Check if DATABASE_URL is configured
 const hasDatabase = !!process.env.DATABASE_URL;
 
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
@@ -77,8 +78,8 @@ function toNullableIso(value: unknown): string | null { const text = toNullableS
 
 const PRODUCT_STATUSES = new Set(['ACTIVE', 'DRAFT', 'ARCHIVED', 'INACTIVE', 'OUT_OF_STOCK', 'active', 'draft', 'archived']);
 
-export async function POST(request: Request) {
-  const denied = requireAdminMutation(request);
+async function POSTHandler(request: Request) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   return NextResponse.json(
@@ -90,3 +91,6 @@ export async function POST(request: Request) {
     { status: 409 }
   );
 }
+
+export const GET = withAdminContext(GETHandler);
+export const POST = withAdminContext(POSTHandler);

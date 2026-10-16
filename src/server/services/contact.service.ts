@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { adminActor, adminAuditStatements } from '../admin-context';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
 import { hashIp } from '@/lib/rate-limiter';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -376,10 +377,10 @@ export async function updateContactSubmissionStatus(
 
   if (targetStatus === 'PROCESSING') {
     if (!startedProcessingAt) startedProcessingAt = now;
-    handledBy = SHARED_CONTACT_ACTOR;
+    handledBy = adminActor(SHARED_CONTACT_ACTOR);
   } else if (targetStatus === 'HANDLED') {
     handledAt = now;
-    handledBy = SHARED_CONTACT_ACTOR;
+    handledBy = adminActor(SHARED_CONTACT_ACTOR);
     if (!startedProcessingAt) startedProcessingAt = now;
   } else if (targetStatus === 'PENDING') {
     handledAt = null;
@@ -431,12 +432,12 @@ export async function updateContactSubmissionStatus(
     currentStatus,
     targetStatus,
     cleanNote,
-    SHARED_CONTACT_ACTOR,
+    adminActor(SHARED_CONTACT_ACTOR),
     nowIso,
     id
   );
 
-  const [updateRes] = await db.batch([updateStmt, eventStmt]);
+  const [updateRes] = await db.batch([updateStmt, eventStmt, ...adminAuditStatements(db, 'contact.' + action, id, 'Contact processed', eventId, 'contact')]);
   if ((updateRes.meta?.changes ?? 0) === 0) {
     const fresh = await prisma.contactSubmission.findUnique({ where: { id } });
     if (!fresh) {

@@ -1,3 +1,4 @@
+import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { blankProduct, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
 import { sanitizeHtml } from '../../lib/sanitize-html';
@@ -602,10 +603,10 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     statements.push(db.prepare("UPDATE Product SET status='DRAFT',updatedAt=CURRENT_TIMESTAMP WHERE id=?").bind(productId));
   }
 
-  statements.push(db.prepare('INSERT INTO ProductEditLog(id,productId,action,actorName,snapshot) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(), productId, `STUDIO_${action.toUpperCase()}`, 'admin', snapshot));
+  statements.push(db.prepare('INSERT INTO ProductEditLog(id,productId,action,actorName,snapshot) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(), productId, `STUDIO_${action.toUpperCase()}`, adminActor(), snapshot));
 
   try {
-    await db.batch(statements);
+    await db.batch([...statements, ...adminAuditStatements(db, 'product.' + action, productId, 'CMS mutation')]);
   } catch (e) {
     if (e instanceof Error && /STUDIO_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản, slug, SKU hoặc trạng thái media. Tải lại và kiểm tra dữ liệu.', 409);
@@ -628,7 +629,8 @@ export async function archiveProduct(db: D1Database, id: string) {
   await db.batch([
     db.prepare("UPDATE Product SET status='ARCHIVED', updatedAt=CURRENT_TIMESTAMP WHERE id=?").bind(id),
     db.prepare("UPDATE ProductStudio SET published=NULL, updatedAt=CURRENT_TIMESTAMP WHERE productId=?").bind(id),
-    db.prepare("INSERT INTO ProductEditLog(id,productId,action,actorName) VALUES(?,?,'ARCHIVE','admin')").bind(crypto.randomUUID(), id),
+    db.prepare("INSERT INTO ProductEditLog(id,productId,action,actorName) VALUES(?,?,'ARCHIVE',?)").bind(crypto.randomUUID(), id, adminActor()),
+    ...adminAuditStatements(db, 'product.archive', id, 'Product archived'),
   ]);
 
   return { success: true, archived: true, id, orderReferenced: (orderCount?.cnt ?? 0) > 0 };
@@ -729,17 +731,12 @@ export async function restoreProductRevision(
 ) {
   const snapshot = await getProductRevisionSnapshot(env.DB, productId, targetRevision);
   
-  // Call canonical writeStudio with action: 'save' to save restored snapshot as new draft
+  // Canonical restore writes a new draft and its audit atomically; public stays unchanged.
   const writeResult = await writeStudio(env, productId, {
     expectedRevision,
-    action: 'save',
+    action: 'restore',
     document: snapshot.document,
   });
-
-  // Record audit log
-  await env.DB.prepare(
-    "INSERT INTO ProductEditLog(id,productId,action,actorName) VALUES(?,?,'RESTORE','admin')"
-  ).bind(crypto.randomUUID(), productId).run();
 
   return {
     success: true,

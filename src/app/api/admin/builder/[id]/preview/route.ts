@@ -1,10 +1,11 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { mediaAdmin } from '@/server/media-http';
 import { getPreviewLandingPage } from '@/server/services/site-builder.service';
 import type { LandingPageDocument } from '@/contracts/cms/site-builder';
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function POST(request: Request, context: Context) {
+async function POSTHandler(request: Request, context: Context) {
   const { id } = await context.params;
   return mediaAdmin(request, false, async (env) => {
     let documentOverride: LandingPageDocument | undefined;
@@ -22,3 +23,5 @@ export async function POST(request: Request, context: Context) {
     return getPreviewLandingPage(env.DB, id, documentOverride);
   });
 }
+
+export const POST = withAdminContext(POSTHandler);

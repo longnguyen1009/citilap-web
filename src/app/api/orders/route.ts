@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import {
@@ -22,8 +23,8 @@ function errorResponse(message: string, status: number, code = 'INVALID_REQUEST'
   );
 }
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   // 1. Rate limiting check (5 submissions per 10 minutes per IP)
   const rateLimit = await checkRateLimit('order', request, 5, 600);
   if (!rateLimit.allowed) {
@@ -202,3 +203,6 @@ export async function POST(request: Request) {
     return errorResponse('Không thể tạo đơn hàng. Vui lòng thử lại sau.', 500, 'ORDER_CREATE_FAILED');
   }
 }
+
+export const GET = withAdminContext(GETHandler);
+export const POST = withAdminContext(POSTHandler);

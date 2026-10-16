@@ -186,7 +186,7 @@ export default function AdminNotificationBell() {
                 )}
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Hộp thư vận hành chung (Đã đọc chung)
+                Thông báo · Đã đọc theo tài khoản
               </p>
             </div>
 

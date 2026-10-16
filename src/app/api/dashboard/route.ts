@@ -1,9 +1,10 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { mediaEnvironment } from "@/server/media-http";
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -107,3 +108,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = withAdminContext(GETHandler);
