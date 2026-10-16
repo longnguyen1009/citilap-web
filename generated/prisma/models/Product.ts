@@ -612,6 +612,7 @@ export type ProductWhereInput = {
   editLogs?: Prisma.ProductEditLogListRelationFilter
   versions?: Prisma.ProductVersionListRelationFilter
   orderItems?: Prisma.OrderItemListRelationFilter
+  campaignItems?: Prisma.PromotionCampaignItemListRelationFilter
   serialUnits?: Prisma.SerialUnitListRelationFilter
   inventoryBalances?: Prisma.InventoryBalanceListRelationFilter
   inventoryTransactions?: Prisma.InventoryTransactionListRelationFilter
@@ -676,6 +677,7 @@ export type ProductOrderByWithRelationInput = {
   editLogs?: Prisma.ProductEditLogOrderByRelationAggregateInput
   versions?: Prisma.ProductVersionOrderByRelationAggregateInput
   orderItems?: Prisma.OrderItemOrderByRelationAggregateInput
+  campaignItems?: Prisma.PromotionCampaignItemOrderByRelationAggregateInput
   serialUnits?: Prisma.SerialUnitOrderByRelationAggregateInput
   inventoryBalances?: Prisma.InventoryBalanceOrderByRelationAggregateInput
   inventoryTransactions?: Prisma.InventoryTransactionOrderByRelationAggregateInput
@@ -743,6 +745,7 @@ export type ProductWhereUniqueInput = Prisma.AtLeast<{
   editLogs?: Prisma.ProductEditLogListRelationFilter
   versions?: Prisma.ProductVersionListRelationFilter
   orderItems?: Prisma.OrderItemListRelationFilter
+  campaignItems?: Prisma.PromotionCampaignItemListRelationFilter
   serialUnits?: Prisma.SerialUnitListRelationFilter
   inventoryBalances?: Prisma.InventoryBalanceListRelationFilter
   inventoryTransactions?: Prisma.InventoryTransactionListRelationFilter
@@ -917,6 +920,7 @@ export type ProductCreateInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -979,6 +983,7 @@ export type ProductUncheckedCreateInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -1041,6 +1046,7 @@ export type ProductUpdateInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -1103,6 +1109,7 @@ export type ProductUncheckedUpdateInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -1704,6 +1711,20 @@ export type ProductUpdateOneRequiredWithoutStudioNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProductUpdateToOneWithWhereWithoutStudioInput, Prisma.ProductUpdateWithoutStudioInput>, Prisma.ProductUncheckedUpdateWithoutStudioInput>
 }
 
+export type ProductCreateNestedOneWithoutCampaignItemsInput = {
+  create?: Prisma.XOR<Prisma.ProductCreateWithoutCampaignItemsInput, Prisma.ProductUncheckedCreateWithoutCampaignItemsInput>
+  connectOrCreate?: Prisma.ProductCreateOrConnectWithoutCampaignItemsInput
+  connect?: Prisma.ProductWhereUniqueInput
+}
+
+export type ProductUpdateOneRequiredWithoutCampaignItemsNestedInput = {
+  create?: Prisma.XOR<Prisma.ProductCreateWithoutCampaignItemsInput, Prisma.ProductUncheckedCreateWithoutCampaignItemsInput>
+  connectOrCreate?: Prisma.ProductCreateOrConnectWithoutCampaignItemsInput
+  upsert?: Prisma.ProductUpsertWithoutCampaignItemsInput
+  connect?: Prisma.ProductWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ProductUpdateToOneWithWhereWithoutCampaignItemsInput, Prisma.ProductUpdateWithoutCampaignItemsInput>, Prisma.ProductUncheckedUpdateWithoutCampaignItemsInput>
+}
+
 export type ProductCreateWithoutBrandRelInput = {
   id?: string
   name: string
@@ -1759,6 +1780,7 @@ export type ProductCreateWithoutBrandRelInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -1820,6 +1842,7 @@ export type ProductUncheckedCreateWithoutBrandRelInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -1961,6 +1984,7 @@ export type ProductCreateWithoutCategoryInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -2022,6 +2046,7 @@ export type ProductUncheckedCreateWithoutCategoryInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -2108,6 +2133,7 @@ export type ProductCreateWithoutVariantsInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -2169,6 +2195,7 @@ export type ProductUncheckedCreateWithoutVariantsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -2246,6 +2273,7 @@ export type ProductUpdateWithoutVariantsInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -2307,6 +2335,7 @@ export type ProductUncheckedUpdateWithoutVariantsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -2368,6 +2397,7 @@ export type ProductCreateWithoutProductImagesInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -2429,6 +2459,7 @@ export type ProductUncheckedCreateWithoutProductImagesInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -2506,6 +2537,7 @@ export type ProductUpdateWithoutProductImagesInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -2567,6 +2599,7 @@ export type ProductUncheckedUpdateWithoutProductImagesInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -2628,6 +2661,7 @@ export type ProductCreateWithoutEditLogsInput = {
   productImages?: Prisma.ProductImageCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -2689,6 +2723,7 @@ export type ProductUncheckedCreateWithoutEditLogsInput = {
   productImages?: Prisma.ProductImageUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -2766,6 +2801,7 @@ export type ProductUpdateWithoutEditLogsInput = {
   productImages?: Prisma.ProductImageUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -2827,6 +2863,7 @@ export type ProductUncheckedUpdateWithoutEditLogsInput = {
   productImages?: Prisma.ProductImageUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -2888,6 +2925,7 @@ export type ProductCreateWithoutVersionsInput = {
   productImages?: Prisma.ProductImageCreateNestedManyWithoutProductInput
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -2949,6 +2987,7 @@ export type ProductUncheckedCreateWithoutVersionsInput = {
   productImages?: Prisma.ProductImageUncheckedCreateNestedManyWithoutProductInput
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -3026,6 +3065,7 @@ export type ProductUpdateWithoutVersionsInput = {
   productImages?: Prisma.ProductImageUpdateManyWithoutProductNestedInput
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -3087,6 +3127,7 @@ export type ProductUncheckedUpdateWithoutVersionsInput = {
   productImages?: Prisma.ProductImageUncheckedUpdateManyWithoutProductNestedInput
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -3148,6 +3189,7 @@ export type ProductCreateWithoutOrderItemsInput = {
   productImages?: Prisma.ProductImageCreateNestedManyWithoutProductInput
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -3209,6 +3251,7 @@ export type ProductUncheckedCreateWithoutOrderItemsInput = {
   productImages?: Prisma.ProductImageUncheckedCreateNestedManyWithoutProductInput
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -3286,6 +3329,7 @@ export type ProductUpdateWithoutOrderItemsInput = {
   productImages?: Prisma.ProductImageUpdateManyWithoutProductNestedInput
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -3347,6 +3391,7 @@ export type ProductUncheckedUpdateWithoutOrderItemsInput = {
   productImages?: Prisma.ProductImageUncheckedUpdateManyWithoutProductNestedInput
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -3409,6 +3454,7 @@ export type ProductCreateWithoutSerialUnitsInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
   inventoryReservations?: Prisma.InventoryReservationCreateNestedManyWithoutProductInput
@@ -3470,6 +3516,7 @@ export type ProductUncheckedCreateWithoutSerialUnitsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
   inventoryReservations?: Prisma.InventoryReservationUncheckedCreateNestedManyWithoutProductInput
@@ -3547,6 +3594,7 @@ export type ProductUpdateWithoutSerialUnitsInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
   inventoryReservations?: Prisma.InventoryReservationUpdateManyWithoutProductNestedInput
@@ -3608,6 +3656,7 @@ export type ProductUncheckedUpdateWithoutSerialUnitsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
   inventoryReservations?: Prisma.InventoryReservationUncheckedUpdateManyWithoutProductNestedInput
@@ -3669,6 +3718,7 @@ export type ProductCreateWithoutInventoryBalancesInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
   inventoryReservations?: Prisma.InventoryReservationCreateNestedManyWithoutProductInput
@@ -3730,6 +3780,7 @@ export type ProductUncheckedCreateWithoutInventoryBalancesInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
   inventoryReservations?: Prisma.InventoryReservationUncheckedCreateNestedManyWithoutProductInput
@@ -3807,6 +3858,7 @@ export type ProductUpdateWithoutInventoryBalancesInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
   inventoryReservations?: Prisma.InventoryReservationUpdateManyWithoutProductNestedInput
@@ -3868,6 +3920,7 @@ export type ProductUncheckedUpdateWithoutInventoryBalancesInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
   inventoryReservations?: Prisma.InventoryReservationUncheckedUpdateManyWithoutProductNestedInput
@@ -3929,6 +3982,7 @@ export type ProductCreateWithoutInventoryTransactionsInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryReservations?: Prisma.InventoryReservationCreateNestedManyWithoutProductInput
@@ -3990,6 +4044,7 @@ export type ProductUncheckedCreateWithoutInventoryTransactionsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryReservations?: Prisma.InventoryReservationUncheckedCreateNestedManyWithoutProductInput
@@ -4067,6 +4122,7 @@ export type ProductUpdateWithoutInventoryTransactionsInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryReservations?: Prisma.InventoryReservationUpdateManyWithoutProductNestedInput
@@ -4128,6 +4184,7 @@ export type ProductUncheckedUpdateWithoutInventoryTransactionsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryReservations?: Prisma.InventoryReservationUncheckedUpdateManyWithoutProductNestedInput
@@ -4189,6 +4246,7 @@ export type ProductCreateWithoutInventoryReservationsInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -4250,6 +4308,7 @@ export type ProductUncheckedCreateWithoutInventoryReservationsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -4327,6 +4386,7 @@ export type ProductUpdateWithoutInventoryReservationsInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -4388,6 +4448,7 @@ export type ProductUncheckedUpdateWithoutInventoryReservationsInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -4448,6 +4509,7 @@ export type ProductCreateWithoutStudioInput = {
   editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
@@ -4509,6 +4571,7 @@ export type ProductUncheckedCreateWithoutStudioInput = {
   editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
   versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedCreateNestedManyWithoutProductInput
   serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
@@ -4586,6 +4649,7 @@ export type ProductUpdateWithoutStudioInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -4642,6 +4706,271 @@ export type ProductUncheckedUpdateWithoutStudioInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  variants?: Prisma.ProductVariantUncheckedUpdateManyWithoutProductNestedInput
+  productImages?: Prisma.ProductImageUncheckedUpdateManyWithoutProductNestedInput
+  editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
+  versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
+  orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
+  serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
+  inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
+  inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
+  inventoryReservations?: Prisma.InventoryReservationUncheckedUpdateManyWithoutProductNestedInput
+}
+
+export type ProductCreateWithoutCampaignItemsInput = {
+  id?: string
+  name: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  contentHtml?: string | null
+  brand?: string | null
+  model?: string | null
+  series?: string | null
+  warranty?: string | null
+  condition?: string
+  origin?: string | null
+  seoTitle?: string | null
+  seoDescription?: string | null
+  canonicalSlug?: string | null
+  isFeatured?: boolean
+  isNewArrival?: boolean
+  isFlashSale?: boolean
+  isBestSeller?: boolean
+  allowBackorder?: boolean
+  minOrderQty?: number
+  maxOrderQty?: number | null
+  lowestPrice30d?: number | null
+  publishAt?: Date | string | null
+  unpublishAt?: Date | string | null
+  price: number
+  originalPrice?: number | null
+  images?: string
+  stock?: number
+  status?: string
+  cpu?: string | null
+  cpuSeries?: string | null
+  gpu?: string | null
+  gpuSeries?: string | null
+  ram?: string | null
+  ramGb?: number | null
+  storage?: string | null
+  storageGb?: number | null
+  display?: string | null
+  screenSize?: number | null
+  refreshRate?: number | null
+  specs?: string | null
+  tags?: string | null
+  inventoryType?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  studio?: Prisma.ProductStudioCreateNestedOneWithoutProductInput
+  brandRel?: Prisma.BrandCreateNestedOneWithoutProductsInput
+  category: Prisma.CategoryCreateNestedOneWithoutProductsInput
+  variants?: Prisma.ProductVariantCreateNestedManyWithoutProductInput
+  productImages?: Prisma.ProductImageCreateNestedManyWithoutProductInput
+  editLogs?: Prisma.ProductEditLogCreateNestedManyWithoutProductInput
+  versions?: Prisma.ProductVersionCreateNestedManyWithoutProductInput
+  orderItems?: Prisma.OrderItemCreateNestedManyWithoutProductInput
+  serialUnits?: Prisma.SerialUnitCreateNestedManyWithoutProductInput
+  inventoryBalances?: Prisma.InventoryBalanceCreateNestedManyWithoutProductInput
+  inventoryTransactions?: Prisma.InventoryTransactionCreateNestedManyWithoutProductInput
+  inventoryReservations?: Prisma.InventoryReservationCreateNestedManyWithoutProductInput
+}
+
+export type ProductUncheckedCreateWithoutCampaignItemsInput = {
+  id?: string
+  name: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  contentHtml?: string | null
+  brand?: string | null
+  brandId?: string | null
+  model?: string | null
+  series?: string | null
+  warranty?: string | null
+  condition?: string
+  origin?: string | null
+  seoTitle?: string | null
+  seoDescription?: string | null
+  canonicalSlug?: string | null
+  isFeatured?: boolean
+  isNewArrival?: boolean
+  isFlashSale?: boolean
+  isBestSeller?: boolean
+  allowBackorder?: boolean
+  minOrderQty?: number
+  maxOrderQty?: number | null
+  lowestPrice30d?: number | null
+  publishAt?: Date | string | null
+  unpublishAt?: Date | string | null
+  price: number
+  originalPrice?: number | null
+  images?: string
+  stock?: number
+  status?: string
+  cpu?: string | null
+  cpuSeries?: string | null
+  gpu?: string | null
+  gpuSeries?: string | null
+  ram?: string | null
+  ramGb?: number | null
+  storage?: string | null
+  storageGb?: number | null
+  display?: string | null
+  screenSize?: number | null
+  refreshRate?: number | null
+  specs?: string | null
+  tags?: string | null
+  categoryId: string
+  inventoryType?: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  deletedAt?: Date | string | null
+  studio?: Prisma.ProductStudioUncheckedCreateNestedOneWithoutProductInput
+  variants?: Prisma.ProductVariantUncheckedCreateNestedManyWithoutProductInput
+  productImages?: Prisma.ProductImageUncheckedCreateNestedManyWithoutProductInput
+  editLogs?: Prisma.ProductEditLogUncheckedCreateNestedManyWithoutProductInput
+  versions?: Prisma.ProductVersionUncheckedCreateNestedManyWithoutProductInput
+  orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutProductInput
+  serialUnits?: Prisma.SerialUnitUncheckedCreateNestedManyWithoutProductInput
+  inventoryBalances?: Prisma.InventoryBalanceUncheckedCreateNestedManyWithoutProductInput
+  inventoryTransactions?: Prisma.InventoryTransactionUncheckedCreateNestedManyWithoutProductInput
+  inventoryReservations?: Prisma.InventoryReservationUncheckedCreateNestedManyWithoutProductInput
+}
+
+export type ProductCreateOrConnectWithoutCampaignItemsInput = {
+  where: Prisma.ProductWhereUniqueInput
+  create: Prisma.XOR<Prisma.ProductCreateWithoutCampaignItemsInput, Prisma.ProductUncheckedCreateWithoutCampaignItemsInput>
+}
+
+export type ProductUpsertWithoutCampaignItemsInput = {
+  update: Prisma.XOR<Prisma.ProductUpdateWithoutCampaignItemsInput, Prisma.ProductUncheckedUpdateWithoutCampaignItemsInput>
+  create: Prisma.XOR<Prisma.ProductCreateWithoutCampaignItemsInput, Prisma.ProductUncheckedCreateWithoutCampaignItemsInput>
+  where?: Prisma.ProductWhereInput
+}
+
+export type ProductUpdateToOneWithWhereWithoutCampaignItemsInput = {
+  where?: Prisma.ProductWhereInput
+  data: Prisma.XOR<Prisma.ProductUpdateWithoutCampaignItemsInput, Prisma.ProductUncheckedUpdateWithoutCampaignItemsInput>
+}
+
+export type ProductUpdateWithoutCampaignItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contentHtml?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  model?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  series?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  warranty?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  condition?: Prisma.StringFieldUpdateOperationsInput | string
+  origin?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seoTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seoDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isFeatured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isNewArrival?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isFlashSale?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isBestSeller?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  allowBackorder?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  minOrderQty?: Prisma.IntFieldUpdateOperationsInput | number
+  maxOrderQty?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  lowestPrice30d?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  publishAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  unpublishAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  price?: Prisma.IntFieldUpdateOperationsInput | number
+  originalPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  images?: Prisma.StringFieldUpdateOperationsInput | string
+  stock?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  cpu?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cpuSeries?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gpu?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gpuSeries?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ram?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ramGb?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  storage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storageGb?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  display?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  screenSize?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  refreshRate?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  specs?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  inventoryType?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  studio?: Prisma.ProductStudioUpdateOneWithoutProductNestedInput
+  brandRel?: Prisma.BrandUpdateOneWithoutProductsNestedInput
+  category?: Prisma.CategoryUpdateOneRequiredWithoutProductsNestedInput
+  variants?: Prisma.ProductVariantUpdateManyWithoutProductNestedInput
+  productImages?: Prisma.ProductImageUpdateManyWithoutProductNestedInput
+  editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
+  versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
+  orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
+  inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
+  inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
+  inventoryReservations?: Prisma.InventoryReservationUpdateManyWithoutProductNestedInput
+}
+
+export type ProductUncheckedUpdateWithoutCampaignItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  contentHtml?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  brand?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  brandId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  model?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  series?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  warranty?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  condition?: Prisma.StringFieldUpdateOperationsInput | string
+  origin?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seoTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  seoDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalSlug?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  isFeatured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isNewArrival?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isFlashSale?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  isBestSeller?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  allowBackorder?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  minOrderQty?: Prisma.IntFieldUpdateOperationsInput | number
+  maxOrderQty?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  lowestPrice30d?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  publishAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  unpublishAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  price?: Prisma.IntFieldUpdateOperationsInput | number
+  originalPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  images?: Prisma.StringFieldUpdateOperationsInput | string
+  stock?: Prisma.IntFieldUpdateOperationsInput | number
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  cpu?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cpuSeries?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gpu?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  gpuSeries?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ram?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ramGb?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  storage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  storageGb?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  display?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  screenSize?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  refreshRate?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  specs?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categoryId?: Prisma.StringFieldUpdateOperationsInput | string
+  inventoryType?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  deletedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  studio?: Prisma.ProductStudioUncheckedUpdateOneWithoutProductNestedInput
   variants?: Prisma.ProductVariantUncheckedUpdateManyWithoutProductNestedInput
   productImages?: Prisma.ProductImageUncheckedUpdateManyWithoutProductNestedInput
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
@@ -4759,6 +5088,7 @@ export type ProductUpdateWithoutBrandRelInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -4820,6 +5150,7 @@ export type ProductUncheckedUpdateWithoutBrandRelInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -4983,6 +5314,7 @@ export type ProductUpdateWithoutCategoryInput = {
   editLogs?: Prisma.ProductEditLogUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUpdateManyWithoutProductNestedInput
@@ -5044,6 +5376,7 @@ export type ProductUncheckedUpdateWithoutCategoryInput = {
   editLogs?: Prisma.ProductEditLogUncheckedUpdateManyWithoutProductNestedInput
   versions?: Prisma.ProductVersionUncheckedUpdateManyWithoutProductNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutProductNestedInput
+  campaignItems?: Prisma.PromotionCampaignItemUncheckedUpdateManyWithoutProductNestedInput
   serialUnits?: Prisma.SerialUnitUncheckedUpdateManyWithoutProductNestedInput
   inventoryBalances?: Prisma.InventoryBalanceUncheckedUpdateManyWithoutProductNestedInput
   inventoryTransactions?: Prisma.InventoryTransactionUncheckedUpdateManyWithoutProductNestedInput
@@ -5112,6 +5445,7 @@ export type ProductCountOutputType = {
   editLogs: number
   versions: number
   orderItems: number
+  campaignItems: number
   serialUnits: number
   inventoryBalances: number
   inventoryTransactions: number
@@ -5124,6 +5458,7 @@ export type ProductCountOutputTypeSelect<ExtArgs extends runtime.Types.Extension
   editLogs?: boolean | ProductCountOutputTypeCountEditLogsArgs
   versions?: boolean | ProductCountOutputTypeCountVersionsArgs
   orderItems?: boolean | ProductCountOutputTypeCountOrderItemsArgs
+  campaignItems?: boolean | ProductCountOutputTypeCountCampaignItemsArgs
   serialUnits?: boolean | ProductCountOutputTypeCountSerialUnitsArgs
   inventoryBalances?: boolean | ProductCountOutputTypeCountInventoryBalancesArgs
   inventoryTransactions?: boolean | ProductCountOutputTypeCountInventoryTransactionsArgs
@@ -5173,6 +5508,13 @@ export type ProductCountOutputTypeCountVersionsArgs<ExtArgs extends runtime.Type
  */
 export type ProductCountOutputTypeCountOrderItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.OrderItemWhereInput
+}
+
+/**
+ * ProductCountOutputType without action
+ */
+export type ProductCountOutputTypeCountCampaignItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PromotionCampaignItemWhereInput
 }
 
 /**
@@ -5262,6 +5604,7 @@ export type ProductSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   editLogs?: boolean | Prisma.Product$editLogsArgs<ExtArgs>
   versions?: boolean | Prisma.Product$versionsArgs<ExtArgs>
   orderItems?: boolean | Prisma.Product$orderItemsArgs<ExtArgs>
+  campaignItems?: boolean | Prisma.Product$campaignItemsArgs<ExtArgs>
   serialUnits?: boolean | Prisma.Product$serialUnitsArgs<ExtArgs>
   inventoryBalances?: boolean | Prisma.Product$inventoryBalancesArgs<ExtArgs>
   inventoryTransactions?: boolean | Prisma.Product$inventoryTransactionsArgs<ExtArgs>
@@ -5439,6 +5782,7 @@ export type ProductInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   editLogs?: boolean | Prisma.Product$editLogsArgs<ExtArgs>
   versions?: boolean | Prisma.Product$versionsArgs<ExtArgs>
   orderItems?: boolean | Prisma.Product$orderItemsArgs<ExtArgs>
+  campaignItems?: boolean | Prisma.Product$campaignItemsArgs<ExtArgs>
   serialUnits?: boolean | Prisma.Product$serialUnitsArgs<ExtArgs>
   inventoryBalances?: boolean | Prisma.Product$inventoryBalancesArgs<ExtArgs>
   inventoryTransactions?: boolean | Prisma.Product$inventoryTransactionsArgs<ExtArgs>
@@ -5465,6 +5809,7 @@ export type $ProductPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     editLogs: Prisma.$ProductEditLogPayload<ExtArgs>[]
     versions: Prisma.$ProductVersionPayload<ExtArgs>[]
     orderItems: Prisma.$OrderItemPayload<ExtArgs>[]
+    campaignItems: Prisma.$PromotionCampaignItemPayload<ExtArgs>[]
     serialUnits: Prisma.$SerialUnitPayload<ExtArgs>[]
     inventoryBalances: Prisma.$InventoryBalancePayload<ExtArgs>[]
     inventoryTransactions: Prisma.$InventoryTransactionPayload<ExtArgs>[]
@@ -5922,6 +6267,7 @@ export interface Prisma__ProductClient<T, Null = never, ExtArgs extends runtime.
   editLogs<T extends Prisma.Product$editLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Product$editLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProductEditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   versions<T extends Prisma.Product$versionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Product$versionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProductVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orderItems<T extends Prisma.Product$orderItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Product$orderItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  campaignItems<T extends Prisma.Product$campaignItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Product$campaignItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PromotionCampaignItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   serialUnits<T extends Prisma.Product$serialUnitsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Product$serialUnitsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SerialUnitPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   inventoryBalances<T extends Prisma.Product$inventoryBalancesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Product$inventoryBalancesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InventoryBalancePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   inventoryTransactions<T extends Prisma.Product$inventoryTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Product$inventoryTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InventoryTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -6558,6 +6904,30 @@ export type Product$orderItemsArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   distinct?: Prisma.OrderItemScalarFieldEnum | Prisma.OrderItemScalarFieldEnum[]
+}
+
+/**
+ * Product.campaignItems
+ */
+export type Product$campaignItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PromotionCampaignItem
+   */
+  select?: Prisma.PromotionCampaignItemSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PromotionCampaignItem
+   */
+  omit?: Prisma.PromotionCampaignItemOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PromotionCampaignItemInclude<ExtArgs> | null
+  where?: Prisma.PromotionCampaignItemWhereInput
+  orderBy?: Prisma.PromotionCampaignItemOrderByWithRelationInput | Prisma.PromotionCampaignItemOrderByWithRelationInput[]
+  cursor?: Prisma.PromotionCampaignItemWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PromotionCampaignItemScalarFieldEnum | Prisma.PromotionCampaignItemScalarFieldEnum[]
 }
 
 /**

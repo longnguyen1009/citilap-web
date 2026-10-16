@@ -3,6 +3,7 @@ import { navigationWriteSchema, type NavigationDocument, type NavigationDetail, 
 import { MediaError, getAsset, type MediaEnvironment } from './media-library.service';
 import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
 import { resolveProductsByIds, resolveProductsByCriteria, type HomepageProduct } from './catalog.service';
+import { applyPricingToHomepageProducts, getStorefrontPricingContext } from './pricing.service';
 
 type Row = { revision: number; draft: string; published: string | null; publishedRevision: number | null };
 type CategoryRow = { id: string; name: string; slug: string; description: string | null; parentId: string | null; image: string | null; status: string; sortOrder: number };
@@ -200,6 +201,10 @@ export async function publicCollection(db: D1Database, slug: string) {
   } else {
     products = await resolveProductsByIds(c.productIds || []);
   }
+
+  // Fail-closed: evaluate pricing context with active campaigns, surfacing infrastructure errors
+  const pricingContext = await getStorefrontPricingContext(db);
+  products = applyPricingToHomepageProducts(products, pricingContext);
 
   return {
     schemaVersion: 1,

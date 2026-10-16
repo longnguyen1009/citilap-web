@@ -212,3 +212,13 @@ export type LandingPageStudio = Prisma.LandingPageStudioModel
  * 
  */
 export type LandingPageRevision = Prisma.LandingPageRevisionModel
+/**
+ * Model PromotionCampaign
+ * 
+ */
+export type PromotionCampaign = Prisma.PromotionCampaignModel
+/**
+ * Model PromotionCampaignItem
+ * 
+ */
+export type PromotionCampaignItem = Prisma.PromotionCampaignItemModel

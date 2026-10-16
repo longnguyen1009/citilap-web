@@ -6,6 +6,7 @@ import {
   buildRamClauses,
   buildStorageClauses,
 } from "./catalog.service";
+import { applyPricingToHomepageProducts, type PriceEvaluationContext } from "./pricing.service";
 
 export interface SearchFilterOptions {
   query?: string;
@@ -414,7 +415,8 @@ function calculateProductRelevanceScore(
  */
 export async function searchProducts(
   options: SearchFilterOptions,
-  client: PrismaClient = prisma
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null
 ): Promise<SearchResult> {
   const { cleanQuery, tokens } = normalizeSearchQuery(options.query || "");
 
@@ -870,7 +872,8 @@ export async function searchProducts(
   const totalCount = processedProducts.length;
   const totalPages = Math.ceil(totalCount / pageSize);
   const startIndex = (page - 1) * pageSize;
-  const pagedList = processedProducts.slice(startIndex, startIndex + pageSize).map((p) => p.product);
+  const rawPagedList = processedProducts.slice(startIndex, startIndex + pageSize).map((p) => p.product);
+  const pagedList = pricingContext ? applyPricingToHomepageProducts(rawPagedList, pricingContext) : rawPagedList;
 
   return {
     query: cleanQuery,

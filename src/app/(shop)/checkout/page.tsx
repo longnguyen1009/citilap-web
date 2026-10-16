@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, MapPin, Building2, Truck, ShieldCheck, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, Building2, Truck, ShieldCheck, CheckCircle2, AlertCircle, Loader2, AlertTriangle } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -20,17 +20,35 @@ const SHOWROOMS = onlinePickupLocations.map((loc) => ({
   phone: loc.displayPhone,
 }));
 
+interface PriceChangeDetails {
+  changedItems: Array<{
+    productId: string;
+    variantId: string | null;
+    productName: string;
+    oldPrice: number;
+    newPrice: number;
+    quantity: number;
+    oldLineTotal: number;
+    newLineTotal: number;
+  }>;
+  oldSubtotal: number;
+  newSubtotal: number;
+  oldGrandTotal: number;
+  newGrandTotal: number;
+}
+
 export default function CheckoutPage() {
-  const { cart, cartTotal, clearCart } = useCart();
+  const { cart, cartTotal, clearCart, updateItemPrice } = useCart();
   const router = useRouter();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
   const [selectedShowroom, setSelectedShowroom] = useState("hanoi");
+  const [priceChangeDetails, setPriceChangeDetails] = useState<PriceChangeDetails | null>(null);
 
-  // Single idempotency key per checkout attempt
-  const [idempotencyKey] = useState(() => `checkout-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
+  // Idempotency key state (refreshed whenever payload changes)
+  const [idempotencyKey, setIdempotencyKey] = useState(() => `checkout-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
 
   const [form, setForm] = useState({
     fullName: "",
@@ -63,20 +81,7 @@ export default function CheckoutPage() {
     return null;
   };
 
-  const handleSubmitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-
-    const error = validateForm();
-    if (error) {
-      setFormError(error);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setFormError("");
-
+  const executeOrderSubmission = async (itemsToSubmit = cart, currentKey = idempotencyKey) => {
     let shippingAddress = "";
     if (deliveryType === "delivery") {
       shippingAddress = `${form.address.trim()}, ${form.district.trim()}, ${form.province}`;
@@ -90,13 +95,14 @@ export default function CheckoutPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": idempotencyKey,
+          "Idempotency-Key": currentKey,
         },
         body: JSON.stringify({
-          items: cart.map((item) => ({
+          items: itemsToSubmit.map((item) => ({
             productId: item.productId,
             variantId: item.variantId || null,
             quantity: item.quantity,
+            expectedPrice: item.price,
           })),
           customerName: form.fullName.trim(),
           customerPhone: form.phone.trim(),
@@ -114,6 +120,10 @@ export default function CheckoutPage() {
         clearCart();
         const tokenQuery = data.confirmationToken ? `&token=${encodeURIComponent(data.confirmationToken)}` : "";
         router.push(`/checkout/success?orderId=${data.orderId}${tokenQuery}`);
+      } else if (response.status === 409 && data?.error?.code === "PRICE_CHANGED" && data?.error?.details) {
+        setPriceChangeDetails(data.error.details);
+        setFormError("");
+        setIsSubmitting(false);
       } else {
         const errorMsg = data?.error?.message || data?.message || "Không thể gửi đơn hàng. Vui lòng kiểm tra lại.";
         setFormError(errorMsg);
@@ -125,6 +135,59 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
+  };
+
+  const handleSubmitOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    const error = validateForm();
+    if (error) {
+      setFormError(error);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFormError("");
+    await executeOrderSubmission(cart, idempotencyKey);
+  };
+
+  const handleConfirmPriceChange = async () => {
+    if (!priceChangeDetails) return;
+    setIsSubmitting(true);
+    setFormError("");
+
+    // Update cart context items with new prices
+    for (const changed of priceChangeDetails.changedItems) {
+      updateItemPrice(changed.productId, changed.variantId, changed.newPrice);
+    }
+
+    // Build updated items list immediately for submission
+    const updatedItems = cart.map((item) => {
+      const match = priceChangeDetails.changedItems.find(
+        (c) => c.productId === item.productId && (c.variantId || null) === (item.variantId || null)
+      );
+      if (match) {
+        return { ...item, price: match.newPrice };
+      }
+      return item;
+    });
+
+    const newKey = `checkout-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    setIdempotencyKey(newKey);
+    setPriceChangeDetails(null);
+
+    await executeOrderSubmission(updatedItems, newKey);
+  };
+
+  const handleReviewCart = () => {
+    if (priceChangeDetails) {
+      for (const changed of priceChangeDetails.changedItems) {
+        updateItemPrice(changed.productId, changed.variantId, changed.newPrice);
+      }
+    }
+    router.push("/cart");
   };
 
   if (cart.length === 0 && !isSubmitting) {
@@ -179,6 +242,29 @@ export default function CheckoutPage() {
             <div>
               <p className="font-bold">Chưa thể gửi yêu cầu đặt hàng:</p>
               <p>{formError}</p>
+            </div>
+          </div>
+        )}
+
+        {priceChangeDetails && !isSubmitting && (
+          <div className="mb-6 rounded-xl bg-amber-50 border border-amber-200 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm text-amber-900">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Giá sản phẩm đã được cập nhật</p>
+                <p className="text-xs text-amber-800">
+                  Tổng tiền mới dự kiến: <strong className="text-red-600">{priceChangeDetails.newGrandTotal.toLocaleString("vi-VN")}₫</strong> (Giá cũ: {priceChangeDetails.oldGrandTotal.toLocaleString("vi-VN")}₫).
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={handleConfirmPriceChange}
+                className="text-xs bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-3.5 rounded-lg transition shadow-sm w-full sm:w-auto text-center"
+              >
+                Xác nhận giá mới
+              </button>
             </div>
           </div>
         )}
@@ -488,6 +574,93 @@ export default function CheckoutPage() {
             </div>
           </div>
         </form>
+
+        {/* Price Change Review Modal */}
+        {priceChangeDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="p-5 bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center gap-3">
+                <div className="p-2 bg-white/20 rounded-xl">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Giá Sản Phẩm Đã Được Cập Nhật</h3>
+                  <p className="text-xs text-white/90">
+                    Bảng giá hoặc ưu đãi vừa được hệ thống cập nhật tự động
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 overflow-y-auto">
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  Một hoặc nhiều sản phẩm trong giỏ hàng có sự thay đổi về giá so với lúc bạn thêm vào giỏ. Dưới đây là chi tiết giá mới nhất được áp dụng:
+                </p>
+
+                <div className="space-y-2.5">
+                  {priceChangeDetails.changedItems.map((item, idx) => {
+                    const diff = item.newPrice - item.oldPrice;
+                    const isIncrease = diff > 0;
+                    return (
+                      <div
+                        key={idx}
+                        className="p-3.5 bg-gray-50 rounded-xl border border-gray-200/70 flex justify-between items-center gap-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.productName}</p>
+                          <p className="text-[11px] text-gray-500">Số lượng: {item.quantity}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-xs text-gray-400 line-through">
+                            {item.oldPrice.toLocaleString("vi-VN")}₫
+                          </p>
+                          <p className="text-sm font-bold text-red-600">
+                            {item.newPrice.toLocaleString("vi-VN")}₫
+                          </p>
+                          <p className={`text-[10px] font-semibold ${isIncrease ? "text-amber-600" : "text-emerald-600"}`}>
+                            {isIncrease ? `+${diff.toLocaleString("vi-VN")}₫` : `${diff.toLocaleString("vi-VN")}₫`}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-4 bg-blue-50/80 rounded-xl border border-blue-100 space-y-1.5 text-xs">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Tổng tiền cũ:</span>
+                    <span className="line-through">{priceChangeDetails.oldGrandTotal.toLocaleString("vi-VN")}₫</span>
+                  </div>
+                  <div className="flex justify-between text-gray-900 font-bold text-sm">
+                    <span>Tổng tiền mới:</span>
+                    <span className="text-red-600 font-black text-base">
+                      {priceChangeDetails.newGrandTotal.toLocaleString("vi-VN")}₫
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleConfirmPriceChange}
+                  disabled={isSubmitting}
+                  className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                  Xác nhận giá mới & Đặt hàng
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReviewCart}
+                  disabled={isSubmitting}
+                  className="bg-white hover:bg-gray-100 text-gray-700 font-semibold py-3 px-4 rounded-xl border border-gray-300 text-sm transition cursor-pointer"
+                >
+                  Xem lại giỏ hàng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

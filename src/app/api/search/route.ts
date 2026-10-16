@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { searchProducts } from '@/server/services/search.service';
+import { mediaEnvironment } from '@/server/media-http';
+import { getStorefrontPricingContext } from '@/server/services/pricing.service';
 
 const SearchQuerySchema = z.object({
   q: z.string().max(100).optional(),
@@ -65,21 +67,28 @@ export async function GET(request: Request) {
 
     const { data: validParams } = parsed;
 
-    const result = await searchProducts({
-      query: validParams.q,
-      brand: validParams.brand,
-      category: validParams.category,
-      condition: validParams.condition,
-      minPrice: validParams.minPrice,
-      maxPrice: validParams.maxPrice,
-      cpu: validParams.cpu,
-      gpu: validParams.gpu,
-      ram: validParams.ram,
-      storage: validParams.storage,
-      sort: validParams.sort,
-      page: validParams.page,
-      limit: validParams.limit,
-    });
+    const env = await mediaEnvironment();
+    const pricingContext = await getStorefrontPricingContext(env.DB);
+
+    const result = await searchProducts(
+      {
+        query: validParams.q,
+        brand: validParams.brand,
+        category: validParams.category,
+        condition: validParams.condition,
+        minPrice: validParams.minPrice,
+        maxPrice: validParams.maxPrice,
+        cpu: validParams.cpu,
+        gpu: validParams.gpu,
+        ram: validParams.ram,
+        storage: validParams.storage,
+        sort: validParams.sort,
+        page: validParams.page,
+        limit: validParams.limit,
+      },
+      undefined,
+      pricingContext
+    );
 
     return NextResponse.json({
       success: true,

@@ -22,6 +22,8 @@ export type ProductCardProduct = {
   oldPrice?: number | string | null;
   originalPrice?: number | string | null;
   discount?: string;
+  isFlashSale?: boolean;
+  isOnSale?: boolean;
   image?: string | null;
   brand?: string;
   model?: string;
@@ -202,13 +204,15 @@ export default function ProductCard({
           <ConditionBadge condition={product.condition} fallbackName={product.name} size="xs" />
 
           {/* Discount Badge */}
-          {product.discount && (
+          {(product.discount || (product.isOnSale && product.originalPrice && Number(product.originalPrice) > Number(product.price))) && (
             <Badge
               variant="sale"
               size="xs"
               className={badgeColor ? badgeColor : undefined}
             >
-              {product.discount.startsWith("-") ? product.discount : `-${product.discount}`}
+              {product.discount
+                ? (product.discount.startsWith("-") ? product.discount : `-${product.discount}`)
+                : `-${Math.round((1 - Number(product.price) / Number(product.originalPrice)) * 100)}%`}
             </Badge>
           )}
         </div>

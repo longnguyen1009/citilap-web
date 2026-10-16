@@ -2,7 +2,8 @@
 
 > **Dự án:** CitiLap CMS & Storefront  
 > **Phiên bản:** V2 (Chuẩn hóa R03B)  
-> **Ngày cập nhật:** 2026-10-13  
+> **Ngày cập nhật:** 2026-10-15  
+
 > **Nguyên tắc cốt lõi:** Mỗi thực thể dữ liệu có duy nhất 1 nguồn chuẩn (Single Source of Truth), 1 service ghi chuẩn (Canonical Writer), và mọi thay đổi giao diện/công cộng phải tuân thủ chu kỳ kiểm soát trạng thái.
 
 ---
@@ -23,7 +24,10 @@
 | **Lịch sử Site Builder (LandingPageRevision)** | Bảng `LandingPageRevision` (Append-only JSON snapshot) | `src/server/services/site-builder.service.ts` | `/api/admin/builder/[id]/revisions`, `.../restore` | Không công khai | **Tự động ghi lại** mọi thao tác lưu nháp/xuất bản/hủy xuất bản. Khôi phục tạo revision nháp mới. |
 | **Bộ Sưu Tập Sản Phẩm (Collections)** | Bảng `NavigationStudio` (mảng `collections[]` chế độ `manual` / `rule`) | `src/server/services/navigation.service.ts` | `/api/admin/navigation` | `/collection`, `/collection/[slug]`, `/api/catalog/collections`, `.../[slug]` | **Chỉ có `navigation.service.ts`**. Lọc sản phẩm `ACTIVE` thời gian thực, cấm xuất bản bộ sưu tập thủ công chứa sản phẩm nháp. |
 | **Tài nguyên Media (Hình ảnh, Video)** | Cloudflare R2 Bucket + Bảng `MediaAsset` (metadata, alt, sizes, sha256) | `src/server/services/media-library.service.ts` | `/api/admin/media` | CDN R2 Public URL | **Chỉ có Media Library**. Khi xóa kiểm tra tham chiếu `MediaUsage` trong Catalog và Post/Page revisions. |
-| **Cài đặt Website & Nhận diện (Settings)** | Bảng `SiteSettings` (D1 canonical id='site', bảng lịch sử `SiteSettingsRevision`) | `src/server/services/settings.service.ts` | `/api/admin/settings` | Header, Footer, MobileBottomNav, `/lien-he` qua `getStorefrontSettings()` | **Chỉ có `writeSettings`**. Kiểm tra CSRF, Zod Schema nghiêm ngặt, cung cấp logo, motto, hotline, showroom cho toàn bộ StoreFront. |
+| **Cài đặt Website & Nhận diện (Settings)** | Bảng `SiteSettings` (D1 canonical id='site', bảng lịch sử `SiteSettingsRevision`) | `src/server/services/settings.service.ts` | `/api/admin/settings` | Header, Footer, MobileBottomNav, `/lien-he`, `/he-thong-cua-hang` qua `getStorefrontSettings()` | **Chỉ có `writeSettings`**. Logo/motto/hotline/showroom/social đã nối StoreFront (R07A). |
+| **Chiến Dịch Khuyến Mại & Unified Pricing (PROMO-01 / R07B.1 & R07B.2)** | Bảng `PromotionCampaign` + `PromotionCampaignItem` (D1 canonical) kết hợp `SiteSettings` (Flash sale fallback) + `Product.isFlashSale` | `src/server/services/pricing.service.ts` & `src/server/services/campaign.service.ts` | `/api/admin/campaigns`, `/api/admin/campaigns/[id]`, `/publish`, `/archive`, `/admin/campaigns`, `/api/admin/settings` | Storefront: Search (`search.service.ts`), Navigation collections (`navigation.service.ts`), Site Builder (`site-builder.service.ts`), Compare (`/api/compare`), PDP (`/product/[id]`), Revalidate (`/api/cart/revalidate`), Đặt hàng (`POST /api/orders`) | **Chỉ có `campaign.service.ts` ghi chiến dịch** (bảo vệ CAS `expectedRevision`, D1 atomic batch, chặn overlap trên cả Save PUBLISHED và Publish, validate target tồn tại/variant parentage/duplicate). **Chỉ có `pricing.service.ts` tính giá** (cách ly biến thể không mượn giá cha, campaign sản phẩm không tự áp biến thể, kiểm tra `[startAt, endAt)` trên item explicit, fail-closed DB). Đơn hàng snapshot bất biến: `regularPriceSnapshot`, `compareAtPriceSnapshot`, `campaignSnapshot`, `pricingEvaluatedAt`. |
+| **Checkout settings (SET-02)** | Cùng `SiteSettings`: `shippingFee`, `freeShippingThreshold`, `codEnabled`, `bankTransferEnabled`, `bankAccountInfo` | `settings.service.ts` (ghi) + checkout/order services (đọc — **chờ R07C**) | `/api/admin/settings` | `/checkout`, `POST /api/orders`, (dự kiến) `POST /api/checkout/quote` | **Chưa nối StoreFront.** Admin đã lưu D1; `createOrder` đang hardcode `shippingFee = 0` và checkout hardcode `COD`. Thiết kế: [R07C-CHECKOUT-SETTINGS.md](./R07C-CHECKOUT-SETTINGS.md). Prompt: [prompts/PROMPT-R07C.md](./prompts/PROMPT-R07C.md). |
+| **Checkout / đặt hàng (SF-03)** | Bảng `Order` + `OrderItem` (snapshot bất biến) | `order.service.ts` | `/api/admin/orders` | `/checkout`, `/checkout/success`, `POST /api/orders` | Writer chuẩn `createOrder` + idempotency (R06). Tiêu thụ pricing R07B (verify 0đ); R07C bổ sung verify ship/method; không cổng TT online. |
 | **Hệ thống Điều hướng (Navigation)** | Bảng `NavigationMenu` & `NavigationItem` (D1) | `src/server/services/navigation.service.ts` | `/api/admin/navigation` | Gắn trực tiếp vào layout server-side | **Chỉ có Navigation Studio**. Có kiểm tra liên kết hợp lệ. |
 
 ---
@@ -189,3 +193,61 @@ Nhằm đảm bảo người dùng Storefront không bao giờ nhận kết qu�
     - **Đồng Bộ Dữ Liệu StoreFront Toàn Diện (StoreFront Sync):**
       - `Header.tsx`, `Footer.tsx`, `MobileBottomNav.tsx`, và `/lien-he` đều tiêu thụ dữ liệu tập trung qua facade `getStorefrontSettings()` trong `src/server/services/storefront-cms.service.ts`.
       - Mọi thay đổi về Logo, Favicon, Slogan/Motto, Hotline, Email, Giờ mở cửa, Địa chỉ chi nhánh Hà Nội & Bắc Ninh, Bản quyền và Mạng xã hội trong Admin Settings được phản ánh tức thì trên toàn bộ các thành phần StoreFront.
+
+---
+
+## 11. Quy Tắc Định Giá Hợp Nhất & Giờ Vàng (R07B Pricing Invariants)
+
+1. **Đơn Nhất Động Cơ Tính Giá (Unified Pricing Engine):**
+   - Mọi nơi hiển thị và xử lý giá (`ProductCard`, `/hot-sale`, trang chủ, PDP `/product/[id]`, biến thể, sản phẩm liên quan, giỏ hàng và tạo đơn hàng) đều bắt buộc tiêu thụ thông qua `src/server/services/pricing.service.ts`.
+   - Tuyệt đối cấm tính giá ad-hoc hoặc tự suy diễn giá khuyến mãi trên UI client.
+
+2. **Khung Giờ Chiến Dịch Thực Tế & Khoảng Thời Gian Nửa Mở `[startAt, endAt)`:**
+   - Khung giờ Flash Sale được cấu hình tập trung trong `SiteSettings` (`flashSaleStartAt`, `flashSaleEndAt`, `flashSaleEnabled`, `flashSaleTitle`) và lưu trữ theo chuẩn UTC.
+   - Trạng thái sale được xác định theo công thức nửa mở: `now >= startAt && now < endAt`.
+   - Zod schema nghiêm ngặt: từ chối lưu cài đặt nếu `startAt >= endAt` khi bật chiến dịch.
+   - Loại bỏ hoàn toàn sự phụ thuộc vào biến môi trường `NEXT_PUBLIC_FLASH_SALE_END_AT`.
+
+3. **Hết Hạn Giá Tức Thì Phía Máy Chủ (Server-Enforced Immediate Expiration):**
+   - Khi chiến dịch không hoạt động (`isFlashSaleActive === false`), sản phẩm có cờ `isFlashSale = true` và `originalPrice > price` tự động có giá hiệu lực (`effectivePrice`) khôi phục về `originalPrice`, và `compareAtPrice = null`.
+   - Loại bỏ việc phải chờ cron/worker quét DB để phục hồi giá niêm yết.
+
+4. **Xác Thực Giá Tạo Đơn Hàng Sai Số 0 Đồng (0đ Tolerance Price Verification):**
+   - Luồng tạo đơn hàng (`order.service.ts`) tính lại `effectivePrice` trực tiếp trên server từ dữ liệu gốc trong D1.
+   - Đối chiếu với `item.expectedPrice` do client gửi lên. Nếu có bất kỳ sự sai lệch nào (`expectedPrice !== effectivePrice`), server từ chối tạo đơn và trả mã lỗi **HTTP 409 Conflict** (`code: 'PRICE_CHANGED'`).
+   - Đơn hàng snapshot bất biến: `OrderItem.price` lưu `effectivePrice`, `OrderItem.compareAtPrice` lưu giá so sánh (nếu có), và `OrderEvent` ghi nhận nhật ký chiến dịch ưu đãi.
+
+5. **Đồng Hồ Đếm Ngược Theo Mốc Thực Tế (Milestone Countdown Invariant):**
+   - `FlashSaleCountdown.tsx` chỉ hiển thị 3 mốc thực tế: Sắp diễn ra (`Bắt đầu trong:`), Đang diễn ra (`Kết thúc trong:`), Đã kết thúc (`Flash sale đã kết thúc`).
+   - Tuyệt đối không tự động cuộn thêm giờ (artificial reset) khi hết hạn.
+
+6. **Cách Ly Biến Thể Tuyệt Đối (Variant Price Isolation — R07B.2):**
+   - Biến thể (`ProductVariant`) tuyệt đối không mượn `originalPrice` của sản phẩm cha (`Product`), kể cả khi `variant.originalPrice` là `null`.
+   - `effectiveOriginal` của biến thể luôn bằng `variant.originalPrice`. Nếu biến thể không có `originalPrice` riêng, `compareAtPrice` là `null` và `isOnSale = false` (trừ khi có chiến dịch sale chỉ định riêng biến thể với `salePrice < variant.price`).
+   - Cấm mọi biểu thức fallback `variant.originalPrice ?? product.originalPrice` trên toàn bộ hệ thống (PDP, Card, Order, JSON-LD, Pricing Engine).
+
+7. **Phạm Vi Chiến Dịch An Toàn (Safe Campaign Scope — R07B.2):**
+   - Khuyến mại ở cấp độ sản phẩm (`PromotionCampaignItem` chỉ có `productId`, không có `variantId`) **chỉ áp dụng cho sản phẩm base không biến thể**.
+   - Tuyệt đối không tự ý áp đặt mức giá sale của sản phẩm cha vào các biến thể cấu hình khác nhau. Mỗi biến thể muốn có giá ưu đãi bắt buộc phải có bản ghi item explicit (`productId` + `variantId`).
+   - Rào chắn kiểm thực (`assertValidCampaignTargets`): từ chối xuất bản hoặc lưu chiến dịch nếu `variantId` không thuộc `productId`, nếu target không tồn tại trong DB, nếu trùng lặp target trong cùng chiến dịch, hoặc nếu `salePrice >= regularPrice`.
+
+8. **Đồng Bộ Ngữ Cảnh Chiến Dịch Toàn Bộ Consumer (Universal Storefront Context):**
+   - Mọi consumer công khai đều lấy chung ngữ cảnh định giá tại cùng một thời điểm đánh giá `evaluatedAt` qua `getStorefrontPricingContext(db, at)`.
+   - Các consumer đã được tích hợp chuẩn:
+     - `search.service.ts`: `searchProducts(options, client, pricingContext)`
+     - `navigation.service.ts`: `publicCollection(db, slug)` tự động lấy context và định giá sản phẩm
+     - `site-builder.service.ts`: `resolveSectionsForStorefront(db, sections)` định giá toàn bộ khối `product_grid`
+     - `/api/compare`: định giá cho danh sách sản phẩm so sánh
+     - `/product/[id]`: PDP nạp context định giá, truyền `pricingTarget` chính xác cho biến thể được chọn
+     - `/api/cart/revalidate`: endpoint tái thẩm định giỏ hàng từ server, phát hiện sai lệch giá thời gian thực.
+
+9. **Bảo Vệ Bất Biến & Chống Xung Đột CAS Quản Trị Chiến Dịch (CAS Concurrency & Atomic D1 Batch):**
+   - Bảng `PromotionCampaign` quản lý phiên bản với cột `revision INTEGER DEFAULT 1`.
+   - Mọi thao tác cập nhật (`saveCampaign`), xuất bản (`publishCampaign`) và lưu trữ (`archiveCampaign`) đều yêu cầu `expectedRevision`. Nếu phiên bản bị lệch do ghi đồng thời, trả về HTTP 409 `CAMPAIGN_REVISION_CONFLICT`.
+   - Kiểm tra trùng lịch (`assertNoPublishedOverlap`) được thực thi trên cả `publishCampaign` và `saveCampaign` (khi `status === 'PUBLISHED'`), ngăn chặn hoàn toàn việc bypass overlap check bằng API lưu cập nhật.
+   - Batch D1 nguyên tử: cập nhật chiến dịch, xóa items cũ, chèn items mới nằm trọn trong 1 lệnh `db.batch([...])`, tự động rollback toàn bộ nếu có lỗi.
+
+10. **Tái Thẩm Định Giỏ Hàng Máy Chủ (Server-Side Cart Revalidation):**
+    - Trình duyệt/client chỉ lưu `productId`, `variantId`, `quantity`. Không tin cậy bất kỳ giá nào do client lưu trữ cục bộ (localStorage).
+    - Endpoint `POST /api/cart/revalidate` tính toán lại giá chuẩn từ server theo context thời gian thực, trả về danh sách sản phẩm thay đổi giá (`hasPriceChanges`, `changedItems`) để giao diện cập nhật cảnh báo minh bạch cho người dùng.
+

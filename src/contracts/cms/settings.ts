@@ -49,9 +49,10 @@ export const adminSettingsDocumentSchema = z.object({
   defaultSeoDescription: safeText(500).default("CitiLap chuyên cung cấp Laptop Gaming, Ultrabook, Máy Trạm và Like New chính hãng."),
 
   // Flash sale
-  flashSaleEnabled: z.boolean(),
+  flashSaleEnabled: z.union([z.boolean(), z.number().transform((n) => n !== 0)]).default(false),
   flashSaleTitle: safeText(120),
-  flashSaleEndAt: safeText(64), // Chuỗi ISO cố định hoặc rỗng
+  flashSaleStartAt: safeText(64).default(""), // Chuỗi ISO UTC cố định hoặc rỗng
+  flashSaleEndAt: safeText(64), // Chuỗi ISO UTC cố định hoặc rỗng
 
   // Hero & Banners
   heroBadge: safeText(100),
@@ -90,6 +91,18 @@ export const adminSettingsDocumentSchema = z.object({
   codEnabled: z.boolean(),
   bankTransferEnabled: z.boolean(),
   bankAccountInfo: safeText(500),
+}).superRefine((data, ctx) => {
+  if (data.flashSaleEnabled && data.flashSaleStartAt && data.flashSaleEndAt) {
+    const start = new Date(data.flashSaleStartAt).getTime();
+    const end = new Date(data.flashSaleEndAt).getTime();
+    if (!Number.isNaN(start) && !Number.isNaN(end) && start >= end) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Thời điểm bắt đầu Flash Sale phải trước thời điểm kết thúc.",
+        path: ["flashSaleStartAt"],
+      });
+    }
+  }
 });
 
 export type AdminSettingsDocument = z.infer<typeof adminSettingsDocumentSchema>;
@@ -128,7 +141,8 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
 
   flashSaleEnabled: true,
   flashSaleTitle: "Giá Sốc Giờ Vàng",
-  flashSaleEndAt: process.env.NEXT_PUBLIC_FLASH_SALE_END_AT || "2026-12-31T23:59:59Z",
+  flashSaleStartAt: "",
+  flashSaleEndAt: "2026-12-31T23:59:59Z",
 
   heroBadge: "CitiLap Gaming Zone",
   heroTitle: "LAPTOP",
@@ -193,6 +207,7 @@ export const publicStorefrontSettingsSchema = z.object({
 
   flashSaleEnabled: z.boolean(),
   flashSaleTitle: z.string(),
+  flashSaleStartAt: z.string().default(""),
   flashSaleEndAt: z.string(),
 
   heroBadge: z.string(),

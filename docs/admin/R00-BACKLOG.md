@@ -313,13 +313,33 @@
 
 ---
 
-## 5. Các Quyết Định Nghiệp Vụ Đã Xác Lập & Đề Xuất Kế Tiếp (R07B)
+### Task CMS-R07B: Hot Sale, Countdown & Unified Pricing Engine — [HOÀN THÀNH]
+- **ID:** `CMS-R07B` (Mã phạm vi: `PROMO-01`)
+- **Mức độ ưu tiên:** P0 (Khung giờ chiến dịch CMS UTC, đồng hồ mốc thực tế, động cơ tính giá tập trung & xác thực đơn hàng 0đ)
+- **Trạng thái thực tế:** ĐÃ HOÀN THÀNH.
+  - **Thiết kế / Nghiệm thu:** [R07B-HOT-SALE-PRICING.md](./R07B-HOT-SALE-PRICING.md), [R07B-ACCEPTANCE.md](./R07B-ACCEPTANCE.md).
+  - **Khung giờ chiến dịch CMS:** Cài đặt `SiteSettings` lưu trữ UTC (`flashSaleStartAt`, `flashSaleEndAt`, `flashSaleEnabled`, `flashSaleTitle`), kiểm thực Zod `startAt < endAt`. Loại bỏ hoàn toàn `NEXT_PUBLIC_FLASH_SALE_END_AT`.
+  - **Unified Pricing Engine:** `src/server/services/pricing.service.ts` thống nhất tính toán giá trên toàn hệ thống (ProductCard, `/hot-sale`, trang chủ, PDP, giỏ hàng, đơn hàng). Hết hạn giá tức thì ngoài `[startAt, endAt)` nửa mở mà không chờ cron.
+  - **Product Studio:** Cờ `isFlashSale` trong draft, chiếu vào `Product.isFlashSale` khi xuất bản với nguyên tắc cô lập bản nháp nghiêm ngặt.
+  - **Order Verification 0đ:** `order.service.ts` tính lại giá phía server, ném 409 `PRICE_CHANGED` khi có chênh lệch giá, snapshot `unitPrice`, `compareAtPrice`, và log chiến dịch.
+  - **StoreFront UI:** `FlashSaleCountdown.tsx` đếm ngược theo 3 mốc thực tế không tự lặp lại; `/hot-sale` lọc sản phẩm sale thực tế; PDP đồng bộ JSON-LD structured data.
+  - **Bằng chứng kiểm chứng:**
+    - Static: `tsc --noEmit` (0 lỗi), `build:cloudflare` (Exit 0).
+    - Service / Data Integration: `scripts/test-r07b-hot-sale-pricing.mjs` (7/7 PASS - 100%).
+
+---
+
+## 5. Các Quyết Định Nghiệp Vụ Đã Xác Lập & Đề Xuất Kế Tiếp
 
 1. **Thuộc tính Phụ kiện (R04):** ĐÃ HOÀN THÀNH.
 2. **Quy trình Biên tập Tin tức & Trang Tĩnh (R05/R05.1):** ĐÃ HOÀN THÀNH.
 3. **Quy trình Xử lý Đơn hàng & Thông báo (R06):** ĐÃ HOÀN THÀNH.
 4. **Site Builder / Collection / Settings Sync (R07A):** ĐÃ HOÀN THÀNH.
-5. **Đề xuất R07B (Hot Sale + countdown + unified pricing):**
-   - Đồng hồ đếm ngược Flash Sale thật trên StoreFront (Home + `/hot-sale` + PDP).
-   - Giá sale thống nhất server-side, structured data và checkout không lệch cache/giá cũ.
+5. **R07B (Hot Sale + countdown + unified pricing):** ĐÃ HOÀN THÀNH — xem [R07B-HOT-SALE-PRICING.md](./R07B-HOT-SALE-PRICING.md) và [R07B-ACCEPTANCE.md](./R07B-ACCEPTANCE.md).
+6. **Đề xuất R07C (Checkout gọn + shipping/payment settings) — ĐÃ SOẠN THIẾT KẾ / PROMPT, SẴN SÀNG TRIỂN KHAI:**
+   - Thiết kế: [R07C-CHECKOUT-SETTINGS.md](./R07C-CHECKOUT-SETTINGS.md).
+   - Prompt Antigravity: [prompts/PROMPT-R07C.md](./prompts/PROMPT-R07C.md).
+   - Baseline đã ghi nhận: Admin Settings lưu `shippingFee` / `freeShippingThreshold` / `codEnabled` / `bankTransferEnabled` / `bankAccountInfo`, nhưng StoreFront checkout hardcode `paymentMethod: "COD"` và `order.service` gán `shippingFee = 0`.
+   - R07C sẽ nối Settings → checkout/quote/`createOrder`, tiêu thụ pricing R07B, chặn method tắt, giữ idempotency R06; **không** làm cổng TT online / auto-PAID / RBAC.
+
 

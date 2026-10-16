@@ -3,11 +3,19 @@ import { Flame } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import FlashSaleCountdown from "@/components/product/FlashSaleCountdown";
 import { getFlashSaleProducts } from "@/server/services/catalog.service";
+import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import { isFlashSaleActive, applyPricingToHomepageProducts, getStorefrontPricingContext } from "@/server/services/pricing.service";
 
 export default async function FlashSaleSection() {
+  const settings = await getStorefrontPricingContext();
+  if (!isFlashSaleActive(settings)) {
+    return null;
+  }
+
   let flashSaleProducts = [];
   try {
-    flashSaleProducts = await getFlashSaleProducts(10);
+    const rawProducts = await getFlashSaleProducts(10);
+    flashSaleProducts = applyPricingToHomepageProducts(rawProducts, settings);
   } catch (error) {
     console.error("[FlashSaleSection] Failed to load flash sale products from D1:", error);
     return null;
@@ -16,6 +24,8 @@ export default async function FlashSaleSection() {
   if (flashSaleProducts.length === 0) {
     return null;
   }
+
+  const title = settings?.flashSaleTitle || "Giá Sốc Giờ Vàng";
 
   return (
     <section className="pb-16">
@@ -27,11 +37,14 @@ export default async function FlashSaleSection() {
                 <Flame className="w-5 h-5 text-amber-300" />
               </span>
               <h2 className="text-lg sm:text-xl font-bold tracking-tight uppercase">
-                Giá Sốc Giờ Vàng
+                {title}
               </h2>
             </div>
             <div className="flex items-center gap-4">
-              <FlashSaleCountdown endAt={process.env.NEXT_PUBLIC_FLASH_SALE_END_AT} />
+              <FlashSaleCountdown
+                startAt={settings?.flashSaleStartAt}
+                endAt={settings?.flashSaleEndAt}
+              />
               <Link 
                 href="/hot-sale" 
                 className="text-xs sm:text-sm font-semibold text-white/90 hover:text-white hover:underline flex items-center gap-1 transition"

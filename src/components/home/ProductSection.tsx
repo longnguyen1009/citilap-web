@@ -6,6 +6,7 @@ import { ErrorState } from "@/components/ui/ErrorState";
 import { Button } from "@/components/ui/Button";
 import { getSectionProducts } from "@/services/product-home";
 import type { LucideIcon } from "lucide-react";
+import type { PriceEvaluationContext } from "@/server/services/pricing.service";
 
 interface ProductSectionProps {
   title: string;
@@ -18,6 +19,8 @@ interface ProductSectionProps {
   fallback?: ProductCardProduct[]; // Deprecated, kept only for type safety during transition
   badgeColor?: string;
   rank?: boolean;
+  pricingContext?: PriceEvaluationContext | null;
+  evaluatedAt?: Date;
 }
 
 export default async function ProductSection({
@@ -30,13 +33,15 @@ export default async function ProductSection({
   products: initialProducts,
   badgeColor,
   rank = false,
+  pricingContext,
+  evaluatedAt,
 }: ProductSectionProps) {
   let products: ProductCardProduct[] = initialProducts || [];
   let isError = false;
 
   if (!initialProducts) {
     try {
-      products = await getSectionProducts(sectionKey);
+      products = await getSectionProducts(sectionKey, pricingContext, evaluatedAt);
     } catch (err) {
       console.error(`[ProductSection] Error fetching products for ${sectionKey}:`, err);
       isError = true;

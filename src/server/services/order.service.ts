@@ -1,12 +1,14 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
 import { assertPublishedStudioOrderable } from './storefront-order-guard';
+import { calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from './pricing.service';
 
 export interface OrderItemInput {
   productId: string;
   variantId?: string | null;
   sku?: string | null;
   quantity: number;
+  expectedPrice?: number | null;
 }
 
 export interface CreateOrderInput {
@@ -30,6 +32,10 @@ export interface ResolvedOrderItem {
   variantNameSnapshot: string | null;
   price: number;
   priceSnapshot: number;
+  regularPriceSnapshot: number;
+  compareAtPriceSnapshot: number | null;
+  campaignSnapshot: string | null;
+  pricingEvaluatedAt: string;
   quantity: number;
   lineTotal: number;
 }
@@ -69,6 +75,10 @@ export interface OrderRecord {
     variantNameSnapshot: string | null;
     price: number;
     priceSnapshot: number | null;
+    regularPriceSnapshot?: number | null;
+    compareAtPriceSnapshot?: number | null;
+    campaignSnapshot?: string | null;
+    pricingEvaluatedAt?: Date | string | null;
     quantity: number;
     lineTotal: number;
     createdAt: Date;
@@ -161,6 +171,40 @@ export function toPublicOrderDto(order: OrderRecord): PublicOrderDto {
       lineTotal: item.lineTotal,
     })),
   };
+}
+
+export class PriceChangedError extends Error {
+  code = 'PRICE_CHANGED';
+  productId?: string;
+  expectedPrice?: number;
+  effectivePrice?: number;
+  details: {
+    changedItems: Array<{
+      productId: string;
+      variantId: string | null;
+      productName: string;
+      oldPrice: number;
+      newPrice: number;
+      quantity: number;
+      oldLineTotal: number;
+      newLineTotal: number;
+    }>;
+    oldSubtotal: number;
+    newSubtotal: number;
+    oldGrandTotal: number;
+    newGrandTotal: number;
+  };
+
+  constructor(message: string, details: PriceChangedError['details']) {
+    super(message);
+    this.name = 'PriceChangedError';
+    this.details = details;
+    if (details.changedItems && details.changedItems.length > 0) {
+      this.productId = details.changedItems[0].productId;
+      this.expectedPrice = details.changedItems[0].oldPrice;
+      this.effectivePrice = details.changedItems[0].newPrice;
+    }
+  }
 }
 
 export class OrderConflictError extends Error {
@@ -391,9 +435,19 @@ export async function createOrder(
     }
   }
 
-  // 4. Resolve products & variants from D1
+  // 4. Resolve products & variants from D1 with authoritative pricing
+  const evaluatedAt = new Date();
+  const now = evaluatedAt.toISOString().replace('Z', '+00:00');
+  const evaluatedAtStr = now;
+
+  // Differentiate infrastructure failure from inactive campaign: fail-closed if DB throws
+  const storefrontSettings = await getStorefrontPricingContext(db, evaluatedAt);
+
   const resolvedItems: ResolvedOrderItem[] = [];
+  const campaignNotes: string[] = [];
+  const changedItems: PriceChangedError['details']['changedItems'] = [];
   let subtotalAmount = 0;
+  let expectedSubtotal = 0;
 
   for (const item of payload.items) {
     if (!item || typeof item !== 'object') {
@@ -410,7 +464,7 @@ export async function createOrder(
     const product = await prisma.product.findUnique({
       where: { id: productId },
       select: {
-        id: true, name: true, price: true, status: true,
+        id: true, name: true, price: true, originalPrice: true, status: true, isFlashSale: true,
         studio: { select: { published: true } },
       },
     });
@@ -424,23 +478,74 @@ export async function createOrder(
       variantId
     );
 
-    let price = product.price;
+    let basePrice = product.price;
+    let originalPrice: number | null = null;
     let sku: string | null = null;
     let variantName: string | null = null;
 
     if (variantId) {
       const variant = await prisma.productVariant.findFirst({
         where: { id: variantId, productId },
-        select: { id: true, sku: true, name: true, price: true, status: true },
+        select: { id: true, sku: true, name: true, price: true, originalPrice: true, status: true },
       });
 
       if (!variant || variant.status !== 'ACTIVE') {
         throw new Error('VARIANT_UNAVAILABLE');
       }
 
-      price = variant.price;
+      basePrice = variant.price;
+      // Invariant: Variant NEVER borrows parent's originalPrice!
+      originalPrice = variant.originalPrice !== null && variant.originalPrice !== undefined ? variant.originalPrice : null;
       sku = variant.sku;
       variantName = variant.name;
+    } else {
+      originalPrice = product.originalPrice ?? null;
+    }
+
+    // Evaluate authoritative pricing via pricing.service
+    const resolvedPricing = calculateEffectivePrice(
+      basePrice,
+      originalPrice,
+      Boolean(product.isFlashSale),
+      true,
+      storefrontSettings,
+      evaluatedAt,
+      {
+        productId,
+        variantId,
+        isVariant: Boolean(variantId),
+        variantOriginalPrice: variantId ? originalPrice : null,
+      }
+    );
+
+    const price = resolvedPricing.effectivePrice;
+
+    // Strict 0đ tolerance verification against client expectation if provided
+    let expectedItemPrice: number | null = null;
+    if (item.expectedPrice !== undefined && item.expectedPrice !== null) {
+      expectedItemPrice = Number(item.expectedPrice);
+      if (!Number.isFinite(expectedItemPrice)) {
+        throw new Error('INVALID_ITEM');
+      }
+      if (expectedItemPrice !== price) {
+        changedItems.push({
+          productId,
+          variantId,
+          productName: variantName ? `${product.name} - ${variantName}` : product.name,
+          oldPrice: expectedItemPrice,
+          newPrice: price,
+          quantity,
+          oldLineTotal: expectedItemPrice * quantity,
+          newLineTotal: price * quantity,
+        });
+      }
+    }
+
+    const priceForOldSubtotal = expectedItemPrice !== null ? expectedItemPrice : price;
+    expectedSubtotal += priceForOldSubtotal * quantity;
+
+    if (resolvedPricing.campaign) {
+      campaignNotes.push(`${product.name}: ${resolvedPricing.campaign.name}`);
     }
 
     const lineTotal = price * quantity;
@@ -456,6 +561,10 @@ export async function createOrder(
       variantNameSnapshot: variantName,
       price,
       priceSnapshot: price,
+      regularPriceSnapshot: resolvedPricing.regularPrice,
+      compareAtPriceSnapshot: resolvedPricing.compareAtPrice,
+      campaignSnapshot: resolvedPricing.campaign ? JSON.stringify(resolvedPricing.campaign) : null,
+      pricingEvaluatedAt: evaluatedAtStr,
       quantity,
       lineTotal,
     });
@@ -463,10 +572,24 @@ export async function createOrder(
 
   const shippingFee = 0;
   const totalAmount = subtotalAmount + shippingFee;
+  const oldGrandTotal = expectedSubtotal + shippingFee;
+
+  if (changedItems.length > 0) {
+    throw new PriceChangedError(
+      `PRICE_CHANGED: Giá của ${changedItems.length} sản phẩm đã thay đổi hoặc khuyến mãi đã kết thúc`,
+      {
+        changedItems,
+        oldSubtotal: expectedSubtotal,
+        newSubtotal: subtotalAmount,
+        oldGrandTotal,
+        newGrandTotal: totalAmount,
+      }
+    );
+  }
+
   const orderNumber = generateOrderNumber();
   const orderId = 'c' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
   const eventId = 'e' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
-  const now = new Date().toISOString().replace('Z', '+00:00');
 
   const { token: confirmationToken, tokenHash: confirmationTokenHash } =
     await generateOrderConfirmationToken(orderId, cleanIdempotencyKey);
@@ -515,8 +638,9 @@ export async function createOrder(
       INSERT INTO "OrderItem" (
         "id", "orderId", "productId", "variantId", "productName", "sku",
         "productNameSnapshot", "skuSnapshot", "variantNameSnapshot",
-        "price", "priceSnapshot", "quantity", "lineTotal", "createdAt", "updatedAt"
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "price", "priceSnapshot", "regularPriceSnapshot", "compareAtPriceSnapshot",
+        "campaignSnapshot", "pricingEvaluatedAt", "quantity", "lineTotal", "createdAt", "updatedAt"
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       itemId,
       orderId,
@@ -529,6 +653,10 @@ export async function createOrder(
       item.variantNameSnapshot,
       item.price,
       item.priceSnapshot,
+      item.regularPriceSnapshot,
+      item.compareAtPriceSnapshot,
+      item.campaignSnapshot,
+      item.pricingEvaluatedAt,
       item.quantity,
       item.lineTotal,
       now,
@@ -547,7 +675,7 @@ export async function createOrder(
     null,
     'NEW',
     'Khách đặt hàng qua website',
-    note,
+    [note, campaignNotes.length > 0 ? `Khuyến mãi: ${campaignNotes.join('; ')}` : null].filter(Boolean).join(' | ') || null,
     'Khách hàng',
     now
   );
@@ -610,6 +738,10 @@ export async function createOrder(
         variantNameSnapshot: item.variantNameSnapshot,
         price: item.price,
         priceSnapshot: item.priceSnapshot,
+        regularPriceSnapshot: item.regularPriceSnapshot,
+        compareAtPriceSnapshot: item.compareAtPriceSnapshot,
+        campaignSnapshot: item.campaignSnapshot,
+        pricingEvaluatedAt: item.pricingEvaluatedAt,
         quantity: item.quantity,
         lineTotal: item.lineTotal,
         createdAt: new Date(now),

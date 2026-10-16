@@ -1,6 +1,7 @@
 import { prisma, type PrismaClient } from "@/lib/prisma";
 import { getProductImageUrl, getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import { ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
+import { normalizeVnd, calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
 
 /**
  * Standardized Homepage & Card Product Data Contract (STORE-05)
@@ -18,9 +19,14 @@ export interface HomepageProduct {
   model?: string;
   series?: string;
   condition: string; // Stable codes: "NEW", "LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"
+  rawPrice?: number;
+  rawOriginalPrice?: number | null;
   price: number; // Integer VND
   originalPrice?: number | null; // Integer VND
+  oldPrice?: number | null;
   discount?: string; // Formatted badge discount string e.g. "-14%"
+  isFlashSale?: boolean;
+  isOnSale?: boolean;
   stock: number; // Transitional aggregate inventory
   warranty?: string;
   primaryImage: string | null;
@@ -99,6 +105,7 @@ export interface ProductDetailData {
   price: number;
   originalPrice: number | null;
   discount?: string;
+  isFlashSale?: boolean;
   stock: number;
 
   specs: {
@@ -225,6 +232,7 @@ type ProductDbRow = {
   images: string;
   stock: number;
   status: string;
+  isFlashSale?: boolean | number;
   cpu?: string | null;
   gpu?: string | null;
   ram?: string | null;
@@ -247,6 +255,7 @@ type ProductDbRow = {
     sku: string;
     name: string;
     price: number;
+    originalPrice?: number | null;
     ram?: string | null;
     storage?: string | null;
     gpu?: string | null;
@@ -333,7 +342,9 @@ export interface ActiveFilterContext {
  */
 export function mapD1ProductToHomepageProduct(
   row: ProductDbRow,
-  activeFilter?: ActiveFilterContext
+  activeFilter?: ActiveFilterContext,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
 ): HomepageProduct {
   // 1. Resolve primary image from ProductImage table (metadata for Cloudflare R2)
   let resolvedImage: string | null = null;
@@ -448,12 +459,26 @@ export function mapD1ProductToHomepageProduct(
   const display = row.display || specsObj["Màn hình"] || specsObj.display || specsObj.Screen || "";
 
   // 3. Integer money values (VND integer number faithful to chosen variant)
-  const price = chosenVariant ? Math.round(Number(chosenVariant.price) || 0) : Math.round(Number(row.price) || 0);
-  const originalPrice = row.originalPrice ? Math.round(Number(row.originalPrice)) : null;
-  const discount =
-    originalPrice && originalPrice > price
-      ? `-${Math.round((1 - price / originalPrice) * 100)}%`
-      : undefined;
+  const isVariant = Boolean(chosenVariant);
+  const rawPrice = chosenVariant ? normalizeVnd(chosenVariant.price) : normalizeVnd(row.price);
+  const rawOriginalPrice = isVariant
+    ? (chosenVariant?.originalPrice !== null && chosenVariant?.originalPrice !== undefined ? normalizeVnd(chosenVariant.originalPrice) : null)
+    : (row.originalPrice !== null && row.originalPrice !== undefined ? normalizeVnd(row.originalPrice) : null);
+
+  const resolved = calculateEffectivePrice(
+    rawPrice,
+    rawOriginalPrice,
+    Boolean(row.isFlashSale),
+    true,
+    pricingContext,
+    at,
+    {
+      productId: row.id,
+      variantId: chosenVariant?.id,
+      isVariant,
+      variantOriginalPrice: rawOriginalPrice,
+    }
+  );
 
   // 4. Normalized brand and category relations
   const brandName = row.brandRel?.name || row.brand || undefined;
@@ -472,9 +497,14 @@ export function mapD1ProductToHomepageProduct(
     model: row.model || undefined,
     series: row.series || undefined,
     condition: row.condition || "NEW",
-    price,
-    originalPrice,
-    discount,
+    rawPrice,
+    rawOriginalPrice,
+    price: resolved.effectivePrice,
+    originalPrice: resolved.compareAtPrice,
+    oldPrice: resolved.compareAtPrice,
+    discount: resolved.discountPercent ? `-${resolved.discountPercent}%` : undefined,
+    isFlashSale: Boolean(row.isFlashSale),
+    isOnSale: resolved.isOnSale,
     stock: typeof row.stock === "number" ? row.stock : 0,
     warranty: row.warranty || undefined,
     primaryImage: resolvedImage,
@@ -512,18 +542,25 @@ const defaultInclude = {
 /**
  * Fetches featured products directly from D1.
  */
-export async function getFeaturedProducts(limit = 10, client: PrismaClient = prisma): Promise<HomepageProduct[]> {
+export async function getFeaturedProducts(
+  limit = 10,
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
+): Promise<HomepageProduct[]> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
+        deletedAt: null,
         isFeatured: true,
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
   } catch (error) {
     console.error("[CatalogService] Failed to query featured products from D1:", error);
     throw error;
@@ -533,18 +570,25 @@ export async function getFeaturedProducts(limit = 10, client: PrismaClient = pri
 /**
  * Fetches new arrival products directly from D1.
  */
-export async function getNewArrivals(limit = 10, client: PrismaClient = prisma): Promise<HomepageProduct[]> {
+export async function getNewArrivals(
+  limit = 10,
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
+): Promise<HomepageProduct[]> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
+        deletedAt: null,
         isNewArrival: true,
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
   } catch (error) {
     console.error("[CatalogService] Failed to query new arrivals from D1:", error);
     throw error;
@@ -554,18 +598,25 @@ export async function getNewArrivals(limit = 10, client: PrismaClient = prisma):
 /**
  * Fetches flash sale products directly from D1.
  */
-export async function getFlashSaleProducts(limit = 10, client: PrismaClient = prisma): Promise<HomepageProduct[]> {
+export async function getFlashSaleProducts(
+  limit = 10,
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
+): Promise<HomepageProduct[]> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
+        deletedAt: null,
         isFlashSale: true,
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
   } catch (error) {
     console.error("[CatalogService] Failed to query flash sale products from D1:", error);
     throw error;
@@ -575,18 +626,26 @@ export async function getFlashSaleProducts(limit = 10, client: PrismaClient = pr
 /**
  * Fetches products in a specific category by category slug directly from D1.
  */
-export async function getCategoryProducts(categorySlug: string, limit = 10, client: PrismaClient = prisma): Promise<HomepageProduct[]> {
+export async function getCategoryProducts(
+  categorySlug: string,
+  limit = 10,
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
+): Promise<HomepageProduct[]> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
+        deletedAt: null,
         category: { slug: categorySlug },
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
   } catch (error) {
     console.error(`[CatalogService] Failed to query products for category '${categorySlug}' from D1:`, error);
     throw error;
@@ -596,18 +655,25 @@ export async function getCategoryProducts(categorySlug: string, limit = 10, clie
 /**
  * Fetches like-new and certified used laptop products directly from D1.
  */
-export async function getLikeNewProducts(limit = 10, client: PrismaClient = prisma): Promise<HomepageProduct[]> {
+export async function getLikeNewProducts(
+  limit = 10,
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
+): Promise<HomepageProduct[]> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
+        deletedAt: null,
         condition: { in: ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"] },
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
   } catch (error) {
     console.error("[CatalogService] Failed to query like-new products from D1:", error);
     throw error;
@@ -617,18 +683,25 @@ export async function getLikeNewProducts(limit = 10, client: PrismaClient = pris
 /**
  * Fetches best-selling products directly from D1.
  */
-export async function getBestSellingProducts(limit = 10, client: PrismaClient = prisma): Promise<HomepageProduct[]> {
+export async function getBestSellingProducts(
+  limit = 10,
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
+): Promise<HomepageProduct[]> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
+        deletedAt: null,
         isBestSeller: true,
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
   } catch (error) {
     console.error("[CatalogService] Failed to query best-selling products from D1:", error);
     throw error;
@@ -638,8 +711,13 @@ export async function getBestSellingProducts(limit = 10, client: PrismaClient = 
 /**
  * Parallel optimized retrieval for all Homepage sections to avoid waterfall requests.
  */
-export async function getHomepageCatalog(client: PrismaClient = prisma): Promise<HomepageCatalogData> {
+export async function getHomepageCatalog(
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
+): Promise<HomepageCatalogData> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const [
       featured,
       newArrivals,
@@ -650,14 +728,14 @@ export async function getHomepageCatalog(client: PrismaClient = prisma): Promise
       likeNew,
       accessories,
     ] = await Promise.all([
-      getFeaturedProducts(10, client),
-      getNewArrivals(10, client),
-      getCategoryProducts("laptop-gaming", 10, client),
-      getCategoryProducts("laptop-van-phong", 10, client),
-      getCategoryProducts("laptop-do-hoa", 10, client),
-      getBestSellingProducts(10, client),
-      getLikeNewProducts(10, client),
-      getCategoryProducts("linh-kien", 10, client),
+      getFeaturedProducts(10, client, context, at),
+      getNewArrivals(10, client, context, at),
+      getCategoryProducts("laptop-gaming", 10, client, context, at),
+      getCategoryProducts("laptop-van-phong", 10, client, context, at),
+      getCategoryProducts("laptop-do-hoa", 10, client, context, at),
+      getBestSellingProducts(10, client, context, at),
+      getLikeNewProducts(10, client, context, at),
+      getCategoryProducts("linh-kien", 10, client, context, at),
     ]);
 
     return {
@@ -794,9 +872,12 @@ const conditionDisplayLabels: Record<string, string> = {
  */
 export async function getCategoryFilteredProducts(
   options: CategoryFilterOptions,
-  client: PrismaClient = prisma
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
 ): Promise<CategoryFilteredResult> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     // 1. Resolve category if slug is provided
     let category: CategorySummary | null = null;
     const effectiveSlug = options.categorySlug || (options as { slug?: string }).slug;
@@ -1315,7 +1396,7 @@ export async function getCategoryFilteredProducts(
 
     return {
       category,
-      products: rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, activeFilter)),
+      products: rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, activeFilter, context, at)),
       totalCount,
       page,
       pageSize,
@@ -1600,6 +1681,7 @@ export async function getProductDetail(
       price: activePrice,
       originalPrice: activeOriginalPrice,
       discount: activeDiscount,
+      isFlashSale: Boolean(product.isFlashSale),
       stock: activeStock,
 
       specs: {
@@ -1643,9 +1725,12 @@ export async function getRelatedProducts(
   brandId?: string | null,
   limit = 4,
   manualIdsOrClient: string[] | PrismaClient = [],
-  clientParam: PrismaClient = prisma
+  clientParam: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
 ): Promise<HomepageProduct[]> {
   try {
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
     const isArrayManual = Array.isArray(manualIdsOrClient);
     const manualIds = isArrayManual ? manualIdsOrClient : [];
     const client = isArrayManual ? clientParam : (manualIdsOrClient as PrismaClient);
@@ -1664,7 +1749,7 @@ export async function getRelatedProducts(
       });
 
       const manualMap = new Map(
-        manualRows.map((r) => [r.id, mapD1ProductToHomepageProduct(r as unknown as ProductDbRow)])
+        manualRows.map((r) => [r.id, mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at)])
       );
 
       resolvedManual = validManualIds
@@ -1701,7 +1786,7 @@ export async function getRelatedProducts(
     });
 
     const fallbackProducts = fallbackRows.map((r) =>
-      mapD1ProductToHomepageProduct(r as unknown as ProductDbRow)
+      mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at)
     );
 
     return [...resolvedManual, ...fallbackProducts];
@@ -1717,8 +1802,11 @@ export async function getRelatedProducts(
  */
 export async function resolveProductsByIds(
   productIds: string[],
-  client: PrismaClient = prisma
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
   const uniqueIds = [...new Set((productIds || []).filter(Boolean))];
   if (uniqueIds.length === 0) return [];
 
@@ -1732,7 +1820,7 @@ export async function resolveProductsByIds(
   });
 
   const map = new Map(
-    rows.map((r) => [r.id, mapD1ProductToHomepageProduct(r as unknown as ProductDbRow)])
+    rows.map((r) => [r.id, mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at)])
   );
 
   return uniqueIds
@@ -1754,8 +1842,11 @@ export async function resolveProductsByCriteria(
     sort?: "newest" | "price-asc" | "price-desc" | "name-asc" | "best-selling";
     limit?: number;
   },
-  client: PrismaClient = prisma
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     status: { in: ["ACTIVE", "active"] },
@@ -1811,7 +1902,7 @@ export async function resolveProductsByCriteria(
     take: limit,
   });
 
-  return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow));
+  return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
 }
 
 

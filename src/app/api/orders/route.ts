@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
-import { createOrder, listOrders, CreateOrderInput, toPublicOrderDto } from '@/server/services/order.service';
+import {
+  createOrder,
+  listOrders,
+  CreateOrderInput,
+  toPublicOrderDto,
+  PriceChangedError,
+} from '@/server/services/order.service';
 import { checkRateLimit, rateLimitExceededResponse, getClientIp } from '@/lib/rate-limiter';
 import { verifyTurnstileToken } from '@/lib/turnstile';
 
@@ -84,16 +90,32 @@ export async function POST(request: Request) {
     }
 
     // 3. Payload size & item quantity constraints
-    const items = Array.isArray(body.items) ? body.items : [];
-    if (items.length > 10) {
+    const rawItems = Array.isArray(body.items) ? body.items : [];
+    if (rawItems.length === 0) {
+      return errorResponse('Giỏ hàng trống. Vui lòng chọn sản phẩm.', 400, 'EMPTY_CART');
+    }
+    if (rawItems.length > 10) {
       return errorResponse('Số lượng sản phẩm trong một đơn hàng không được vượt quá 10.', 400, 'TOO_MANY_ITEMS');
     }
 
-    for (const it of items) {
-      if (typeof it.quantity === 'number' && (it.quantity < 1 || it.quantity > 5)) {
-        return errorResponse('Số lượng cho mỗi sản phẩm không được vượt quá 5 chiếc.', 400, 'INVALID_ITEM_QUANTITY');
+    for (const it of rawItems) {
+      const q = typeof it?.quantity === 'number' ? it.quantity : Number(it?.quantity);
+      if (!Number.isInteger(q) || q < 1 || q > 5) {
+        return errorResponse('Số lượng cho mỗi sản phẩm phải là số nguyên từ 1 đến 5.', 400, 'INVALID_ITEM_QUANTITY');
       }
     }
+
+    const items = rawItems.map((it: Record<string, unknown>) => ({
+      productId: typeof it.productId === 'string' ? it.productId.trim() : '',
+      variantId: typeof it.variantId === 'string' && it.variantId.trim() ? it.variantId.trim() : null,
+      sku: typeof it.sku === 'string' ? it.sku.trim() : null,
+      quantity: Number(it.quantity),
+      expectedPrice: typeof it.expectedPrice === 'number'
+        ? it.expectedPrice
+        : typeof it.price === 'number'
+        ? it.price
+        : null,
+    }));
 
     const payload: CreateOrderInput = {
       items,
@@ -126,9 +148,28 @@ export async function POST(request: Request) {
       }
     );
   } catch (error: unknown) {
-    const err = error as { code?: string; message?: string };
-    const code = err?.code || err?.message || '';
+    const err = error as { code?: string; message?: string; details?: unknown };
+    const code = err?.code || (typeof err?.message === 'string' && err.message.startsWith('PRICE_CHANGED') ? 'PRICE_CHANGED' : '');
 
+    if (error instanceof PriceChangedError || code === 'PRICE_CHANGED') {
+      const details = error instanceof PriceChangedError ? error.details : (err as { details?: unknown })?.details;
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'PRICE_CHANGED',
+            message: 'Giá sản phẩm đã thay đổi hoặc chương trình khuyến mãi đã kết thúc. Vui lòng xác nhận lại giá mới trước khi hoàn tất đặt hàng.',
+            details: details || null,
+          },
+        },
+        {
+          status: 409,
+          headers: {
+            'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+          },
+        }
+      );
+    }
     if (code === 'IDEMPOTENCY_PAYLOAD_MISMATCH') {
       return errorResponse('Nội dung đặt hàng không khớp với yêu cầu trước đó của mã Idempotency này.', 422, 'IDEMPOTENCY_PAYLOAD_MISMATCH');
     }

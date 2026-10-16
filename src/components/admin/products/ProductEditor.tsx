@@ -689,6 +689,15 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   />
                   <span>Sản phẩm nổi bật (Featured)</span>
                 </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-red-600 bg-red-50/70 border border-red-200/60 px-2.5 py-1 rounded-lg hover:bg-red-100/70 transition">
+                  <input
+                    type="checkbox"
+                    checked={!!doc.isFlashSale}
+                    onChange={e => updateDoc('isFlashSale', e.target.checked)}
+                    className="w-4 h-4 rounded text-red-600 focus:ring-red-500"
+                  />
+                  <span>🔥 Giá sốc giờ vàng (Hot Sale)</span>
+                </label>
               </div>
             </div>
 

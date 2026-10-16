@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Image as ImageIcon,
   Share2,
+  CheckCircle,
 } from "lucide-react";
 import { PageHeader, InlineAlert } from "@/components/admin/ui";
 import type { AdminSettingsDocument as StorefrontSettings } from "@/contracts/cms/settings";
@@ -93,6 +94,18 @@ export default function SettingsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving || loading || loadError) return;
+
+    if (settings.flashSaleEnabled && settings.flashSaleStartAt && settings.flashSaleEndAt) {
+      const start = new Date(settings.flashSaleStartAt).getTime();
+      const end = new Date(settings.flashSaleEndAt).getTime();
+      if (!Number.isNaN(start) && !Number.isNaN(end) && start >= end) {
+        setMessage({
+          type: "error",
+          text: "Thời điểm bắt đầu Flash Sale phải trước thời điểm kết thúc.",
+        });
+        return;
+      }
+    }
 
     setSaving(true);
     setMessage(null);
@@ -524,9 +537,9 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-800 flex items-start gap-2.5">
-              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <span>Cấu hình Flash Sale được lưu trữ an toàn tại hệ thống quản trị; tính năng hiển thị đếm ngược tự động trên Storefront sẽ được kết nối ở giai đoạn R07.</span>
+            <div className="p-3.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-xs text-emerald-800 flex items-start gap-2.5">
+              <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <span>Chương trình Hot Sale hoạt động theo giờ server thực tế. Khi ngoài khung giờ hoặc bị tắt, StoreFront và API tạo đơn sẽ tự động chuyển về giá thường mà không cần khởi động lại hệ thống.</span>
             </div>
 
             <div className="space-y-5">
@@ -538,35 +551,62 @@ export default function SettingsPage() {
                   className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500"
                 />
                 <div>
-                  <div className="font-bold text-slate-900 text-sm">Bật khối Flash Sale trên trang chủ</div>
-                  <div className="text-xs text-slate-500">Nếu tắt, khối Flash Sale trên Trang chủ sẽ tạm thời ẩn.</div>
+                  <div className="font-bold text-slate-900 text-sm">Bật chương trình Flash Sale trên toàn trang</div>
+                  <div className="text-xs text-slate-500">Nếu tắt, khối Flash Sale trên Trang chủ và trang `/hot-sale` sẽ tạm ẩn hoặc chuyển về trạng thái không hoạt động.</div>
                 </div>
               </label>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Tiêu đề chương trình</label>
+                <input
+                  type="text"
+                  value={settings.flashSaleTitle}
+                  onChange={(e) => update("flashSaleTitle", e.target.value)}
+                  placeholder="Giá Sốc Giờ Vàng"
+                  className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Tiêu đề chương trình</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
+                    Thời điểm bắt đầu (UTC ISO hoặc YYYY-MM-DDTHH:MM)
+                  </label>
                   <input
                     type="text"
-                    value={settings.flashSaleTitle}
-                    onChange={(e) => update("flashSaleTitle", e.target.value)}
-                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    value={settings.flashSaleStartAt}
+                    onChange={(e) => update("flashSaleStartAt", e.target.value)}
+                    placeholder="2026-10-01T00:00:00Z (để trống = mở ngay)"
+                    className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
                   />
+                  <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-700">Giờ VN:</span>
+                    <span className="text-blue-700 font-mono">
+                      {settings.flashSaleStartAt && !Number.isNaN(new Date(settings.flashSaleStartAt).getTime())
+                        ? new Date(settings.flashSaleStartAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false }) + " (UTC+7)"
+                        : "Bắt đầu ngay khi bật"}
+                    </span>
+                  </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-2">
-                    Thời điểm kết thúc đếm ngược (ISO hoặc YYYY-MM-DDTHH:MM)
+                    Thời điểm kết thúc (UTC ISO hoặc YYYY-MM-DDTHH:MM)
                   </label>
                   <input
                     type="text"
                     value={settings.flashSaleEndAt}
                     onChange={(e) => update("flashSaleEndAt", e.target.value)}
-                    placeholder="2026-10-31T23:59:59Z"
+                    placeholder="2026-12-31T23:59:59Z"
                     className="w-full border border-slate-300 rounded-xl px-4 py-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none"
                   />
-                  <p className="text-xs text-slate-500 mt-1.5">
-                    Ví dụ: <code className="text-blue-600">2026-12-31T23:59:59.000Z</code>
+                  <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5">
+                    <span className="font-semibold text-slate-700">Giờ VN:</span>
+                    <span className="text-blue-700 font-mono">
+                      {settings.flashSaleEndAt && !Number.isNaN(new Date(settings.flashSaleEndAt).getTime())
+                        ? new Date(settings.flashSaleEndAt).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false }) + " (UTC+7)"
+                        : "Chưa thiết lập"}
+                    </span>
                   </p>
                 </div>
               </div>

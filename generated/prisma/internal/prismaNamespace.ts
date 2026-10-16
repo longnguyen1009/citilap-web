@@ -435,7 +435,9 @@ export const ModelName = {
   PageStudioRevision: 'PageStudioRevision',
   LandingPage: 'LandingPage',
   LandingPageStudio: 'LandingPageStudio',
-  LandingPageRevision: 'LandingPageRevision'
+  LandingPageRevision: 'LandingPageRevision',
+  PromotionCampaign: 'PromotionCampaign',
+  PromotionCampaignItem: 'PromotionCampaignItem'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -451,7 +453,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "brand" | "category" | "product" | "productVariant" | "productImage" | "productEditLog" | "productVersion" | "order" | "orderItem" | "orderEvent" | "orderNote" | "warehouse" | "serialUnit" | "inventoryBalance" | "inventoryTransaction" | "inventoryReservation" | "contactSubmission" | "contactEvent" | "adminNotification" | "rateLimitRecord" | "navigationStudio" | "navigationRevision" | "productStudio" | "productStudioRevision" | "mediaAsset" | "mediaUsage" | "siteSettings" | "siteSettingsRevision" | "postCategory" | "post" | "postStudio" | "postStudioRevision" | "page" | "pageStudio" | "pageStudioRevision" | "landingPage" | "landingPageStudio" | "landingPageRevision"
+    modelProps: "user" | "brand" | "category" | "product" | "productVariant" | "productImage" | "productEditLog" | "productVersion" | "order" | "orderItem" | "orderEvent" | "orderNote" | "warehouse" | "serialUnit" | "inventoryBalance" | "inventoryTransaction" | "inventoryReservation" | "contactSubmission" | "contactEvent" | "adminNotification" | "rateLimitRecord" | "navigationStudio" | "navigationRevision" | "productStudio" | "productStudioRevision" | "mediaAsset" | "mediaUsage" | "siteSettings" | "siteSettingsRevision" | "postCategory" | "post" | "postStudio" | "postStudioRevision" | "page" | "pageStudio" | "pageStudioRevision" | "landingPage" | "landingPageStudio" | "landingPageRevision" | "promotionCampaign" | "promotionCampaignItem"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3341,6 +3343,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    PromotionCampaign: {
+      payload: Prisma.$PromotionCampaignPayload<ExtArgs>
+      fields: Prisma.PromotionCampaignFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PromotionCampaignFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PromotionCampaignFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>
+        }
+        findFirst: {
+          args: Prisma.PromotionCampaignFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PromotionCampaignFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>
+        }
+        findMany: {
+          args: Prisma.PromotionCampaignFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>[]
+        }
+        create: {
+          args: Prisma.PromotionCampaignCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>
+        }
+        createMany: {
+          args: Prisma.PromotionCampaignCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PromotionCampaignCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>[]
+        }
+        delete: {
+          args: Prisma.PromotionCampaignDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>
+        }
+        update: {
+          args: Prisma.PromotionCampaignUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>
+        }
+        deleteMany: {
+          args: Prisma.PromotionCampaignDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PromotionCampaignUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PromotionCampaignUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>[]
+        }
+        upsert: {
+          args: Prisma.PromotionCampaignUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignPayload>
+        }
+        aggregate: {
+          args: Prisma.PromotionCampaignAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePromotionCampaign>
+        }
+        groupBy: {
+          args: Prisma.PromotionCampaignGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PromotionCampaignGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PromotionCampaignCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PromotionCampaignCountAggregateOutputType> | number
+        }
+      }
+    }
+    PromotionCampaignItem: {
+      payload: Prisma.$PromotionCampaignItemPayload<ExtArgs>
+      fields: Prisma.PromotionCampaignItemFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PromotionCampaignItemFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PromotionCampaignItemFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>
+        }
+        findFirst: {
+          args: Prisma.PromotionCampaignItemFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PromotionCampaignItemFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>
+        }
+        findMany: {
+          args: Prisma.PromotionCampaignItemFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>[]
+        }
+        create: {
+          args: Prisma.PromotionCampaignItemCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>
+        }
+        createMany: {
+          args: Prisma.PromotionCampaignItemCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PromotionCampaignItemCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>[]
+        }
+        delete: {
+          args: Prisma.PromotionCampaignItemDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>
+        }
+        update: {
+          args: Prisma.PromotionCampaignItemUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>
+        }
+        deleteMany: {
+          args: Prisma.PromotionCampaignItemDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PromotionCampaignItemUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PromotionCampaignItemUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>[]
+        }
+        upsert: {
+          args: Prisma.PromotionCampaignItemUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PromotionCampaignItemPayload>
+        }
+        aggregate: {
+          args: Prisma.PromotionCampaignItemAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePromotionCampaignItem>
+        }
+        groupBy: {
+          args: Prisma.PromotionCampaignItemGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PromotionCampaignItemGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PromotionCampaignItemCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PromotionCampaignItemCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -3588,6 +3738,10 @@ export const OrderItemScalarFieldEnum = {
   variantNameSnapshot: 'variantNameSnapshot',
   price: 'price',
   priceSnapshot: 'priceSnapshot',
+  regularPriceSnapshot: 'regularPriceSnapshot',
+  compareAtPriceSnapshot: 'compareAtPriceSnapshot',
+  campaignSnapshot: 'campaignSnapshot',
+  pricingEvaluatedAt: 'pricingEvaluatedAt',
   quantity: 'quantity',
   lineTotal: 'lineTotal',
   createdAt: 'createdAt',
@@ -3999,6 +4153,35 @@ export const LandingPageRevisionScalarFieldEnum = {
 export type LandingPageRevisionScalarFieldEnum = (typeof LandingPageRevisionScalarFieldEnum)[keyof typeof LandingPageRevisionScalarFieldEnum]
 
 
+export const PromotionCampaignScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  status: 'status',
+  revision: 'revision',
+  startAt: 'startAt',
+  endAt: 'endAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PromotionCampaignScalarFieldEnum = (typeof PromotionCampaignScalarFieldEnum)[keyof typeof PromotionCampaignScalarFieldEnum]
+
+
+export const PromotionCampaignItemScalarFieldEnum = {
+  id: 'id',
+  campaignId: 'campaignId',
+  productId: 'productId',
+  variantId: 'variantId',
+  salePrice: 'salePrice',
+  regularPrice: 'regularPrice',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PromotionCampaignItemScalarFieldEnum = (typeof PromotionCampaignItemScalarFieldEnum)[keyof typeof PromotionCampaignItemScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -4245,6 +4428,8 @@ export type GlobalOmitConfig = {
   landingPage?: Prisma.LandingPageOmit
   landingPageStudio?: Prisma.LandingPageStudioOmit
   landingPageRevision?: Prisma.LandingPageRevisionOmit
+  promotionCampaign?: Prisma.PromotionCampaignOmit
+  promotionCampaignItem?: Prisma.PromotionCampaignItemOmit
 }
 
 /* Types for Logging */

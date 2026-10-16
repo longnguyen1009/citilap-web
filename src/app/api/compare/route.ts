@@ -7,6 +7,7 @@ import {
   type CompareApiResponse,
 } from "@/contracts/catalog/compare";
 import { conditionLabels, attributeTemplateDefinitions } from "@/contracts/cms/product-studio";
+import { getStorefrontPricingContext, calculateEffectivePrice } from "@/server/services/pricing.service";
 
 export const runtime = "edge";
 
@@ -28,6 +29,7 @@ interface ProductRow {
   display: string | null;
   categoryId: string | null;
   categorySlug: string | null;
+  isFlashSale: number | boolean | null;
   published: string | null;
 }
 
@@ -73,7 +75,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
     const placeholders = uniqueIds.map(() => "?").join(",");
     const sql = `
       SELECT
-        p.id, p.name, p.slug, p.price, p.originalPrice, p.images,
+        p.id, p.name, p.slug, p.price, p.originalPrice, p.isFlashSale, p.images,
         p.condition, p.brand, p.warranty, p.specs,
         p.cpu, p.gpu, p.ram, p.storage, p.display,
         p.categoryId, c.slug AS categorySlug,
@@ -105,6 +107,9 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
     // Preserve the requested order of IDs
     const rowMap = new Map(rows.map((r) => [r.id, r]));
     const orderedRows = uniqueIds.map((id) => rowMap.get(id)).filter(Boolean) as ProductRow[];
+
+    // Authoritative Storefront Pricing Context
+    const pricingContext = await getStorefrontPricingContext(DB);
 
     // Parse product details, determine template & kind
     const products: CompareProductItem[] = [];
@@ -195,12 +200,22 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
       const cond = productCondition;
       const conditionLabel = conditionLabels[cond as keyof typeof conditionLabels] || cond;
 
+      const resolved = calculateEffectivePrice(
+        productPrice,
+        productOriginalPrice,
+        Boolean(row.isFlashSale),
+        true,
+        pricingContext,
+        new Date(),
+        { productId: row.id, isVariant: false }
+      );
+
       products.push({
         id: row.id,
         name: productName,
         slug: row.slug,
-        price: productPrice,
-        originalPrice: productOriginalPrice,
+        price: resolved.effectivePrice,
+        originalPrice: resolved.compareAtPrice,
         image: primaryImage,
         kind,
         template,

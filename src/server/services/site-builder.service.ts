@@ -16,6 +16,7 @@ import {
 } from './catalog.service';
 import { publicCollection } from './navigation.service';
 import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
+import { applyPricingToHomepageProducts, getStorefrontPricingContext } from './pricing.service';
 
 export interface LandingPageListItem {
   id: string;
@@ -491,16 +492,21 @@ export async function resolveSectionsForStorefront(
   const enabledSections = sections.filter((s) => s.enabled);
   const resolvedList: ResolvedSectionItem[] = [];
 
+  // Fail-closed: evaluate pricing context with active campaigns, surfacing infrastructure errors
+  const pricingContext = await getStorefrontPricingContext(db);
+
   for (const sec of enabledSections) {
     const resolvedSec: ResolvedSectionItem = { ...sec };
 
     const data = sec.data;
     if (data.type === 'product_grid') {
+      let prods: HomepageProduct[] = [];
       if (data.sourceMode === 'manual') {
-        resolvedSec.resolvedProducts = await resolveProductsByIds(data.manualProductIds);
+        prods = await resolveProductsByIds(data.manualProductIds);
       } else {
-        resolvedSec.resolvedProducts = await resolveProductsByCriteria(data.ruleCriteria);
+        prods = await resolveProductsByCriteria(data.ruleCriteria);
       }
+      resolvedSec.resolvedProducts = applyPricingToHomepageProducts(prods, pricingContext);
     } else if (data.type === 'featured_collection') {
       try {
         const col = await publicCollection(db, data.collectionId);

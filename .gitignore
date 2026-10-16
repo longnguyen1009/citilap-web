@@ -44,3 +44,6 @@ next-env.d.ts
 /dist/
 .vinext/
 .wrangler/
+scripts/.*bundle*.mjs
+/.worktrees/
+/.claude/settings.local.json

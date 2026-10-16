@@ -29,6 +29,8 @@ export type AggregateOrderItem = {
 export type OrderItemAvgAggregateOutputType = {
   price: number | null
   priceSnapshot: number | null
+  regularPriceSnapshot: number | null
+  compareAtPriceSnapshot: number | null
   quantity: number | null
   lineTotal: number | null
 }
@@ -36,6 +38,8 @@ export type OrderItemAvgAggregateOutputType = {
 export type OrderItemSumAggregateOutputType = {
   price: number | null
   priceSnapshot: number | null
+  regularPriceSnapshot: number | null
+  compareAtPriceSnapshot: number | null
   quantity: number | null
   lineTotal: number | null
 }
@@ -53,6 +57,10 @@ export type OrderItemMinAggregateOutputType = {
   variantNameSnapshot: string | null
   price: number | null
   priceSnapshot: number | null
+  regularPriceSnapshot: number | null
+  compareAtPriceSnapshot: number | null
+  campaignSnapshot: string | null
+  pricingEvaluatedAt: Date | null
   quantity: number | null
   lineTotal: number | null
   createdAt: Date | null
@@ -72,6 +80,10 @@ export type OrderItemMaxAggregateOutputType = {
   variantNameSnapshot: string | null
   price: number | null
   priceSnapshot: number | null
+  regularPriceSnapshot: number | null
+  compareAtPriceSnapshot: number | null
+  campaignSnapshot: string | null
+  pricingEvaluatedAt: Date | null
   quantity: number | null
   lineTotal: number | null
   createdAt: Date | null
@@ -91,6 +103,10 @@ export type OrderItemCountAggregateOutputType = {
   variantNameSnapshot: number
   price: number
   priceSnapshot: number
+  regularPriceSnapshot: number
+  compareAtPriceSnapshot: number
+  campaignSnapshot: number
+  pricingEvaluatedAt: number
   quantity: number
   lineTotal: number
   createdAt: number
@@ -102,6 +118,8 @@ export type OrderItemCountAggregateOutputType = {
 export type OrderItemAvgAggregateInputType = {
   price?: true
   priceSnapshot?: true
+  regularPriceSnapshot?: true
+  compareAtPriceSnapshot?: true
   quantity?: true
   lineTotal?: true
 }
@@ -109,6 +127,8 @@ export type OrderItemAvgAggregateInputType = {
 export type OrderItemSumAggregateInputType = {
   price?: true
   priceSnapshot?: true
+  regularPriceSnapshot?: true
+  compareAtPriceSnapshot?: true
   quantity?: true
   lineTotal?: true
 }
@@ -126,6 +146,10 @@ export type OrderItemMinAggregateInputType = {
   variantNameSnapshot?: true
   price?: true
   priceSnapshot?: true
+  regularPriceSnapshot?: true
+  compareAtPriceSnapshot?: true
+  campaignSnapshot?: true
+  pricingEvaluatedAt?: true
   quantity?: true
   lineTotal?: true
   createdAt?: true
@@ -145,6 +169,10 @@ export type OrderItemMaxAggregateInputType = {
   variantNameSnapshot?: true
   price?: true
   priceSnapshot?: true
+  regularPriceSnapshot?: true
+  compareAtPriceSnapshot?: true
+  campaignSnapshot?: true
+  pricingEvaluatedAt?: true
   quantity?: true
   lineTotal?: true
   createdAt?: true
@@ -164,6 +192,10 @@ export type OrderItemCountAggregateInputType = {
   variantNameSnapshot?: true
   price?: true
   priceSnapshot?: true
+  regularPriceSnapshot?: true
+  compareAtPriceSnapshot?: true
+  campaignSnapshot?: true
+  pricingEvaluatedAt?: true
   quantity?: true
   lineTotal?: true
   createdAt?: true
@@ -270,6 +302,10 @@ export type OrderItemGroupByOutputType = {
   variantNameSnapshot: string | null
   price: number
   priceSnapshot: number | null
+  regularPriceSnapshot: number | null
+  compareAtPriceSnapshot: number | null
+  campaignSnapshot: string | null
+  pricingEvaluatedAt: Date | null
   quantity: number
   lineTotal: number
   createdAt: Date
@@ -312,6 +348,10 @@ export type OrderItemWhereInput = {
   variantNameSnapshot?: Prisma.StringNullableFilter<"OrderItem"> | string | null
   price?: Prisma.IntFilter<"OrderItem"> | number
   priceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  regularPriceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  compareAtPriceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  campaignSnapshot?: Prisma.StringNullableFilter<"OrderItem"> | string | null
+  pricingEvaluatedAt?: Prisma.DateTimeNullableFilter<"OrderItem"> | Date | string | null
   quantity?: Prisma.IntFilter<"OrderItem"> | number
   lineTotal?: Prisma.IntFilter<"OrderItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrderItem"> | Date | string
@@ -334,6 +374,10 @@ export type OrderItemOrderByWithRelationInput = {
   variantNameSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
   price?: Prisma.SortOrder
   priceSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  regularPriceSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  compareAtPriceSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  campaignSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  pricingEvaluatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   quantity?: Prisma.SortOrder
   lineTotal?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -359,6 +403,10 @@ export type OrderItemWhereUniqueInput = Prisma.AtLeast<{
   variantNameSnapshot?: Prisma.StringNullableFilter<"OrderItem"> | string | null
   price?: Prisma.IntFilter<"OrderItem"> | number
   priceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  regularPriceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  compareAtPriceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  campaignSnapshot?: Prisma.StringNullableFilter<"OrderItem"> | string | null
+  pricingEvaluatedAt?: Prisma.DateTimeNullableFilter<"OrderItem"> | Date | string | null
   quantity?: Prisma.IntFilter<"OrderItem"> | number
   lineTotal?: Prisma.IntFilter<"OrderItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrderItem"> | Date | string
@@ -381,6 +429,10 @@ export type OrderItemOrderByWithAggregationInput = {
   variantNameSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
   price?: Prisma.SortOrder
   priceSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  regularPriceSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  compareAtPriceSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  campaignSnapshot?: Prisma.SortOrderInput | Prisma.SortOrder
+  pricingEvaluatedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   quantity?: Prisma.SortOrder
   lineTotal?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -408,6 +460,10 @@ export type OrderItemScalarWhereWithAggregatesInput = {
   variantNameSnapshot?: Prisma.StringNullableWithAggregatesFilter<"OrderItem"> | string | null
   price?: Prisma.IntWithAggregatesFilter<"OrderItem"> | number
   priceSnapshot?: Prisma.IntNullableWithAggregatesFilter<"OrderItem"> | number | null
+  regularPriceSnapshot?: Prisma.IntNullableWithAggregatesFilter<"OrderItem"> | number | null
+  compareAtPriceSnapshot?: Prisma.IntNullableWithAggregatesFilter<"OrderItem"> | number | null
+  campaignSnapshot?: Prisma.StringNullableWithAggregatesFilter<"OrderItem"> | string | null
+  pricingEvaluatedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"OrderItem"> | Date | string | null
   quantity?: Prisma.IntWithAggregatesFilter<"OrderItem"> | number
   lineTotal?: Prisma.IntWithAggregatesFilter<"OrderItem"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"OrderItem"> | Date | string
@@ -424,6 +480,10 @@ export type OrderItemCreateInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -446,6 +506,10 @@ export type OrderItemUncheckedCreateInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -462,6 +526,10 @@ export type OrderItemUpdateInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -484,6 +552,10 @@ export type OrderItemUncheckedUpdateInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -503,6 +575,10 @@ export type OrderItemCreateManyInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -519,6 +595,10 @@ export type OrderItemUpdateManyMutationInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -538,6 +618,10 @@ export type OrderItemUncheckedUpdateManyInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -567,6 +651,10 @@ export type OrderItemCountOrderByAggregateInput = {
   variantNameSnapshot?: Prisma.SortOrder
   price?: Prisma.SortOrder
   priceSnapshot?: Prisma.SortOrder
+  regularPriceSnapshot?: Prisma.SortOrder
+  compareAtPriceSnapshot?: Prisma.SortOrder
+  campaignSnapshot?: Prisma.SortOrder
+  pricingEvaluatedAt?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   lineTotal?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -576,6 +664,8 @@ export type OrderItemCountOrderByAggregateInput = {
 export type OrderItemAvgOrderByAggregateInput = {
   price?: Prisma.SortOrder
   priceSnapshot?: Prisma.SortOrder
+  regularPriceSnapshot?: Prisma.SortOrder
+  compareAtPriceSnapshot?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   lineTotal?: Prisma.SortOrder
 }
@@ -593,6 +683,10 @@ export type OrderItemMaxOrderByAggregateInput = {
   variantNameSnapshot?: Prisma.SortOrder
   price?: Prisma.SortOrder
   priceSnapshot?: Prisma.SortOrder
+  regularPriceSnapshot?: Prisma.SortOrder
+  compareAtPriceSnapshot?: Prisma.SortOrder
+  campaignSnapshot?: Prisma.SortOrder
+  pricingEvaluatedAt?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   lineTotal?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -612,6 +706,10 @@ export type OrderItemMinOrderByAggregateInput = {
   variantNameSnapshot?: Prisma.SortOrder
   price?: Prisma.SortOrder
   priceSnapshot?: Prisma.SortOrder
+  regularPriceSnapshot?: Prisma.SortOrder
+  compareAtPriceSnapshot?: Prisma.SortOrder
+  campaignSnapshot?: Prisma.SortOrder
+  pricingEvaluatedAt?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   lineTotal?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -621,6 +719,8 @@ export type OrderItemMinOrderByAggregateInput = {
 export type OrderItemSumOrderByAggregateInput = {
   price?: Prisma.SortOrder
   priceSnapshot?: Prisma.SortOrder
+  regularPriceSnapshot?: Prisma.SortOrder
+  compareAtPriceSnapshot?: Prisma.SortOrder
   quantity?: Prisma.SortOrder
   lineTotal?: Prisma.SortOrder
 }
@@ -761,6 +861,10 @@ export type OrderItemCreateWithoutProductInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -781,6 +885,10 @@ export type OrderItemUncheckedCreateWithoutProductInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -828,6 +936,10 @@ export type OrderItemScalarWhereInput = {
   variantNameSnapshot?: Prisma.StringNullableFilter<"OrderItem"> | string | null
   price?: Prisma.IntFilter<"OrderItem"> | number
   priceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  regularPriceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  compareAtPriceSnapshot?: Prisma.IntNullableFilter<"OrderItem"> | number | null
+  campaignSnapshot?: Prisma.StringNullableFilter<"OrderItem"> | string | null
+  pricingEvaluatedAt?: Prisma.DateTimeNullableFilter<"OrderItem"> | Date | string | null
   quantity?: Prisma.IntFilter<"OrderItem"> | number
   lineTotal?: Prisma.IntFilter<"OrderItem"> | number
   createdAt?: Prisma.DateTimeFilter<"OrderItem"> | Date | string
@@ -844,6 +956,10 @@ export type OrderItemCreateWithoutOrderInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -864,6 +980,10 @@ export type OrderItemUncheckedCreateWithoutOrderInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -905,6 +1025,10 @@ export type OrderItemCreateWithoutSerialUnitInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -925,6 +1049,10 @@ export type OrderItemUncheckedCreateWithoutSerialUnitInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -968,6 +1096,10 @@ export type OrderItemCreateManyProductInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -984,6 +1116,10 @@ export type OrderItemUpdateWithoutProductInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1004,6 +1140,10 @@ export type OrderItemUncheckedUpdateWithoutProductInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1022,6 +1162,10 @@ export type OrderItemUncheckedUpdateManyWithoutProductInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1040,6 +1184,10 @@ export type OrderItemCreateManyOrderInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -1056,6 +1204,10 @@ export type OrderItemUpdateWithoutOrderInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1076,6 +1228,10 @@ export type OrderItemUncheckedUpdateWithoutOrderInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1094,6 +1250,10 @@ export type OrderItemUncheckedUpdateManyWithoutOrderInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1112,6 +1272,10 @@ export type OrderItemCreateManySerialUnitInput = {
   variantNameSnapshot?: string | null
   price: number
   priceSnapshot?: number | null
+  regularPriceSnapshot?: number | null
+  compareAtPriceSnapshot?: number | null
+  campaignSnapshot?: string | null
+  pricingEvaluatedAt?: Date | string | null
   quantity: number
   lineTotal?: number
   createdAt?: Date | string
@@ -1128,6 +1292,10 @@ export type OrderItemUpdateWithoutSerialUnitInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1148,6 +1316,10 @@ export type OrderItemUncheckedUpdateWithoutSerialUnitInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1166,6 +1338,10 @@ export type OrderItemUncheckedUpdateManyWithoutSerialUnitInput = {
   variantNameSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   price?: Prisma.IntFieldUpdateOperationsInput | number
   priceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  regularPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  compareAtPriceSnapshot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  campaignSnapshot?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  pricingEvaluatedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   quantity?: Prisma.IntFieldUpdateOperationsInput | number
   lineTotal?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1187,6 +1363,10 @@ export type OrderItemSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   variantNameSnapshot?: boolean
   price?: boolean
   priceSnapshot?: boolean
+  regularPriceSnapshot?: boolean
+  compareAtPriceSnapshot?: boolean
+  campaignSnapshot?: boolean
+  pricingEvaluatedAt?: boolean
   quantity?: boolean
   lineTotal?: boolean
   createdAt?: boolean
@@ -1209,6 +1389,10 @@ export type OrderItemSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   variantNameSnapshot?: boolean
   price?: boolean
   priceSnapshot?: boolean
+  regularPriceSnapshot?: boolean
+  compareAtPriceSnapshot?: boolean
+  campaignSnapshot?: boolean
+  pricingEvaluatedAt?: boolean
   quantity?: boolean
   lineTotal?: boolean
   createdAt?: boolean
@@ -1231,6 +1415,10 @@ export type OrderItemSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   variantNameSnapshot?: boolean
   price?: boolean
   priceSnapshot?: boolean
+  regularPriceSnapshot?: boolean
+  compareAtPriceSnapshot?: boolean
+  campaignSnapshot?: boolean
+  pricingEvaluatedAt?: boolean
   quantity?: boolean
   lineTotal?: boolean
   createdAt?: boolean
@@ -1253,13 +1441,17 @@ export type OrderItemSelectScalar = {
   variantNameSnapshot?: boolean
   price?: boolean
   priceSnapshot?: boolean
+  regularPriceSnapshot?: boolean
+  compareAtPriceSnapshot?: boolean
+  campaignSnapshot?: boolean
+  pricingEvaluatedAt?: boolean
   quantity?: boolean
   lineTotal?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type OrderItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "productId" | "variantId" | "serialUnitId" | "productName" | "sku" | "productNameSnapshot" | "skuSnapshot" | "variantNameSnapshot" | "price" | "priceSnapshot" | "quantity" | "lineTotal" | "createdAt" | "updatedAt", ExtArgs["result"]["orderItem"]>
+export type OrderItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "productId" | "variantId" | "serialUnitId" | "productName" | "sku" | "productNameSnapshot" | "skuSnapshot" | "variantNameSnapshot" | "price" | "priceSnapshot" | "regularPriceSnapshot" | "compareAtPriceSnapshot" | "campaignSnapshot" | "pricingEvaluatedAt" | "quantity" | "lineTotal" | "createdAt" | "updatedAt", ExtArgs["result"]["orderItem"]>
 export type OrderItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
   product?: boolean | Prisma.ProductDefaultArgs<ExtArgs>
@@ -1296,6 +1488,10 @@ export type $OrderItemPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     variantNameSnapshot: string | null
     price: number
     priceSnapshot: number | null
+    regularPriceSnapshot: number | null
+    compareAtPriceSnapshot: number | null
+    campaignSnapshot: string | null
+    pricingEvaluatedAt: Date | null
     quantity: number
     lineTotal: number
     createdAt: Date
@@ -1738,6 +1934,10 @@ export interface OrderItemFieldRefs {
   readonly variantNameSnapshot: Prisma.FieldRef<"OrderItem", 'String'>
   readonly price: Prisma.FieldRef<"OrderItem", 'Int'>
   readonly priceSnapshot: Prisma.FieldRef<"OrderItem", 'Int'>
+  readonly regularPriceSnapshot: Prisma.FieldRef<"OrderItem", 'Int'>
+  readonly compareAtPriceSnapshot: Prisma.FieldRef<"OrderItem", 'Int'>
+  readonly campaignSnapshot: Prisma.FieldRef<"OrderItem", 'String'>
+  readonly pricingEvaluatedAt: Prisma.FieldRef<"OrderItem", 'DateTime'>
   readonly quantity: Prisma.FieldRef<"OrderItem", 'Int'>
   readonly lineTotal: Prisma.FieldRef<"OrderItem", 'Int'>
   readonly createdAt: Prisma.FieldRef<"OrderItem", 'DateTime'>

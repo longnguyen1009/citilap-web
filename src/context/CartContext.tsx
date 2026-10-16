@@ -20,6 +20,8 @@ interface CartContextType {
   addToCart: (item: CartItem) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
+  updateItemPrice: (productId: string, variantId: string | null | undefined, newPrice: number) => void;
+  revalidateCart: () => Promise<void>;
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
@@ -94,8 +96,67 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const updateItemPrice = (productId: string, variantId: string | null | undefined, newPrice: number) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        const matches =
+          item.productId === productId &&
+          (item.variantId || null) === (variantId || null);
+        if (matches) {
+          return {
+            ...item,
+            price: newPrice,
+            displayPrice: new Intl.NumberFormat('vi-VN').format(newPrice) + '₫',
+          };
+        }
+        return item;
+      })
+    );
+  };
+
   const clearCart = () => {
     setCart([]);
+  };
+
+  const revalidateCart = async () => {
+    if (cart.length === 0) return;
+    try {
+      const res = await fetch("/api/cart/revalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cart.map((i) => ({
+            id: i.id,
+            productId: i.productId,
+            variantId: i.variantId || null,
+            expectedPrice: i.price,
+          })),
+        }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as {
+          success: boolean;
+          items: Array<{ id: string; price: number; available: boolean }>;
+        };
+        if (data.success && Array.isArray(data.items)) {
+          setCart((prev) =>
+            prev.map((item) => {
+              const serverItem = data.items.find((s) => s.id === item.id);
+              if (serverItem && serverItem.available && serverItem.price !== item.price) {
+                return {
+                  ...item,
+                  price: serverItem.price,
+                  displayPrice: new Intl.NumberFormat("vi-VN").format(serverItem.price) + "₫",
+                };
+              }
+              return item;
+            })
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("Cart price revalidation failed:", e);
+    }
   };
 
   const cartCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
@@ -108,6 +169,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         addToCart,
         removeFromCart,
         updateQuantity,
+        updateItemPrice,
+        revalidateCart,
         clearCart,
         cartCount,
         cartTotal,

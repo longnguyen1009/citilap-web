@@ -89,7 +89,9 @@ export const ModelName = {
   PageStudioRevision: 'PageStudioRevision',
   LandingPage: 'LandingPage',
   LandingPageStudio: 'LandingPageStudio',
-  LandingPageRevision: 'LandingPageRevision'
+  LandingPageRevision: 'LandingPageRevision',
+  PromotionCampaign: 'PromotionCampaign',
+  PromotionCampaignItem: 'PromotionCampaignItem'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -316,6 +318,10 @@ export const OrderItemScalarFieldEnum = {
   variantNameSnapshot: 'variantNameSnapshot',
   price: 'price',
   priceSnapshot: 'priceSnapshot',
+  regularPriceSnapshot: 'regularPriceSnapshot',
+  compareAtPriceSnapshot: 'compareAtPriceSnapshot',
+  campaignSnapshot: 'campaignSnapshot',
+  pricingEvaluatedAt: 'pricingEvaluatedAt',
   quantity: 'quantity',
   lineTotal: 'lineTotal',
   createdAt: 'createdAt',
@@ -725,6 +731,35 @@ export const LandingPageRevisionScalarFieldEnum = {
 } as const
 
 export type LandingPageRevisionScalarFieldEnum = (typeof LandingPageRevisionScalarFieldEnum)[keyof typeof LandingPageRevisionScalarFieldEnum]
+
+
+export const PromotionCampaignScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  status: 'status',
+  revision: 'revision',
+  startAt: 'startAt',
+  endAt: 'endAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PromotionCampaignScalarFieldEnum = (typeof PromotionCampaignScalarFieldEnum)[keyof typeof PromotionCampaignScalarFieldEnum]
+
+
+export const PromotionCampaignItemScalarFieldEnum = {
+  id: 'id',
+  campaignId: 'campaignId',
+  productId: 'productId',
+  variantId: 'variantId',
+  salePrice: 'salePrice',
+  regularPrice: 'regularPrice',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PromotionCampaignItemScalarFieldEnum = (typeof PromotionCampaignItemScalarFieldEnum)[keyof typeof PromotionCampaignItemScalarFieldEnum]
 
 
 export const SortOrder = {

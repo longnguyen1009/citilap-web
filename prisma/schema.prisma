@@ -116,6 +116,7 @@ model Product {
   editLogs       ProductEditLog[]
   versions       ProductVersion[]
   orderItems     OrderItem[]
+  campaignItems  PromotionCampaignItem[]
   inventoryType  String           @default("SERIALIZED") // SERIALIZED, QUANTITY
   serialUnits    SerialUnit[]
   inventoryBalances InventoryBalance[]
@@ -165,6 +166,7 @@ model ProductVariant {
   inventoryBalances     InventoryBalance[]
   inventoryTransactions InventoryTransaction[]
   inventoryReservations InventoryReservation[]
+  campaignItems         PromotionCampaignItem[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -271,6 +273,10 @@ model OrderItem {
   variantNameSnapshot String?
   price               Int         // Integer VND price at the time of purchase
   priceSnapshot       Int?
+  regularPriceSnapshot Int?       // Integer VND regular non-sale price snapshot
+  compareAtPriceSnapshot Int?     // Integer VND compare-at price snapshot
+  campaignSnapshot    String?     // Structured JSON campaign snapshot
+  pricingEvaluatedAt  DateTime?   // Timestamp when pricing was authoritatively evaluated
   quantity            Int
   lineTotal           Int         @default(0)
   createdAt           DateTime    @default(now())
@@ -713,5 +719,39 @@ model LandingPageRevision {
   createdAt String   @default(dbgenerated("CURRENT_TIMESTAMP"))
 
   @@id([pageId, revision])
+}
+
+model PromotionCampaign {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  status      String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
+  revision    Int      @default(0)
+  startAt     DateTime
+  endAt       DateTime
+  items       PromotionCampaignItem[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([startAt, endAt])
+}
+
+model PromotionCampaignItem {
+  id           String            @id @default(cuid())
+  campaignId   String
+  campaign     PromotionCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId    String?
+  variant      ProductVariant?   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  salePrice    Int               // Integer VND
+  regularPrice Int?              // Integer VND snapshot at setup
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([campaignId])
+  @@index([productId])
+  @@index([variantId])
 }
 

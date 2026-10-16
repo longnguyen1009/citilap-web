@@ -26,7 +26,13 @@ import { businessProfile } from "@/config/business-profile";
 import {
   getPublishedStudio,
   classifyProductPublication,
+  getStorefrontSettings,
 } from "@/server/services/storefront-cms.service";
+import {
+  calculateEffectivePrice,
+  applyPricingToHomepageProducts,
+  getStorefrontPricingContext,
+} from "@/server/services/pricing.service";
 
 interface ProductPageProps {
   params: Promise<{ id: string }>;
@@ -150,7 +156,34 @@ export default async function ProductDetailPage({
     ? (studioImages.find((m) => m.variantId && m.variantId === studioVariant?.id)?.url || studioImages[0]?.url || "")
     : (product.primaryImageUrl || "");
   const displayName = studio?.name || product.name;
-  const displayPrice = studioVariant?.price ?? studio?.price ?? product.price;
+  const pricingContext = await getStorefrontPricingContext();
+  const selectedVariant =
+    product.variants.find((v) => v.id === product.selectedVariantId) || null;
+  const isVariant = Boolean(studioVariant || selectedVariant);
+  const activeVariant = studioVariant || selectedVariant;
+  const rawPrice = activeVariant?.price ?? studio?.price ?? product.price;
+  const rawOriginalPrice = isVariant
+    ? (activeVariant?.originalPrice ?? null)
+    : (studio?.originalPrice ?? product.originalPrice ?? null);
+  const isFlashSale = Boolean(studio?.isFlashSale ?? product.isFlashSale);
+
+  const pricing = calculateEffectivePrice(
+    rawPrice,
+    rawOriginalPrice,
+    isFlashSale,
+    true,
+    pricingContext,
+    new Date(),
+    {
+      productId: product.id,
+      variantId: activeVariant?.id,
+      isVariant,
+      variantOriginalPrice: isVariant ? rawOriginalPrice : null,
+    }
+  );
+
+  const displayPrice = pricing.effectivePrice;
+  const displayOriginalPrice = pricing.compareAtPrice;
   const displayAvailability = studio?.availability === "AVAILABLE" ? "https://schema.org/InStock"
     : studio?.availability === "PREORDER" ? "https://schema.org/PreOrder"
     : studio ? "https://schema.org/OutOfStock"
@@ -158,22 +191,19 @@ export default async function ProductDetailPage({
 
   // 4. Fetch related products from D1 (prioritizing manual curated items)
   const manualRelatedIds = (studio?.relatedProductIds || []).filter((rid) => rid && rid !== product.id);
-  const relatedProducts = await getRelatedProducts(
+  const rawRelatedProducts = await getRelatedProducts(
     product.id,
     product.categoryId,
     product.brandId,
     4,
     manualRelatedIds
   );
+  const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext);
 
-  // 5. Active selected variant reference
-  const selectedVariant =
-    product.variants.find((v) => v.id === product.selectedVariantId) || null;
-
-  // 6. Sanitize description
+  // 5. Sanitize description
   const safeDescription = sanitizeHtml(studio ? (studio.contentHtml || studio.description) : (product.contentHtml || product.description || ""));
 
-  // 7. Schema.org JSON-LD Structured Data
+  // 6. Schema.org JSON-LD Structured Data
   const jsonLdProduct = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -196,14 +226,46 @@ export default async function ProductDetailPage({
     },
   };
 
-  const jsonLdVariants = studio ? studio.variants.map((v) => ({
-    name: `${displayName} - ${v.name}`, sku: v.sku, price: v.price,
-    availability: displayAvailability, condition: v.condition,
-  })) : product.variants.map((v) => ({
-    name: `${displayName} - ${v.name}`, sku: v.sku, price: v.price,
-    availability: v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-    condition: product.condition,
-  }));
+  const jsonLdVariants = studio ? studio.variants.map((v) => {
+    const vp = calculateEffectivePrice(
+      v.price,
+      v.originalPrice ?? null,
+      isFlashSale,
+      true,
+      pricingContext,
+      new Date(),
+      {
+        productId: product.id,
+        variantId: v.id,
+        isVariant: true,
+        variantOriginalPrice: v.originalPrice ?? null,
+      }
+    );
+    return {
+      name: `${displayName} - ${v.name}`, sku: v.sku, price: vp.effectivePrice,
+      availability: displayAvailability, condition: v.condition,
+    };
+  }) : product.variants.map((v) => {
+    const vp = calculateEffectivePrice(
+      v.price,
+      v.originalPrice ?? null,
+      isFlashSale,
+      true,
+      pricingContext,
+      new Date(),
+      {
+        productId: product.id,
+        variantId: v.id,
+        isVariant: true,
+        variantOriginalPrice: v.originalPrice ?? null,
+      }
+    );
+    return {
+      name: `${displayName} - ${v.name}`, sku: v.sku, price: vp.effectivePrice,
+      availability: v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      condition: product.condition,
+    };
+  });
   const jsonLdProductGroup = jsonLdVariants.length > 1 ? {
     "@context": "https://schema.org",
     "@type": "ProductGroup",
@@ -363,7 +425,32 @@ export default async function ProductDetailPage({
 
               {/* Unified Purchase Section: Condition, Variants, Warranty, Live Price, Actions */}
               {studio ? <StudioPurchaseSection
-                studio={studio}
+                studio={{
+                  ...studio,
+                  price: displayPrice,
+                  originalPrice: displayOriginalPrice,
+                  variants: studio.variants.map((v) => {
+                    const vp = calculateEffectivePrice(
+                      v.price,
+                      v.originalPrice ?? null,
+                      isFlashSale,
+                      true,
+                      pricingContext,
+                      new Date(),
+                      {
+                        productId: product.id,
+                        variantId: v.id,
+                        isVariant: true,
+                        variantOriginalPrice: v.originalPrice ?? null,
+                      }
+                    );
+                    return {
+                      ...v,
+                      price: vp.effectivePrice,
+                      originalPrice: vp.compareAtPrice,
+                    };
+                  }),
+                }}
                 productId={product.id}
                 image={cover}
                 selectedSku={skuParam}
@@ -374,10 +461,30 @@ export default async function ProductDetailPage({
                 productImage={product.primaryImageUrl || ""}
                 initialCondition={product.condition}
                 initialWarranty={product.warranty}
-                basePrice={product.price}
-                baseOriginalPrice={product.originalPrice}
+                basePrice={displayPrice}
+                baseOriginalPrice={displayOriginalPrice}
                 baseStock={product.stock}
-                variants={product.variants}
+                variants={product.variants.map((v) => {
+                  const vp = calculateEffectivePrice(
+                    v.price,
+                    v.originalPrice ?? null,
+                    isFlashSale,
+                    true,
+                    pricingContext,
+                    new Date(),
+                    {
+                      productId: product.id,
+                      variantId: v.id,
+                      isVariant: true,
+                      variantOriginalPrice: v.originalPrice ?? null,
+                    }
+                  );
+                  return {
+                    ...v,
+                    price: vp.effectivePrice,
+                    originalPrice: vp.compareAtPrice,
+                  };
+                })}
                 selectedVariantId={product.selectedVariantId}
               />}
             </div>

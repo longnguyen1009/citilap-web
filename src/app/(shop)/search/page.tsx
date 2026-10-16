@@ -6,6 +6,7 @@ import {
   searchProducts,
   type SearchFilterOptions,
 } from "@/server/services/search.service";
+import { getStorefrontPricingContext } from "@/server/services/pricing.service";
 
 interface SearchPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -95,7 +96,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     limit: 12,
   };
 
-  const searchResult = await searchProducts(options);
+  const pricingContext = await getStorefrontPricingContext().catch(() => null);
+  const searchResult = await searchProducts(options, undefined, pricingContext);
 
   const breadcrumbItems = [
     { label: "Trang chủ", href: "/" },

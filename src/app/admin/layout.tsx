@@ -20,6 +20,7 @@ import {
   Newspaper,
   FileText,
   LayoutTemplate,
+  Zap,
 } from "lucide-react";
 import AdminBreadcrumbs, { type BreadcrumbItem } from "@/components/admin/ui/AdminBreadcrumbs";
 import AdminNotificationBell from "@/components/admin/notifications/AdminNotificationBell";
@@ -50,6 +51,7 @@ const navGroups: NavGroup[] = [
     groupName: "Catalog & Sản phẩm",
     items: [
       { name: "Sản phẩm", href: "/admin/products", icon: Package },
+      { name: "Chiến dịch giá", href: "/admin/campaigns", icon: Zap },
       { name: "Thương hiệu", href: "/admin/brands", icon: Tag },
       { name: "Thư viện Media", href: "/admin/media", icon: Images },
     ],
@@ -103,6 +105,9 @@ function getBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
   }
   if (pathname === "/admin/media") {
     return [{ label: "Catalog" }, { label: "Thư viện Media" }];
+  }
+  if (pathname === "/admin/campaigns") {
+    return [{ label: "Catalog" }, { label: "Chiến dịch giá" }];
   }
   if (pathname === "/admin/categories") {
     return [{ label: "Nội dung" }, { label: "Danh mục sản phẩm" }];

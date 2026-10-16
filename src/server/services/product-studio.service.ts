@@ -211,6 +211,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       p.isNewArrival,
       p.isBestSeller,
       p.isFeatured,
+      p.isFlashSale,
       p.cpu,
       p.categoryId,
       c.name AS categoryName,
@@ -287,6 +288,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       isNewArrival: !!r.isNewArrival,
       isBestSeller: !!r.isBestSeller,
       isFeatured: !!r.isFeatured,
+      isFlashSale: !!r.isFlashSale,
       image,
       updatedAt: String(r.updatedAt),
       hasStudio: r.studioId != null,
@@ -328,7 +330,11 @@ export async function studioList(db: D1Database, q = '') {
 export async function studioDetail(db: D1Database, id: string) {
   const row = await db.prepare('SELECT * FROM ProductStudio WHERE productId=?').bind(id).first<Studio>();
   if (row) {
-    return { id, revision: row.revision, document: JSON.parse(row.draft) as ProductDocument, published: !!row.published };
+    const document = JSON.parse(row.draft) as ProductDocument;
+    if (document.isFlashSale === undefined) {
+      document.isFlashSale = false;
+    }
+    return { id, revision: row.revision, document, published: !!row.published };
   }
 
   const p = await db.prepare('SELECT * FROM Product WHERE id=? AND deletedAt IS NULL').bind(id).first<Record<string, unknown>>();
@@ -372,6 +378,7 @@ export async function studioDetail(db: D1Database, id: string) {
   d.isNewArrival = !!p.isNewArrival;
   d.isBestSeller = !!p.isBestSeller;
   d.isFeatured = !!p.isFeatured;
+  d.isFlashSale = !!p.isFlashSale;
 
   // Variants
   const variants = await db.prepare("SELECT * FROM ProductVariant WHERE productId=? AND status='ACTIVE'").bind(id).all<Record<string, unknown>>();
@@ -387,7 +394,7 @@ export async function studioDetail(db: D1Database, id: string) {
         name: String(v.name),
         price: Number(v.price),
         condition: 'NEW',
-        originalPrice: null,
+        originalPrice: v.originalPrice != null ? Number(v.originalPrice) : null,
         availability: 'AVAILABLE',
         ram: String(v.ram || ''),
         storage: String(v.storage || ''),
@@ -522,6 +529,7 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         isNewArrival = ?,
         isBestSeller = ?,
         isFeatured = ?,
+        isFlashSale = ?,
         categoryId = ?,
         price = ?,
         originalPrice = ?,
@@ -543,7 +551,7 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
       WHERE id = ?
     `).bind(
       d.name, d.slug, d.description, d.contentHtml, d.brand, d.brandId || null,
-      d.condition || 'NEW', d.isNewArrival ? 1 : 0, d.isBestSeller ? 1 : 0, d.isFeatured ? 1 : 0,
+      d.condition || 'NEW', d.isNewArrival ? 1 : 0, d.isBestSeller ? 1 : 0, d.isFeatured ? 1 : 0, d.isFlashSale ? 1 : 0,
       d.categoryId,
       d.price, d.originalPrice, d.seoTitle, d.seoDescription,
       JSON.stringify(assets.filter(a => a.kind === 'IMAGE').map(a => a.url)), JSON.stringify(specs),
@@ -557,13 +565,14 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
       const owner = await db.prepare('SELECT productId FROM ProductVariant WHERE id=?').bind(v.id).first<{ productId: string }>();
       if (owner && owner.productId !== productId) throw new MediaError('Biến thể thuộc sản phẩm khác.', 409);
       statements.push(db.prepare(`
-        INSERT INTO ProductVariant(id,productId,sku,name,options,price,status,ram,storage,gpu,updatedAt)
-        VALUES(?,?,?,?,?,?,'ACTIVE',?,?,?,CURRENT_TIMESTAMP)
+        INSERT INTO ProductVariant(id,productId,sku,name,options,price,originalPrice,status,ram,storage,gpu,updatedAt)
+        VALUES(?,?,?,?,?,?,?,'ACTIVE',?,?,?,CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           sku = excluded.sku,
           name = excluded.name,
           options = excluded.options,
           price = excluded.price,
+          originalPrice = excluded.originalPrice,
           status = 'ACTIVE',
           ram = excluded.ram,
           storage = excluded.storage,
@@ -576,6 +585,7 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         v.name,
         JSON.stringify({ condition: v.condition, ...(v.options || {}) }),
         v.price,
+        v.originalPrice ?? null,
         v.ram || null,
         v.storage || null,
         v.gpu || null
