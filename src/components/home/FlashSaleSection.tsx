@@ -3,19 +3,17 @@ import { Flame } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import FlashSaleCountdown from "@/components/product/FlashSaleCountdown";
 import { getFlashSaleProducts } from "@/server/services/catalog.service";
-import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
-import { isFlashSaleActive, applyPricingToHomepageProducts, getStorefrontPricingContext } from "@/server/services/pricing.service";
+import { isFlashSaleActive, getStorefrontPricingContext, type PriceEvaluationContext } from "@/server/services/pricing.service";
 
-export default async function FlashSaleSection() {
-  const settings = await getStorefrontPricingContext();
-  if (!isFlashSaleActive(settings)) {
+export default async function FlashSaleSection({pricingContext, evaluatedAt = new Date()}: {pricingContext?:PriceEvaluationContext; evaluatedAt?:Date} = {}) {
+  const settings = pricingContext || await getStorefrontPricingContext(undefined, evaluatedAt);
+  if (!isFlashSaleActive(settings, evaluatedAt)) {
     return null;
   }
 
   let flashSaleProducts = [];
   try {
-    const rawProducts = await getFlashSaleProducts(10);
-    flashSaleProducts = applyPricingToHomepageProducts(rawProducts, settings);
+    flashSaleProducts = await getFlashSaleProducts(10, settings, evaluatedAt);
   } catch (error) {
     console.error("[FlashSaleSection] Failed to load flash sale products from D1:", error);
     return null;

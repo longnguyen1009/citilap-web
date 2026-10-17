@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 
-const hasDatabase = !!process.env.DATABASE_URL;
+import { getPrismaClient } from '@/lib/prisma';
+import { mediaEnvironment } from '@/server/media-http';
+import { getStorefrontPricingContext } from '@/server/services/pricing.service';
+import { resolveProductsByIds } from '@/server/services/catalog.service';
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    if (!hasDatabase) return NextResponse.json({ success: true, data: { related: [], bundles: [] } });
-    const { prisma } = await import("@/lib/prisma");
+    const { DB } = await mediaEnvironment();
+    const prisma = getPrismaClient(DB);
+    const at = new Date();
+    const context = await getStorefrontPricingContext(DB, at);
 
-    const product = await prisma.product.findUnique({ where: { id }, select: { categoryId: true, brand: true, series: true, tags: true, price: true } });
+    const product = await prisma.product.findFirst({ where: { id, deletedAt: null, status: { in: ['ACTIVE','active'] }, NOT: { studio: { is: { published: null } } } }, select: { categoryId: true, brand: true, series: true, tags: true, price: true } });
     if (!product) return NextResponse.json({ success: false, error: "Product not found" }, { status: 404 });
 
     // Related products: same category, same brand, or similar tags, excluding current product
@@ -29,7 +34,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const relatedProducts = await prisma.product.findMany({
       where: {
         id: { not: id },
-        status: "active",
+        status: { in: ['ACTIVE','active'] }, deletedAt: null, NOT: { studio: { is: { published: null } } },
         OR: [
           ...(product.categoryId ? [{ categoryId: product.categoryId }] : []),
           ...(product.brand ? [{ brand: product.brand }] : []),
@@ -41,6 +46,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         slug: true,
         price: true,
         originalPrice: true,
+        isFlashSale: true,
         images: true,
         brand: true,
         stock: true,
@@ -54,7 +60,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const bundleProducts = await prisma.product.findMany({
       where: {
         id: { not: id },
-        status: "active",
+        status: { in: ['ACTIVE','active'] }, deletedAt: null, NOT: { studio: { is: { published: null } } },
         price: {
           gte: Math.max(0, product.price - priceRange),
           lte: product.price + priceRange,
@@ -66,6 +72,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         slug: true,
         price: true,
         originalPrice: true,
+        isFlashSale: true,
         images: true,
         brand: true,
         stock: true,
@@ -74,11 +81,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       orderBy: { updatedAt: "desc" },
     });
 
+    const resolved = await resolveProductsByIds([...relatedProducts,...bundleProducts].map(p=>p.id),prisma,context,at);
+    const priced = (rows: typeof relatedProducts) => rows.flatMap(p => {
+      const card = resolved.find(r=>r.id===p.id);
+      return card ? [{...p,price:card.price,originalPrice:card.originalPrice,images:card.image?[card.image]:[]}] : [];
+    });
     return NextResponse.json({
       success: true,
       data: {
-        related: relatedProducts.map((p) => ({ ...p, images: typeof p.images === "string" ? (() => { try { return JSON.parse(p.images); } catch { return p.images ? p.images.split(",") : []; } })() : p.images })),
-        bundles: bundleProducts.map((p) => ({ ...p, images: typeof p.images === "string" ? (() => { try { return JSON.parse(p.images); } catch { return p.images ? p.images.split(",") : []; } })() : p.images })),
+        related: priced(relatedProducts),
+        bundles: priced(bundleProducts),
       },
     });
   } catch (error) {

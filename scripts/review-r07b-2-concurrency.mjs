@@ -52,8 +52,15 @@ try {
   } catch (err) { conflict = err; }
   const savedItem = await db.prepare('SELECT salePrice FROM PromotionCampaignItem WHERE campaignId=?').bind(c.id).first();
   assert.equal(conflict?.code, 'CAMPAIGN_REVISION_CONFLICT');
-  console.log(JSON.stringify({ repro: 'CAS loser mutates items before throwing 409', code: conflict.code,
-    beforeSalePrice: 15000000, afterSalePrice: savedItem.salePrice, defectReproduced: savedItem.salePrice === 12000000 }));
+  assert.equal(savedItem.salePrice, 15000000, 'CAS loser must NOT mutate items');
+  console.log(JSON.stringify({
+    regression: 'CAS loser causes zero side effects',
+    code: conflict.code,
+    beforeSalePrice: 15000000,
+    afterSalePrice: savedItem.salePrice,
+    defectReproduced: false,
+    invariantHeld: true
+  }));
 
   // Force both overlap reads to finish before either publication write.
   const a = await api.saveCampaign({ ...doc, name: 'Concurrent A' }, db);
@@ -81,14 +88,45 @@ try {
     api.publishCampaign(b.id, b.revision, concurrentDb),
   ]);
   const count = await db.prepare("SELECT COUNT(*) AS n FROM PromotionCampaign WHERE status='PUBLISHED'").first();
-  console.log(JSON.stringify({ repro: 'Concurrent overlapping publications', outcomes: results.map(r => r.status),
-    publishedCount: count.n, defectReproduced: count.n === 2 }));
+  const fulfilledCount = results.filter(r => r.status === 'fulfilled').length;
+  const rejectedCount = results.filter(r => r.status === 'rejected').length;
+  assert.equal(fulfilledCount, 1, 'Exactly one concurrent publication must succeed');
+  assert.equal(rejectedCount, 1, 'Exactly one concurrent publication must be rejected');
+  assert.equal(count.n, 1, 'Exactly one campaign must be PUBLISHED in DB');
+  console.log(JSON.stringify({
+    regression: 'Concurrent overlapping publications guarded atomically',
+    outcomes: results.map(r => r.status),
+    publishedCount: count.n,
+    defectReproduced: false,
+    invariantHeld: true
+  }));
 
   const settings = { flashSaleEnabled: false, flashSaleTitle: '', flashSaleStartAt: '', flashSaleEndAt: '' };
-  const missing = await api.resolvePrice({ productId: 'does-not-exist', settings, explicitDb: db });
-  const wrongVariant = await api.resolvePrice({ productId: 'review-p', variantId: 'does-not-exist', settings, explicitDb: db });
-  console.log(JSON.stringify({ repro: 'Missing targets resolve successfully',
-    missingProductPrice: missing.effectivePrice, missingVariantPrice: wrongVariant.effectivePrice }));
+  let missingProductError = null;
+  try {
+    await api.resolvePrice({ productId: 'does-not-exist', settings, explicitDb: db });
+  } catch (err) {
+    missingProductError = err;
+  }
+  assert.equal(missingProductError?.code, 'PRODUCT_NOT_FOUND', 'Missing product must reject with PRODUCT_NOT_FOUND');
+  assert.equal(missingProductError?.statusCode, 404);
+
+  let missingVariantError = null;
+  try {
+    await api.resolvePrice({ productId: 'review-p', variantId: 'does-not-exist', settings, explicitDb: db });
+  } catch (err) {
+    missingVariantError = err;
+  }
+  assert.equal(missingVariantError?.code, 'VARIANT_NOT_FOUND', 'Missing variant must reject with VARIANT_NOT_FOUND');
+  assert.equal(missingVariantError?.statusCode, 404);
+
+  console.log(JSON.stringify({
+    regression: 'Strict resolver rejects missing targets',
+    missingProductCode: missingProductError.code,
+    missingVariantCode: missingVariantError.code,
+    defectReproduced: false,
+    invariantHeld: true
+  }));
 } finally {
   await mf.dispose();
 }

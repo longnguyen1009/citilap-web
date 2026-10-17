@@ -6,6 +6,9 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
 interface OrderDetail {
+  paymentMethod: string;
+  paymentStatus: string;
+  checkoutSnapshot: {bankAccountInfo: string | null; showroom: {name:string;address:string} | null} | null;
   id: string;
   orderNumber: string;
   status: string;
@@ -70,6 +73,8 @@ function SuccessContent() {
     );
   }
 
+  if (!order) return <div role="alert" className="rounded border bg-white p-6">Chưa thể xác thực thông tin đơn hàng. Vui lòng kiểm tra đường dẫn xác nhận hoặc tải lại trang.</div>;
+
   const displayOrderNumber = order?.orderNumber || (orderId ? `CTL-${orderId.slice(-6).toUpperCase()}` : "CTL-ORD");
 
   return (
@@ -125,10 +130,11 @@ function SuccessContent() {
 
           <div className="flex justify-between items-center pt-2.5 border-t border-gray-200 text-xs md:text-sm">
             <span className="text-gray-500 font-medium">Hình thức thanh toán:</span>
-            <span className="font-bold text-gray-800">Thanh toán khi nhận máy (COD)</span>
+            <span className="font-bold text-gray-800">{order.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản ngân hàng' : 'Thanh toán khi nhận máy (COD)'}</span>
           </div>
         </div>
 
+        {order.paymentMethod === 'BANK_TRANSFER' && order.checkoutSnapshot?.bankAccountInfo && <div className="rounded border border-blue-200 bg-blue-50 p-4"><h2 className="font-bold">Hướng dẫn chuyển khoản</h2><p className="whitespace-pre-wrap">{order.checkoutSnapshot.bankAccountInfo}</p><p>Trạng thái thanh toán: {order.paymentStatus === 'PENDING' ? 'Chờ xác nhận' : order.paymentStatus}</p></div>}
         {/* Danh sách sản phẩm nếu có */}
         {order && order.items && order.items.length > 0 && (
           <div className="border border-gray-200 rounded-xl p-4">
@@ -151,13 +157,13 @@ function SuccessContent() {
             </div>
 
             <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center text-sm">
-              <span className="font-bold text-gray-700">Tạm tính:</span>
+              <span className="font-bold text-gray-700">Tổng thanh toán:</span>
               <span className="font-black text-red-600 text-base">
                 {order.totalAmount.toLocaleString("vi-VN")}đ
               </span>
             </div>
             <div className="text-[11px] text-gray-500 italic text-right mt-1">
-              Phí giao hàng (nếu có) sẽ được nhân viên tư vấn trao đổi và xác nhận khi gọi điện.
+              Tạm tính: {order.subtotalAmount.toLocaleString('vi-VN')}đ · Phí giao hàng: {order.shippingFee.toLocaleString('vi-VN')}đ
             </div>
           </div>
         )}

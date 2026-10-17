@@ -245,6 +245,7 @@ model Order {
   paymentMethod   String      @default("COD")
   paymentStatus   String      @default("PENDING")
   confirmationTokenHash String?
+  checkoutSnapshot String?
   items           OrderItem[]
   events          OrderEvent[]
   internalNotes   OrderNote[]

@@ -71,7 +71,7 @@ export async function PUT(request: Request, context: RouteContext) {
         { status: 400 }
       );
     }
-    if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 0) {
+    if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
       return NextResponse.json(
         { success: false, code: 'INVALID_EXPECTED_REVISION', error: 'expectedRevision phải là số nguyên không âm.' },
         { status: 400 }
@@ -166,7 +166,7 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     if (qRev !== null) {
       const parsed = Number(qRev);
-      if (Number.isInteger(parsed) && parsed >= 0) expectedRevision = parsed;
+      if (/^(0|[1-9]\d*)$/.test(qRev) && Number.isSafeInteger(parsed)) expectedRevision = parsed;
       else {
         return NextResponse.json(
           { success: false, code: 'INVALID_EXPECTED_REVISION', error: 'expectedRevision phải là số nguyên không âm.' },
@@ -174,8 +174,9 @@ export async function DELETE(request: Request, context: RouteContext) {
         );
       }
     } else if (ifMatch) {
-      const parsed = Number(ifMatch.replace(/["']/g, ''));
-      if (Number.isInteger(parsed) && parsed >= 0) expectedRevision = parsed;
+      const revisionText = /^(?:"(0|[1-9]\d*)"|(0|[1-9]\d*))$/.exec(ifMatch);
+      const parsed = Number(revisionText?.[1] ?? revisionText?.[2]);
+      if (revisionText && Number.isSafeInteger(parsed)) expectedRevision = parsed;
       else {
         return NextResponse.json(
           { success: false, code: 'INVALID_EXPECTED_REVISION', error: 'If-Match revision phải là số nguyên không âm.' },
@@ -184,7 +185,7 @@ export async function DELETE(request: Request, context: RouteContext) {
       }
     } else {
       const body = (await request.json().catch(() => null)) as { expectedRevision?: number } | null;
-      if (typeof body?.expectedRevision === 'number' && Number.isInteger(body.expectedRevision) && body.expectedRevision >= 0) {
+      if (typeof body?.expectedRevision === 'number' && Number.isSafeInteger(body.expectedRevision) && body.expectedRevision >= 0) {
         expectedRevision = body.expectedRevision;
       }
     }

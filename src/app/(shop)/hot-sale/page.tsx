@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Flame, ShieldCheck, Zap, Gift, Truck, AlertCircle, ShoppingBag } from "lucide-react";
 import { getFlashSaleProducts, type HomepageProduct } from "@/server/services/catalog.service";
-import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
-import { isFlashSaleActive, applyPricingToHomepageProducts, getStorefrontPricingContext } from "@/server/services/pricing.service";
+import { isFlashSaleActive, getStorefrontPricingContext } from "@/server/services/pricing.service";
 import FlashSaleCountdown from "@/components/product/FlashSaleCountdown";
 import HotSaleClient from "@/components/product/HotSaleClient";
 
@@ -18,14 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function HotSalePage() {
-  const settings = await getStorefrontPricingContext();
-  const isActive = isFlashSaleActive(settings);
+  const evaluatedAt = new Date();
+  const settings = await getStorefrontPricingContext(undefined, evaluatedAt);
+  const isActive = isFlashSaleActive(settings, evaluatedAt);
   const title = settings?.flashSaleTitle || "Giá Sốc Giờ Vàng";
 
   let products: HomepageProduct[] = [];
   try {
-    const raw = await getFlashSaleProducts(50);
-    products = applyPricingToHomepageProducts(raw, settings);
+    products = await getFlashSaleProducts(50, undefined, settings, evaluatedAt);
   } catch (error) {
     console.error("[HotSalePage] Failed to load hot sale products from D1:", error);
     products = [];
@@ -34,7 +33,7 @@ export default async function HotSalePage() {
   const isUpcoming = Boolean(
     settings?.flashSaleEnabled &&
     settings.flashSaleStartAt &&
-    new Date(settings.flashSaleStartAt).getTime() > Date.now()
+    new Date(settings.flashSaleStartAt).getTime() > evaluatedAt.getTime()
   );
 
   return (

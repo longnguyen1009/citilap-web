@@ -146,7 +146,7 @@ CWV: đo baseline và sau thay đổi theo route, thiết bị, môi trường; 
 | R06 | Đơn đơn giản + liên hệ/khách + export + thông báo trong Admin | Giữ checkout hiện có; chuẩn bị snapshot/permission cho R07C |
 | R07A | Page builder + landing + menu/footer/settings consumers + collection manual/rule | Cần catalog, content đã public; preview/publish + drag keyboard |
 | R07B | Hot Sale + countdown + unified pricing | Sau R07A/các consumer catalog; tích hợp cả PDP và checkout, không chỉ banner |
-| R07C | Checkout gọn + shipping/payment settings + confirmation | Tiêu thụ pricing R07B, order R06; giá/ship/method do server xác minh |
+| R07C | Checkout gọn + shipping/payment settings + confirmation | Local full-app PASS 2026-10-17; [nghiệm thu](R07C-ACCEPTANCE.md). Staging/remote chưa chạy |
 | R08 | 3 vai trò + nhật ký thống nhất + autosave/scheduling/khôi phục còn thiếu + SEO defaults/301/sitemap/structured data | Không hoãn guard quyền và security tới đây; lịch sử sản phẩm đã có ở R03 |
 | R09A | Audit nội dung còn hard-code + SEO/filter policy + tối ưu cache/ảnh/CWV | Chặn hoàn thành nếu vẫn có nội dung CMS chưa nối consumer |
 | R09B | UAT, migration rehearsal, staging, hướng dẫn/rollback | Bằng chứng môi trường rõ, phát hành là bước riêng |

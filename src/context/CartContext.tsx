@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useMemo, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef, ReactNode } from "react";
 
 export interface CartItem {
   id: string; // product id + variant id
@@ -13,6 +13,8 @@ export interface CartItem {
   variantLabel?: string;
   quantity: number;
   maxQuantity?: number; // available stock
+  available?: boolean;
+  unavailableReason?: string;
 }
 
 interface CartContextType {
@@ -25,6 +27,8 @@ interface CartContextType {
   clearCart: () => void;
   cartCount: number;
   cartTotal: number;
+  checkoutReady: boolean;
+  validationError: string;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -32,6 +36,9 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [validation, setValidation] = useState({key:'',status:'pending',error:''});
+  const requestNumber = useRef(0);
+  const cartKey = JSON.stringify(cart.map(i=>[i.id,i.productId,i.variantId || null,i.quantity,i.price]));
 
   // Load from local storage after mount (useEffect keeps SSR hydration safe:
   // server and client both start with [] before the saved cart is applied)
@@ -118,8 +125,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setCart([]);
   };
 
-  const revalidateCart = async () => {
-    if (cart.length === 0) return;
+  const revalidateCart = useCallback(async () => {
+    if (!isLoaded || cart.length === 0) return;
+    const number = ++requestNumber.current;
+    setValidation({key:cartKey,status:'pending',error:''});
     try {
       const res = await fetch("/api/cart/revalidate", {
         method: "POST",
@@ -133,31 +142,46 @@ export function CartProvider({ children }: { children: ReactNode }) {
           })),
         }),
       });
-      if (res.ok) {
+      if (!res.ok) throw new Error('CART_REVALIDATION_FAILED');
+      if (number !== requestNumber.current) return;
+      {
         const data = (await res.json()) as {
           success: boolean;
-          items: Array<{ id: string; price: number; available: boolean }>;
+          items: Array<{ id: string; price?: number; available: boolean; unavailableReason?: string }>;
         };
         if (data.success && Array.isArray(data.items)) {
-          setCart((prev) =>
-            prev.map((item) => {
+          if (data.items.length !== cart.length || cart.some(i=>!data.items.some(s=>s.id===i.id))) throw new Error('INVALID_CART_RESPONSE');
+          if (data.items.some(s=>typeof s.available!=='boolean' || (s.available && (!Number.isSafeInteger(s.price) || s.price!<0)))) throw new Error('INVALID_CART_RESPONSE');
+          if (number !== requestNumber.current) return;
+          setCart((prev) => {
+            if (JSON.stringify(prev.map(i=>[i.id,i.productId,i.variantId || null,i.quantity,i.price])) !== cartKey) return prev;
+            const next = prev.map((item) => {
               const serverItem = data.items.find((s) => s.id === item.id);
-              if (serverItem && serverItem.available && serverItem.price !== item.price) {
+              if (serverItem) {
                 return {
                   ...item,
-                  price: serverItem.price,
-                  displayPrice: new Intl.NumberFormat("vi-VN").format(serverItem.price) + "₫",
+                  available: serverItem.available,
+                  unavailableReason: serverItem.available ? undefined : serverItem.unavailableReason || 'PRODUCT_NOT_AVAILABLE',
+                  price: serverItem.available ? serverItem.price! : item.price,
+                  displayPrice: serverItem.available ? new Intl.NumberFormat("vi-VN").format(serverItem.price!) + "₫" : item.displayPrice,
                 };
               }
               return item;
-            })
-          );
-        }
+            });
+            return JSON.stringify(next)===JSON.stringify(prev) ? prev : next;
+          });
+          setValidation({key:cartKey,status:'ready',error:''});
+        } else throw new Error('INVALID_CART_RESPONSE');
       }
-    } catch (e) {
-      console.warn("Cart price revalidation failed:", e);
+    } catch {
+      if (number === requestNumber.current) setValidation({key:cartKey,status:'error',error:'Chưa thể xác thực giỏ hàng. Giữ nguyên sản phẩm; vui lòng thử lại.'});
     }
-  };
+  }, [cart, cartKey, isLoaded]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- network synchronization after hydration/cart changes, including pending state
+  useEffect(() => { void revalidateCart(); }, [revalidateCart]);
+  const checkoutReady = isLoaded && cart.length > 0 && validation.key===cartKey && validation.status==='ready' && cart.every(i=>i.available===true);
+  const validationError = validation.key===cartKey ? validation.error : '';
 
   const cartCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
   const cartTotal = useMemo(() => cart.reduce((total, item) => total + item.price * item.quantity, 0), [cart]);
@@ -174,6 +198,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         clearCart,
         cartCount,
         cartTotal,
+        checkoutReady,
+        validationError,
       }}
     >
       {children}

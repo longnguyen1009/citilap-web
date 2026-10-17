@@ -9,6 +9,8 @@ import {
 } from '@/server/services/order.service';
 import { checkRateLimit, rateLimitExceededResponse, getClientIp } from '@/lib/rate-limiter';
 import { verifyTurnstileToken } from '@/lib/turnstile';
+import { CheckoutError } from '@/server/services/checkout.service';
+import { checkoutSelectionSchema, checkoutAcknowledgmentSchema } from '@/contracts/checkout';
 
 function errorResponse(message: string, status: number, code = 'INVALID_REQUEST') {
   return NextResponse.json(
@@ -105,15 +107,17 @@ export async function POST(request: Request) {
       }
     }
 
-    const items = rawItems.map((it: Record<string, unknown>) => ({
+    const selection = checkoutSelectionSchema.safeParse(body);
+    if (!selection.success) return errorResponse('Thông tin giỏ hàng hoặc nhận hàng không hợp lệ.', 400, 'INVALID_CHECKOUT');
+    const acknowledgment = body.checkoutAcknowledgment === undefined ? null : checkoutAcknowledgmentSchema.safeParse(body.checkoutAcknowledgment);
+    if (acknowledgment && !acknowledgment.success) return errorResponse('Xác nhận tổng tiền không hợp lệ.', 400, 'INVALID_CHECKOUT');
+    const items = selection.data.items.map((it) => ({
       productId: typeof it.productId === 'string' ? it.productId.trim() : '',
       variantId: typeof it.variantId === 'string' && it.variantId.trim() ? it.variantId.trim() : null,
       sku: typeof it.sku === 'string' ? it.sku.trim() : null,
       quantity: Number(it.quantity),
       expectedPrice: typeof it.expectedPrice === 'number'
         ? it.expectedPrice
-        : typeof it.price === 'number'
-        ? it.price
         : null,
     }));
 
@@ -126,6 +130,8 @@ export async function POST(request: Request) {
       note: typeof body.note === 'string' ? body.note.slice(0, 1000) : null,
       shippingMethod: typeof body.shippingMethod === 'string' ? body.shippingMethod : 'standard',
       paymentMethod: typeof body.paymentMethod === 'string' ? body.paymentMethod : 'COD',
+      showroomId: selection.data.showroomId,
+      checkoutAcknowledgment: acknowledgment?.success ? acknowledgment.data : undefined,
     };
 
     const result = await createOrder(payload, idempotencyKey);
@@ -148,8 +154,11 @@ export async function POST(request: Request) {
       }
     );
   } catch (error: unknown) {
+    if (error instanceof CheckoutError) {
+      return NextResponse.json({success:false,error:{code:error.code,message:error.message,details:error.details || null}}, {status:error.status,headers:{'Cache-Control':'private, no-store'}});
+    }
     const err = error as { code?: string; message?: string; details?: unknown };
-    const code = err?.code || (typeof err?.message === 'string' && err.message.startsWith('PRICE_CHANGED') ? 'PRICE_CHANGED' : '');
+    const code = err?.code || err?.message || '';
 
     if (error instanceof PriceChangedError || code === 'PRICE_CHANGED') {
       const details = error instanceof PriceChangedError ? error.details : (err as { details?: unknown })?.details;

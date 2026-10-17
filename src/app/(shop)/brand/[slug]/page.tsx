@@ -167,40 +167,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-              {products.map((p: {
-                id: string;
-                name: string;
-                slug: string;
-                price: number;
-                originalPrice: number | null;
-                image: string;
-                brand: string;
-                condition: string;
-                isNewArrival: boolean;
-                isBestSeller: boolean;
-                cpu?: string | null;
-                ram?: string | null;
-              }) => (
-                <ProductCard
-                  key={p.id}
-                  product={{
-                    id: p.id,
-                    name: p.name,
-                    slug: p.slug,
-                    price: p.price,
-                    originalPrice: p.originalPrice,
-                    image: p.image,
-                    brand: p.brand,
-                    condition: p.condition,
-                    badge: p.isNewArrival ? 'Mới về' : p.isBestSeller ? 'Bán chạy' : undefined,
-                    specs: {
-                      cpu: p.cpu || undefined,
-                      ram: p.ram || undefined,
-                    },
-                  }}
-                  showSpecs
-                />
-              ))}
+              {products.map(p => <ProductCard key={p.id} product={p} showSpecs />)}
             </div>
           </div>
         )}

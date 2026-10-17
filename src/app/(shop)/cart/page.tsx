@@ -4,19 +4,15 @@ import Link from "next/link";
 import { Trash2, ShoppingCart, ArrowRight, Minus, Plus, Tag, ShieldCheck, Truck, Headphones } from "lucide-react";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import CartValidationStatus from '@/components/cart/CartValidationStatus';
 import Breadcrumb from "@/components/layout/Breadcrumb";
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity, cartTotal, cartCount, revalidateCart } = useCart();
+  const { cart, removeFromCart, updateQuantity, cartTotal, cartCount, checkoutReady } = useCart();
   const [couponCode, setCouponCode] = useState("");
   const [couponApplied, setCouponApplied] = useState(false);
   const [couponDiscount, setCouponDiscount] = useState(0);
-
-  useEffect(() => {
-    revalidateCart();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleApplyCoupon = () => {
     const code = couponCode.trim().toUpperCase();
@@ -61,6 +57,7 @@ export default function CartPage() {
       ]} />
 
       <div className="container mx-auto px-4 max-w-[1370px] mt-6">
+        <CartValidationStatus />
         <h1 className="text-2xl md:text-3xl font-black text-gray-900 uppercase mb-6">Giỏ hàng</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -218,6 +215,9 @@ export default function CartPage() {
 
               <Link
                 href="/checkout"
+                aria-disabled={!checkoutReady}
+                tabIndex={checkoutReady ? undefined : -1}
+                onClick={e=>{if(!checkoutReady)e.preventDefault();}}
                 className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg p-4 flex flex-col items-center justify-center transition shadow-lg shadow-red-600/30 mb-3"
               >
                 <span className="font-black text-lg uppercase">TIẾN HÀNH ĐẶT HÀNG</span>

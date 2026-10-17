@@ -539,21 +539,50 @@ const defaultInclude = {
   },
 };
 
+function isPrismaClient(val: unknown): val is PrismaClient {
+  return Boolean(val && typeof val === "object" && typeof (val as PrismaClient).product?.findMany === "function");
+}
+
+function resolveClientAndPricing(
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt?: Date
+): {
+  client: PrismaClient;
+  pricingContext?: PriceEvaluationContext | null;
+  at: Date;
+} {
+  if (isPrismaClient(clientOrContext)) {
+    return {
+      client: clientOrContext,
+      pricingContext: (contextOrAt instanceof Date ? undefined : contextOrAt) as PriceEvaluationContext | null | undefined,
+      at: (contextOrAt instanceof Date ? contextOrAt : (maybeAt instanceof Date ? maybeAt : new Date())),
+    };
+  }
+
+  return {
+    client: prisma,
+    pricingContext: (clientOrContext as PriceEvaluationContext | null | undefined),
+    at: (contextOrAt instanceof Date ? contextOrAt : (maybeAt instanceof Date ? maybeAt : new Date())),
+  };
+}
+
 /**
  * Fetches featured products directly from D1.
  */
 export async function getFeaturedProducts(
   limit = 10,
-  client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
-        deletedAt: null,
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         isFeatured: true,
       },
       include: defaultInclude,
@@ -572,16 +601,17 @@ export async function getFeaturedProducts(
  */
 export async function getNewArrivals(
   limit = 10,
-  client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
-        deletedAt: null,
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         isNewArrival: true,
       },
       include: defaultInclude,
@@ -600,16 +630,17 @@ export async function getNewArrivals(
  */
 export async function getFlashSaleProducts(
   limit = 10,
-  client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
-        deletedAt: null,
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         isFlashSale: true,
       },
       include: defaultInclude,
@@ -629,16 +660,17 @@ export async function getFlashSaleProducts(
 export async function getCategoryProducts(
   categorySlug: string,
   limit = 10,
-  client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
-        deletedAt: null,
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         category: { slug: categorySlug },
       },
       include: defaultInclude,
@@ -657,16 +689,17 @@ export async function getCategoryProducts(
  */
 export async function getLikeNewProducts(
   limit = 10,
-  client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
-        deletedAt: null,
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         condition: { in: ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"] },
       },
       include: defaultInclude,
@@ -685,16 +718,17 @@ export async function getLikeNewProducts(
  */
 export async function getBestSellingProducts(
   limit = 10,
-  client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt: Date = new Date()
 ): Promise<HomepageProduct[]> {
+  const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
-        deletedAt: null,
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         isBestSeller: true,
       },
       include: defaultInclude,
@@ -712,12 +746,13 @@ export async function getBestSellingProducts(
  * Parallel optimized retrieval for all Homepage sections to avoid waterfall requests.
  */
 export async function getHomepageCatalog(
-  client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  clientOrContext?: PrismaClient | PriceEvaluationContext | null,
+  contextOrAt?: PriceEvaluationContext | Date | null,
+  maybeAt: Date = new Date()
 ): Promise<HomepageCatalogData> {
+  const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const [
       featured,
       newArrivals,
@@ -877,7 +912,7 @@ export async function getCategoryFilteredProducts(
   at: Date = new Date()
 ): Promise<CategoryFilteredResult> {
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     // 1. Resolve category if slug is provided
     let category: CategorySummary | null = null;
     const effectiveSlug = options.categorySlug || (options as { slug?: string }).slug;
@@ -907,6 +942,7 @@ export async function getCategoryFilteredProducts(
     // 2. Build parameterized Prisma where clause for D1
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {
+      deletedAt: null, NOT: { studio: { is: { published: null } } },
       status: { in: ["ACTIVE", "active"] },
     };
 
@@ -1202,6 +1238,7 @@ export async function getCategoryFilteredProducts(
         where: category
           ? {
               status: { in: ["ACTIVE", "active"] },
+              deletedAt: null, NOT: { studio: { is: { published: null } } },
               ...(category.slug === "laptop-cu"
                 ? {
                     OR: [
@@ -1211,7 +1248,7 @@ export async function getCategoryFilteredProducts(
                   }
                 : { categoryId: category.id }),
             }
-          : { status: { in: ["ACTIVE", "active"] } },
+          : { status: { in: ["ACTIVE", "active"] }, deletedAt: null, NOT: { studio: { is: { published: null } } } },
         select: {
           name: true,
           slug: true,
@@ -1439,6 +1476,7 @@ export async function getProductDetail(
   try {
     const product = await client.product.findFirst({
       where: {
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         OR: [{ slug: identifier }, { id: identifier }],
         status: { in: ["ACTIVE", "active"] },
       },
@@ -1730,7 +1768,7 @@ export async function getRelatedProducts(
   at: Date = new Date()
 ): Promise<HomepageProduct[]> {
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
     const isArrayManual = Array.isArray(manualIdsOrClient);
     const manualIds = isArrayManual ? manualIdsOrClient : [];
     const client = isArrayManual ? clientParam : (manualIdsOrClient as PrismaClient);
@@ -1743,7 +1781,7 @@ export async function getRelatedProducts(
         where: {
           id: { in: validManualIds },
           status: { in: ["ACTIVE", "active"] },
-          deletedAt: null,
+          deletedAt: null, NOT: { studio: { is: { published: null } } },
         },
         include: defaultInclude,
       });
@@ -1774,7 +1812,7 @@ export async function getRelatedProducts(
       where: {
         id: { notIn: excludedIds },
         status: { in: ["ACTIVE", "active"] },
-        deletedAt: null,
+        deletedAt: null, NOT: { studio: { is: { published: null } } },
         OR: orConditions,
       },
       include: defaultInclude,
@@ -1792,7 +1830,7 @@ export async function getRelatedProducts(
     return [...resolvedManual, ...fallbackProducts];
   } catch (error) {
     console.error("[CatalogService] Failed to getRelatedProducts on D1:", error);
-    return [];
+    throw error;
   }
 }
 
@@ -1806,7 +1844,7 @@ export async function resolveProductsByIds(
   pricingContext?: PriceEvaluationContext | null,
   at: Date = new Date()
 ): Promise<HomepageProduct[]> {
-  const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+  const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
   const uniqueIds = [...new Set((productIds || []).filter(Boolean))];
   if (uniqueIds.length === 0) return [];
 
@@ -1814,7 +1852,7 @@ export async function resolveProductsByIds(
     where: {
       id: { in: uniqueIds },
       status: { in: ["ACTIVE", "active"] },
-      deletedAt: null,
+      deletedAt: null, NOT: { studio: { is: { published: null } } },
     },
     include: defaultInclude,
   });
@@ -1846,11 +1884,11 @@ export async function resolveProductsByCriteria(
   pricingContext?: PriceEvaluationContext | null,
   at: Date = new Date()
 ): Promise<HomepageProduct[]> {
-  const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at).catch(() => null));
+  const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     status: { in: ["ACTIVE", "active"] },
-    deletedAt: null,
+    deletedAt: null, NOT: { studio: { is: { published: null } } },
   };
 
   if (criteria.productType === "accessory") {
@@ -1875,8 +1913,14 @@ export async function resolveProductsByCriteria(
     where.isBestSeller = true;
   }
 
-  if (criteria.availability === "AVAILABLE") {
-    where.stock = { gt: 0 };
+  if (criteria.availability && criteria.availability !== "all") {
+    const studios = await client.productStudio.findMany({ select: { productId: true, published: true } });
+    const matching = studios.filter(s => {
+      try { return s.published && JSON.parse(s.published).availability === criteria.availability; }
+      catch { return false; }
+    }).map(s => s.productId);
+    // Legacy products without Studio use the existing AVAILABLE contract, never stock.
+    where.OR = [{ id: { in: matching } }, ...(criteria.availability === "AVAILABLE" ? [{ studio: { is: null } }] : [])];
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,7 +1,8 @@
+import { assertPublishedStudioOrderable, type StudioOrderContext } from './storefront-order-guard';
 import type { D1Database } from '@cloudflare/workers-types';
 import { prisma, type PrismaClient } from '../../lib/prisma';
 import { getPublicStorefrontSettings } from './settings.service';
-import { resolveActiveCampaigns, type ActiveCampaignResolution } from './campaign.service';
+import { resolveActiveCampaigns } from './campaign.service';
 import { mediaEnvironment } from '../media-http';
 import type { HomepageProduct } from './catalog.service';
 
@@ -199,7 +200,7 @@ export function calculateEffectivePrice(
     const getItem = (key: string) => {
       if (!camp.items) return undefined;
       if (camp.items instanceof Map) return camp.items.get(key);
-      return (camp.items as Record<string, any>)[key];
+      return camp.items[key];
     };
 
     // Safe Scope Rule:
@@ -418,7 +419,8 @@ export class PricingTargetError extends Error {
  */
 export async function getStorefrontPricingContext(
   d1?: D1Database,
-  at: Date = new Date()
+  at: Date = new Date(),
+  suppliedSettings?: Awaited<ReturnType<typeof getPublicStorefrontSettings>>
 ): Promise<PriceEvaluationContext> {
   const db = d1 || (await mediaEnvironment()).DB;
   if (!db) {
@@ -426,7 +428,7 @@ export async function getStorefrontPricingContext(
   }
 
   const [publicSettings, activeCampaign] = await Promise.all([
-    getPublicStorefrontSettings(db),
+    suppliedSettings || getPublicStorefrontSettings(db),
     resolveActiveCampaigns(at, db),
   ]);
 
@@ -450,15 +452,7 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
 
   // 1. Resolve settings if not provided
   if (!settings) {
-    let db = input.explicitDb;
-    if (!db) {
-      try {
-        db = (await mediaEnvironment()).DB;
-      } catch {}
-    }
-    if (db) {
-      settings = await getStorefrontPricingContext(db, at);
-    }
+    settings = await getStorefrontPricingContext(input.explicitDb, at);
   }
 
   // 2. Resolve product & variant data
@@ -468,38 +462,14 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
   let isProductActive = true;
   let isVariant = Boolean(input.variantId);
   let variantOriginalPrice: number | null = null;
+  let studioContext: StudioOrderContext = null;
 
-  if (input.product) {
-    if (!['ACTIVE', 'active'].includes(input.product.status)) {
-      throw new PricingTargetError('Sản phẩm không ở trạng thái mở bán', 'PRODUCT_NOT_AVAILABLE', 400);
-    }
-
-    basePrice = input.product.price;
-    originalPrice = input.product.originalPrice ?? null;
-    isFlashSale = Boolean(input.product.isFlashSale);
-    isProductActive = true;
-
-    if (input.variantId) {
-      const variants = input.product.variants || [];
-      const v = variants.find((item) => item.id === input.variantId);
-      if (!v) {
-        throw new PricingTargetError('Biến thể không tồn tại hoặc không thuộc sản phẩm', 'VARIANT_NOT_FOUND', 404);
-      }
-      if (!['ACTIVE', 'active'].includes(v.status)) {
-        throw new PricingTargetError('Biến thể không ở trạng thái mở bán', 'VARIANT_NOT_AVAILABLE', 400);
-      }
-
-      basePrice = v.price;
-      variantOriginalPrice = v.originalPrice !== undefined && v.originalPrice !== null ? v.originalPrice : null;
-      originalPrice = variantOriginalPrice;
-      isVariant = true;
-    }
-  } else {
+  {
     // Query D1 directly via explicitDb or Prisma
     const db = input.explicitDb;
     if (db) {
       const p = await db
-        .prepare('SELECT p.id, p.price, p.originalPrice, p.status, p.isFlashSale, ps.published FROM Product p LEFT JOIN ProductStudio ps ON ps.productId = p.id WHERE p.id = ? AND p.deletedAt IS NULL')
+        .prepare('SELECT p.id, p.price, p.originalPrice, p.status, p.isFlashSale, ps.productId AS studioId, ps.published FROM Product p LEFT JOIN ProductStudio ps ON ps.productId = p.id WHERE p.id = ? AND p.deletedAt IS NULL')
         .bind(input.productId)
         .first<{
           id: string;
@@ -507,6 +477,7 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
           originalPrice: number | null;
           status: string;
           isFlashSale: number | boolean;
+          studioId: string | null;
           published: string | null;
         }>();
 
@@ -517,29 +488,7 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
         throw new PricingTargetError('Sản phẩm không ở trạng thái mở bán', 'PRODUCT_NOT_AVAILABLE', 400);
       }
 
-      // Studio published orderability validation
-      if (p.published) {
-        try {
-          const doc = JSON.parse(p.published);
-          if (doc && typeof doc === 'object') {
-            if (doc.availability !== 'AVAILABLE' && doc.availability !== 'PREORDER') {
-              throw new PricingTargetError('Sản phẩm tạm ngừng nhận đơn', 'PRODUCT_NOT_AVAILABLE', 400);
-            }
-            if (input.variantId && Array.isArray(doc.variants)) {
-              const vDoc = doc.variants.find((item: any) => item && item.id === input.variantId);
-              if (!vDoc) {
-                throw new PricingTargetError('Biến thể không tồn tại trong bản xuất bản', 'VARIANT_NOT_FOUND', 404);
-              }
-              if (vDoc.availability && vDoc.availability !== 'AVAILABLE' && vDoc.availability !== 'PREORDER') {
-                throw new PricingTargetError('Biến thể tạm ngừng nhận đơn', 'VARIANT_NOT_AVAILABLE', 400);
-              }
-            }
-          }
-        } catch (e) {
-          if (e instanceof PricingTargetError) throw e;
-          throw new PricingTargetError('Sản phẩm chưa có cấu hình xuất bản hợp lệ', 'PRODUCT_NOT_AVAILABLE', 400);
-        }
-      }
+      studioContext = {hasStudio: Boolean(p.studioId), published:p.published};
 
       basePrice = p.price;
       originalPrice = p.originalPrice;
@@ -596,28 +545,7 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
         throw new PricingTargetError('Sản phẩm không ở trạng thái mở bán', 'PRODUCT_NOT_AVAILABLE', 400);
       }
 
-      if (p.studio?.published) {
-        try {
-          const doc = JSON.parse(p.studio.published);
-          if (doc && typeof doc === 'object') {
-            if (doc.availability !== 'AVAILABLE' && doc.availability !== 'PREORDER') {
-              throw new PricingTargetError('Sản phẩm tạm ngừng nhận đơn', 'PRODUCT_NOT_AVAILABLE', 400);
-            }
-            if (input.variantId && Array.isArray(doc.variants)) {
-              const vDoc = doc.variants.find((item: any) => item && item.id === input.variantId);
-              if (!vDoc) {
-                throw new PricingTargetError('Biến thể không tồn tại trong bản xuất bản', 'VARIANT_NOT_FOUND', 404);
-              }
-              if (vDoc.availability && vDoc.availability !== 'AVAILABLE' && vDoc.availability !== 'PREORDER') {
-                throw new PricingTargetError('Biến thể tạm ngừng nhận đơn', 'VARIANT_NOT_AVAILABLE', 400);
-              }
-            }
-          }
-        } catch (e) {
-          if (e instanceof PricingTargetError) throw e;
-          throw new PricingTargetError('Sản phẩm chưa có cấu hình xuất bản hợp lệ', 'PRODUCT_NOT_AVAILABLE', 400);
-        }
-      }
+      studioContext = {hasStudio: Boolean(p.studio), published:p.studio?.published};
 
       basePrice = p.price;
       originalPrice = p.originalPrice;
@@ -641,6 +569,11 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
     }
   }
 
+  try { assertPublishedStudioOrderable(studioContext, input.variantId || null); }
+  catch (error) {
+    const variantError = error instanceof Error && error.message === 'VARIANT_UNAVAILABLE';
+    throw new PricingTargetError('Sản phẩm hoặc biến thể chưa sẵn sàng đặt hàng', variantError ? 'VARIANT_NOT_AVAILABLE' : 'PRODUCT_NOT_AVAILABLE', 400);
+  }
   return calculateEffectivePrice(
     basePrice,
     originalPrice,

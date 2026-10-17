@@ -109,7 +109,8 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
     const orderedRows = uniqueIds.map((id) => rowMap.get(id)).filter(Boolean) as ProductRow[];
 
     // Authoritative Storefront Pricing Context
-    const pricingContext = await getStorefrontPricingContext(DB);
+    const evaluatedAt = new Date();
+    const pricingContext = await getStorefrontPricingContext(DB, evaluatedAt);
 
     // Parse product details, determine template & kind
     const products: CompareProductItem[] = [];
@@ -206,7 +207,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
         Boolean(row.isFlashSale),
         true,
         pricingContext,
-        new Date(),
+        evaluatedAt,
         { productId: row.id, isVariant: false }
       );
 

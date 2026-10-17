@@ -1,7 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
-import { assertPublishedStudioOrderable } from './storefront-order-guard';
-import { calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from './pricing.service';
+import { calculateCheckout, CheckoutError } from './checkout.service';
+import { checkoutSelectionSchema, checkoutAcknowledgmentSchema, type CheckoutAcknowledgment, type CheckoutSnapshot } from '@/contracts/checkout';
 
 export interface OrderItemInput {
   productId: string;
@@ -20,6 +20,8 @@ export interface CreateOrderInput {
   note?: string | null;
   shippingMethod?: string;
   paymentMethod?: string;
+  showroomId?: string | null;
+  checkoutAcknowledgment?: CheckoutAcknowledgment;
 }
 
 export interface ResolvedOrderItem {
@@ -48,6 +50,7 @@ export interface OrderRecord {
   userId: string | null;
   status: string;
   revision?: number;
+  checkoutSnapshot?: string | null;
   subtotalAmount: number;
   shippingFee: number;
   discountAmount: number;
@@ -123,6 +126,7 @@ export interface PublicOrderItemDto {
 }
 
 export interface PublicOrderDto {
+  checkoutSnapshot: CheckoutSnapshot | null;
   id: string;
   orderNumber: string | null;
   status: string;
@@ -144,6 +148,7 @@ export interface PublicOrderDto {
 
 export function toPublicOrderDto(order: OrderRecord): PublicOrderDto {
   return {
+    checkoutSnapshot: order.checkoutSnapshot ? JSON.parse(order.checkoutSnapshot) : null,
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
@@ -352,7 +357,8 @@ export async function computeOrderPayloadHash(payload: CreateOrderInput): Promis
       .sort((a, b) => `${a.productId}:${a.variantId}`.localeCompare(`${b.productId}:${b.variantId}`)),
   };
 
-  const jsonStr = JSON.stringify(normalized);
+  // Preserve legacy hashes for retries without the new acknowledgment.
+  const jsonStr = JSON.stringify(payload.checkoutAcknowledgment ? {...normalized, checkoutVersion:1, showroomId:payload.showroomId || null, acknowledgment:payload.checkoutAcknowledgment, prices:payload.items.map(i=>({productId:i.productId,variantId:i.variantId || null,expectedPrice:i.expectedPrice})).sort((a,b)=>(a.productId+':'+a.variantId).localeCompare(b.productId+':'+b.variantId))} : normalized);
   const enc = new TextEncoder().encode(jsonStr);
   const buf = await crypto.subtle.digest('SHA-256', enc);
   return Array.from(new Uint8Array(buf))
@@ -398,7 +404,7 @@ export async function createOrder(
     throw new Error('CUSTOMER_EMAIL_INVALID');
   }
 
-  const shippingAddress = payload.shippingAddress?.trim() || null;
+  let shippingAddress = payload.shippingAddress?.trim() || null;
   const note = payload.note?.trim()?.slice(0, 1000) || null;
 
   // 2. Validate items
@@ -435,156 +441,22 @@ export async function createOrder(
     }
   }
 
-  // 4. Resolve products & variants from D1 with authoritative pricing
-  const evaluatedAt = new Date();
-  const now = evaluatedAt.toISOString().replace('Z', '+00:00');
-  const evaluatedAtStr = now;
-
-  // Differentiate infrastructure failure from inactive campaign: fail-closed if DB throws
-  const storefrontSettings = await getStorefrontPricingContext(db, evaluatedAt);
-
-  const resolvedItems: ResolvedOrderItem[] = [];
-  const campaignNotes: string[] = [];
-  const changedItems: PriceChangedError['details']['changedItems'] = [];
-  let subtotalAmount = 0;
-  let expectedSubtotal = 0;
-
-  for (const item of payload.items) {
-    if (!item || typeof item !== 'object') {
-      throw new Error('INVALID_ITEM');
-    }
-    const productId = typeof item.productId === 'string' ? item.productId.trim() : '';
-    const variantId = typeof item.variantId === 'string' && item.variantId.trim() ? item.variantId.trim() : null;
-    const quantity = Number(item.quantity);
-
-    if (!productId || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
-      throw new Error('INVALID_ITEM');
-    }
-
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-      select: {
-        id: true, name: true, price: true, originalPrice: true, status: true, isFlashSale: true,
-        studio: { select: { published: true } },
-      },
-    });
-
-    if (!product || product.status !== 'ACTIVE') {
-      throw new Error('PRODUCT_UNAVAILABLE');
-    }
-
-    assertPublishedStudioOrderable(
-      { hasStudio: product.studio !== null, published: product.studio?.published },
-      variantId
-    );
-
-    let basePrice = product.price;
-    let originalPrice: number | null = null;
-    let sku: string | null = null;
-    let variantName: string | null = null;
-
-    if (variantId) {
-      const variant = await prisma.productVariant.findFirst({
-        where: { id: variantId, productId },
-        select: { id: true, sku: true, name: true, price: true, originalPrice: true, status: true },
-      });
-
-      if (!variant || variant.status !== 'ACTIVE') {
-        throw new Error('VARIANT_UNAVAILABLE');
-      }
-
-      basePrice = variant.price;
-      // Invariant: Variant NEVER borrows parent's originalPrice!
-      originalPrice = variant.originalPrice !== null && variant.originalPrice !== undefined ? variant.originalPrice : null;
-      sku = variant.sku;
-      variantName = variant.name;
-    } else {
-      originalPrice = product.originalPrice ?? null;
-    }
-
-    // Evaluate authoritative pricing via pricing.service
-    const resolvedPricing = calculateEffectivePrice(
-      basePrice,
-      originalPrice,
-      Boolean(product.isFlashSale),
-      true,
-      storefrontSettings,
-      evaluatedAt,
-      {
-        productId,
-        variantId,
-        isVariant: Boolean(variantId),
-        variantOriginalPrice: variantId ? originalPrice : null,
-      }
-    );
-
-    const price = resolvedPricing.effectivePrice;
-
-    // Strict 0đ tolerance verification against client expectation if provided
-    let expectedItemPrice: number | null = null;
-    if (item.expectedPrice !== undefined && item.expectedPrice !== null) {
-      expectedItemPrice = Number(item.expectedPrice);
-      if (!Number.isFinite(expectedItemPrice)) {
-        throw new Error('INVALID_ITEM');
-      }
-      if (expectedItemPrice !== price) {
-        changedItems.push({
-          productId,
-          variantId,
-          productName: variantName ? `${product.name} - ${variantName}` : product.name,
-          oldPrice: expectedItemPrice,
-          newPrice: price,
-          quantity,
-          oldLineTotal: expectedItemPrice * quantity,
-          newLineTotal: price * quantity,
-        });
-      }
-    }
-
-    const priceForOldSubtotal = expectedItemPrice !== null ? expectedItemPrice : price;
-    expectedSubtotal += priceForOldSubtotal * quantity;
-
-    if (resolvedPricing.campaign) {
-      campaignNotes.push(`${product.name}: ${resolvedPricing.campaign.name}`);
-    }
-
-    const lineTotal = price * quantity;
-    subtotalAmount += lineTotal;
-
-    resolvedItems.push({
-      productId,
-      variantId,
-      productName: product.name,
-      sku,
-      productNameSnapshot: product.name,
-      skuSnapshot: sku,
-      variantNameSnapshot: variantName,
-      price,
-      priceSnapshot: price,
-      regularPriceSnapshot: resolvedPricing.regularPrice,
-      compareAtPriceSnapshot: resolvedPricing.compareAtPrice,
-      campaignSnapshot: resolvedPricing.campaign ? JSON.stringify(resolvedPricing.campaign) : null,
-      pricingEvaluatedAt: evaluatedAtStr,
-      quantity,
-      lineTotal,
-    });
+  const selection = checkoutSelectionSchema.safeParse(payload);
+  const acknowledgment = checkoutAcknowledgmentSchema.safeParse(payload.checkoutAcknowledgment);
+  if (!selection.success || !acknowledgment.success || !payload.paymentMethod || payload.items.some(i=>!Number.isSafeInteger(i.expectedPrice) || Number(i.expectedPrice)<0)) {
+    throw new CheckoutError('INVALID_CHECKOUT', 'Vui lòng kiểm tra và xác nhận tổng tiền trước khi đặt hàng.');
   }
-
-  const shippingFee = 0;
-  const totalAmount = subtotalAmount + shippingFee;
-  const oldGrandTotal = expectedSubtotal + shippingFee;
-
-  if (changedItems.length > 0) {
-    throw new PriceChangedError(
-      `PRICE_CHANGED: Giá của ${changedItems.length} sản phẩm đã thay đổi hoặc khuyến mãi đã kết thúc`,
-      {
-        changedItems,
-        oldSubtotal: expectedSubtotal,
-        newSubtotal: subtotalAmount,
-        oldGrandTotal,
-        newGrandTotal: totalAmount,
-      }
-    );
+  const {quote, resolvedItems, campaignNotes, changedItems, expectedSubtotal} = await calculateCheckout(payload, db);
+  const now = quote.evaluatedAt.replace('Z', '+00:00');
+  const subtotalAmount = quote.subtotal, shippingFee = quote.shippingFee, totalAmount = quote.totalAmount;
+  const checkoutSnapshot = JSON.stringify(quote.snapshot);
+  if (quote.snapshot.showroom) shippingAddress = 'Nhận tại showroom: '+quote.snapshot.showroom.name+' ('+quote.snapshot.showroom.address+')';
+  else if (!shippingAddress || shippingAddress.length > 500) throw new CheckoutError('INVALID_CHECKOUT', 'Vui lòng nhập địa chỉ giao hàng.');
+  if (changedItems.length || acknowledgment.data.shippingFee !== shippingFee || acknowledgment.data.totalAmount !== totalAmount || acknowledgment.data.termsVersion !== quote.termsVersion) {
+    throw new CheckoutError(changedItems.length ? 'PRICE_CHANGED' : 'CHECKOUT_CHANGED', 'Giá, phí giao hàng hoặc thông tin nhận/thanh toán đã thay đổi. Vui lòng kiểm tra và xác nhận lại.', 409, {
+      changedItems, oldSubtotal:expectedSubtotal, newSubtotal:subtotalAmount, oldGrandTotal:acknowledgment.data.totalAmount, newGrandTotal:totalAmount,
+      oldShippingFee:acknowledgment.data.shippingFee, newShippingFee:shippingFee, quote,
+    });
   }
 
   const orderNumber = generateOrderNumber();
@@ -601,8 +473,8 @@ export async function createOrder(
       "subtotalAmount", "shippingFee", "discountAmount", "totalAmount",
       "customerName", "customerPhone", "customerEmail", "shippingAddress",
       "shippingMethod", "note", "paymentMethod", "paymentStatus",
-      "confirmationTokenHash", "createdAt", "updatedAt"
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      "confirmationTokenHash", "createdAt", "updatedAt", "checkoutSnapshot"
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     orderId,
     orderNumber,
@@ -625,7 +497,8 @@ export async function createOrder(
     'PENDING',
     confirmationTokenHash,
     now,
-    now
+    now,
+    checkoutSnapshot
   );
 
   const itemStmts = resolvedItems.map((item, idx) => {
@@ -693,7 +566,20 @@ export async function createOrder(
     now
   );
 
-  await db.batch([orderStmt, ...itemStmts, initialEventStmt, notifStmt]);
+  try {
+    await db.batch([orderStmt, ...itemStmts, initialEventStmt, notifStmt]);
+  } catch (error) {
+    // A concurrent retry may commit first. Read its immutable result before live validation.
+    if (cleanIdempotencyKey) {
+      const winner = await prisma.order.findUnique({where:{idempotencyKey:cleanIdempotencyKey},include:{items:true}});
+      if (winner) {
+        if (winner.payloadHash !== payloadHash) throw Object.assign(new Error('IDEMPOTENCY_PAYLOAD_MISMATCH'), {code:'IDEMPOTENCY_PAYLOAD_MISMATCH'});
+        const generated = await generateOrderConfirmationToken(winner.id, cleanIdempotencyKey);
+        return {success:true,order:winner,isIdempotentReplay:true,confirmationToken:generated.token};
+      }
+    }
+    throw error;
+  }
 
   // Read back committed order using the same DB
   const createdOrder = await prisma.order.findUnique({
@@ -704,6 +590,7 @@ export async function createOrder(
   return {
     success: true,
     order: createdOrder || ({
+      checkoutSnapshot,
       id: orderId,
       orderNumber,
       idempotencyKey: cleanIdempotencyKey,

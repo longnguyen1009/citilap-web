@@ -3,7 +3,8 @@ import { navigationWriteSchema, type NavigationDocument, type NavigationDetail, 
 import { MediaError, getAsset, type MediaEnvironment } from './media-library.service';
 import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
 import { resolveProductsByIds, resolveProductsByCriteria, type HomepageProduct } from './catalog.service';
-import { applyPricingToHomepageProducts, getStorefrontPricingContext } from './pricing.service';
+import { getStorefrontPricingContext, type PriceEvaluationContext } from './pricing.service';
+import { getPrismaClient } from '../../lib/prisma';
 
 type Row = { revision: number; draft: string; published: string | null; publishedRevision: number | null };
 type CategoryRow = { id: string; name: string; slug: string; description: string | null; parentId: string | null; image: string | null; status: string; sortOrder: number };
@@ -189,22 +190,19 @@ export async function publicNavigation(db: D1Database) {
   return resolveNavigation(db, JSON.parse(row.published), row.publishedRevision!);
 }
 
-export async function publicCollection(db: D1Database, slug: string) {
+export async function publicCollection(db: D1Database, slug: string, pricingContext?:PriceEvaluationContext, at:Date = new Date()) {
   const row = await db.prepare("SELECT published,publishedRevision FROM NavigationStudio WHERE id='site'").first<Row>();
   const d: NavigationDocument | null = row?.published ? JSON.parse(row.published) : null;
   const c = d?.collections.find(c => c.slug === slug && c.visible);
   if (!c) throw new MediaError('Không tìm thấy bộ sưu tập.', 404);
 
   let products: HomepageProduct[] = [];
+  const context = pricingContext || await getStorefrontPricingContext(db, at);
   if (c.mode === 'rule' && c.rule) {
-    products = await resolveProductsByCriteria(c.rule);
+    products = await resolveProductsByCriteria(c.rule, getPrismaClient(db), context, at);
   } else {
-    products = await resolveProductsByIds(c.productIds || []);
+    products = await resolveProductsByIds(c.productIds || [], getPrismaClient(db), context, at);
   }
-
-  // Fail-closed: evaluate pricing context with active campaigns, surfacing infrastructure errors
-  const pricingContext = await getStorefrontPricingContext(db);
-  products = applyPricingToHomepageProducts(products, pricingContext);
 
   return {
     schemaVersion: 1,
@@ -226,16 +224,14 @@ export async function publicCollectionList(db: D1Database) {
   if (!d) return [];
 
   const visibleCollections = d.collections.filter(c => c.visible);
+  const at = new Date();
+  const context = await getStorefrontPricingContext(db, at);
   return Promise.all(
     visibleCollections.map(async (c) => {
       let productCount = (c.productIds || []).length;
       if (c.mode === 'rule' && c.rule) {
-        try {
-          const matched = await resolveProductsByCriteria(c.rule);
-          productCount = matched.length;
-        } catch {
-          productCount = 0;
-        }
+        const matched = await resolveProductsByCriteria(c.rule, getPrismaClient(db), context, at);
+        productCount = matched.length;
       }
       return {
         id: c.id,

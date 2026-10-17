@@ -1,3 +1,4 @@
+import { getStorefrontPricingContext } from '@/server/services/pricing.service';
 import { Suspense } from "react";
 import { Metadata } from "next";
 import {
@@ -92,6 +93,8 @@ export default async function Home() {
     );
   }
 
+  const evaluatedAt = new Date();
+  const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);
   return (
     <div className="bg-surface-subtle min-h-screen">
       <script
@@ -110,12 +113,12 @@ export default async function Home() {
 
       {/* 4. FLASH SALE */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <FlashSaleSection />
+        <FlashSaleSection pricingContext={pricingContext} evaluatedAt={evaluatedAt} />
       </Suspense>
 
       {/* 4. HÀNG MỚI VỀ */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection
+        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
           title="Hàng Mới Về - Bắt Trend Công Nghệ"
           icon={Sparkles}
           colorClass="bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800"
@@ -133,7 +136,7 @@ export default async function Home() {
 
       {/* 5. LAPTOP GAMING */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection
+        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
           title="Laptop Gaming - Chiến Thần Đồ Hoạ"
           icon={Zap}
           colorClass="bg-gradient-to-r from-red-700 via-red-600 to-red-800"
@@ -150,7 +153,7 @@ export default async function Home() {
 
       {/* 6. ULTRABOOK CAO CẤP */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection
+        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
           title="Ultrabook Cao Cấp - Doanh Nhân"
           icon={Briefcase}
           colorClass="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800"
@@ -168,7 +171,7 @@ export default async function Home() {
 
       {/* 7. MÁY TRẠM WORKSTATION */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection
+        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
           title="Máy Trạm Workstation - Đồ Hoạ Chuyên Nghiệp"
           icon={Server}
           colorClass="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-900"
@@ -186,7 +189,7 @@ export default async function Home() {
 
       {/* 8. PHỤ KIỆN LAPTOP & SETUP CÔNG NGHỆ */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection
+        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
           title="Phụ Kiện Laptop & Đồ Chơi Công Nghệ"
           icon={Headphones}
           colorClass="bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-800"
@@ -204,7 +207,7 @@ export default async function Home() {
 
       {/* 9. BÁN CHẠY NHẤT */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection
+        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
           title="Bán Chạy Nhất - Được Yêu Thích"
           icon={TrendingUp}
           colorClass="bg-gradient-to-r from-orange-600 via-orange-500 to-orange-700"

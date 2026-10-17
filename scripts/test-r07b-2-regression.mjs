@@ -818,7 +818,8 @@ try {
     assert.equal(campSnap.title, 'Mùa Tựu Trường R07B.2 (Updated Title)');
 
     // 2. Archive campaign
-    await api.archiveCampaign(c1.id, DB);
+    const c1Latest = await api.getCampaignById(c1.id, DB);
+    await api.archiveCampaign(c1.id, c1Latest.revision, DB);
     const c1Status = (await DB.prepare('SELECT status FROM PromotionCampaign WHERE id = ?').bind(c1.id).first()).status;
     assert.equal(c1Status, 'ARCHIVED', 'Campaign C1 archived');
 

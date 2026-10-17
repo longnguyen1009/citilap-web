@@ -336,10 +336,11 @@
 3. **Quy trình Xử lý Đơn hàng & Thông báo (R06):** ĐÃ HOÀN THÀNH.
 4. **Site Builder / Collection / Settings Sync (R07A):** ĐÃ HOÀN THÀNH.
 5. **R07B (Hot Sale + countdown + unified pricing):** ĐÃ HOÀN THÀNH — xem [R07B-HOT-SALE-PRICING.md](./R07B-HOT-SALE-PRICING.md) và [R07B-ACCEPTANCE.md](./R07B-ACCEPTANCE.md).
-6. **Đề xuất R07C (Checkout gọn + shipping/payment settings) — ĐÃ SOẠN THIẾT KẾ / PROMPT, SẴN SÀNG TRIỂN KHAI:**
+6. **R07C — HOÀN THÀNH LOCAL (2026-10-17):**
+   - Nghiệm thu: [R07C-ACCEPTANCE.md](./R07C-ACCEPTANCE.md). Quote/ship/payment/snapshot đã nối; HTTP12, browser5, regression16 PASS; staging/remote chưa chứng nhận.
    - Thiết kế: [R07C-CHECKOUT-SETTINGS.md](./R07C-CHECKOUT-SETTINGS.md).
    - Prompt Antigravity: [prompts/PROMPT-R07C.md](./prompts/PROMPT-R07C.md).
-   - Baseline đã ghi nhận: Admin Settings lưu `shippingFee` / `freeShippingThreshold` / `codEnabled` / `bankTransferEnabled` / `bankAccountInfo`, nhưng StoreFront checkout hardcode `paymentMethod: "COD"` và `order.service` gán `shippingFee = 0`.
-   - R07C sẽ nối Settings → checkout/quote/`createOrder`, tiêu thụ pricing R07B, chặn method tắt, giữ idempotency R06; **không** làm cổng TT online / auto-PAID / RBAC.
+   - Baseline lịch sử trước R07C: Admin Settings lưu `shippingFee` / `freeShippingThreshold` / `codEnabled` / `bankTransferEnabled` / `bankAccountInfo`, nhưng StoreFront checkout hardcode `paymentMethod: "COD"` và `order.service` gán `shippingFee = 0`.
+   - R07C đã nối Settings → checkout/quote/`createOrder`, tiêu thụ pricing R07B, chặn method tắt, giữ idempotency R06; **không** làm cổng TT online / auto-PAID / RBAC.
 
 

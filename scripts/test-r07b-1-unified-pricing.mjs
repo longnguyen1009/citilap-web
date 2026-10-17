@@ -231,7 +231,7 @@ try {
     assert.ok(camp1.id);
     camp1Id = camp1.id;
 
-    const published = await api.publishCampaign(camp1Id, DB);
+    const published = await api.publishCampaign(camp1Id, camp1.revision, DB);
     assert.equal(published.status, 'PUBLISHED');
   });
 
@@ -257,7 +257,7 @@ try {
 
     let conflictErr = null;
     try {
-      await api.publishCampaign(camp2.id, DB);
+      await api.publishCampaign(camp2.id, camp2.revision, DB);
     } catch (err) {
       conflictErr = err;
     }
@@ -288,7 +288,7 @@ try {
       DB
     );
 
-    const published = await api.publishCampaign(camp3.id, DB);
+    const published = await api.publishCampaign(camp3.id, camp3.revision, DB);
     assert.equal(published.status, 'PUBLISHED');
   });
 

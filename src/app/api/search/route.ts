@@ -68,7 +68,8 @@ export async function GET(request: Request) {
     const { data: validParams } = parsed;
 
     const env = await mediaEnvironment();
-    const pricingContext = await getStorefrontPricingContext(env.DB);
+    const evaluatedAt = new Date();
+    const pricingContext = await getStorefrontPricingContext(env.DB, evaluatedAt);
 
     const result = await searchProducts(
       {
@@ -87,7 +88,8 @@ export async function GET(request: Request) {
         limit: validParams.limit,
       },
       undefined,
-      pricingContext
+      pricingContext,
+      evaluatedAt
     );
 
     return NextResponse.json({

@@ -1,14 +1,18 @@
 # CitiLap — Backlog chức năng Admin và Storefront tiếp theo
 
+> R07C 2026-10-17: triển khai và full-app local PASS; quote/ship/payment/snapshot đã nối. HTTP12 nhóm, browser5 nhóm, R07B.4 regression16 nhóm; staging/remote chưa chứng nhận. Xem [R07C-ACCEPTANCE.md](R07C-ACCEPTANCE.md).
+
+> Codex R07B.4 2026-10-16: regression và gate full-app local đã PASS: 11 nhóm HTTP/rendering, 5 nhóm browser admin, 6 nhóm browser storefront/cart/checkout. Sửa thêm order unavailable500→409. Staging/remote chưa chứng nhận; R07C chưa tự bắt đầu. Xem [R07B.4-ACCEPTANCE.md](R07B.4-ACCEPTANCE.md). Claims cũ bên dưới giữ làm lịch sử, không thay bằng chứng hiện tại.
+
 Ngày: 2026-10-16. Trạng thái: đặc tả đề xuất, chưa triển khai/nghiệm thu.
 
-Tài liệu bổ sung [master plan V2](ADMIN-CMS-MASTER-PLAN-V2.md), không thay thế phase đang chạy. Giai đoạn R07B.1 và gói vá lỗi kiến trúc R07B.2 (khép 6 lỗ hổng pricing & campaign review, xem [R07B.1-CODEX-REVIEW.md](R07B.1-CODEX-REVIEW.md) và [R07B.2-ACCEPTANCE.md](R07B.2-ACCEPTANCE.md)) đã hoàn thành với đầy đủ bằng chứng kiểm thử 4 suite regression PASS (22/22, 17/17, 7/7, 15/15), typecheck 0 lỗi, build Cloudflare Exit 0. Giai đoạn tiếp theo là R07C giữ đặc tả riêng tại [Checkout settings](R07C-CHECKOUT-SETTINGS.md).
+Tài liệu bổ sung [master plan V2](ADMIN-CMS-MASTER-PLAN-V2.md), không thay thế phase đang chạy. Giai đoạn R07B.1, R07B.2 và gói vá lỗi concurrency & strict resolver R07B.3 (xem [R07B.2-CODEX-REVIEW.md](R07B.2-CODEX-REVIEW.md), [R07B.2-ACCEPTANCE.md](R07B.2-ACCEPTANCE.md) và [R07B.3-ACCEPTANCE.md](R07B.3-ACCEPTANCE.md)) đã hoàn thành toàn diện với đầy đủ bằng chứng kiểm thử 4 suite regression PASS (16/16, 22/22, 17/17, 3/3), typecheck 0 lỗi, build Cloudflare Exit 0. Giai đoạn tiếp theo là R07C giữ đặc tả riêng tại [Checkout settings](R07C-CHECKOUT-SETTINGS.md).
 
 ## 1. Thứ tự và ranh giới
 
 | Gói | Giá trị vận hành | Ưu tiên | Phụ thuộc |
 |---|---|---|---|
-| R07C | Giá, phí ship và phương thức thanh toán nhất quán khi đặt hàng | P0 trước phát hành | R07B.2 khép pricing và campaign; review R07B.1 |
+| R07C | Giá, phí ship và phương thức thanh toán nhất quán khi đặt hàng | P0 trước phát hành | R07B.3 khép CAS, overlap DB atomic và strict resolver; review R07B.2 |
 | R08A | Tài khoản riêng, ba vai trò, thu hồi phiên, nhật ký | P0 khi mở nhiều nhân viên | R07C ổn định; kiểm kê mọi API quản trị |
 | R08B | Autosave nháp, phục hồi, lịch xuất bản đúng revision | P1 | R08A và writer CMS hiện hành |
 | R08C | SEO defaults, redirect và public discovery | P1 trước phát hành | Published projection; pricing và policy đã nối |

@@ -96,8 +96,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     limit: 12,
   };
 
-  const pricingContext = await getStorefrontPricingContext().catch(() => null);
-  const searchResult = await searchProducts(options, undefined, pricingContext);
+  const evaluatedAt = new Date();
+  const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);
+  const searchResult = await searchProducts(options, undefined, pricingContext, evaluatedAt);
 
   const breadcrumbItems = [
     { label: "Trang chủ", href: "/" },

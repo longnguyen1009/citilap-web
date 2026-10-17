@@ -92,7 +92,7 @@ export function checkInMemoryRateLimit(
  * Uses D1 when available so rate limits persist across multiple Cloudflare Edge isolates.
  */
 export async function checkRateLimit(
-  action: 'order' | 'contact' | 'login',
+  action: 'order' | 'contact' | 'login' | 'checkout-quote',
   request: Request,
   limit: number,
   windowSeconds: number,

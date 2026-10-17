@@ -4,23 +4,18 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, MapPin, Building2, Truck, ShieldCheck, CheckCircle2, AlertCircle, Loader2, AlertTriangle } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import CartValidationStatus from '@/components/cart/CartValidationStatus';
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { onlinePickupLocations } from "@/config/business-profile";
+import { useEffect, useRef, useState } from "react";
+import type { CheckoutQuote } from "@/contracts/checkout";
 
 const PROVINCES = [
   "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
   "Bắc Ninh", "Bình Dương", "Đồng Nai", "Khánh Hòa", "Thanh Hóa", "Nghệ An", "Quảng Ninh"
 ];
 
-const SHOWROOMS = onlinePickupLocations.map((loc) => ({
-  id: loc.id,
-  name: loc.name,
-  address: loc.address,
-  phone: loc.displayPhone,
-}));
-
 interface PriceChangeDetails {
+  quote: CheckoutQuote;
   changedItems: Array<{
     productId: string;
     variantId: string | null;
@@ -38,159 +33,87 @@ interface PriceChangeDetails {
 }
 
 export default function CheckoutPage() {
-  const { cart, cartTotal, clearCart, updateItemPrice } = useCart();
+  const { cart, clearCart, updateItemPrice, checkoutReady } = useCart();
   const router = useRouter();
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState("");
-  const [deliveryType, setDeliveryType] = useState<"delivery" | "pickup">("delivery");
-  const [selectedShowroom, setSelectedShowroom] = useState("hanoi");
+  const [formError, setFormError] = useState('');
+  const [deliveryType, setDeliveryType] = useState<'delivery' | 'pickup'>('delivery');
+  const [selectedShowroom, setSelectedShowroom] = useState('hanoi');
+  const [paymentMethod, setPaymentMethod] = useState<'' | 'COD' | 'BANK_TRANSFER'>('');
   const [priceChangeDetails, setPriceChangeDetails] = useState<PriceChangeDetails | null>(null);
-
-  // Idempotency key state (refreshed whenever payload changes)
-  const [idempotencyKey, setIdempotencyKey] = useState(() => `checkout-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`);
-
-  const [form, setForm] = useState({
-    fullName: "",
-    phone: "",
-    email: "",
-    province: "",
-    district: "",
-    address: "",
-    note: "",
-  });
-
-  const updateField = (field: keyof typeof form) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) => {
-    setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    if (formError) setFormError("");
-  };
-
-  const validateForm = (): string | null => {
-    if (!form.fullName.trim()) return "Vui lòng nhập họ và tên người nhận.";
-    if (!/^[0-9+\s().-]{9,20}$/.test(form.phone.trim())) return "Vui lòng nhập số điện thoại hợp lệ (9 - 15 chữ số).";
-    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return "Email không hợp lệ.";
-
-    if (deliveryType === "delivery") {
-      if (!form.province) return "Vui lòng chọn Tỉnh / Thành phố nhận hàng.";
-      if (!form.district.trim()) return "Vui lòng nhập Quận / Huyện.";
-      if (!form.address.trim()) return "Vui lòng nhập địa chỉ cụ thể (số nhà, tên đường...).";
-    }
-
-    return null;
-  };
-
-  const executeOrderSubmission = async (itemsToSubmit = cart, currentKey = idempotencyKey) => {
-    let shippingAddress = "";
-    if (deliveryType === "delivery") {
-      shippingAddress = `${form.address.trim()}, ${form.district.trim()}, ${form.province}`;
-    } else {
-      const showroom = SHOWROOMS.find((s) => s.id === selectedShowroom);
-      shippingAddress = `Nhận tại showroom: ${showroom?.name} (${showroom?.address})`;
-    }
-
+  const [form, setForm] = useState({fullName:'',phone:'',email:'',province:'',district:'',address:'',note:''});
+  const [loaded, setLoaded] = useState(false);
+  const [quoteState, setQuoteState] = useState<{key:string;data:CheckoutQuote | null;error:string}>({key:'',data:null,error:''});
+  const [quoteRetry, setQuoteRetry] = useState(0);
+  const [pending, setPending] = useState<{key:string;body:string} | null>(null);
+  const sending = useRef(false);
+  const quoteRequest = JSON.stringify({items:cart.map(i=>({productId:i.productId,variantId:i.variantId || null,quantity:i.quantity})),shippingMethod:deliveryType === 'pickup' ? 'pickup' : 'standard',showroomId:deliveryType === 'pickup' ? selectedShowroom : null,...(paymentMethod?{paymentMethod}:{})});
+  const quote = quoteState.data;
+  const quoteKey = quoteRequest + ':' + quoteRetry;
+  const quoteReady = loaded && quoteState.key === quoteKey && !!quote && !quoteState.error && !!paymentMethod && checkoutReady;
+  const SHOWROOMS = quote?.showrooms || [];
+  const locked = isSubmitting || !!pending;
+  // Restore tab-local state after hydration; reading storage during SSR would mismatch HTML.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(()=>{
     try {
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": currentKey,
-        },
-        body: JSON.stringify({
-          items: itemsToSubmit.map((item) => ({
-            productId: item.productId,
-            variantId: item.variantId || null,
-            quantity: item.quantity,
-            expectedPrice: item.price,
-          })),
-          customerName: form.fullName.trim(),
-          customerPhone: form.phone.trim(),
-          customerEmail: form.email.trim() || null,
-          shippingAddress,
-          note: form.note.trim() || null,
-          shippingMethod: deliveryType === "delivery" ? "standard" : "pickup",
-          paymentMethod: "COD",
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        clearCart();
-        const tokenQuery = data.confirmationToken ? `&token=${encodeURIComponent(data.confirmationToken)}` : "";
-        router.push(`/checkout/success?orderId=${data.orderId}${tokenQuery}`);
-      } else if (response.status === 409 && data?.error?.code === "PRICE_CHANGED" && data?.error?.details) {
-        setPriceChangeDetails(data.error.details);
-        setFormError("");
-        setIsSubmitting(false);
-      } else {
-        const errorMsg = data?.error?.message || data?.message || "Không thể gửi đơn hàng. Vui lòng kiểm tra lại.";
-        setFormError(errorMsg);
-        setIsSubmitting(false);
-        window.scrollTo({ top: 0, behavior: "smooth" });
+      const saved = JSON.parse(sessionStorage.getItem('citilap-checkout-v1') || 'null');
+      if (saved?.form && Object.values(saved.form).every(v=>typeof v==='string') && ['delivery','pickup'].includes(saved.deliveryType) && ['', 'COD','BANK_TRANSFER'].includes(saved.paymentMethod) && typeof saved.selectedShowroom==='string') {setForm(prev=>({...prev,...saved.form}));setDeliveryType(saved.deliveryType);setSelectedShowroom(saved.selectedShowroom);setPaymentMethod(saved.paymentMethod);}
+      const attempt = JSON.parse(sessionStorage.getItem('citilap-checkout-attempt-v1') || 'null');
+      if (typeof attempt?.key === 'string' && typeof attempt?.body === 'string') setPending(attempt);
+    } catch { /* Invalid local draft is ignored; never used as server authority. */ }
+    setLoaded(true);
+  },[]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+  useEffect(()=>{if(loaded)try{sessionStorage.setItem('citilap-checkout-v1',JSON.stringify({form,deliveryType,selectedShowroom,paymentMethod}));}catch{}},[loaded,form,deliveryType,selectedShowroom,paymentMethod]);
+  useEffect(()=>{
+    if (!loaded || !cart.length) return;
+    const controller = new AbortController();
+    fetch('/api/checkout/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:quoteRequest,signal:controller.signal})
+      .then(async r=>{const data=await r.json();if(!r.ok || !data.success){if(!controller.signal.aborted && data.error?.code === 'PAYMENT_METHOD_DISABLED')setPaymentMethod('');throw Error(data.error?.message || 'Chưa thể tính tổng tiền.');}return data.data as CheckoutQuote;})
+      .then(data=>{if(!controller.signal.aborted)setQuoteState({key:quoteKey,data,error:''});})
+      .catch(error=>{if(!controller.signal.aborted)setQuoteState(prev=>({...prev,key:quoteKey,error:error.message || 'Chưa thể tính tổng tiền.'}));});
+    return ()=>controller.abort();
+  },[loaded,cart.length,quoteRequest,quoteKey]);
+  const updateField = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {setForm(prev=>({...prev,[field]:e.target.value}));setFormError('');};
+  const forgetAttempt = () => {setPending(null);sessionStorage.removeItem('citilap-checkout-attempt-v1');};
+  const sendAttempt = async (attempt: {key:string;body:string}) => {
+    if(sending.current)return;
+    sending.current=true;setIsSubmitting(true);setFormError('');
+    try {
+      const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':attempt.key},body:attempt.body});
+      const data=await response.json();
+      if(response.ok && data.success){
+        forgetAttempt();sessionStorage.removeItem('citilap-checkout-v1');clearCart();
+        router.push('/checkout/success?orderId='+encodeURIComponent(data.orderId)+'&token='+encodeURIComponent(data.confirmationToken));
+        return;
       }
-    } catch {
-      setFormError("Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.");
-      setIsSubmitting(false);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
+      if(response.status >= 500 || response.status === 429)throw Error(data.error?.message || 'Chưa xác định được kết quả gửi đơn.');
+      forgetAttempt();
+      if(response.status===409 && ['PRICE_CHANGED','CHECKOUT_CHANGED'].includes(data.error?.code) && data.error?.details?.quote){setPriceChangeDetails(data.error.details);}
+      else {setFormError(data.error?.message || 'Không thể gửi đơn.');if(data.error?.code==='PAYMENT_METHOD_DISABLED')setPaymentMethod('');setQuoteRetry(n=>n+1);}
+    }catch{setFormError('Chưa xác định được kết quả gửi đơn. Bấm thử lại để lấy cùng đơn, không tạo yêu cầu mới.');}
+    finally{sending.current=false;setIsSubmitting(false);}
   };
-
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
-
-    const error = validateForm();
-    if (error) {
-      setFormError(error);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setFormError("");
-    await executeOrderSubmission(cart, idempotencyKey);
+    if(pending){await sendAttempt(pending);return;}
+    if(!quoteReady || !quote || priceChangeDetails || sending.current)return;
+    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.district.trim(),form.province].join(', ') : null,note:form.note,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
+    const attempt={key:crypto.randomUUID(),body};
+    try{sessionStorage.setItem('citilap-checkout-attempt-v1',JSON.stringify(attempt));}catch{setFormError('Không thể lưu yêu cầu để thử lại an toàn. Vui lòng bật lưu trữ trình duyệt.');return;}
+    setPending(attempt);await sendAttempt(attempt);
   };
-
-  const handleConfirmPriceChange = async () => {
-    if (!priceChangeDetails) return;
-    setIsSubmitting(true);
-    setFormError("");
-
-    // Update cart context items with new prices
-    for (const changed of priceChangeDetails.changedItems) {
-      updateItemPrice(changed.productId, changed.variantId, changed.newPrice);
-    }
-
-    // Build updated items list immediately for submission
-    const updatedItems = cart.map((item) => {
-      const match = priceChangeDetails.changedItems.find(
-        (c) => c.productId === item.productId && (c.variantId || null) === (item.variantId || null)
-      );
-      if (match) {
-        return { ...item, price: match.newPrice };
-      }
-      return item;
-    });
-
-    const newKey = `checkout-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    setIdempotencyKey(newKey);
-    setPriceChangeDetails(null);
-
-    await executeOrderSubmission(updatedItems, newKey);
+  const handleConfirmPriceChange = () => {
+    if(!priceChangeDetails)return;
+    const next=priceChangeDetails.quote;
+    setQuoteState({key:quoteKey,data:next,error:''});
+    for(const line of next.lines)updateItemPrice(line.productId,line.variantId,line.price);
+    setPriceChangeDetails(null);setFormError('Đã xác nhận thông tin mới. Kiểm tra và bấm gửi đơn.');
   };
+  const handleReviewCart = () => {setPriceChangeDetails(null);router.push('/cart');};
 
-  const handleReviewCart = () => {
-    if (priceChangeDetails) {
-      for (const changed of priceChangeDetails.changedItems) {
-        updateItemPrice(changed.productId, changed.variantId, changed.newPrice);
-      }
-    }
-    router.push("/cart");
-  };
-
-  if (cart.length === 0 && !isSubmitting) {
+  if (loaded && cart.length === 0 && !isSubmitting && !pending) {
     return (
       <div className="bg-[#f8fafc] min-h-[60vh] flex flex-col items-center justify-center p-4">
         <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border border-gray-100">
@@ -227,6 +150,7 @@ export default function CheckoutPage() {
       </div>
 
       <div className="container mx-auto px-4 max-w-[1240px] mt-6">
+        <CartValidationStatus />
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
             Xác Nhận Yêu Cầu Đặt Hàng
@@ -269,7 +193,9 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmitOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {(!quote || quoteState.key !== quoteKey || quoteState.error) && <div role="status" className="mb-4 rounded border border-amber-300 p-3">{quoteState.error || 'Đang kiểm tra giá và phí giao hàng…'}<button type="button" className="ml-3 underline" onClick={()=>setQuoteRetry(n=>n+1)}>Kiểm tra lại</button></div>}
+        {pending && <div role="status" className="mb-4 rounded border border-amber-300 p-3">Yêu cầu đang chờ kết quả. Thông tin đã được giữ để tránh tạo đơn trùng.<button type="button" disabled={isSubmitting} className="ml-3 underline" onClick={()=>sendAttempt(pending)}>Thử lại yêu cầu</button></div>}
+        <form onSubmit={handleSubmitOrder}><fieldset disabled={locked} className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-w-0">
           {/* Cột trái: Thông tin nhận hàng (8 cols) */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6">
             {/* Phương thức nhận hàng */}
@@ -296,6 +222,7 @@ export default function CheckoutPage() {
 
                 <button
                   type="button"
+                  disabled={!SHOWROOMS.length}
                   onClick={() => setDeliveryType("pickup")}
                   className={`flex items-center gap-3 p-4 rounded-xl border text-left transition ${
                     deliveryType === "pickup"
@@ -334,23 +261,14 @@ export default function CheckoutPage() {
                         className="mt-1 text-blue-600 focus:ring-blue-500"
                       />
                       <div className="space-y-0.5">
-                        <div className="font-bold text-gray-900">{s.name} (Trụ sở chính)</div>
+                        <div className="font-bold text-gray-900">{s.name} </div>
                         <div className="text-xs text-gray-600">{s.address}</div>
                         <div className="text-xs text-blue-600 font-semibold">Hotline: {s.phone}</div>
-                        <div className="text-[11px] text-gray-500">Giờ phục vụ: Thứ 2 – Thứ 7: 09:00 – 20:00 (Chủ nhật tiếp theo lịch hẹn)</div>
+
                       </div>
                     </label>
                   ))}
 
-                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200/60 text-xs text-amber-900 space-y-1">
-                    <p className="font-bold">Lưu ý về các cơ sở khác:</p>
-                    <p>
-                      • <strong>Cơ sở Bắc Ninh (Số 40 Trần Hưng Đạo):</strong> Đón khách đến xem và mua trực tiếp; hiện chưa hỗ trợ nhận đơn online tại quầy. Quý khách tại Bắc Ninh có thể chọn <em>&quot;Giao hàng tận nơi&quot;</em> hoặc liên hệ hotline <strong>0842.044.999</strong> để được hỗ trợ nhanh nhất.
-                    </p>
-                    <p>
-                      • <strong>Cơ sở TP.HCM:</strong> Đang tạm ngưng hoạt động để nâng cấp điểm phục vụ.
-                    </p>
-                  </div>
                 </div>
               )}
             </div>
@@ -526,7 +444,7 @@ export default function CheckoutPage() {
                       <div className="flex justify-between items-center mt-1 text-xs text-gray-500">
                         <span>Số lượng: <strong className="text-gray-800">{item.quantity}</strong></span>
                         <span className="font-bold text-red-600">
-                          {(item.price * item.quantity).toLocaleString("vi-VN")}đ
+                          {quote?.lines.find(l=>l.productId===item.productId && l.variantId===(item.variantId || null))?.lineTotal.toLocaleString("vi-VN") || "—"}đ
                         </span>
                       </div>
                     </div>
@@ -534,29 +452,33 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              <fieldset className="mt-4 space-y-3"><legend className="font-bold">Phương thức thanh toán</legend>
+                {(quote?.allowedPaymentMethods || []).map(method=><label key={method} className="flex items-center gap-2"><input type="radio" name="paymentMethod" checked={paymentMethod===method} onChange={()=>setPaymentMethod(method)}/>{method==='COD'?'Thanh toán khi nhận máy (COD)':'Chuyển khoản ngân hàng'}</label>)}
+                {paymentMethod==='BANK_TRANSFER' && <p className="whitespace-pre-wrap rounded bg-blue-50 p-3 text-sm">{quote?.snapshot.bankAccountInfo || 'Đang tải hướng dẫn chuyển khoản…'}</p>}
+              </fieldset>
               {/* Tổng tiền */}
               <div className="border-t border-gray-200 pt-4 mt-4 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600">
                   <span>Tạm tính ({cart.reduce((s, i) => s + i.quantity, 0)} SP):</span>
-                  <span className="font-bold text-gray-900">{cartTotal.toLocaleString("vi-VN")}đ</span>
+                  <span className="font-bold text-gray-900">{quote ? quote.subtotal.toLocaleString("vi-VN") + "đ" : "—"}</span>
                 </div>
                 <div className="flex justify-between text-gray-600 text-xs">
                   <span>Phí vận chuyển:</span>
-                  <span className="text-blue-700 font-semibold">Chuyên viên sẽ xác nhận khi gọi</span>
+                  <span className="text-blue-700 font-semibold">{quote ? (quote.shippingFee === 0 ? "Miễn phí" : quote.shippingFee.toLocaleString("vi-VN") + "đ") : "—"}</span>
                 </div>
                 <div className="border-t border-gray-100 pt-3 flex justify-between items-baseline">
-                  <span className="text-sm font-bold text-gray-900 uppercase">Tạm tính dự kiến:</span>
-                  <span className="text-xl font-black text-red-600">{cartTotal.toLocaleString("vi-VN")}đ</span>
+                  <span className="text-sm font-bold text-gray-900 uppercase">Tổng thanh toán:</span>
+                  <span className="text-xl font-black text-red-600">{quote ? quote.totalAmount.toLocaleString("vi-VN") + "đ" : "—"}</span>
                 </div>
                 <p className="text-[11px] text-gray-500 italic text-right mt-1">
-                  (Chưa bao gồm phí giao hàng nếu có)
+                  Đã bao gồm phí giao hàng.
                 </p>
               </div>
 
               {/* Nút gửi đơn hàng */}
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !quoteReady || !!priceChangeDetails}
                 className="w-full mt-6 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-black py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-base uppercase tracking-wider cursor-pointer"
               >
                 {isSubmitting ? (
@@ -573,30 +495,33 @@ export default function CheckoutPage() {
               </p>
             </div>
           </div>
-        </form>
+        </fieldset></form>
 
         {/* Price Change Review Modal */}
         {priceChangeDetails && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <dialog ref={node=>{if(node && !node.open)node.showModal();}} onCancel={e=>e.preventDefault()} aria-labelledby="checkout-change-title" className="fixed inset-0 m-0 w-full max-w-none h-full max-h-none z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-5 bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl">
                   <AlertTriangle className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold">Giá Sản Phẩm Đã Được Cập Nhật</h3>
+                  <h3 id="checkout-change-title" className="text-lg font-bold">Thông tin đặt hàng đã thay đổi</h3>
                   <p className="text-xs text-white/90">
-                    Bảng giá hoặc ưu đãi vừa được hệ thống cập nhật tự động
+                    Vui lòng kiểm tra giá, phí giao hàng và thông tin thanh toán
                   </p>
                 </div>
               </div>
 
               <div className="p-6 space-y-4 overflow-y-auto">
                 <p className="text-xs text-gray-600 leading-relaxed">
-                  Một hoặc nhiều sản phẩm trong giỏ hàng có sự thay đổi về giá so với lúc bạn thêm vào giỏ. Dưới đây là chi tiết giá mới nhất được áp dụng:
+                  Giá, phí giao hàng hoặc thông tin nhận/thanh toán đã thay đổi. Kiểm tra thông tin mới trước khi xác nhận:
                 </p>
 
                 <div className="space-y-2.5">
+                  {priceChangeDetails.quote.snapshot.bankAccountInfo && <p className="whitespace-pre-wrap mb-3">{priceChangeDetails.quote.snapshot.bankAccountInfo}</p>}
+                  {priceChangeDetails.quote.snapshot.showroom && <p className="mb-3">{priceChangeDetails.quote.snapshot.showroom.name}: {priceChangeDetails.quote.snapshot.showroom.address}</p>}
+                  <p className="mb-3">Phí giao hàng mới: {priceChangeDetails.quote.shippingFee.toLocaleString('vi-VN')}đ</p>
                   {priceChangeDetails.changedItems.map((item, idx) => {
                     const diff = item.newPrice - item.oldPrice;
                     const isIncrease = diff > 0;
@@ -647,7 +572,7 @@ export default function CheckoutPage() {
                   className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Xác nhận giá mới & Đặt hàng
+                  Xác nhận thông tin mới
                 </button>
                 <button
                   type="button"
@@ -659,7 +584,7 @@ export default function CheckoutPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </dialog>
         )}
       </div>
     </div>

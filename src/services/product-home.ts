@@ -58,6 +58,6 @@ export async function getSectionProducts(
   } catch (error) {
     console.error(`[product-home] Error loading products for section '${section}' from D1:`, error);
     // Explicit error handling: return empty list so the section renders an ErrorState or EmptyState, NEVER mock items.
-    return [];
+    throw error;
   }
 }

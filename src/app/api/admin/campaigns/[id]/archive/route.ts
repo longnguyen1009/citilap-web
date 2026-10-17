@@ -4,6 +4,7 @@ import { mediaEnvironment } from '@/server/media-http';
 import {
   archiveCampaign,
   CampaignRevisionConflictError,
+  CampaignValidationError,
 } from '@/server/services/campaign.service';
 
 export const runtime = 'edge';
@@ -27,7 +28,7 @@ export async function POST(request: Request, context: RouteContext) {
         { status: 400 }
       );
     }
-    if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 0) {
+    if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
       return NextResponse.json(
         { success: false, code: 'INVALID_EXPECTED_REVISION', error: 'expectedRevision phải là số nguyên không âm.' },
         { status: 400 }

@@ -914,12 +914,14 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {!settings.codEnabled && !settings.bankTransferEnabled && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3">Cả hai phương thức thanh toán đang tắt. Lưu cấu hình sẽ tạm ngưng nhận đơn mới.</p>}
+        {settings.bankTransferEnabled && !settings.bankAccountInfo.trim() && <p role="alert" className="rounded border border-amber-300 bg-amber-50 p-3">Thiếu hướng dẫn ngân hàng: khách chưa thể chọn chuyển khoản.</p>}
         {/* TAB 5: VẬN CHUYỂN & THANH TOÁN */}
         {activeTab === "shipping" && (
           <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-6 sm:p-8 space-y-6">
             <div className="border-b border-slate-100 pb-4">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-blue-600" /> Chính sách vận chuyển & Cổng thanh toán
+                <CreditCard className="w-5 h-5 text-blue-600" /> Chính sách vận chuyển & Thanh toán
               </h2>
               <p className="text-xs text-slate-500 mt-1">
                 Thiết lập phí giao hàng và hướng dẫn khách chuyển khoản khi đặt hàng tại bước Checkout.
@@ -928,7 +930,7 @@ export default function SettingsPage() {
 
             <div className="p-3.5 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-800 flex items-start gap-2.5">
               <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <span>Chính sách phí giao hàng mặc định được lưu để hỗ trợ quy trình tư vấn và tạo đơn; cơ chế tự động tính phí tại giỏ hàng Storefront sẽ được kết nối ở giai đoạn R08.</span>
+              <span>Phí giao hàng và phương thức thanh toán được áp dụng tại Checkout. Đơn đã tạo giữ nguyên thông tin tại thời điểm khách xác nhận.</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -975,8 +977,8 @@ export default function SettingsPage() {
 
                 <label className="flex items-center justify-between p-4 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition">
                   <div>
-                    <div className="font-bold text-slate-900 text-sm">Chuyển khoản ngân hàng qua mã QR</div>
-                    <div className="text-xs text-slate-500 mt-0.5">Khách hàng quét mã QR chuyển khoản trước.</div>
+                    <div className="font-bold text-slate-900 text-sm">Chuyển khoản ngân hàng</div>
+                    <div className="text-xs text-slate-500 mt-0.5">Hiển thị hướng dẫn chuyển khoản; đơn vẫn chờ xác nhận thanh toán.</div>
                   </div>
                   <input
                     type="checkbox"

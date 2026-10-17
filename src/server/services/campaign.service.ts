@@ -18,8 +18,8 @@ export class CampaignConflictError extends Error {
     message: string,
     conflictingCampaignId: string,
     conflictingCampaignName: string,
-    productId: string,
-    variantId: string | null
+    productId = '',
+    variantId: string | null = null
   ) {
     super(message);
     this.name = 'CampaignConflictError';
@@ -48,13 +48,21 @@ export class CampaignRevisionConflictError extends Error {
 }
 
 export class CampaignValidationError extends Error {
-  code = 'CAMPAIGN_VALIDATION_ERROR';
+  code: string;
   field: string;
 
-  constructor(field: string, message: string) {
+  constructor(
+    messageOrField: string,
+    fieldOrMessage = 'campaign',
+    code = 'CAMPAIGN_VALIDATION_ERROR'
+  ) {
+    const isFirstArgMessage = messageOrField.includes(' ') || messageOrField.length > 30;
+    const message = isFirstArgMessage ? messageOrField : fieldOrMessage;
+    const field = isFirstArgMessage ? fieldOrMessage : messageOrField;
     super(message);
     this.name = 'CampaignValidationError';
     this.field = field;
+    this.code = code;
   }
 }
 
@@ -360,7 +368,7 @@ export async function saveCampaign(
     }
 
     // P2 Invariant: expectedRevision is MANDATORY for updates. Reject missing, fractional, or negative values.
-    const rawRev = expectedRevision ?? input.expectedRevision ?? (input as Record<string, unknown>).revision;
+    const rawRev = expectedRevision ?? input.expectedRevision;
     if (rawRev === undefined || rawRev === null) {
       throw new CampaignValidationError(
         'expectedRevision là bắt buộc khi cập nhật chiến dịch.',
@@ -368,7 +376,7 @@ export async function saveCampaign(
         'MISSING_EXPECTED_REVISION'
       );
     }
-    if (typeof rawRev !== 'number' || !Number.isInteger(rawRev) || rawRev < 0) {
+    if (typeof rawRev !== 'number' || !Number.isSafeInteger(rawRev) || rawRev < 0) {
       throw new CampaignValidationError(
         'expectedRevision phải là số nguyên không âm.',
         'expectedRevision',
@@ -407,14 +415,15 @@ export async function saveCampaign(
         valid.id
       );
 
-    // Concurrently safe delete and insert: only take effect if the campaign has claimed nextRevision
+    // Remove old targets before checking new time/status, in the SAME transaction.
+    // A losing CAS aborts and restores these items; inserts validate final targets.
     const deleteOldItemsStmt = db
       .prepare(
         `DELETE FROM PromotionCampaignItem 
          WHERE campaignId = ? 
            AND EXISTS (SELECT 1 FROM PromotionCampaign WHERE id = ? AND revision = ?)`
       )
-      .bind(valid.id, valid.id, nextRevision);
+      .bind(valid.id, valid.id, checkRev);
 
     const insertItemStmts = valid.items.map((it) => {
       const itemId = it.id || 'citem_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
@@ -440,8 +449,8 @@ export async function saveCampaign(
     });
 
     try {
-      const batchResults = await db.batch([updateCampStmt, deleteOldItemsStmt, ...insertItemStmts]);
-      const updateMeta = batchResults[0]?.meta as { changes?: number } | undefined;
+      const batchResults = await db.batch([deleteOldItemsStmt, updateCampStmt, ...insertItemStmts]);
+      const updateMeta = batchResults[1]?.meta as { changes?: number } | undefined;
       if (updateMeta?.changes === 0) {
         throw new CampaignRevisionConflictError(
           'Cập nhật thất bại do xung đột revision đồng thời.',
@@ -570,7 +579,7 @@ export async function publishCampaign(
       'MISSING_EXPECTED_REVISION'
     );
   }
-  if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 0) {
+  if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
     throw new CampaignValidationError(
       'expectedRevision phải là số nguyên không âm.',
       'expectedRevision',
@@ -683,7 +692,7 @@ export async function archiveCampaign(
       'MISSING_EXPECTED_REVISION'
     );
   }
-  if (typeof expectedRevision !== 'number' || !Number.isInteger(expectedRevision) || expectedRevision < 0) {
+  if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
     throw new CampaignValidationError(
       'expectedRevision phải là số nguyên không âm.',
       'expectedRevision',

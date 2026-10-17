@@ -16,7 +16,8 @@ import {
 } from './catalog.service';
 import { publicCollection } from './navigation.service';
 import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
-import { applyPricingToHomepageProducts, getStorefrontPricingContext } from './pricing.service';
+import { getStorefrontPricingContext } from './pricing.service';
+import { getPrismaClient } from '../../lib/prisma';
 
 export interface LandingPageListItem {
   id: string;
@@ -493,7 +494,8 @@ export async function resolveSectionsForStorefront(
   const resolvedList: ResolvedSectionItem[] = [];
 
   // Fail-closed: evaluate pricing context with active campaigns, surfacing infrastructure errors
-  const pricingContext = await getStorefrontPricingContext(db);
+  const evaluatedAt = new Date();
+  const pricingContext = await getStorefrontPricingContext(db, evaluatedAt);
 
   for (const sec of enabledSections) {
     const resolvedSec: ResolvedSectionItem = { ...sec };
@@ -502,14 +504,14 @@ export async function resolveSectionsForStorefront(
     if (data.type === 'product_grid') {
       let prods: HomepageProduct[] = [];
       if (data.sourceMode === 'manual') {
-        prods = await resolveProductsByIds(data.manualProductIds);
+        prods = await resolveProductsByIds(data.manualProductIds, getPrismaClient(db), pricingContext, evaluatedAt);
       } else {
-        prods = await resolveProductsByCriteria(data.ruleCriteria);
+        prods = await resolveProductsByCriteria(data.ruleCriteria, getPrismaClient(db), pricingContext, evaluatedAt);
       }
-      resolvedSec.resolvedProducts = applyPricingToHomepageProducts(prods, pricingContext);
+      resolvedSec.resolvedProducts = prods;
     } else if (data.type === 'featured_collection') {
       try {
-        const col = await publicCollection(db, data.collectionId);
+        const col = await publicCollection(db, data.collectionId, pricingContext, evaluatedAt);
         resolvedSec.resolvedCollection = col;
       } catch {
         // If collection not found or hidden, gracefully empty

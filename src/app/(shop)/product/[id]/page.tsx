@@ -156,7 +156,8 @@ export default async function ProductDetailPage({
     ? (studioImages.find((m) => m.variantId && m.variantId === studioVariant?.id)?.url || studioImages[0]?.url || "")
     : (product.primaryImageUrl || "");
   const displayName = studio?.name || product.name;
-  const pricingContext = await getStorefrontPricingContext();
+  const evaluatedAt = new Date();
+  const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);
   const selectedVariant =
     product.variants.find((v) => v.id === product.selectedVariantId) || null;
   const isVariant = Boolean(studioVariant || selectedVariant);
@@ -173,7 +174,7 @@ export default async function ProductDetailPage({
     isFlashSale,
     true,
     pricingContext,
-    new Date(),
+    evaluatedAt,
     {
       productId: product.id,
       variantId: activeVariant?.id,
@@ -196,9 +197,12 @@ export default async function ProductDetailPage({
     product.categoryId,
     product.brandId,
     4,
-    manualRelatedIds
+    manualRelatedIds,
+    undefined,
+    pricingContext,
+    evaluatedAt
   );
-  const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext);
+  const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext, evaluatedAt);
 
   // 5. Sanitize description
   const safeDescription = sanitizeHtml(studio ? (studio.contentHtml || studio.description) : (product.contentHtml || product.description || ""));
@@ -233,7 +237,7 @@ export default async function ProductDetailPage({
       isFlashSale,
       true,
       pricingContext,
-      new Date(),
+      evaluatedAt,
       {
         productId: product.id,
         variantId: v.id,
@@ -252,7 +256,7 @@ export default async function ProductDetailPage({
       isFlashSale,
       true,
       pricingContext,
-      new Date(),
+      evaluatedAt,
       {
         productId: product.id,
         variantId: v.id,
@@ -436,7 +440,7 @@ export default async function ProductDetailPage({
                       isFlashSale,
                       true,
                       pricingContext,
-                      new Date(),
+                      evaluatedAt,
                       {
                         productId: product.id,
                         variantId: v.id,
@@ -471,7 +475,7 @@ export default async function ProductDetailPage({
                     isFlashSale,
                     true,
                     pricingContext,
-                    new Date(),
+                    evaluatedAt,
                     {
                       productId: product.id,
                       variantId: v.id,

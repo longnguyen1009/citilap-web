@@ -60,4 +60,6 @@ export function assertPublishedStudioOrderable(
   if (variants.length === 0 && variantId) {
     throw new Error('VARIANT_UNAVAILABLE');
   }
+  const selected = variants.find(v=>v !== null && typeof v==='object' && (v as Record<string,unknown>).id===variantId) as Record<string,unknown> | undefined;
+  if (selected?.availability !== undefined && selected.availability !== 'AVAILABLE' && selected.availability !== 'PREORDER') throw new Error('VARIANT_UNAVAILABLE');
 }

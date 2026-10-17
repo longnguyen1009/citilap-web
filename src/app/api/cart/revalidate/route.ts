@@ -39,14 +39,19 @@ export async function POST(request: Request) {
     }
 
     // Validate each item shape
+    const validId = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0 && value.length <= 200;
+    const ids = new Set<string>();
     for (let i = 0; i < body.items.length; i++) {
       const it = body.items[i];
-      if (!it || typeof it !== 'object' || typeof it.productId !== 'string' || !it.productId.trim()) {
+      if (!it || typeof it !== 'object' || !validId(it.id) || !validId(it.productId) || ids.has(it.id.trim()) ||
+          (it.variantId !== undefined && it.variantId !== null && !validId(it.variantId)) ||
+          (it.expectedPrice !== undefined && (!Number.isSafeInteger(it.expectedPrice) || it.expectedPrice < 0))) {
         return NextResponse.json(
           { success: false, code: 'INVALID_CART_ITEM', error: `Mục thứ ${i + 1} không hợp lệ (cần productId).` },
           { status: 400 }
         );
       }
+      ids.add(it.id.trim());
     }
 
     const env = await mediaEnvironment();

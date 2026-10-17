@@ -297,6 +297,7 @@ export const OrderScalarFieldEnum = {
   paymentMethod: 'paymentMethod',
   paymentStatus: 'paymentStatus',
   confirmationTokenHash: 'confirmationTokenHash',
+  checkoutSnapshot: 'checkoutSnapshot',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   completedAt: 'completedAt'

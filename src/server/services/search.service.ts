@@ -6,7 +6,7 @@ import {
   buildRamClauses,
   buildStorageClauses,
 } from "./catalog.service";
-import { applyPricingToHomepageProducts, type PriceEvaluationContext } from "./pricing.service";
+import { applyPricingToHomepageProducts, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
 
 export interface SearchFilterOptions {
   query?: string;
@@ -416,14 +416,17 @@ function calculateProductRelevanceScore(
 export async function searchProducts(
   options: SearchFilterOptions,
   client: PrismaClient = prisma,
-  pricingContext?: PriceEvaluationContext | null
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date()
 ): Promise<SearchResult> {
+  const context = pricingContext ?? await getStorefrontPricingContext(undefined, at);
   const { cleanQuery, tokens } = normalizeSearchQuery(options.query || "");
 
   // 1. Build parameterized WHERE clause
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     status: { in: ["ACTIVE", "active"] },
+    deletedAt: null, NOT: { studio: { is: { published: null } } },
   };
 
   const andConditions: unknown[] = [];
@@ -873,7 +876,7 @@ export async function searchProducts(
   const totalPages = Math.ceil(totalCount / pageSize);
   const startIndex = (page - 1) * pageSize;
   const rawPagedList = processedProducts.slice(startIndex, startIndex + pageSize).map((p) => p.product);
-  const pagedList = pricingContext ? applyPricingToHomepageProducts(rawPagedList, pricingContext) : rawPagedList;
+  const pagedList = applyPricingToHomepageProducts(rawPagedList, context, at);
 
   return {
     query: cleanQuery,

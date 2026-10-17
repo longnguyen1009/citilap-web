@@ -1,3 +1,6 @@
+import { resolveProductsByIds } from './catalog.service';
+import { getPrismaClient } from '../../lib/prisma';
+import { getStorefrontPricingContext, type PriceEvaluationContext } from './pricing.service';
 import type { D1Database } from '@cloudflare/workers-types';
 import { z } from 'zod';
 import { MediaError, type MediaEnvironment } from './media-library.service';
@@ -272,64 +275,21 @@ export async function archiveBrand(
  */
 export async function publicBrandWithProducts(
   db: D1Database,
-  slug: string
+  slug: string,
+  pricingContext?: PriceEvaluationContext,
+  at: Date = new Date()
 ) {
   const brand = await getBrandDetail(db, slug);
   if (!brand || brand.status !== 'ACTIVE') {
     throw new MediaError('Không tìm thấy thương hiệu hoặc thương hiệu đã tạm ẩn.', 404);
   }
 
-  // Get active published products for this brand
-  const productsRows = await db.prepare(`
-    SELECT
-      p.id,
-      p.name,
-      p.slug,
-      p.price,
-      p.originalPrice,
-      p.images,
-      p.brand,
-      p.cpu,
-      p.ram,
-      p.storage,
-      p.condition,
-      p.isNewArrival,
-      p.isBestSeller,
-      s.published
-    FROM Product p
-    LEFT JOIN ProductStudio s ON s.productId = p.id
-    WHERE (p.brandId = ? OR lower(p.brand) = lower(?))
-      AND p.status = 'ACTIVE'
-      AND p.deletedAt IS NULL
-      AND (s.published IS NOT NULL OR s.productId IS NULL)
-    ORDER BY p.updatedAt DESC
-    LIMIT 40
-  `).bind(brand.id, brand.name).all<Record<string, unknown>>();
-
-  const products = (productsRows.results || []).map((r: Record<string, unknown>) => {
-    let image = 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=200';
-    try {
-      const parsed = JSON.parse(String(r.images || '[]'));
-      if (Array.isArray(parsed) && parsed[0]) image = parsed[0];
-    } catch {
-      if (typeof r.images === 'string' && r.images.startsWith('http')) image = r.images;
-    }
-    return {
-      id: String(r.id),
-      name: String(r.name),
-      slug: String(r.slug),
-      price: Number(r.price),
-      originalPrice: r.originalPrice ? Number(r.originalPrice) : null,
-      image,
-      brand: String(r.brand || brand.name),
-      cpu: r.cpu ? String(r.cpu) : null,
-      ram: r.ram ? String(r.ram) : null,
-      condition: String(r.condition || 'NEW'),
-      isNewArrival: !!r.isNewArrival,
-      isBestSeller: !!r.isBestSeller,
-    };
-  });
-
+  const context = pricingContext || await getStorefrontPricingContext(db, at);
+  const rows = await db.prepare(`SELECT p.id FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id
+    WHERE (p.brandId=? OR lower(p.brand)=lower(?)) AND p.status='ACTIVE' AND p.deletedAt IS NULL
+      AND (s.productId IS NULL OR s.published IS NOT NULL) ORDER BY p.updatedAt DESC LIMIT 40`)
+    .bind(brand.id,brand.name).all<{id:string}>();
+  const products = await resolveProductsByIds(rows.results.map(p=>p.id),getPrismaClient(db),context,at);
   return {
     brand,
     products,

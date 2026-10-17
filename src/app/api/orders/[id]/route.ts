@@ -56,6 +56,10 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
           note: order.note,
           subtotalAmount: order.subtotalAmount,
           shippingFee: order.shippingFee,
+          shippingMethod: order.shippingMethod,
+          paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+          checkoutSnapshot: order.checkoutSnapshot ? JSON.parse(order.checkoutSnapshot) : null,
           totalAmount: order.totalAmount,
           items: order.items.map((item) => {
             let image = '';
@@ -70,7 +74,7 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
               productId: item.productId,
               productName: item.productNameSnapshot || item.productName,
               sku: item.skuSnapshot || item.sku,
-              price: item.priceSnapshot || item.price,
+              price: item.priceSnapshot ?? item.price,
               quantity: item.quantity,
               lineTotal: item.lineTotal,
               image,
