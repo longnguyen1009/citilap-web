@@ -1,3 +1,4 @@
+import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { navigationWriteSchema, type NavigationDocument, type NavigationDetail, type NavigationTarget, type ResolvedNavigation } from '../../contracts/cms/navigation';
@@ -107,7 +108,7 @@ export async function writeNavigation(env: MediaEnvironment, input: unknown) {
   }
 
   try {
-    await db.batch([...statements, ...adminAuditStatements(db, 'navigation.' + action, 'site', 'CMS mutation')]);
+    await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'navigation.' + action, 'site', 'CMS mutation',null,'order',{before:expectedRevision,after:revision})]);
   } catch (e) {
     if (e instanceof Error && /NAVIGATION_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản, tên, slug hoặc ảnh. Tải lại trước khi lưu.',409);

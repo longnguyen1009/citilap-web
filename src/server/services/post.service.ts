@@ -1,3 +1,4 @@
+import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { blankPost, postStudioWriteSchema, postCategoryWriteSchema, RESERVED_SLUGS, type PostDocument } from '../../contracts/cms/post';
@@ -198,7 +199,7 @@ export async function writePost(env: MediaEnvironment, id: string | null, input:
   }
 
   try {
-    await db.batch([...statements, ...adminAuditStatements(db, 'post.' + action, postId, 'CMS mutation')]);
+    await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'post.' + action, postId, 'CMS mutation', null, 'order', { before: expectedRevision, after: version })]);
   } catch (e) {
     if (e instanceof Error && /POST_STUDIO_CONFLICT|UNIQUE constraint/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản hoặc đường dẫn trùng. Tải lại và kiểm tra dữ liệu.', 409);
@@ -401,9 +402,9 @@ export async function writePostCategory(db: D1Database, id: string | null, input
 
   const categoryId = id || crypto.randomUUID();
   if (!id) {
-    await db.prepare('INSERT INTO PostCategory(id,name,slug,sortOrder,status) VALUES(?,?,?,?,?)').bind(categoryId, d.name, d.slug, d.sortOrder, d.status).run();
+    await db.batch([db.prepare('INSERT INTO PostCategory(id,name,slug,sortOrder,status) VALUES(?,?,?,?,?)').bind(categoryId, d.name, d.slug, d.sortOrder, d.status), ...adminAuditStatements(db, 'post-category.create', categoryId, 'Category created')]);
   } else {
-    const result = await db.prepare('UPDATE PostCategory SET name=?,slug=?,sortOrder=?,status=?,revision=revision+1,updatedAt=CURRENT_TIMESTAMP WHERE id=? AND revision=?').bind(d.name, d.slug, d.sortOrder, d.status, categoryId, expectedRevision).run();
+    const [result] = await db.batch([db.prepare('UPDATE PostCategory SET name=?,slug=?,sortOrder=?,status=?,revision=revision+1,updatedAt=CURRENT_TIMESTAMP WHERE id=? AND revision=?').bind(d.name, d.slug, d.sortOrder, d.status, categoryId, expectedRevision), ...adminAuditStatements(db, 'post-category.update', categoryId, 'Category updated', null, 'order', { changed: true, before: expectedRevision, after: expectedRevision + 1 })]);
     if (!result.meta.changes) throw new MediaError('Chuyên mục không tồn tại hoặc đã thay đổi.', 409);
   }
   return { id: categoryId, ...d, revision: expectedRevision + 1 };
@@ -414,7 +415,7 @@ export async function deletePostCategory(db: D1Database, id: string) {
   if ((inUse?.cnt ?? 0) > 0) {
     throw new MediaError(`Không thể xóa, còn ${inUse!.cnt} bài viết thuộc chuyên mục này. Hãy chuyển sang Ẩn.`, 400);
   }
-  await db.prepare('DELETE FROM PostCategory WHERE id=?').bind(id).run();
+  await db.batch([db.prepare("DELETE FROM PostCategory WHERE id=? AND NOT EXISTS(SELECT 1 FROM PostStudioRevision WHERE json_extract(document, '$.categoryId')=?)").bind(id,id), ...adminAuditStatements(db, 'post-category.delete', id, 'Category deleted', null, 'order', { changed: true })]);
   return { success: true };
 }
 

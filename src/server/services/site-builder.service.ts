@@ -1,3 +1,4 @@
+import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import {
@@ -8,6 +9,7 @@ import {
 } from '../../contracts/cms/site-builder';
 import { RESERVED_SLUGS } from '../../contracts/cms/post';
 import { MediaError, type MediaEnvironment } from './media-library.service';
+import { contentAssets } from './content-media.service';
 import {
   resolveProductsByIds,
   resolveProductsByCriteria,
@@ -117,7 +119,7 @@ export async function bootstrapHomepage(db: D1Database) {
       .bind(snapshot, snapshot, now, now, now),
   ];
 
-  await db.batch([...statements, ...adminAuditStatements(db, 'builder.bootstrap', 'home', 'Homepage initialized')]);
+  await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'builder.bootstrap', 'home', 'Homepage initialized')]);
 
   return {
     status: 'BOOTSTRAPPED',
@@ -384,8 +386,9 @@ export async function writeLandingPage(
       .bind(action, action, d.internalName || d.title, slug, pageId),
   ];
 
-  // 6. Track media usages for published revisions
-  if (action === 'publish') {
+  await contentAssets(env, '', [...assetIds], action === 'publish');
+  // Retained draft revisions also protect their images from library cleanup.
+  if (action !== 'unpublish') {
     for (const assetId of assetIds) {
       statements.push(
         db
@@ -399,7 +402,7 @@ export async function writeLandingPage(
   }
 
   try {
-    await db.batch([...statements, ...adminAuditStatements(db, 'landing.' + action, pageId, 'Landing mutation')]);
+    await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'landing.' + action, pageId, 'Landing mutation', null, 'order', {before:expectedRevision,after:nextRevision})]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/LANDING_PAGE_CONFLICT|UNIQUE constraint failed/.test(msg)) {

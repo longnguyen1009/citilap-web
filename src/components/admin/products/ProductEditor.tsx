@@ -1,4 +1,9 @@
 'use client';
+import { useRef } from 'react';
+import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
+import DraftRecovery from '@/components/admin/DraftRecovery';
+import SchedulePanel from '@/components/admin/SchedulePanel';
+
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -98,6 +103,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [doc, setDoc] = useState<ProductDocument | null>(null);
   const [revision, setRevision] = useState<number>(0);
+  const latestDoc=useRef(doc), saveLock=useRef(false);
+  useEffect(()=>{latestDoc.current=doc;},[doc]);
   const [isPublished, setIsPublished] = useState<boolean>(false);
   const [baseline, setBaseline] = useState<string>('');
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -231,7 +238,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   };
 
   const handleSave = useCallback(async (action: 'save' | 'publish' | 'unpublish') => {
-    if (!doc) return;
+    if (!doc || saveLock.current) return false;
+    saveLock.current=true;
+    const submitted=JSON.stringify(doc);
     setSaving(true);
     setStatusMessage(null);
 
@@ -249,11 +258,11 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         }),
       });
 
-      setDoc(result.document);
+      if(JSON.stringify(latestDoc.current)===submitted)setDoc(result.document);
       setRevision(result.revision);
       setIsPublished(result.published);
       setBaseline(JSON.stringify(result.document));
-      sessionStorage.removeItem('citilap_product_editor_recovery');
+
 
       if (action === 'publish') {
         setStatusMessage({ type: 'success', text: 'Đã xuất bản sản phẩm lên website thành công.' });
@@ -266,17 +275,21 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       if (!id && result.id) {
         router.replace(`/admin/products/${result.id}`);
       }
+      return true;
     } catch (err) {
       const errorMsg = (err as Error).message || 'Có lỗi xảy ra khi lưu.';
-      sessionStorage.setItem('citilap_product_editor_recovery', JSON.stringify({ doc, id, revision }));
       setStatusMessage({
         type: 'error',
-        text: `${errorMsg} Nội dung đang nhập đã được lưu giữ trên trình duyệt.`,
+        text: `${errorMsg} Nội dung vẫn giữ trong trình soạn thảo. Lưu lại trước khi rời trang.`,
       });
+      return false;
     } finally {
+      saveLock.current=false;
       setSaving(false);
     }
   }, [doc, id, revision, router]);
+
+  const autosaveStatus=useDraftAutosave(doc,revision,!!id && !loading,isDirty,saving,()=>handleSave('save'));
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data hydration from API
@@ -328,8 +341,11 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   }, [activeTab, id, fetchRevisions]);
 
   const handleRestore = async (targetRev: number) => {
-    if (!id) return;
+    if (!id || saveLock.current) return;
+    saveLock.current = true;
+    const beforeRestore = JSON.stringify(latestDoc.current);
     setRestoring(true);
+    setSaving(true);
     setStatusMessage(null);
     try {
       const res = await mediaRequest<{
@@ -344,7 +360,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         body: JSON.stringify({ expectedRevision: revision }),
       });
 
-      setDoc(res.document);
+      if (JSON.stringify(latestDoc.current) === beforeRestore) setDoc(res.document);
       setRevision(res.newRevision);
       setBaseline(JSON.stringify(res.document));
       setRestoreConfirmRev(null);
@@ -361,6 +377,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         text: msg,
       });
     } finally {
+      saveLock.current = false;
+      setSaving(false);
       setRestoring(false);
     }
   };
@@ -422,6 +440,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       </div>
 
       {/* Page Header */}
+      <p role="status" aria-live="polite">{autosaveStatus}</p>
+      {isDirty && id && <DraftRecovery draft={doc} endpoint={`/api/admin/products/${id}`}/>}
+      <SchedulePanel entityType="product" entityId={id} revision={revision} dirty={isDirty || saving}/>
       <PageHeader
         title={id ? doc.name || 'Biên tập sản phẩm' : 'Thêm sản phẩm mới'}
         description={

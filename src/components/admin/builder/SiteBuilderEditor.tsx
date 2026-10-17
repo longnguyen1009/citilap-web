@@ -1,6 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import {useDraftAutosave} from '../useDraftAutosave';
+import SchedulePanel from '../SchedulePanel';
+import DraftRecovery from '../DraftRecovery';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   Save,
@@ -32,7 +35,6 @@ import {
 } from 'lucide-react';
 import type {
   LandingPageStudioResponse,
-  SiteBuilderSection,
   SectionItem,
   SectionType,
   ProductRuleCriteria,
@@ -270,6 +272,9 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
   // Dirty detection
   const [initialJson, setInitialJson] = useState('');
+  const currentJson=JSON.stringify({sections,internalName,title,slug,seoTitle,seoDesc,ogImageAssetId});
+  const latest=useRef(currentJson),lock=useRef(false);
+  useEffect(()=>{latest.current=currentJson;},[currentJson]);
   const isDirty = initialJson !== JSON.stringify({ sections, internalName, title, slug, seoTitle, seoDesc, ogImageAssetId });
 
   // Dialogs
@@ -327,7 +332,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   }, [pageId, selectedSectionId]);
 
   useEffect(() => {
-    void loadPageData();
+    void Promise.resolve().then(loadPageData);
   }, [loadPageData]);
 
   // Warning when leaving with unsaved changes
@@ -415,7 +420,8 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
   // Save / Publish / Unpublish actions
   const handleSave = async (action: 'save' | 'publish' | 'unpublish') => {
-    if (!data) return;
+    if (!data || lock.current) return false;
+    lock.current=true;const submitted=currentJson;
     setSaving(true);
     setError(null);
     setConflictError(null);
@@ -448,6 +454,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
       setData(res);
       const doc = res.document || res;
+      if(latest.current===submitted){
       setInternalName(doc.internalName || doc.name || '');
       setTitle(doc.title || '');
       setSlug(doc.slug || '');
@@ -455,6 +462,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       setSeoDesc(doc.seo?.description || '');
       setOgImageAssetId(doc.seo?.ogImageAssetId || null);
       setSections(doc.sections || []);
+      }
 
       const snapshot = JSON.stringify({
         sections: doc.sections || [],
@@ -474,6 +482,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       } else {
         setSuccessMsg(`Đã lưu bản nháp r${res.revision}.`);
       }
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Lỗi khi lưu trang.';
       if (msg.includes('409') || msg.includes('Xung đột') || msg.includes('CONFLICT')) {
@@ -483,11 +492,14 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       } else {
         setError(msg);
       }
+      return false;
     } finally {
+      lock.current=false;
       setSaving(false);
     }
   };
 
+  const autosaveStatus=useDraftAutosave(currentJson,data?.revision||0,!!data&&!loading,isDirty,saving,()=>handleSave('save'));
   // Live Preview Modal
   const handleOpenPreview = async () => {
     setShowPreviewModal(true);
@@ -536,12 +548,14 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   };
 
   const handleRestoreRevision = async (targetRev: number) => {
-    if (!data) return;
+    if (!data || lock.current) return;
     if (!confirm(`Bạn có chắc muốn khôi phục bản nháp từ phiên bản r${targetRev}?`)) return;
 
+    lock.current = true;
+    setSaving(true);
+    setLoading(true);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await mediaRequest<any>(`/api/admin/builder/${pageId}/restore`, {
+      await mediaRequest<unknown>(`/api/admin/builder/${pageId}/restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -550,15 +564,14 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
         }),
       });
       setShowRevisionsModal(false);
-      setData(res);
-      const doc = res.document || res;
-      setSections(doc.sections || []);
-      setInternalName(doc.internalName || doc.name || '');
-      setTitle(doc.title || '');
-      setSlug(doc.slug || '');
+      await loadPageData();
       setSuccessMsg(`Đã khôi phục thành công bản r${targetRev} thành bản nháp mới.`);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Lỗi khi khôi phục phiên bản.');
+    } finally {
+      lock.current = false;
+      setSaving(false);
+      setLoading(false);
     }
   };
 
@@ -594,6 +607,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 bg-slate-100 overflow-hidden">
+      <div className="bg-white px-4 py-2 overflow-y-auto max-h-48 shrink-0"><p role="status">{autosaveStatus}</p>{isDirty && <DraftRecovery draft={JSON.parse(currentJson)} endpoint={`/api/admin/builder/${pageId}`}/>}<SchedulePanel entityType="landing" entityId={data?.id || pageId} revision={data?.revision||0} dirty={isDirty||saving}/></div>
       {/* 1. TOP STATUS & ACTION BAR */}
       <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20">
         <div className="flex items-center gap-3 min-w-0">

@@ -1,6 +1,8 @@
 # R08A — Identity, permissions và audit: trạng thái triển khai
 
-Ngày 2026-10-16. **WIP, chưa nghiệm thu R08A; chưa bắt đầu R08B/R08C.**
+Ngày 2026-10-16. Trạng thái lịch sử tại thời điểm tích hợp: **WIP**.
+
+Cập nhật 2026-10-17: R08A/B/C đã triển khai và kiểm chứng local. Xem [R08-ACCEPTANCE.md](R08-ACCEPTANCE.md) cho kết quả hiện hành, giới hạn bằng chứng và điều kiện rollout. Các mục bên dưới giữ nguyên để đối chiếu lịch sử; không còn là danh sách việc tồn đọng hiện hành.
 
 ## Tích hợp master ngày 2026-10-17
 

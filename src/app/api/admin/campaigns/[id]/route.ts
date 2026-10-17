@@ -1,3 +1,4 @@
+import { campaignDocumentSchema } from '@/contracts/cms/campaign';
 import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireAdminMutation } from '@/lib/auth';
@@ -80,11 +81,7 @@ async function PUTHandler(request: Request, context: RouteContext) {
     }
 
     const updated = await saveCampaign(
-      {
-        ...body,
-        id,
-        expectedRevision,
-      } as any,
+      { ...campaignDocumentSchema.parse({ ...body, id }), expectedRevision },
       env.DB
     );
 

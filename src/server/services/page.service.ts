@@ -1,3 +1,4 @@
+import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { pageStudioWriteSchema, type PageDocument, type PageType } from '../../contracts/cms/page';
@@ -140,7 +141,7 @@ export async function writePage(env: MediaEnvironment, id: string | null, input:
   }
 
   try {
-    await db.batch([...statements, ...adminAuditStatements(db, 'page.' + action, pageId, 'CMS mutation')]);
+    await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'page.' + action, pageId, 'CMS mutation', null, 'order', { before: expectedRevision, after: version })]);
   } catch (e) {
     if (e instanceof Error && /PAGE_STUDIO_CONFLICT|UNIQUE constraint/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản hoặc đường dẫn trùng. Tải lại và kiểm tra dữ liệu.', 409);

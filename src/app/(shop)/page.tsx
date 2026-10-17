@@ -23,28 +23,14 @@ import { getPublishedNavigation, getPublishedHomepage } from "@/server/services/
 import BlockRenderer from "@/components/builder/BlockRenderer";
 import { ProductGridSkeleton } from "@/components/ui/Skeleton";
 
-export const metadata: Metadata = {
-  title: "CitiLap - Laptop Gaming, Ultrabook & Like New Chính Hãng",
-  description:
-    "CitiLap chuyên cung cấp các dòng Laptop Gaming, Ultrabook, Máy Trạm (Workstation) và Laptop Like New chính hãng, trả góp 0%, bảo hành uy tín tại Việt Nam.",
-  openGraph: {
-    title: "CitiLap - Laptop Gaming & Ultrabook Cao Cấp Giá Tốt",
-    description:
-      "Khám phá hệ sinh thái Laptop chính hãng tại CitiLap với ưu đãi trả góp 0%, quà tặng gaming và bảo hành chuyên nghiệp.",
-    url: "https://citilap.vn",
-    siteName: "CitiLap",
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
-        width: 1200,
-        height: 630,
-        alt: "CitiLap Laptop Gaming & Ultrabook",
-      },
-    ],
-    locale: "vi_VN",
-    type: "website",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const {mediaEnvironment}=await import('@/server/media-http');
+  const {seoDefaults}=await import('@/server/services/seo.service');
+  const defaults=await seoDefaults((await mediaEnvironment()).DB);
+  const home=await getPublishedHomepage();
+  const title=home?.seo.title || defaults.title,description=home?.seo.description || defaults.description;
+  return {title,description,alternates:{canonical:'https://citilap.vn'},openGraph:{title,description,url:'https://citilap.vn'}};
+}
 
 // Reusable standard skeleton for section suspense boundaries
 function ProductSectionSkeleton() {

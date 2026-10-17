@@ -1,6 +1,7 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { z } from 'zod';
 import type { AdminPrincipal, AdminRole } from '../../lib/admin-permissions';
+import { adminRequestId } from '../admin-context';
 
 const roles = ['OWNER', 'EDITOR', 'SALES'] as const;
 const ITERATIONS = 100_000; // ponytail: Workers WebCrypto PBKDF2 ceiling; upgrade with a supported password KDF when runtime permits.
@@ -59,9 +60,9 @@ export async function resolveAdmin(request: Request, explicitDb?: D1Database): P
   return row ? { ...row, piiExport: Boolean(row.piiExport) } : null;
 }
 
-function audit(db: D1Database, actorId: string, action: string, entityId: string, summary: string) {
-  return db.prepare('INSERT INTO AdminAudit(id,actorId,action,entityId,summary) VALUES(?,?,?,?,?)')
-    .bind(crypto.randomUUID(), actorId, action, entityId, summary);
+function audit(db: D1Database, actorId: string, action: string, entityId: string, summary: string, before: number | null = null, after: number | null = null) {
+  return db.prepare('INSERT INTO AdminAudit(id,actorId,action,entityId,summary,requestId,entityType,beforeRevision,afterRevision) VALUES(?,?,?,?,?,?,?,?,?)')
+    .bind(crypto.randomUUID(), actorId, action, entityId, summary, adminRequestId.getStore() ?? crypto.randomUUID(), action.split('.')[0],before,after);
 }
 
 const loginSchema = z.object({ email: z.string().email().max(254).transform(v => v.trim().toLowerCase()), password: z.string().min(1).max(200) });
@@ -136,7 +137,7 @@ export async function saveAdminAccount(actor: AdminPrincipal, input: unknown, ex
       .bind(id, data.email, hashed!, data.name, data.role, Number(data.disabled), Number(data.piiExport));
   try {
     await db.batch([guard, mutation, db.prepare('DELETE FROM AdminSession WHERE userId=?').bind(id),
-      audit(db, actor.id, data.id ? 'account.update' : 'account.create', id, JSON.stringify({ role: data.role, disabled: data.disabled, piiExport: data.piiExport, resetPassword: Boolean(hashed) })),
+      audit(db, actor.id, data.id ? 'account.update' : 'account.create', id, JSON.stringify({ role: data.role, disabled: data.disabled, piiExport: data.piiExport, resetPassword: Boolean(hashed) }),data.id?data.expectedRevision!:null,data.id?data.expectedRevision!+1:0),
       db.prepare('DELETE FROM AdminMutationGuard WHERE id=?').bind(guardId)]);
   } catch (error) {
     const message = error instanceof Error ? error.message : '';

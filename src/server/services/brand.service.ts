@@ -1,3 +1,4 @@
+import { adminAuditStatements } from '../admin-context';
 import { resolveProductsByIds } from './catalog.service';
 import { getPrismaClient } from '../../lib/prisma';
 import { getStorefrontPricingContext, type PriceEvaluationContext } from './pricing.service';
@@ -174,9 +175,11 @@ export async function writeBrand(
 
   const brandId = id || crypto.randomUUID();
 
+  const guard = crypto.randomUUID();
+  const statements = id ? [db.prepare('INSERT INTO AdminMutationGuard(id,allowed) SELECT ?,CASE WHEN EXISTS(SELECT 1 FROM Brand WHERE id=? AND deletedAt IS NULL) THEN 1 ELSE 0 END').bind(guard,id)] : [];
   if (!id) {
     // Insert new
-    await db.prepare(`
+    statements.push(db.prepare(`
       INSERT INTO Brand (id, name, slug, logo, description, seoTitle, seoDescription, status, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
     `).bind(
@@ -188,10 +191,10 @@ export async function writeBrand(
       parsed.seoTitle || null,
       parsed.seoDescription || null,
       parsed.status
-    ).run();
+    ));
   } else {
     // Update existing
-    await db.prepare(`
+    statements.push(db.prepare(`
       UPDATE Brand SET
         name = ?,
         slug = ?,
@@ -211,31 +214,21 @@ export async function writeBrand(
       parsed.seoDescription || null,
       parsed.status,
       brandId
-    ).run();
+    ));
 
     // Synchronize Product.brand name for all products referencing this brandId
-    await db.prepare(`
+    statements.push(db.prepare(`
       UPDATE Product SET brand = ? WHERE brandId = ?
-    `).bind(parsed.name, brandId).run();
+    `).bind(parsed.name, brandId));
   }
 
-  // Update MediaUsage for brand logo
-  try {
-    await db.prepare("DELETE FROM MediaUsage WHERE ownerType='BRAND' AND ownerId=?").bind(brandId).run();
-    if (parsed.logo) {
-      const match = parsed.logo.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-      const assetId = match ? match[0] : (parsed.logo.length <= 40 ? parsed.logo : null);
-      if (assetId) {
-        const assetExists = await db.prepare("SELECT id FROM MediaAsset WHERE id=?").bind(assetId).first();
-        if (assetExists) {
-          await db.prepare("INSERT INTO MediaUsage(id, assetId, ownerType, ownerId, slot) VALUES(?, ?, 'BRAND', ?, 'logo')")
-            .bind(crypto.randomUUID(), assetId, brandId).run();
-        }
-      }
-    }
-  } catch {
-    // Ignore usage tracking errors if table/schema is temporarily unavailable
+  statements.push(db.prepare("DELETE FROM MediaUsage WHERE ownerType='BRAND' AND ownerId=?").bind(brandId));
+  if (parsed.logo) {
+    const match = parsed.logo.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+    const assetId = match?.[0] ?? parsed.logo;
+    statements.push(db.prepare("INSERT INTO MediaUsage(id,assetId,ownerType,ownerId,slot) SELECT ?,id,'BRAND',?,'logo' FROM MediaAsset WHERE id=?").bind(crypto.randomUUID(),brandId,assetId));
   }
+  await db.batch([...statements, ...adminAuditStatements(db, id ? 'brand.update' : 'brand.create', brandId, 'Brand mutation'), db.prepare('DELETE FROM AdminMutationGuard WHERE id=?').bind(guard)]);
 
   const updated = await getBrandDetail(db, brandId);
   if (!updated) throw new MediaError('Không thể tải lại thông tin thương hiệu sau khi lưu.', 500);
@@ -263,10 +256,9 @@ export async function archiveBrand(
     );
   }
 
-  await db.prepare(`
-    UPDATE Brand SET status='INACTIVE', deletedAt=CURRENT_TIMESTAMP, updatedAt=CURRENT_TIMESTAMP WHERE id=?
-  `).bind(id).run();
+  const [result] = await db.batch([db.prepare(`UPDATE Brand SET status='INACTIVE', deletedAt=CURRENT_TIMESTAMP, updatedAt=CURRENT_TIMESTAMP WHERE id=? AND deletedAt IS NULL AND NOT EXISTS(SELECT 1 FROM Product WHERE brandId=? AND deletedAt IS NULL)`).bind(id,id), ...adminAuditStatements(db, 'brand.archive', id, 'Brand archived', null, 'order', { changed: true })]);
 
+  if (!result.meta.changes) throw new MediaError('Thương hiệu đã thay đổi hoặc có sản phẩm liên kết.', 409);
   return { success: true, archived: true, id };
 }
 

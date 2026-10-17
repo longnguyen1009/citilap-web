@@ -74,6 +74,7 @@ const navGroups: NavGroup[] = [
       { name: "Cài đặt hệ thống", href: "/admin/settings", icon: Settings },
       { name: "Tài khoản và quyền", href: "/admin/users", icon: Users },
       { name: "Nhật ký quản trị", href: "/admin/audit", icon: FileText },
+      { name: "Chuyển hướng 301", href: "/admin/redirects", icon: ExternalLink },
     ],
   },
 ];
@@ -207,6 +208,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     try {
       const response = await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
       if (!response.ok) throw new Error('LOGOUT_FAILED');
+      for (const key of ['citilap_product_editor_recovery','citilap-product-recovery','citilap-navigation-recovery']) sessionStorage.removeItem(key);
       router.replace("/login");
       router.refresh();
     } catch { setSessionError('Đăng xuất chưa thành công. Thử lại.'); }

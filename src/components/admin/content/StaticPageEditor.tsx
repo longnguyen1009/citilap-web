@@ -1,4 +1,9 @@
 'use client';
+import { useRef } from 'react';
+import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
+import DraftRecovery from '@/components/admin/DraftRecovery';
+import SchedulePanel from '@/components/admin/SchedulePanel';
+
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
@@ -53,6 +58,8 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
   // Document state
   const [doc, setDoc] = useState<PageDocument>(blankPage());
   const [revision, setRevision] = useState(0);
+  const latestDoc=useRef(doc), saveLock=useRef(false);
+  useEffect(()=>{latestDoc.current=doc;},[doc]);
   const [isPublished, setIsPublished] = useState(false);
   const [loading, setLoading] = useState(!!id);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +146,9 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
   };
 
   const handleSave = async (action: 'save' | 'publish' | 'unpublish') => {
+    if(saveLock.current)return false;
+    saveLock.current=true;
+    const submitted=JSON.stringify(doc);
     setSaving(true);
     setConflictError(null);
     setSaveSuccess(null);
@@ -162,8 +172,8 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
 
       setRevision(result.revision);
       setIsPublished(result.published);
-      setDoc(result.document);
-      setHasUnsavedChanges(false);
+      if(JSON.stringify(latestDoc.current)===submitted)setDoc(result.document);
+      setHasUnsavedChanges(JSON.stringify(latestDoc.current)!==submitted);
 
       if (action === 'publish') {
         setSaveSuccess('Trang tĩnh đã được xuất bản lên website thành công!');
@@ -176,6 +186,7 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
       if (!id && result.id) {
         router.replace(`/admin/pages/${result.id}`);
       }
+      return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi lưu.';
       if (msg.includes('Xung đột') || msg.includes('409') || msg.includes('nơi khác')) {
@@ -183,10 +194,14 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
       } else {
         setError(msg);
       }
+      return false;
     } finally {
+      saveLock.current=false;
       setSaving(false);
     }
   };
+
+  const autosaveStatus=useDraftAutosave(doc,revision,!!id && !loading,hasUnsavedChanges,saving,()=>handleSave('save'));
 
   const loadHistory = async () => {
     if (!id) return;
@@ -202,10 +217,12 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
   };
 
   const handleRestore = async (targetRev: number) => {
-    if (!id) return;
+    if (!id || saveLock.current) return;
     const confirmed = window.confirm(`Bạn có chắc muốn khôi phục phiên bản #${targetRev} thành bản nháp mới? Website vẫn giữ nguyên nội dung công cộng cho đến khi bạn xuất bản lại.`);
     if (!confirmed) return;
 
+    saveLock.current = true;
+    const beforeRestore = JSON.stringify(latestDoc.current);
     setSaving(true);
     try {
       const result = await mediaRequest<{ success: boolean; newRevision: number; document: PageDocument }>(`/api/admin/pages/${id}/revisions/${targetRev}/restore`, {
@@ -214,13 +231,14 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
         body: JSON.stringify({ expectedRevision: revision }),
       });
       setRevision(result.newRevision);
-      setDoc(result.document);
-      setHasUnsavedChanges(false);
+      if (JSON.stringify(latestDoc.current) === beforeRestore) setDoc(result.document);
+      setHasUnsavedChanges(JSON.stringify(latestDoc.current) !== beforeRestore);
       setSaveSuccess(`Đã khôi phục phiên bản #${targetRev} thành bản nháp mới (rev #${result.newRevision}). Hãy kiểm tra và xuất bản khi sẵn sàng.`);
       setHistoryOpen(false);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Không thể khôi phục phiên bản.');
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   };
@@ -231,6 +249,9 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
   return (
     <div className="space-y-6 pb-20">
       {/* Header */}
+      <p role="status" aria-live="polite">{autosaveStatus}</p>
+      {hasUnsavedChanges && id && <DraftRecovery draft={doc} endpoint={`/api/admin/pages/${id}`}/>}
+      <SchedulePanel entityType="page" entityId={id} revision={revision} dirty={hasUnsavedChanges || saving}/>
       <PageHeader
         title={id ? (doc.title || 'Biên tập trang thông tin') : 'Tạo trang thông tin mới'}
         description="Quản lý chính sách bảo hành, đổi trả, vận chuyển, giới thiệu và hệ thống showroom."

@@ -35,15 +35,11 @@ export default function ImageUploader({
       try {
         const formData = new FormData();
         formData.append("file", file);
-        if (productId) {
-          formData.append("productId", productId);
-        }
-
-        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const res = await fetch("/api/admin/media", { method: "POST", body: formData });
         const result = await res.json();
 
-        if (result.success && result.url) {
-          newImages.push(result.url);
+        if (result.success && result.data?.asset?.url) {
+          newImages.push(result.data.asset.url);
         } else {
           const reason = result.failed?.[0]?.reason || result.error || "Tải lên thất bại";
           errors.push(`${file.name}: ${reason}`);

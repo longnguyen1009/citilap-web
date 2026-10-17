@@ -1,3 +1,4 @@
+import { adminAuditStatements } from '../admin-context';
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
 import { mediaEditSchema, mediaQuerySchema, videoSchema, youtubeId, type MediaAssetDto, type MediaUsageDto } from '../../contracts/cms/media';
 import { detectImageSignature, extractImageDimensions } from '../../infra/cloudflare/r2/storage';
@@ -45,8 +46,8 @@ export async function editMedia(db: D1Database, id: string, input: unknown) {
   await getAsset(db, id);
   // Atomic compare-and-swap; DB trigger also protects simultaneous usage creation.
   try {
-    const result = await db.prepare(`UPDATE MediaAsset SET name=?,alt=?,caption=?,state=?,revision=revision+1,updatedAt=?
-      WHERE id=? AND revision=?`).bind(data.name, data.alt, data.caption, data.state, new Date().toISOString(), id, data.revision).run();
+    const [result] = await db.batch([db.prepare(`UPDATE MediaAsset SET name=?,alt=?,caption=?,state=?,revision=revision+1,updatedAt=?
+      WHERE id=? AND revision=?`).bind(data.name, data.alt, data.caption, data.state, new Date().toISOString(), id, data.revision), ...adminAuditStatements(db, 'media.update', id, 'Media metadata updated', null, 'order', { changed: true, before: data.revision, after: data.revision + 1 })]);
     if (!result.meta.changes) throw new MediaError('Tệp đã được sửa ở nơi khác. Tải lại trước khi lưu.', 409);
   } catch (error) {
     if (error instanceof Error && error.message.includes('MEDIA_IN_USE')) throw new MediaError('Tệp đang được sử dụng, không thể ẩn khỏi thư viện.', 409);
@@ -66,8 +67,8 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
   const result = await env.PRODUCT_MEDIA.put(key, buffer, { httpMetadata: { contentType: detected.mime } });
   if (!result) throw new MediaError('Không thể tải ảnh lên bộ lưu trữ.', 503);
   try {
-    await env.DB.prepare(`INSERT INTO MediaAsset(id,kind,provider,storageKey,name,mimeType,size,width,height)
-      VALUES(?,'IMAGE','R2',?,?,?,?,?,?)`).bind(id, key, file.name.slice(0, 180) || 'Ảnh mới', detected.mime, file.size, dim?.width ?? null, dim?.height ?? null).run();
+    await env.DB.batch([env.DB.prepare(`INSERT INTO MediaAsset(id,kind,provider,storageKey,name,mimeType,size,width,height)
+      VALUES(?,'IMAGE','R2',?,?,?,?,?,?)`).bind(id, key, file.name.slice(0, 180) || 'Ảnh mới', detected.mime, file.size, dim?.width ?? null, dim?.height ?? null), ...adminAuditStatements(env.DB, 'media.upload', id, 'Image uploaded')]);
   } catch (error) {
     // R2/D1 cannot share a transaction. Compensate only our newly generated object.
     await env.PRODUCT_MEDIA.delete(key).catch(() => console.error('Media cleanup pending', id));
@@ -80,7 +81,7 @@ export async function addVideo(db: D1Database, input: unknown) {
   const externalId = youtubeId(data.url);
   if (!externalId) throw new MediaError('Nhập liên kết HTTPS YouTube hợp lệ.');
   const id = crypto.randomUUID();
-  await db.prepare("INSERT OR IGNORE INTO MediaAsset(id,kind,provider,externalId,name) VALUES(?,'VIDEO','YOUTUBE',?,?)").bind(id, externalId, data.name).run();
+  await db.batch([db.prepare("INSERT OR IGNORE INTO MediaAsset(id,kind,provider,externalId,name) VALUES(?,'VIDEO','YOUTUBE',?,?)").bind(id, externalId, data.name), ...adminAuditStatements(db, 'media.create', id, 'Video added', null, 'order', { changed: true })]);
   const row = await db.prepare("SELECT id FROM MediaAsset WHERE provider='YOUTUBE' AND externalId=?").bind(externalId).first<{ id: string }>();
   return mediaDetail(db, row!.id);
 }
@@ -103,11 +104,11 @@ export async function attachProductImage(env: MediaEnvironment, assetId: string,
   if (!await env.DB.prepare('SELECT id FROM Product WHERE id=?').bind(productId).first()) throw new MediaError('Không tìm thấy sản phẩm.', 404);
   const imageId = `library-${productId}-${assetId}`;
   // Trigger enforces usage tracking and unarchives under concurrent attachment.
-  await env.DB.prepare(`INSERT OR IGNORE INTO ProductImage(id,productId,r2Key,url,mimeType,size,width,height,alt,sortOrder,isPrimary)
+  await env.DB.batch([env.DB.prepare(`INSERT OR IGNORE INTO ProductImage(id,productId,r2Key,url,mimeType,size,width,height,alt,sortOrder,isPrimary)
     SELECT ?,?,?,?,?,?,?,?,?,coalesce((SELECT max(sortOrder)+1 FROM ProductImage WHERE productId=?),0),
       CASE WHEN EXISTS(SELECT 1 FROM ProductImage WHERE productId=?) THEN 0 ELSE 1 END
     FROM MediaAsset WHERE id=? AND state='READY'`).bind(imageId, productId, asset.storageKey, dto({ ...asset, usageCount: 0 }).url,
-      asset.mimeType, asset.size, asset.width, asset.height, asset.alt, productId, productId, assetId).run();
+      asset.mimeType, asset.size, asset.width, asset.height, asset.alt, productId, productId, assetId), ...adminAuditStatements(env.DB, 'media.attach', assetId, 'Image attached', null, 'order', { changed: true })]);
   if (!await env.DB.prepare('SELECT id FROM ProductImage WHERE id=?').bind(imageId).first()) throw new MediaError('Ảnh vừa bị ẩn. Tải lại thư viện.', 409);
   return mediaDetail(env.DB, assetId);
 }

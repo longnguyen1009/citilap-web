@@ -1,4 +1,4 @@
-import { adminContext } from './admin-context';
+import { adminContext, adminRequestId } from './admin-context';
 import { resolveAdmin } from './services/admin-identity.service';
 
 /** HTTP boundary; canonical writers only import request-local actor/audit helpers. */
@@ -7,6 +7,6 @@ export function withAdminContext<R extends Request, Args extends unknown[], Resu
     let principal;
     try { principal = await resolveAdmin(request); }
     catch { return Response.json({success:false,error:'Authentication unavailable'}, {status:503}); }
-    return adminContext.run(principal, () => handler(request, ...args));
+    return adminRequestId.run(crypto.randomUUID(), () => adminContext.run(principal, () => handler(request, ...args)));
   };
 }

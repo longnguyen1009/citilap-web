@@ -49,7 +49,7 @@ async function POSTHandler(request: Request) {
     }
 
     const env = await mediaEnvironment();
-    const created = await saveCampaign(body as any, env.DB);
+    const created = await saveCampaign(campaignDocumentSchema.parse(body), env.DB);
 
     return NextResponse.json(
       {

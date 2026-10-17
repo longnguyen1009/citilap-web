@@ -632,7 +632,7 @@ export async function publishCampaign(
       )
       .bind(nextRevision, now, campaignId)
       ;
-    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.publish', campaignId, 'Campaign publish')]);
+    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.publish', campaignId, 'Campaign publish', null, 'order', { changed: true })]);
 
     const meta = res?.meta as { changes?: number } | undefined;
     if (meta?.changes === 0) {
@@ -722,7 +722,7 @@ export async function archiveCampaign(
       )
       .bind(nextRevision, now, campaignId)
       ;
-    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.archive', campaignId, 'Campaign archive')]);
+    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.archive', campaignId, 'Campaign archive', null, 'order', { changed: true })]);
 
     const meta = res?.meta as { changes?: number } | undefined;
     if (meta?.changes === 0) {

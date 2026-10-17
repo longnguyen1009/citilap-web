@@ -95,7 +95,7 @@ export async function saveAdminSettings(
   ];
 
   try {
-    await db.batch([...statements, ...adminAuditStatements(db, 'settings.save', 'site', 'CMS mutation')]);
+    await db.batch([...statements, ...adminAuditStatements(db, 'settings.save', 'site', 'CMS mutation',null,'order',{before:expectedRevision,after:nextRevision})]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/SETTINGS_CONFLICT|UNIQUE constraint failed/.test(msg)) {

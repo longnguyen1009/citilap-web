@@ -26,7 +26,7 @@ const inter = Inter({
   subsets: ["latin", "vietnamese"],
 });
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   title: {
     default: `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
     template: `%s | ${businessProfile.brandName}`,
@@ -88,6 +88,14 @@ export const metadata: Metadata = {
     },
   },
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  const {mediaEnvironment}=await import('@/server/media-http');
+  const {seoDefaults}=await import('@/server/services/seo.service');
+  const defaults=await seoDefaults((await mediaEnvironment()).DB);
+  return {...baseMetadata,title:{default:defaults.title,template:'%s | CitiLap'},description:defaults.description,alternates:undefined,
+    openGraph:{...baseMetadata.openGraph,title:defaults.title,description:defaults.description},twitter:{...baseMetadata.twitter,title:defaults.title,description:defaults.description}};
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const orgJsonLd = generateOrganizationJsonLd();
