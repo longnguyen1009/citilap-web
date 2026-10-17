@@ -1,17 +1,19 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
-import { requireAdminMutation } from '@/lib/auth';
-import { markNotificationAsRead } from '@/server/services/notification.service';
+import { authenticatedAdmin, requireAdminMutation } from '@/lib/auth';
+import { markPersonalNotificationsRead } from '@/server/services/notification.service';
+import { mediaEnvironment } from '@/server/media-http';
 
-export async function PATCH(
+async function PATCHHandler(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
-  const denied = requireAdminMutation(request);
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
     const params = await props.params;
-    const updated = await markNotificationAsRead(params.id);
+    const updated = await markPersonalNotificationsRead((await mediaEnvironment()).DB, authenticatedAdmin(request).id, params.id);
 
     return NextResponse.json(
       { success: true, data: updated },
@@ -25,3 +27,5 @@ export async function PATCH(
     );
   }
 }
+
+export const PATCH = withAdminContext(PATCHHandler);

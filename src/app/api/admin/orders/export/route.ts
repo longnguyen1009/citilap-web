@@ -1,9 +1,12 @@
+import { adminAuditStatements } from '@/server/admin-context';
+import { mediaEnvironment } from '@/server/media-http';
+import { withAdminContext } from '@/server/admin-request-context';
 import { requireAdmin } from '@/lib/auth';
 import { getAllOrdersForExport, ORDER_STATUS_LABELS } from '@/server/services/order.service';
 import { createCsvResponse } from '@/lib/csv-export';
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -63,9 +66,12 @@ export async function GET(request: Request) {
     });
 
     const filename = `don-hang-${new Date().toISOString().slice(0, 10)}.csv`;
+    await (await mediaEnvironment()).DB.batch(adminAuditStatements((await mediaEnvironment()).DB, 'orders.export', 'orders', 'Filtered CSV export'));
     return createCsvResponse(headers, rows, filename);
   } catch (error) {
     console.error('[ExportOrders] Failed to export orders:', error);
     return new Response('Không thể xuất danh sách đơn hàng', { status: 500 });
   }
 }
+
+export const GET = withAdminContext(GETHandler);

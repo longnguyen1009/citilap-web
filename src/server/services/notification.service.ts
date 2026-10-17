@@ -1,6 +1,23 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
 
+export async function listPersonalNotifications(db: D1Database, userId: string, limit: number, onlyUnread: boolean) {
+  const [rows,count] = await Promise.all([
+    db.prepare(`SELECT n.*,r.readAt AS personalReadAt FROM AdminNotification n
+      LEFT JOIN AdminNotificationRead r ON r.notificationId=n.id AND r.userId=?
+      WHERE (?=0 OR r.notificationId IS NULL) ORDER BY n.createdAt DESC,n.id DESC LIMIT ?`)
+      .bind(userId,Number(onlyUnread),Math.min(50,Math.max(1,limit))).all<AdminNotificationDto & {personalReadAt:string|null}>(),
+    db.prepare('SELECT COUNT(*) AS total FROM AdminNotification n WHERE NOT EXISTS(SELECT 1 FROM AdminNotificationRead r WHERE r.notificationId=n.id AND r.userId=?)').bind(userId).first<{total:number}>(),
+  ]);
+  return {notifications:rows.results.map(n=>({...n,isRead:Boolean(n.personalReadAt),readAt:n.personalReadAt})),unreadCount:count?.total || 0};
+}
+
+export async function markPersonalNotificationsRead(db: D1Database, userId: string, id?: string) {
+  const result=await db.prepare(`INSERT OR IGNORE INTO AdminNotificationRead(userId,notificationId)
+    SELECT ?,id FROM AdminNotification WHERE (? IS NULL OR id=?)`).bind(userId,id||null,id||null).run();
+  return {count:result.meta.changes || 0};
+}
+
 export interface AdminNotificationDto {
   id: string;
   type: string;

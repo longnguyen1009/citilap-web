@@ -1,10 +1,11 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from "next/server";
 import { requireAdmin, requireAdminMutation } from "@/lib/auth";
 
 const hasDatabase = !!process.env.DATABASE_URL;
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string; versionId: string }> }) {
-  const denied = requireAdmin(_request);
+async function GETHandler(_request: Request, { params }: { params: Promise<{ id: string; versionId: string }> }) {
+  const denied = await requireAdmin(_request);
   if (denied) return denied;
   try {
     const { id, versionId } = await params;
@@ -21,8 +22,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 }
 
-export async function PATCH(request: Request) {
-  const denied = requireAdminMutation(request);
+async function PATCHHandler(request: Request) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   return NextResponse.json(
@@ -34,3 +35,6 @@ export async function PATCH(request: Request) {
     { status: 409 }
   );
 }
+
+export const GET = withAdminContext(GETHandler);
+export const PATCH = withAdminContext(PATCHHandler);

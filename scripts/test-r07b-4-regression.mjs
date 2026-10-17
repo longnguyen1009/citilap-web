@@ -11,6 +11,7 @@ export * from './src/server/services/catalog.service'; export * from './src/serv
 export * from './src/server/services/order.service'; export * from './src/lib/prisma'; export * from './src/lib/auth';
 export * from './src/server/services/search.service';
 export * from './src/server/services/checkout.service';
+export {loginAdmin} from './src/server/services/admin-identity.service';
 export {DEFAULT_ADMIN_SETTINGS} from './src/contracts/cms/settings';
 export {POST as cartPOST} from './src/app/api/cart/revalidate/route';
 export {PUT as campaignPUT,DELETE as campaignDELETE} from './src/app/api/admin/campaigns/[id]/route';
@@ -95,8 +96,9 @@ try {
     }
   });
   // Real TCP HTTP, exported handlers, isolated DB; never an existing dev server.
-  process.env.ADMIN_API_TOKEN=crypto.randomUUID()+crypto.randomUUID();
-  const session=api.createAdminSession();
+  process.env.ADMIN_EMAIL='owner@fixture.invalid';
+  process.env.ADMIN_PASSWORD=crypto.randomUUID()+'A!';
+  const {token:session}=await api.loginAdmin({email:process.env.ADMIN_EMAIL,password:process.env.ADMIN_PASSWORD},db);
   server=createServer(async(req,res)=>{try{
     if(browserBundle && req.method==='GET') {res.setHeader('content-type',req.url==='/bundle.js'?'text/javascript':'text/html');res.end(req.url==='/bundle.js'?browserBundle:'<!doctype html><html><meta charset="utf-8"><div id="root"></div><script src="/bundle.js"></script></html>');return;}
     if(browserBundle && req.url.startsWith('/fixture/')){fixtureMode=req.url.split('/').pop();await db.prepare('UPDATE ProductStudio SET published=?').bind(fixtureMode==='unavailable'?null:JSON.stringify({availability:'AVAILABLE',variants:[]})).run();res.end('ok');return;}

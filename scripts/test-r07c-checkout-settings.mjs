@@ -1,7 +1,7 @@
 // Local production Worker + real browser assets, isolated ephemeral D1/R2. No .env/config loading.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { resolve, join, extname } from 'node:path';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
@@ -14,10 +14,8 @@ const root=resolve('dist/server'), clientRoot=resolve('dist/client');
 const files=await readdir(root,{recursive:true});
 const modules=[{type:'ESModule',path:join(root,'fixture-entry.mjs'),contents:`import app from './index.js';export default {fetch(request,env,ctx){globalThis.env=env;return app.fetch(request,env,ctx)}};`}];
 for(const f of files)if(['.js','.wasm'].includes(extname(f)))modules.push({type:f.endsWith('.wasm')?'CompiledWasm':'ESModule',path:join(root,f)});
-const token=randomUUID()+randomUUID();
-const cookieExpires=Math.floor(Date.now()/1000)+28800;
-const cookie=`admin_session=${cookieExpires}.${createHmac('sha256',token).update(String(cookieExpires)).digest('base64url')}`;
-const mf=new Miniflare(convertV4MiniflareOptions({modules,modulesRoot:root,compatibilityDate:'2026-10-01',compatibilityFlags:['nodejs_compat','enable_weak_ref','nodejs_compat_populate_process_env'],d1Databases:['DB'],r2Buckets:['PRODUCT_MEDIA'],bindings:{ADMIN_API_TOKEN:token,ADMIN_EMAIL:'fixture@example.invalid',ADMIN_PASSWORD:'FixtureOnlyPassword-2026',CONFIRMATION_TOKEN_SECRET:randomUUID()+randomUUID()},serviceBindings:{ASSETS:async request=>{
+let cookie;
+const mf=new Miniflare(convertV4MiniflareOptions({modules,modulesRoot:root,compatibilityDate:'2026-10-01',compatibilityFlags:['nodejs_compat','enable_weak_ref','nodejs_compat_populate_process_env'],d1Databases:['DB'],r2Buckets:['PRODUCT_MEDIA'],bindings:{ADMIN_EMAIL:'fixture@example.invalid',ADMIN_PASSWORD:'FixtureOnlyPassword-2026',CONFIRMATION_TOKEN_SECRET:randomUUID()+randomUUID()},serviceBindings:{ASSETS:async request=>{
   const path=resolve(clientRoot,'.'+decodeURIComponent(new URL(request.url).pathname));
   if(!path.startsWith(clientRoot+'/')&&!path.startsWith(clientRoot+'\\'))return new Response('Not found',{status:404});
   try{return new Response(await readFile(path),{headers:{'content-type':({'.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2','.png':'image/png'}[extname(path)]||'application/octet-stream')}});}catch{return new Response('Not found',{status:404});}
@@ -69,6 +67,10 @@ try {
     res.writeHead(result.status,Object.fromEntries(result.headers));res.end(Buffer.from(await result.arrayBuffer()));
   }catch(e){console.error('Fixture host:',e.message);res.writeHead(500);res.end('Fixture host error');}});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));base=`http://127.0.0.1:${server.address().port}`;
+  const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json',origin:base},body:JSON.stringify({email:'fixture@example.invalid',password:'FixtureOnlyPassword-2026'})});
+  assert.equal(login.status,200,await login.text());
+  cookie=login.headers.get('set-cookie')?.split(';')[0];
+  assert.match(cookie,/^admin_session=[a-f0-9]{64}$/);
   const originalSettings={...config};
   const now=Date.now();
   const campaignDoc={name:'Fixture Active Campaign',status:'PUBLISHED',startAt:new Date(now-600000).toISOString(),endAt:new Date(now+86400000).toISOString(),items:[{productId:'fixture-p',variantId:null,salePrice:15000000,regularPrice:22000000}]};

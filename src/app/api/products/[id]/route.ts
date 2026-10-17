@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from "next/server";
 import { requireAdminMutation, isAdminRequest } from "@/lib/auth";
 import { sanitizeHtml } from "@/lib/sanitize-html";
@@ -58,18 +59,18 @@ function normalizeVariants(value: unknown): { variants?: NormalizedVariant[]; er
   return { variants };
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GETHandler(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { createPrismaD1Client } = await import('@/lib/prisma');
     const { mediaEnvironment } = await import('@/server/media-http');
     const prisma = createPrismaD1Client((await mediaEnvironment()).DB);
     const product = await prisma.product.findFirst({
-      where: isAdminRequest(_request) ? { id } : { id, status: { in: ["ACTIVE", "active"] } },
+      where: (await isAdminRequest(_request)) ? { id } : { id, status: { in: ["ACTIVE", "active"] } },
       include: {
         category: true,
         variants: {
-          where: isAdminRequest(_request) ? undefined : { status: { in: ["ACTIVE", "active"] } },
+          where: (await isAdminRequest(_request)) ? undefined : { status: { in: ["ACTIVE", "active"] } },
           orderBy: { createdAt: "asc" },
         },
         productImages: {
@@ -90,8 +91,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireAdminMutation(request);
+async function DELETEHandler(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   const { id } = await params;
@@ -105,8 +106,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   );
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const denied = requireAdminMutation(request);
+async function PATCHHandler(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   const { id } = await params;
@@ -119,3 +120,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     { status: 409 }
   );
 }
+
+export const GET = withAdminContext(GETHandler);
+export const DELETE = withAdminContext(DELETEHandler);
+export const PATCH = withAdminContext(PATCHHandler);

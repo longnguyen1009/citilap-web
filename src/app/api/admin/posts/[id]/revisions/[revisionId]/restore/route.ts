@@ -1,9 +1,10 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { mediaAdmin } from '@/server/media-http';
 import { restorePostRevision } from '@/server/services/post.service';
 
 type Context = { params: Promise<{ id: string; revisionId: string }> };
 
-export async function POST(request: Request, context: Context) {
+async function POSTHandler(request: Request, context: Context) {
   const { id, revisionId } = await context.params;
   return mediaAdmin(request, true, async env => {
     const body = await request.json().catch(() => ({}));
@@ -11,3 +12,5 @@ export async function POST(request: Request, context: Context) {
     return restorePostRevision(env, id, parseInt(revisionId, 10), expectedRevision);
   });
 }
+
+export const POST = withAdminContext(POSTHandler);

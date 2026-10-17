@@ -1,10 +1,11 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { mediaAdmin } from '@/server/media-http';
 import { restoreLandingPageRevision } from '@/server/services/site-builder.service';
 import { MediaError } from '@/server/services/media-library.service';
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function POST(request: Request, context: Context) {
+async function POSTHandler(request: Request, context: Context) {
   const { id } = await context.params;
   return mediaAdmin(request, true, async (env) => {
     const body = await request.json() as { targetRevision?: number; expectedRevision?: number };
@@ -21,3 +22,5 @@ export async function POST(request: Request, context: Context) {
     return restoreLandingPageRevision(env, id, targetRevision, expectedRevision);
   });
 }
+
+export const POST = withAdminContext(POSTHandler);

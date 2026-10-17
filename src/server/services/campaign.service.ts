@@ -1,3 +1,4 @@
+import { adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
 import { mediaEnvironment } from '@/server/media-http';
@@ -449,7 +450,7 @@ export async function saveCampaign(
     });
 
     try {
-      const batchResults = await db.batch([deleteOldItemsStmt, updateCampStmt, ...insertItemStmts]);
+      const batchResults = await db.batch([deleteOldItemsStmt, updateCampStmt, ...insertItemStmts, ...adminAuditStatements(db, 'campaign.save', valid.id, 'Campaign mutation')]);
       const updateMeta = batchResults[1]?.meta as { changes?: number } | undefined;
       if (updateMeta?.changes === 0) {
         throw new CampaignRevisionConflictError(
@@ -520,7 +521,7 @@ export async function saveCampaign(
     });
 
     try {
-      await db.batch([insertCampStmt, ...insertItemStmts]);
+      await db.batch([insertCampStmt, ...insertItemStmts, ...adminAuditStatements(db, 'campaign.create', campaignId, 'Campaign created')]);
     } catch (err: unknown) {
       const errMsg = (err as Error)?.message || String(err);
       if (errMsg.includes('CAMPAIGN_OVERLAP_CONFLICT')) {
@@ -623,14 +624,15 @@ export async function publishCampaign(
   const nextRevision = campaign.revision + 1;
 
   try {
-    const res = await db
+    const statement = db
       .prepare(
         `UPDATE PromotionCampaign 
          SET status = 'PUBLISHED', revision = ?, updatedAt = ?
          WHERE id = ?`
       )
       .bind(nextRevision, now, campaignId)
-      .run();
+      ;
+    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.publish', campaignId, 'Campaign publish')]);
 
     const meta = res?.meta as { changes?: number } | undefined;
     if (meta?.changes === 0) {
@@ -712,14 +714,15 @@ export async function archiveCampaign(
   const nextRevision = existing.revision + 1;
 
   try {
-    const res = await db
+    const statement = db
       .prepare(
         `UPDATE PromotionCampaign 
          SET status = 'ARCHIVED', revision = ?, updatedAt = ?
          WHERE id = ?`
       )
       .bind(nextRevision, now, campaignId)
-      .run();
+      ;
+    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.archive', campaignId, 'Campaign archive')]);
 
     const meta = res?.meta as { changes?: number } | undefined;
     if (meta?.changes === 0) {

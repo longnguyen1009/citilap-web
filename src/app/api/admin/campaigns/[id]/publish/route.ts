@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdminMutation } from '@/lib/auth';
 import { mediaEnvironment } from '@/server/media-http';
@@ -14,8 +15,8 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function POST(request: Request, context: RouteContext) {
-  const mutationDenied = requireAdminMutation(request);
+async function POSTHandler(request: Request, context: RouteContext) {
+  const mutationDenied = await requireAdminMutation(request);
   if (mutationDenied) return mutationDenied;
 
   const { id } = await context.params;
@@ -92,3 +93,5 @@ export async function POST(request: Request, context: RouteContext) {
     );
   }
 }
+
+export const POST = withAdminContext(POSTHandler);

@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireAdminMutation } from '@/lib/auth';
 import { mediaEnvironment } from '@/server/media-http';
@@ -13,8 +14,8 @@ import { ZodError } from 'zod';
 
 export const runtime = 'edge';
 
-export async function GET(request: Request) {
-  const authDenied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const authDenied = await requireAdmin(request);
   if (authDenied) return authDenied;
 
   try {
@@ -34,8 +35,8 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
-  const mutationDenied = requireAdminMutation(request);
+async function POSTHandler(request: Request) {
+  const mutationDenied = await requireAdminMutation(request);
   if (mutationDenied) return mutationDenied;
 
   try {
@@ -117,3 +118,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export const GET = withAdminContext(GETHandler);
+export const POST = withAdminContext(POSTHandler);

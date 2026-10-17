@@ -1,3 +1,4 @@
+import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { navigationWriteSchema, type NavigationDocument, type NavigationDetail, type NavigationTarget, type ResolvedNavigation } from '../../contracts/cms/navigation';
 import { MediaError, getAsset, type MediaEnvironment } from './media-library.service';
@@ -87,7 +88,7 @@ export async function writeNavigation(env: MediaEnvironment, input: unknown) {
   const revision = expectedRevision+1, snapshot = JSON.stringify(d);
   const statements = [
     db.prepare("INSERT OR IGNORE INTO NavigationStudio(id,draft) VALUES('site',?)").bind(snapshot),
-    db.prepare('INSERT INTO NavigationRevision(revision,document,action) VALUES(?,?,?)').bind(revision,snapshot,action),
+    db.prepare('INSERT INTO NavigationRevision(revision,document,action,actor) VALUES(?,?,?,?)').bind(revision,snapshot,action,adminActor()),
     db.prepare("UPDATE NavigationStudio SET draft=?,revision=?,published=CASE WHEN ?='publish' THEN ? ELSE published END,publishedRevision=CASE WHEN ?='publish' THEN ? ELSE publishedRevision END,updatedAt=CURRENT_TIMESTAMP WHERE id='site'").bind(snapshot,revision,action,snapshot,action,revision),
   ];
 
@@ -106,7 +107,7 @@ export async function writeNavigation(env: MediaEnvironment, input: unknown) {
   }
 
   try {
-    await db.batch(statements);
+    await db.batch([...statements, ...adminAuditStatements(db, 'navigation.' + action, 'site', 'CMS mutation')]);
   } catch (e) {
     if (e instanceof Error && /NAVIGATION_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản, tên, slug hoặc ảnh. Tải lại trước khi lưu.',409);

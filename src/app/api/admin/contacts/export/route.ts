@@ -1,3 +1,6 @@
+import { adminAuditStatements } from '@/server/admin-context';
+import { mediaEnvironment } from '@/server/media-http';
+import { withAdminContext } from '@/server/admin-request-context';
 import { requireAdmin } from '@/lib/auth';
 import { getAllContactsForExport } from '@/server/services/contact.service';
 import { createCsvResponse } from '@/lib/csv-export';
@@ -8,8 +11,8 @@ const CONTACT_STATUS_MAP: Record<string, string> = {
   HANDLED: 'Đã xử lý',
 };
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -46,9 +49,12 @@ export async function GET(request: Request) {
     ]);
 
     const filename = `lien-he-${new Date().toISOString().slice(0, 10)}.csv`;
+    await (await mediaEnvironment()).DB.batch(adminAuditStatements((await mediaEnvironment()).DB, 'contacts.export', 'contacts', 'Filtered CSV export'));
     return createCsvResponse(headers, rows, filename);
   } catch (error) {
     console.error('[ExportContacts] Failed to export contacts:', error);
     return new Response('Không thể xuất danh sách liên hệ', { status: 500 });
   }
 }
+
+export const GET = withAdminContext(GETHandler);

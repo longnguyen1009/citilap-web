@@ -18,7 +18,7 @@ export function mediaFailure(error: unknown) {
   return Response.json({ success: false, error: message }, { status, headers: { 'Cache-Control': 'private, no-store' } });
 }
 export async function mediaAdmin(request: Request, mutation: boolean, action: (env: MediaEnvironment) => Promise<unknown>, resolveEnv = mediaEnvironment) {
-  const denied = mutation ? requireAdminMutation(request) : requireAdmin(request);
+  const denied = mutation ? await requireAdminMutation(request) : await requireAdmin(request);
   if (denied) return denied;
   try {
     const result = await action(await resolveEnv());

@@ -6,7 +6,7 @@ const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif', '
 const ALLOWED_PUBLIC_PREFIXES = ['products/', 'brand/', 'categories/'];
 const ALLOWED_TEMP_PREFIXES = ['tmp/products/'];
 
-function validateMediaKey(keySegments: string[], request: Request): { valid: boolean; r2Key?: string; error?: string; status?: number } {
+async function validateMediaKey(keySegments: string[], request: Request): Promise<{ valid: boolean; r2Key?: string; error?: string; status?: number }> {
   if (!keySegments || keySegments.length === 0) {
     return { valid: false, error: 'Key not provided', status: 400 };
   }
@@ -32,7 +32,7 @@ function validateMediaKey(keySegments: string[], request: Request): { valid: boo
     const hasTempPrefix = ALLOWED_TEMP_PREFIXES.some((prefix) => r2Key.startsWith(prefix));
     if (hasTempPrefix) {
       // Temporary/unapproved media requires authenticated admin session
-      if (!isAdminRequest(request)) {
+      if (!(await isAdminRequest(request))) {
         return { valid: false, error: 'Temporary media preview requires admin authentication', status: 403 };
       }
     } else {
@@ -56,7 +56,7 @@ export async function GET(
 ) {
   try {
     const { key } = await params;
-    const validation = validateMediaKey(key, request);
+    const validation = await validateMediaKey(key, request);
     if (!validation.valid || !validation.r2Key) {
       return NextResponse.json(
         { success: false, error: validation.error },
@@ -124,7 +124,7 @@ export async function HEAD(
 ) {
   try {
     const { key } = await params;
-    const validation = validateMediaKey(key, request);
+    const validation = await validateMediaKey(key, request);
     if (!validation.valid || !validation.r2Key) {
       return new Response(null, { status: validation.status || 400 });
     }

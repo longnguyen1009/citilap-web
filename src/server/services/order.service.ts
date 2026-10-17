@@ -1,3 +1,4 @@
+import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
 import { calculateCheckout, CheckoutError } from './checkout.service';
@@ -948,7 +949,7 @@ export interface TransitionOrderInput {
  * 4. Reopen (CANCELLED -> NEW) requires non-empty reason (min 3 chars).
  * 5. expectedRevision is REQUIRED (positive integer). Checked directly at UPDATE SQL WHERE clause.
  * 6. CAS failure returns OrderConflictError (HTTP 409) with zero side effects.
- * 7. Server decides the actor strictly (SHARED_ADMIN_ACTOR), ignoring untrusted request payloads.
+ * 7. Server decides the actor from authenticated request context, ignoring untrusted request payloads.
  * 8. Any event write error triggers compensating rollback of status & revision.
  */
 export async function transitionOrderStatus(
@@ -1051,12 +1052,11 @@ export async function transitionOrderStatus(
     targetStatus,
     cleanReason,
     note?.trim() || null,
-    SHARED_ADMIN_ACTOR,
-    nowIso,
+    adminActor(SHARED_ADMIN_ACTOR), nowIso,
     orderId
   );
 
-  const [updateRes] = await db.batch([updateStmt, eventStmt]);
+  const [updateRes] = await db.batch([updateStmt, eventStmt, ...adminAuditStatements(db, 'order.' + action.toLowerCase(), orderId, 'Order status mutation', eventId)]);
   if ((updateRes.meta?.changes ?? 0) === 0) {
     const fresh = await prisma.order.findUnique({ where: { id: orderId } });
     if (!fresh) {
@@ -1079,7 +1079,7 @@ export async function transitionOrderStatus(
 
 /**
  * Add an internal staff note to an order.
- * Server strictly enforces SHARED_ADMIN_ACTOR to avoid spoofing.
+ * Server uses authenticated request context and ignores client actor fields.
  * Commits note and event atomically in the same batch transaction.
  */
 export async function addOrderInternalNote(
@@ -1112,21 +1112,21 @@ export async function addOrderInternalNote(
   const noteStmt = db.prepare(
     `INSERT INTO "OrderNote" ("id", "orderId", "content", "actor", "createdAt")
      VALUES (?, ?, ?, ?, ?)`
-  ).bind(noteId, orderId, cleanContent, SHARED_ADMIN_ACTOR, nowIso);
+  ).bind(noteId, orderId, cleanContent, adminActor(SHARED_ADMIN_ACTOR), nowIso);
 
   const eventNoteSummary = cleanContent.length > 150 ? `${cleanContent.slice(0, 150)}...` : cleanContent;
   const eventStmt = db.prepare(
     `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
      VALUES (?, ?, 'NOTE_ADDED', ?, ?, ?, ?, ?)`
-  ).bind(eventId, orderId, existing.status, existing.status, eventNoteSummary, SHARED_ADMIN_ACTOR, nowIso);
+  ).bind(eventId, orderId, existing.status, existing.status, eventNoteSummary, adminActor(SHARED_ADMIN_ACTOR), nowIso);
 
-  await db.batch([noteStmt, eventStmt]);
+  await db.batch([noteStmt, eventStmt, ...adminAuditStatements(db, 'order.note', orderId, 'Internal note added')]);
 
   return {
     id: noteId,
     orderId,
     content: cleanContent,
-    actor: SHARED_ADMIN_ACTOR,
+    actor: adminActor(SHARED_ADMIN_ACTOR),
     createdAt: now,
   };
 }

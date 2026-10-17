@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireAdminMutation } from '@/lib/auth';
 import { mediaEnvironment } from '@/server/media-http';
@@ -17,8 +18,8 @@ interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
-export async function GET(request: Request, context: RouteContext) {
-  const authDenied = requireAdmin(request);
+async function GETHandler(request: Request, context: RouteContext) {
+  const authDenied = await requireAdmin(request);
   if (authDenied) return authDenied;
 
   const { id } = await context.params;
@@ -48,8 +49,8 @@ export async function GET(request: Request, context: RouteContext) {
   }
 }
 
-export async function PUT(request: Request, context: RouteContext) {
-  const mutationDenied = requireAdminMutation(request);
+async function PUTHandler(request: Request, context: RouteContext) {
+  const mutationDenied = await requireAdminMutation(request);
   if (mutationDenied) return mutationDenied;
 
   const { id } = await context.params;
@@ -152,8 +153,8 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 }
 
-export async function DELETE(request: Request, context: RouteContext) {
-  const mutationDenied = requireAdminMutation(request);
+async function DELETEHandler(request: Request, context: RouteContext) {
+  const mutationDenied = await requireAdminMutation(request);
   if (mutationDenied) return mutationDenied;
 
   const { id } = await context.params;
@@ -238,3 +239,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     );
   }
 }
+
+export const GET = withAdminContext(GETHandler);
+export const PUT = withAdminContext(PUTHandler);
+export const DELETE = withAdminContext(DELETEHandler);

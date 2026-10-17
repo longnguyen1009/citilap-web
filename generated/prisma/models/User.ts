@@ -27,10 +27,16 @@ export type AggregateUser = {
 }
 
 export type UserAvgAggregateOutputType = {
+  adminDisabled: number | null
+  adminVersion: number | null
+  piiExport: number | null
   totalSpend: number | null
 }
 
 export type UserSumAggregateOutputType = {
+  adminDisabled: number | null
+  adminVersion: number | null
+  piiExport: number | null
   totalSpend: number | null
 }
 
@@ -41,6 +47,9 @@ export type UserMinAggregateOutputType = {
   name: string | null
   phone: string | null
   role: string | null
+  adminDisabled: number | null
+  adminVersion: number | null
+  piiExport: number | null
   tier: string | null
   totalSpend: number | null
   createdAt: Date | null
@@ -54,6 +63,9 @@ export type UserMaxAggregateOutputType = {
   name: string | null
   phone: string | null
   role: string | null
+  adminDisabled: number | null
+  adminVersion: number | null
+  piiExport: number | null
   tier: string | null
   totalSpend: number | null
   createdAt: Date | null
@@ -67,6 +79,9 @@ export type UserCountAggregateOutputType = {
   name: number
   phone: number
   role: number
+  adminDisabled: number
+  adminVersion: number
+  piiExport: number
   tier: number
   totalSpend: number
   createdAt: number
@@ -76,10 +91,16 @@ export type UserCountAggregateOutputType = {
 
 
 export type UserAvgAggregateInputType = {
+  adminDisabled?: true
+  adminVersion?: true
+  piiExport?: true
   totalSpend?: true
 }
 
 export type UserSumAggregateInputType = {
+  adminDisabled?: true
+  adminVersion?: true
+  piiExport?: true
   totalSpend?: true
 }
 
@@ -90,6 +111,9 @@ export type UserMinAggregateInputType = {
   name?: true
   phone?: true
   role?: true
+  adminDisabled?: true
+  adminVersion?: true
+  piiExport?: true
   tier?: true
   totalSpend?: true
   createdAt?: true
@@ -103,6 +127,9 @@ export type UserMaxAggregateInputType = {
   name?: true
   phone?: true
   role?: true
+  adminDisabled?: true
+  adminVersion?: true
+  piiExport?: true
   tier?: true
   totalSpend?: true
   createdAt?: true
@@ -116,6 +143,9 @@ export type UserCountAggregateInputType = {
   name?: true
   phone?: true
   role?: true
+  adminDisabled?: true
+  adminVersion?: true
+  piiExport?: true
   tier?: true
   totalSpend?: true
   createdAt?: true
@@ -216,6 +246,9 @@ export type UserGroupByOutputType = {
   name: string | null
   phone: string | null
   role: string
+  adminDisabled: number
+  adminVersion: number
+  piiExport: number
   tier: string
   totalSpend: number
   createdAt: Date
@@ -252,6 +285,9 @@ export type UserWhereInput = {
   name?: Prisma.StringNullableFilter<"User"> | string | null
   phone?: Prisma.StringNullableFilter<"User"> | string | null
   role?: Prisma.StringFilter<"User"> | string
+  adminDisabled?: Prisma.IntFilter<"User"> | number
+  adminVersion?: Prisma.IntFilter<"User"> | number
+  piiExport?: Prisma.IntFilter<"User"> | number
   tier?: Prisma.StringFilter<"User"> | string
   totalSpend?: Prisma.IntFilter<"User"> | number
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
@@ -266,6 +302,9 @@ export type UserOrderByWithRelationInput = {
   name?: Prisma.SortOrderInput | Prisma.SortOrder
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   role?: Prisma.SortOrder
+  adminDisabled?: Prisma.SortOrder
+  adminVersion?: Prisma.SortOrder
+  piiExport?: Prisma.SortOrder
   tier?: Prisma.SortOrder
   totalSpend?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -283,6 +322,9 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   name?: Prisma.StringNullableFilter<"User"> | string | null
   phone?: Prisma.StringNullableFilter<"User"> | string | null
   role?: Prisma.StringFilter<"User"> | string
+  adminDisabled?: Prisma.IntFilter<"User"> | number
+  adminVersion?: Prisma.IntFilter<"User"> | number
+  piiExport?: Prisma.IntFilter<"User"> | number
   tier?: Prisma.StringFilter<"User"> | string
   totalSpend?: Prisma.IntFilter<"User"> | number
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
@@ -297,6 +339,9 @@ export type UserOrderByWithAggregationInput = {
   name?: Prisma.SortOrderInput | Prisma.SortOrder
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   role?: Prisma.SortOrder
+  adminDisabled?: Prisma.SortOrder
+  adminVersion?: Prisma.SortOrder
+  piiExport?: Prisma.SortOrder
   tier?: Prisma.SortOrder
   totalSpend?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -318,6 +363,9 @@ export type UserScalarWhereWithAggregatesInput = {
   name?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   phone?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   role?: Prisma.StringWithAggregatesFilter<"User"> | string
+  adminDisabled?: Prisma.IntWithAggregatesFilter<"User"> | number
+  adminVersion?: Prisma.IntWithAggregatesFilter<"User"> | number
+  piiExport?: Prisma.IntWithAggregatesFilter<"User"> | number
   tier?: Prisma.StringWithAggregatesFilter<"User"> | string
   totalSpend?: Prisma.IntWithAggregatesFilter<"User"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
@@ -331,6 +379,9 @@ export type UserCreateInput = {
   name?: string | null
   phone?: string | null
   role?: string
+  adminDisabled?: number
+  adminVersion?: number
+  piiExport?: number
   tier?: string
   totalSpend?: number
   createdAt?: Date | string
@@ -345,6 +396,9 @@ export type UserUncheckedCreateInput = {
   name?: string | null
   phone?: string | null
   role?: string
+  adminDisabled?: number
+  adminVersion?: number
+  piiExport?: number
   tier?: string
   totalSpend?: number
   createdAt?: Date | string
@@ -359,6 +413,9 @@ export type UserUpdateInput = {
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   role?: Prisma.StringFieldUpdateOperationsInput | string
+  adminDisabled?: Prisma.IntFieldUpdateOperationsInput | number
+  adminVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  piiExport?: Prisma.IntFieldUpdateOperationsInput | number
   tier?: Prisma.StringFieldUpdateOperationsInput | string
   totalSpend?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -373,6 +430,9 @@ export type UserUncheckedUpdateInput = {
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   role?: Prisma.StringFieldUpdateOperationsInput | string
+  adminDisabled?: Prisma.IntFieldUpdateOperationsInput | number
+  adminVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  piiExport?: Prisma.IntFieldUpdateOperationsInput | number
   tier?: Prisma.StringFieldUpdateOperationsInput | string
   totalSpend?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -387,6 +447,9 @@ export type UserCreateManyInput = {
   name?: string | null
   phone?: string | null
   role?: string
+  adminDisabled?: number
+  adminVersion?: number
+  piiExport?: number
   tier?: string
   totalSpend?: number
   createdAt?: Date | string
@@ -400,6 +463,9 @@ export type UserUpdateManyMutationInput = {
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   role?: Prisma.StringFieldUpdateOperationsInput | string
+  adminDisabled?: Prisma.IntFieldUpdateOperationsInput | number
+  adminVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  piiExport?: Prisma.IntFieldUpdateOperationsInput | number
   tier?: Prisma.StringFieldUpdateOperationsInput | string
   totalSpend?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -413,6 +479,9 @@ export type UserUncheckedUpdateManyInput = {
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   role?: Prisma.StringFieldUpdateOperationsInput | string
+  adminDisabled?: Prisma.IntFieldUpdateOperationsInput | number
+  adminVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  piiExport?: Prisma.IntFieldUpdateOperationsInput | number
   tier?: Prisma.StringFieldUpdateOperationsInput | string
   totalSpend?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -426,6 +495,9 @@ export type UserCountOrderByAggregateInput = {
   name?: Prisma.SortOrder
   phone?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  adminDisabled?: Prisma.SortOrder
+  adminVersion?: Prisma.SortOrder
+  piiExport?: Prisma.SortOrder
   tier?: Prisma.SortOrder
   totalSpend?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -433,6 +505,9 @@ export type UserCountOrderByAggregateInput = {
 }
 
 export type UserAvgOrderByAggregateInput = {
+  adminDisabled?: Prisma.SortOrder
+  adminVersion?: Prisma.SortOrder
+  piiExport?: Prisma.SortOrder
   totalSpend?: Prisma.SortOrder
 }
 
@@ -443,6 +518,9 @@ export type UserMaxOrderByAggregateInput = {
   name?: Prisma.SortOrder
   phone?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  adminDisabled?: Prisma.SortOrder
+  adminVersion?: Prisma.SortOrder
+  piiExport?: Prisma.SortOrder
   tier?: Prisma.SortOrder
   totalSpend?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -456,6 +534,9 @@ export type UserMinOrderByAggregateInput = {
   name?: Prisma.SortOrder
   phone?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  adminDisabled?: Prisma.SortOrder
+  adminVersion?: Prisma.SortOrder
+  piiExport?: Prisma.SortOrder
   tier?: Prisma.SortOrder
   totalSpend?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -463,6 +544,9 @@ export type UserMinOrderByAggregateInput = {
 }
 
 export type UserSumOrderByAggregateInput = {
+  adminDisabled?: Prisma.SortOrder
+  adminVersion?: Prisma.SortOrder
+  piiExport?: Prisma.SortOrder
   totalSpend?: Prisma.SortOrder
 }
 
@@ -514,6 +598,9 @@ export type UserCreateWithoutOrdersInput = {
   name?: string | null
   phone?: string | null
   role?: string
+  adminDisabled?: number
+  adminVersion?: number
+  piiExport?: number
   tier?: string
   totalSpend?: number
   createdAt?: Date | string
@@ -527,6 +614,9 @@ export type UserUncheckedCreateWithoutOrdersInput = {
   name?: string | null
   phone?: string | null
   role?: string
+  adminDisabled?: number
+  adminVersion?: number
+  piiExport?: number
   tier?: string
   totalSpend?: number
   createdAt?: Date | string
@@ -556,6 +646,9 @@ export type UserUpdateWithoutOrdersInput = {
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   role?: Prisma.StringFieldUpdateOperationsInput | string
+  adminDisabled?: Prisma.IntFieldUpdateOperationsInput | number
+  adminVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  piiExport?: Prisma.IntFieldUpdateOperationsInput | number
   tier?: Prisma.StringFieldUpdateOperationsInput | string
   totalSpend?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -569,6 +662,9 @@ export type UserUncheckedUpdateWithoutOrdersInput = {
   name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   role?: Prisma.StringFieldUpdateOperationsInput | string
+  adminDisabled?: Prisma.IntFieldUpdateOperationsInput | number
+  adminVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  piiExport?: Prisma.IntFieldUpdateOperationsInput | number
   tier?: Prisma.StringFieldUpdateOperationsInput | string
   totalSpend?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -613,6 +709,9 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   name?: boolean
   phone?: boolean
   role?: boolean
+  adminDisabled?: boolean
+  adminVersion?: boolean
+  piiExport?: boolean
   tier?: boolean
   totalSpend?: boolean
   createdAt?: boolean
@@ -628,6 +727,9 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   name?: boolean
   phone?: boolean
   role?: boolean
+  adminDisabled?: boolean
+  adminVersion?: boolean
+  piiExport?: boolean
   tier?: boolean
   totalSpend?: boolean
   createdAt?: boolean
@@ -641,6 +743,9 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   name?: boolean
   phone?: boolean
   role?: boolean
+  adminDisabled?: boolean
+  adminVersion?: boolean
+  piiExport?: boolean
   tier?: boolean
   totalSpend?: boolean
   createdAt?: boolean
@@ -654,13 +759,16 @@ export type UserSelectScalar = {
   name?: boolean
   phone?: boolean
   role?: boolean
+  adminDisabled?: boolean
+  adminVersion?: boolean
+  piiExport?: boolean
   tier?: boolean
   totalSpend?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "password" | "name" | "phone" | "role" | "tier" | "totalSpend" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "password" | "name" | "phone" | "role" | "adminDisabled" | "adminVersion" | "piiExport" | "tier" | "totalSpend" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   orders?: boolean | Prisma.User$ordersArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
@@ -680,6 +788,9 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     name: string | null
     phone: string | null
     role: string
+    adminDisabled: number
+    adminVersion: number
+    piiExport: number
     tier: string
     totalSpend: number
     createdAt: Date
@@ -1114,6 +1225,9 @@ export interface UserFieldRefs {
   readonly name: Prisma.FieldRef<"User", 'String'>
   readonly phone: Prisma.FieldRef<"User", 'String'>
   readonly role: Prisma.FieldRef<"User", 'String'>
+  readonly adminDisabled: Prisma.FieldRef<"User", 'Int'>
+  readonly adminVersion: Prisma.FieldRef<"User", 'Int'>
+  readonly piiExport: Prisma.FieldRef<"User", 'Int'>
   readonly tier: Prisma.FieldRef<"User", 'String'>
   readonly totalSpend: Prisma.FieldRef<"User", 'Int'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>

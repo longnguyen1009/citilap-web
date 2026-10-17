@@ -1,9 +1,10 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { listCustomers } from '@/server/services/customer.service';
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -37,3 +38,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, error: 'Failed to fetch customers' }, { status: 500 });
   }
 }
+
+export const GET = withAdminContext(GETHandler);

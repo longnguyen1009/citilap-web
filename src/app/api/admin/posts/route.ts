@@ -1,7 +1,8 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { mediaAdmin } from '@/server/media-http';
 import { postList, writePost, type PostListOptions } from '@/server/services/post.service';
 
-export async function GET(request: Request) {
+async function GETHandler(request: Request) {
   const url = new URL(request.url);
   const q = url.searchParams.get('q') || '';
   const categoryId = url.searchParams.get('categoryId') || '';
@@ -24,6 +25,9 @@ export async function GET(request: Request) {
   );
 }
 
-export async function POST(request: Request) {
+async function POSTHandler(request: Request) {
   return mediaAdmin(request, true, async env => writePost(env, null, await request.json()));
 }
+
+export const GET = withAdminContext(GETHandler);
+export const POST = withAdminContext(POSTHandler);

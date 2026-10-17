@@ -1,3 +1,4 @@
+import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { blankPost, postStudioWriteSchema, postCategoryWriteSchema, RESERVED_SLUGS, type PostDocument } from '../../contracts/cms/post';
 import { sanitizeHtml } from '../../lib/sanitize-html';
@@ -174,7 +175,7 @@ export async function writePost(env: MediaEnvironment, id: string | null, input:
   statements.push(db.prepare('INSERT INTO PostStudio(postId,draft,published) VALUES(?,?,?) ON CONFLICT(postId) DO NOTHING').bind(
     postId, snapshot, action === 'publish' ? snapshot : null
   ));
-  statements.push(db.prepare('INSERT INTO PostStudioRevision(postId,revision,document,action) VALUES(?,?,?,?)').bind(postId, version, snapshot, action));
+  statements.push(db.prepare('INSERT INTO PostStudioRevision(postId,revision,document,action,actor) VALUES(?,?,?,?,?)').bind(postId, version, snapshot, action, adminActor()));
 
   statements.push(db.prepare(`
     UPDATE PostStudio
@@ -197,7 +198,7 @@ export async function writePost(env: MediaEnvironment, id: string | null, input:
   }
 
   try {
-    await db.batch(statements);
+    await db.batch([...statements, ...adminAuditStatements(db, 'post.' + action, postId, 'CMS mutation')]);
   } catch (e) {
     if (e instanceof Error && /POST_STUDIO_CONFLICT|UNIQUE constraint/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản hoặc đường dẫn trùng. Tải lại và kiểm tra dữ liệu.', 409);

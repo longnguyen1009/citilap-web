@@ -1,3 +1,4 @@
+import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import {
   landingPageStudioWriteSchema,
@@ -116,7 +117,7 @@ export async function bootstrapHomepage(db: D1Database) {
       .bind(snapshot, snapshot, now, now, now),
   ];
 
-  await db.batch(statements);
+  await db.batch([...statements, ...adminAuditStatements(db, 'builder.bootstrap', 'home', 'Homepage initialized')]);
 
   return {
     status: 'BOOTSTRAPPED',
@@ -345,7 +346,7 @@ export async function writeLandingPage(
         INSERT INTO LandingPageRevision(pageId, revision, document, action, actor)
         VALUES(?, ?, ?, ?, ?)
       `)
-      .bind(pageId, nextRevision, snapshot, action, actor),
+      .bind(pageId, nextRevision, snapshot, action, adminActor()),
 
     // 4. Update LandingPageStudio with new draft / publish
     db
@@ -398,7 +399,7 @@ export async function writeLandingPage(
   }
 
   try {
-    await db.batch(statements);
+    await db.batch([...statements, ...adminAuditStatements(db, 'landing.' + action, pageId, 'Landing mutation')]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/LANDING_PAGE_CONFLICT|UNIQUE constraint failed/.test(msg)) {

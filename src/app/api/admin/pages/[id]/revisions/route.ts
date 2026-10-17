@@ -1,9 +1,12 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { mediaAdmin } from '@/server/media-http';
 import { listPageRevisions } from '@/server/services/page.service';
 
 type Context = { params: Promise<{ id: string }> };
 
-export async function GET(request: Request, context: Context) {
+async function GETHandler(request: Request, context: Context) {
   const { id } = await context.params;
   return mediaAdmin(request, false, env => listPageRevisions(env.DB, id));
 }
+
+export const GET = withAdminContext(GETHandler);

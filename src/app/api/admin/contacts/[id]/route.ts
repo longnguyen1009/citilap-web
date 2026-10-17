@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireAdminMutation } from '@/lib/auth';
 import {
@@ -8,11 +9,11 @@ import {
   SHARED_CONTACT_ACTOR,
 } from '@/server/services/contact.service';
 
-export async function GET(
+async function GETHandler(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
-  const denied = requireAdmin(request);
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -31,11 +32,11 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+async function PATCHHandler(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
-  const denied = requireAdminMutation(request);
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
@@ -112,3 +113,6 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: 'Lỗi cập nhật trạng thái liên hệ' }, { status: 500 });
   }
 }
+
+export const GET = withAdminContext(GETHandler);
+export const PATCH = withAdminContext(PATCHHandler);

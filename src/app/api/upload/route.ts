@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdminMutation } from '@/lib/auth';
 import {
@@ -27,8 +28,8 @@ export interface UploadedImageResult {
   isPrimary?: boolean;
 }
 
-export async function POST(request: Request) {
-  const denied = requireAdminMutation(request);
+async function POSTHandler(request: Request) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
@@ -245,8 +246,8 @@ export async function POST(request: Request) {
  * Safely deletes a media object from R2 and removes/archives its D1 metadata.
  * Requires admin authorization.
  */
-export async function DELETE(request: Request) {
-  const denied = requireAdminMutation(request);
+async function DELETEHandler(request: Request) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
@@ -339,8 +340,8 @@ export async function DELETE(request: Request) {
  * Sets a specific image as the primary image of its product.
  * Requires admin authorization.
  */
-export async function PATCH(request: Request) {
-  const denied = requireAdminMutation(request);
+async function PATCHHandler(request: Request) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
@@ -371,3 +372,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: false, error: 'Cập nhật thất bại' }, { status: 500 });
   }
 }
+
+export const POST = withAdminContext(POSTHandler);
+export const DELETE = withAdminContext(DELETEHandler);
+export const PATCH = withAdminContext(PATCHHandler);

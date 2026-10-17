@@ -1,9 +1,12 @@
+import { adminAuditStatements } from '@/server/admin-context';
+import { mediaEnvironment } from '@/server/media-http';
+import { withAdminContext } from '@/server/admin-request-context';
 import { requireAdmin } from '@/lib/auth';
 import { getAllCustomersForExport } from '@/server/services/customer.service';
 import { createCsvResponse } from '@/lib/csv-export';
 
-export async function GET(request: Request) {
-  const denied = requireAdmin(request);
+async function GETHandler(request: Request) {
+  const denied = await requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -41,9 +44,12 @@ export async function GET(request: Request) {
     ]);
 
     const filename = `khach-hang-${new Date().toISOString().slice(0, 10)}.csv`;
+    await (await mediaEnvironment()).DB.batch(adminAuditStatements((await mediaEnvironment()).DB, 'customers.export', 'customers', 'Filtered CSV export'));
     return createCsvResponse(headers, rows, filename);
   } catch (error) {
     console.error('[ExportCustomers] Failed to export customers:', error);
     return new Response('Không thể xuất danh sách khách hàng', { status: 500 });
   }
 }
+
+export const GET = withAdminContext(GETHandler);

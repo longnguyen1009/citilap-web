@@ -1,3 +1,4 @@
+import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from 'next/server';
 import { requireAdmin, requireAdminMutation } from '@/lib/auth';
 import {
@@ -9,13 +10,13 @@ import {
   OrderStatus,
 } from '@/server/services/order.service';
 
-export async function GET(request: Request, props: { params: Promise<{ id: string }> }) {
+async function GETHandler(request: Request, props: { params: Promise<{ id: string }> }) {
   try {
     const params = await props.params;
     const { searchParams } = new URL(request.url);
     const token = searchParams.get('token');
 
-    const adminDenied = requireAdmin(request);
+    const adminDenied = await requireAdmin(request);
     const isAdmin = !adminDenied;
 
     const order = await getOrderById(params.id);
@@ -104,8 +105,8 @@ export async function GET(request: Request, props: { params: Promise<{ id: strin
   }
 }
 
-export async function PUT(request: Request, props: { params: Promise<{ id: string }> }) {
-  const denied = requireAdminMutation(request);
+async function PUTHandler(request: Request, props: { params: Promise<{ id: string }> }) {
+  const denied = await requireAdminMutation(request);
   if (denied) return denied;
 
   try {
@@ -213,4 +214,7 @@ export async function PUT(request: Request, props: { params: Promise<{ id: strin
   }
 }
 
-export const PATCH = PUT;
+export const PATCH = withAdminContext(PUTHandler);
+
+export const GET = withAdminContext(GETHandler);
+export const PUT = withAdminContext(PUTHandler);
