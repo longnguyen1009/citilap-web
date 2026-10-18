@@ -1,0 +1,6 @@
+{
+  "recordedAt": "2026-10-17T17:32:09.707Z",
+  "passed": 4,
+  "browser": "Chrome/155.0.8059.82",
+  "environment": "Built local Worker + ephemeral D1/R2; four Chrome targets with focus emulation; no remote proof"
+}

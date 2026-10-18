@@ -1,98 +1,44 @@
 "use client";
 
-import Link from "next/link";
-import { Heart, ShoppingCart, ArrowRight } from "lucide-react";
-import { useWishlist } from "@/context/WishlistContext";
-import { useCart } from "@/context/CartContext";
-import Breadcrumb from "@/components/layout/Breadcrumb";
-import ProductCard from "@/components/product/ProductCard";
-import { Container } from "@/components/ui/Container";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { Button } from "@/components/ui/Button";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useWishlist } from '@/context/WishlistContext';
+import ProductCard from '@/components/product/ProductCard';
+import type { HomepageProduct } from '@/server/services/catalog.service';
 
 export default function WishlistPage() {
-  const { wishlist } = useWishlist();
-  const { addToCart } = useCart();
-
-  const handleAddToCart = (item: (typeof wishlist)[0]) => {
-    addToCart({
-      id: item.productId,
-      productId: item.productId,
-      name: item.name,
-      price: parseInt(item.price.replace(/\D/g, ""), 10) || 0,
-      displayPrice: item.price,
-      image: item.image,
-      quantity: 1,
-    });
-  };
-
-  if (wishlist.length === 0) {
-    return (
-      <div className="bg-surface-subtle min-h-[60vh] flex flex-col items-center justify-center p-4">
-        <Container className="max-w-md">
-          <EmptyState
-            icon={<Heart className="w-10 h-10 text-text-muted" />}
-            title="Danh sách yêu thích trống"
-            description="Bạn chưa lưu sản phẩm nào vào danh sách yêu thích. Khám phá các mẫu laptop mới nhất tại Citilap ngay hôm nay."
-            action={
-              <Link href="/">
-                <Button
-                  variant="primary"
-                  size="md"
-                  rightIcon={<ArrowRight className="w-4 h-4" />}
-                >
-                  Tiếp tục mua sắm
-                </Button>
-              </Link>
-            }
-          />
-        </Container>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-surface-subtle min-h-screen pb-12">
-      <Breadcrumb
-        items={[
-          { label: "Trang chủ", href: "/" },
-          { label: `Yêu thích (${wishlist.length})`, href: "/wishlist" },
-        ]}
-      />
-
-      <Container className="mt-6">
-        <div className="flex items-center justify-between mb-6 pb-3 border-b border-border-default">
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-black text-text-primary uppercase tracking-tight">
-            Danh sách yêu thích ({wishlist.length})
-          </h1>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
-          {wishlist.map((item) => (
-            <ProductCard
-              key={item.productId}
-              product={{
-                id: item.productId,
-                name: item.name,
-                price: item.price,
-                image: item.image,
-              }}
-              showSpecs={false}
-              footerAction={
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="w-full font-bold"
-                  onClick={() => handleAddToCart(item)}
-                  leftIcon={<ShoppingCart className="w-4 h-4" />}
-                >
-                  Thêm vào giỏ
-                </Button>
-              }
-            />
-          ))}
-        </div>
-      </Container>
-    </div>
-  );
+  const {wishlist, removeFromWishlist, storageError, loaded} = useWishlist();
+  const [result,setResult] = useState<{ids:string;products:HomepageProduct[];unavailableIds:string[]}|null>(null);
+  const [error,setError] = useState('');
+  const [retry,setRetry] = useState(0);
+  const ids = wishlist.map(item=>item.productId).join(',');
+  useEffect(()=>{
+    if (!loaded || !ids) return;
+    const controller = new AbortController();
+    const refresh = async()=>{
+      try {
+        const response = await fetch('/api/wishlist?ids='+encodeURIComponent(ids), {cache:'no-store',signal:controller.signal});
+        if (!response.ok) throw new Error('Không thể tải giá hiện tại. Thử lại để xem danh sách.');
+        const data = await response.json();
+        if (!controller.signal.aborted) {setResult({...data,ids});setError('');}
+      } catch (err) {
+        if (!controller.signal.aborted) setError((err as Error).message);
+      }
+    };
+    void refresh();
+    window.addEventListener('focus',refresh);
+    window.addEventListener('citilap:price-refresh',refresh);
+    const timer=setInterval(refresh,30000);
+    return ()=>{controller.abort();window.removeEventListener('focus',refresh);window.removeEventListener('citilap:price-refresh',refresh);clearInterval(timer);};
+  },[ids,loaded,retry]);
+  return <main className="container mx-auto max-w-[1370px] px-4 py-8 space-y-5">
+    <h1 className="text-2xl font-bold">Danh sách yêu thích ({wishlist.length})</h1>
+    <p>Lưu trên thiết bị này, tối đa 100 sản phẩm. Mở sản phẩm để chọn cấu hình và kiểm tra khả dụng trước khi đặt.</p>
+    {storageError && <p role="status">Trình duyệt không cho lưu trên thiết bị. Danh sách chỉ được giữ trong phiên này.</p>}
+    {!loaded ? <p role="status">Đang tải danh sách…</p> : !ids ? <p>Chưa có sản phẩm yêu thích. <Link href="/search" className="underline">Khám phá sản phẩm</Link></p> : error ?
+      <div role="alert">{error} <button onClick={()=>{setError('');setRetry(v=>v+1);}} className="underline">Thử lại</button></div> : result?.ids !== ids ? <p role="status">Đang tải giá hiện tại…</p> : <>
+        {result.unavailableIds.map(id=><div key={id} role="status">Một sản phẩm đã lưu không còn công khai. <button onClick={()=>removeFromWishlist(id)} className="underline">Bỏ khỏi danh sách</button></div>)}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{result.products.map(product=><ProductCard key={product.id} product={product}/>)}</div>
+      </>}
+  </main>;
 }

@@ -1,10 +1,11 @@
+import { parseSearchParams } from '@/contracts/catalog/search';
+import Link from 'next/link';
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import SearchListingContainer from "@/components/search/SearchListingContainer";
 import {
   searchProducts,
-  type SearchFilterOptions,
 } from "@/server/services/search.service";
 import { getStorefrontPricingContext } from "@/server/services/pricing.service";
 
@@ -42,59 +43,11 @@ export async function generateMetadata({
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sp = await searchParams;
 
-  const getStringOrArray = (val: string | string[] | undefined): string[] => {
-    if (!val) return [];
-    return Array.isArray(val) ? val : [val];
-  };
-
-  const getNumberOrArray = (val: string | string[] | undefined): number[] => {
-    if (!val) return [];
-    const arr = Array.isArray(val) ? val : [val];
-    return arr.map(Number).filter((n) => !isNaN(n));
-  };
-
-  // Price presets
-  let minPrice = sp.minPrice ? Number(sp.minPrice) : undefined;
-  let maxPrice = sp.maxPrice ? Number(sp.maxPrice) : undefined;
-
-  if (typeof sp.pricePreset === "string" && !minPrice && !maxPrice) {
-    if (sp.pricePreset === "under-15" || sp.pricePreset === "under-15m") maxPrice = 15_000_000;
-    else if (sp.pricePreset === "15-20" || sp.pricePreset === "15m-20m") {
-      minPrice = 15_000_000;
-      maxPrice = 20_000_000;
-    } else if (sp.pricePreset === "20-30" || sp.pricePreset === "20m-25m") {
-      minPrice = 20_000_000;
-      maxPrice = 30_000_000;
-    } else if (sp.pricePreset === "over-30" || sp.pricePreset === "above-30m") {
-      minPrice = 30_000_000;
-    }
-  }
-
-  const query = typeof sp.q === "string" ? sp.q.trim() : "";
-
-  const sortValue =
-    typeof sp.sort === "string" &&
-    ["relevance", "price-asc", "price-desc", "newest"].includes(sp.sort)
-      ? (sp.sort as SearchFilterOptions["sort"])
-      : query
-      ? "relevance"
-      : "newest";
-
-  const options: SearchFilterOptions = {
-    query,
-    brand: getStringOrArray(sp.brand),
-    category: getStringOrArray(sp.category),
-    condition: getStringOrArray(sp.condition),
-    minPrice,
-    maxPrice,
-    cpu: getStringOrArray(sp.cpu),
-    gpu: getStringOrArray(sp.gpu),
-    ram: getNumberOrArray(sp.ram),
-    storage: getNumberOrArray(sp.storage),
-    sort: sortValue,
-    page: sp.page ? Math.max(1, Number(sp.page)) : 1,
-    limit: 12,
-  };
+  const params = new URLSearchParams();
+  for (const [key,value] of Object.entries(sp)) for (const item of Array.isArray(value)?value:value===undefined?[]:[value]) params.append(key,item);
+  const parsed = parseSearchParams(params);
+  if (!parsed.success) return <main className="container mx-auto p-8"><p role="alert">Bộ lọc không hợp lệ. Kiểm tra khoảng giá, số trang và giá trị đã nhập.</p><Link href="/search">Xóa bộ lọc</Link></main>;
+  const options=parsed.data, query=options.query || '';
 
   const evaluatedAt = new Date();
   const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);

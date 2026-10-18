@@ -1,0 +1,42 @@
+{
+  "recordedAt": "2026-10-17T17:32:30.768Z",
+  "method": "chrome.settingsPrivate.setDefaultZoom(2) in isolated profile; OS scale 1; no CDP metrics override, pinch or CSS zoom",
+  "observations": [
+    {
+      "path": "/",
+      "dpr": 2,
+      "innerWidth": 711,
+      "outerWidth": 1440,
+      "scale": 1,
+      "scrollWidth": 703,
+      "cssZoom": "1"
+    },
+    {
+      "path": "/search",
+      "dpr": 2,
+      "innerWidth": 711,
+      "outerWidth": 1440,
+      "scale": 1,
+      "scrollWidth": 703,
+      "cssZoom": "1"
+    },
+    {
+      "path": "/product/fixture-p",
+      "dpr": 2,
+      "innerWidth": 711,
+      "outerWidth": 1440,
+      "scale": 1,
+      "scrollWidth": 703,
+      "cssZoom": "1"
+    },
+    {
+      "path": "/checkout",
+      "dpr": 2,
+      "innerWidth": 711,
+      "outerWidth": 1440,
+      "scale": 1,
+      "scrollWidth": 703,
+      "cssZoom": "1"
+    }
+  ]
+}

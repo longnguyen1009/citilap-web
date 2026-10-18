@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTurnstile } from "@/components/Turnstile";
 import { Star, Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 type ReviewFormProps = {
@@ -9,6 +10,7 @@ type ReviewFormProps = {
 };
 
 export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
+  const turnstile = useTurnstile("contact");
   const [rating, setRating] = useState(5);
   const [hoveredStar, setHoveredStar] = useState(0);
   const [comment, setComment] = useState("");
@@ -20,6 +22,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!turnstile.ready) return;
     if (rating === 0 || !comment.trim() || !name.trim()) {
       setError("Vui lòng chọn số sao và nhập đầy đủ thông tin.");
       return;
@@ -31,15 +34,16 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
     try {
       // If phone is provided, post to contact/feedback system
       if (phone.trim()) {
-        await fetch("/api/contact", {
+        const response = await fetch("/api/contact", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "cf-turnstile-response": turnstile.token },
           body: JSON.stringify({
             name: name.trim(),
             phone: phone.trim(),
             message: `[Đánh giá ${rating}⭐ sản phẩm: ${productName}]: ${comment.trim()}`,
           }),
-        }).catch(() => {});
+        });
+        if (!response.ok) throw new Error("Contact submission failed");
       }
 
       onSubmit?.({ rating, comment: comment.trim(), name: name.trim(), phone: phone.trim() });
@@ -47,6 +51,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
     } catch {
       setError("Có lỗi xảy ra khi gửi đánh giá. Vui lòng thử lại!");
     } finally {
+      turnstile.reset();
       setSubmitting(false);
     }
   };
@@ -165,9 +170,10 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
       </div>
 
       {/* Submit */}
+      {turnstile.widget}
       <button
         type="submit"
-        disabled={rating === 0 || !comment.trim() || !name.trim() || submitting}
+        disabled={!turnstile.ready || rating === 0 || !comment.trim() || !name.trim() || submitting}
         className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl transition flex items-center gap-2 cursor-pointer text-sm"
       >
         {submitting ? (

@@ -146,8 +146,10 @@ export default async function ProductDetailPage({
     notFound();
   }
 
+  const settings=await getStorefrontSettings();
   const studio = pub.kind === "CMS_PUBLISHED" ? await getPublishedStudio(resolvedSlug) : null;
-  const studioVariant = studio?.variants.find((v) => v.sku === skuParam) || studio?.variants[0];
+  const studioVariant = skuParam ? studio?.variants.find((v) => v.sku === skuParam || v.id === skuParam) : studio?.variants[0];
+  if (studio && skuParam && !studioVariant) notFound();
   const studioImages = studio?.media.filter((m): m is typeof m & { url: string } => m.kind === "IMAGE" && Boolean(m.url)) || [];
   const galleryImages = studio ? studioImages.map((m) => ({
     url: m.url, alt: m.alt || studio.name, variantId: m.variantId || null,
@@ -429,6 +431,7 @@ export default async function ProductDetailPage({
 
               {/* Unified Purchase Section: Condition, Variants, Warranty, Live Price, Actions */}
               {studio ? <StudioPurchaseSection
+                phone={settings?.storePhone}
                 studio={{
                   ...studio,
                   price: displayPrice,
@@ -459,6 +462,7 @@ export default async function ProductDetailPage({
                 image={cover}
                 selectedSku={skuParam}
               /> : <ProductPurchaseSection
+                phone={settings?.storePhone}
                 productId={product.id}
                 productName={product.name}
                 productSlug={product.slug}

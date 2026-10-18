@@ -34,15 +34,17 @@
   "env": {
     "staging": {
       "name": "citilap-ecommerce-staging",
+      "account_id": "8952957f4eed25a74e19a3e273c4a589",
       "vars": {
         "APP_ENV": "staging",
-        "NEXT_PUBLIC_SITE_URL": "https://staging.citilap.vn"
+        "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAFZsbdPpsQAHD2eQ",
+        "NEXT_PUBLIC_SITE_URL": "https://citilap-ecommerce-staging.restless-snowflake-aaae.workers.dev"
       },
       "d1_databases": [
         {
           "binding": "DB",
           "database_name": "citilap-db-staging",
-          "database_id": "STAGING_D1_DB_ID_PLACEHOLDER",
+          "database_id": "a812357f-51a3-4139-badf-2079bf2cd2e9",
           "migrations_dir": "d1-migrations"
         }
       ],

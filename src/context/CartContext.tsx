@@ -43,9 +43,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Load from local storage after mount (useEffect keeps SSR hydration safe:
   // server and client both start with [] before the saved cart is applied)
   useEffect(() => {
-    const savedCart = localStorage.getItem("citilap_cart");
-    if (savedCart) {
-      try {
+    try {
+      const savedCart = localStorage.getItem("citilap_cart");
+      if (savedCart) {
         const parsed: unknown = JSON.parse(savedCart);
         const valid = Array.isArray(parsed) ? parsed.filter((item): item is CartItem => {
           if (!item || typeof item !== "object") return false;
@@ -54,9 +54,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }) : [];
         // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional post-hydration restore from localStorage
         setCart(valid);
-      } catch (e) {
-        console.error("Failed to parse cart", e);
       }
+    } catch (e) {
+      console.error("Cart storage unavailable", e);
     }
     setIsLoaded(true);
   }, []);
@@ -64,7 +64,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Save to local storage
   useEffect(() => {
     if (isLoaded) {
-      localStorage.setItem("citilap_cart", JSON.stringify(cart));
+      try { localStorage.setItem("citilap_cart", JSON.stringify(cart)); }
+      catch { /* Keep the live cart usable when browser storage is blocked. */ }
     }
   }, [cart, isLoaded]);
 

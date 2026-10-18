@@ -1,0 +1,1798 @@
+{
+  "recordedAt": "2026-10-17T16:57:34.096Z",
+  "browser": "Chrome/155.0.8059.82",
+  "environment": "Local built Worker, ephemeral fixture, Chrome headless, no CPU/network throttle; lab only; INP not measured",
+  "clsTarget": "<= 0.1",
+  "checkoutBenchmarkSummary": [
+    {
+      "scenario": "EMPTY_CART_DESKTOP",
+      "width": 1440,
+      "height": 900,
+      "mobile": false,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 340,
+          "ttfb": 97,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 320,
+          "ttfb": 155,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 372,
+          "ttfb": 213,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 344,
+      "avgTtfb": 155
+    },
+    {
+      "scenario": "EMPTY_CART_DESKTOP",
+      "width": 1440,
+      "height": 900,
+      "mobile": false,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 308,
+          "ttfb": 148,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 264,
+          "ttfb": 107,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 452,
+          "ttfb": 276,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 341,
+      "avgTtfb": 177
+    },
+    {
+      "scenario": "EMPTY_CART_MOBILE",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 360,
+          "ttfb": 224,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 576,
+          "ttfb": 267,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 540,
+          "ttfb": 270,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 492,
+      "avgTtfb": 254
+    },
+    {
+      "scenario": "EMPTY_CART_MOBILE",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 676,
+          "ttfb": 358,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 556,
+          "ttfb": 304,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 724,
+          "ttfb": 408,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 652,
+      "avgTtfb": 357
+    },
+    {
+      "scenario": "POPULATED_CART_DESKTOP",
+      "width": 1440,
+      "height": 900,
+      "mobile": false,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.01229,
+          "lcp": 596,
+          "ttfb": 308,
+          "shifts": [
+            {
+              "value": 0.005232149379296194,
+              "time": 669,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): — Phí vận chuyển: — TỔN",
+                  "prev": {
+                    "y": 380,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 460,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 533.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 613.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 600.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "FIELDSET",
+                  "text": "Phương thức thanh toán",
+                  "prev": {
+                    "y": 340,
+                    "h": 24
+                  },
+                  "curr": {
+                    "y": 420,
+                    "h": 24
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 791.9000000059605,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 460,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 532,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 613.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 685.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 752.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 360,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 360,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 2,
+          "cls": 0.01229,
+          "lcp": 576,
+          "ttfb": 328,
+          "shifts": [
+            {
+              "value": 0.005232149379296194,
+              "time": 649.2000000029802,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): — Phí vận chuyển: — TỔN",
+                  "prev": {
+                    "y": 380,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 460,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 533.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 613.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 600.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "FIELDSET",
+                  "text": "Phương thức thanh toán",
+                  "prev": {
+                    "y": 340,
+                    "h": 24
+                  },
+                  "curr": {
+                    "y": 420,
+                    "h": 24
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 773.7999999970198,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 460,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 532,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 613.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 685.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 752.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 360,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 360,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 3,
+          "cls": 0.01229,
+          "lcp": 704,
+          "ttfb": 340,
+          "shifts": [
+            {
+              "value": 0.005232149379296194,
+              "time": 759,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): — Phí vận chuyển: — TỔN",
+                  "prev": {
+                    "y": 380,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 460,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 533.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 613.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 600.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "FIELDSET",
+                  "text": "Phương thức thanh toán",
+                  "prev": {
+                    "y": 340,
+                    "h": 24
+                  },
+                  "curr": {
+                    "y": 420,
+                    "h": 24
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 842.2000000029802,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 460,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 532,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 613.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 685.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 752.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 360,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 360,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "avgCls": 0.01229,
+      "maxCls": 0.01229,
+      "avgLcp": 625,
+      "avgTtfb": 325
+    },
+    {
+      "scenario": "POPULATED_CART_DESKTOP",
+      "width": 1440,
+      "height": 900,
+      "mobile": false,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.01229,
+          "lcp": 748,
+          "ttfb": 407,
+          "shifts": [
+            {
+              "value": 0.005232149379296194,
+              "time": 843.0999999940395,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): — Phí vận chuyển: — TỔN",
+                  "prev": {
+                    "y": 380,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 460,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 533.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 613.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 600.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "FIELDSET",
+                  "text": "Phương thức thanh toán",
+                  "prev": {
+                    "y": 340,
+                    "h": 24
+                  },
+                  "curr": {
+                    "y": 420,
+                    "h": 24
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 980.2999999970198,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 460,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 532,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 613.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 685.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 752.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 360,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 360,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 2,
+          "cls": 0.01229,
+          "lcp": 656,
+          "ttfb": 330,
+          "shifts": [
+            {
+              "value": 0.005232149379296194,
+              "time": 734.9000000059605,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): — Phí vận chuyển: — TỔN",
+                  "prev": {
+                    "y": 380,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 460,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 533.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 613.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 600.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "FIELDSET",
+                  "text": "Phương thức thanh toán",
+                  "prev": {
+                    "y": 340,
+                    "h": 24
+                  },
+                  "curr": {
+                    "y": 420,
+                    "h": 24
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 834.6000000089407,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 460,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 532,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 613.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 685.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 752.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 360,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 360,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 3,
+          "cls": 0.01229,
+          "lcp": 628,
+          "ttfb": 333,
+          "shifts": [
+            {
+              "value": 0.005232149379296194,
+              "time": 712.7999999970198,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): — Phí vận chuyển: — TỔN",
+                  "prev": {
+                    "y": 380,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 460,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 533.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 613.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 600.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "FIELDSET",
+                  "text": "Phương thức thanh toán",
+                  "prev": {
+                    "y": 340,
+                    "h": 24
+                  },
+                  "curr": {
+                    "y": 420,
+                    "h": 24
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 841.9000000059605,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 460,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 532,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 613.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 685.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 680.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 752.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 360,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 360,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "avgCls": 0.01229,
+      "maxCls": 0.01229,
+      "avgLcp": 677,
+      "avgTtfb": 357
+    },
+    {
+      "scenario": "POPULATED_CART_MOBILE",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 664,
+          "ttfb": 357,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 548,
+          "ttfb": 287,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 636,
+          "ttfb": 321,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 616,
+      "avgTtfb": 322
+    },
+    {
+      "scenario": "POPULATED_CART_MOBILE",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 668,
+          "ttfb": 378,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 740,
+          "ttfb": 434,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 652,
+          "ttfb": 321,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 687,
+      "avgTtfb": 378
+    },
+    {
+      "scenario": "PENDING_RETRY_DESKTOP",
+      "width": 1440,
+      "height": 900,
+      "mobile": false,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.041996,
+          "lcp": 624,
+          "ttfb": 357,
+          "shifts": [
+            {
+              "value": 0.03493851509866284,
+              "time": 694.3999999910593,
+              "sources": [
+                {
+                  "node": "FORM",
+                  "text": "HÌNH THỨC NHẬN HÀNG Giao hàng tận nơi Gi",
+                  "prev": {
+                    "y": 242,
+                    "h": 658
+                  },
+                  "curr": {
+                    "y": 308,
+                    "h": 592
+                  }
+                },
+                {
+                  "node": "TEXTAREA",
+                  "text": "",
+                  "prev": {
+                    "y": 863,
+                    "h": 37
+                  },
+                  "curr": {
+                    "y": 0,
+                    "h": 0
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 840.5,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 526,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 598,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 679.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 751.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 746.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 818.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 426,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 426,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 2,
+          "cls": 0.041996,
+          "lcp": 480,
+          "ttfb": 311,
+          "shifts": [
+            {
+              "value": 0.03493851509866284,
+              "time": 507.29999999701977,
+              "sources": [
+                {
+                  "node": "FORM",
+                  "text": "HÌNH THỨC NHẬN HÀNG Giao hàng tận nơi Gi",
+                  "prev": {
+                    "y": 242,
+                    "h": 658
+                  },
+                  "curr": {
+                    "y": 308,
+                    "h": 592
+                  }
+                },
+                {
+                  "node": "TEXTAREA",
+                  "text": "",
+                  "prev": {
+                    "y": 863,
+                    "h": 37
+                  },
+                  "curr": {
+                    "y": 0,
+                    "h": 0
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 562.4000000059605,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 526,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 598,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 679.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 751.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 746.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 818.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 426,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 426,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 3,
+          "cls": 0.041996,
+          "lcp": 304,
+          "ttfb": 175,
+          "shifts": [
+            {
+              "value": 0.03493851509866284,
+              "time": 332.29999999701977,
+              "sources": [
+                {
+                  "node": "FORM",
+                  "text": "HÌNH THỨC NHẬN HÀNG Giao hàng tận nơi Gi",
+                  "prev": {
+                    "y": 242,
+                    "h": 658
+                  },
+                  "curr": {
+                    "y": 308,
+                    "h": 592
+                  }
+                },
+                {
+                  "node": "TEXTAREA",
+                  "text": "",
+                  "prev": {
+                    "y": 863,
+                    "h": 37
+                  },
+                  "curr": {
+                    "y": 0,
+                    "h": 0
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 390.29999999701977,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 526,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 598,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 679.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 751.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 746.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 818.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 426,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 426,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "avgCls": 0.041996,
+      "maxCls": 0.041996,
+      "avgLcp": 469,
+      "avgTtfb": 281
+    },
+    {
+      "scenario": "PENDING_RETRY_DESKTOP",
+      "width": 1440,
+      "height": 900,
+      "mobile": false,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.041996,
+          "lcp": 260,
+          "ttfb": 154,
+          "shifts": [
+            {
+              "value": 0.03493851509866284,
+              "time": 284.1000000089407,
+              "sources": [
+                {
+                  "node": "FORM",
+                  "text": "HÌNH THỨC NHẬN HÀNG Giao hàng tận nơi Gi",
+                  "prev": {
+                    "y": 242,
+                    "h": 658
+                  },
+                  "curr": {
+                    "y": 308,
+                    "h": 592
+                  }
+                },
+                {
+                  "node": "TEXTAREA",
+                  "text": "",
+                  "prev": {
+                    "y": 863,
+                    "h": 37
+                  },
+                  "curr": {
+                    "y": 0,
+                    "h": 0
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 335.6000000089407,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 526,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 598,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 679.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 751.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 746.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 818.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 426,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 426,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 2,
+          "cls": 0.041996,
+          "lcp": 268,
+          "ttfb": 140,
+          "shifts": [
+            {
+              "value": 0.03493851509866284,
+              "time": 298.29999999701977,
+              "sources": [
+                {
+                  "node": "FORM",
+                  "text": "HÌNH THỨC NHẬN HÀNG Giao hàng tận nơi Gi",
+                  "prev": {
+                    "y": 242,
+                    "h": 658
+                  },
+                  "curr": {
+                    "y": 308,
+                    "h": 592
+                  }
+                },
+                {
+                  "node": "TEXTAREA",
+                  "text": "",
+                  "prev": {
+                    "y": 863,
+                    "h": 37
+                  },
+                  "curr": {
+                    "y": 0,
+                    "h": 0
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 353.3999999910593,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 526,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 598,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 679.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 751.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 746.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 818.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 426,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 426,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "run": 3,
+          "cls": 0.041996,
+          "lcp": 308,
+          "ttfb": 191,
+          "shifts": [
+            {
+              "value": 0.03493851509866284,
+              "time": 341.20000000298023,
+              "sources": [
+                {
+                  "node": "FORM",
+                  "text": "HÌNH THỨC NHẬN HÀNG Giao hàng tận nơi Gi",
+                  "prev": {
+                    "y": 242,
+                    "h": 658
+                  },
+                  "curr": {
+                    "y": 308,
+                    "h": 592
+                  }
+                },
+                {
+                  "node": "TEXTAREA",
+                  "text": "",
+                  "prev": {
+                    "y": 863,
+                    "h": 37
+                  },
+                  "curr": {
+                    "y": 0,
+                    "h": 0
+                  }
+                }
+              ]
+            },
+            {
+              "value": 0.0070575034882527955,
+              "time": 384.1000000089407,
+              "sources": [
+                {
+                  "node": "DIV",
+                  "text": "Tạm tính (1 SP): 22.000.000đ Phí vận chu",
+                  "prev": {
+                    "y": 526,
+                    "h": 133.703125
+                  },
+                  "curr": {
+                    "y": 598,
+                    "h": 133.703125
+                  }
+                },
+                {
+                  "node": "BUTTON",
+                  "text": "ĐANG TÍNH TỔNG TIỀN...",
+                  "prev": {
+                    "y": 679.703125,
+                    "h": 68
+                  },
+                  "curr": {
+                    "y": 751.703125,
+                    "h": 68
+                  }
+                },
+                {
+                  "node": "P",
+                  "text": "Bằng việc nhấn \"Gửi Đơn Đặt Hàng\", bạn đ",
+                  "prev": {
+                    "y": 746.703125,
+                    "h": 28.5
+                  },
+                  "curr": {
+                    "y": 818.703125,
+                    "h": 28.5
+                  }
+                },
+                {
+                  "node": "SPAN",
+                  "text": "22.000.000đ",
+                  "prev": {
+                    "y": 426,
+                    "h": 16
+                  },
+                  "curr": {
+                    "y": 426,
+                    "h": 16
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "avgCls": 0.041996,
+      "maxCls": 0.041996,
+      "avgLcp": 279,
+      "avgTtfb": 162
+    },
+    {
+      "scenario": "PENDING_RETRY_MOBILE",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 204,
+          "ttfb": 102,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 292,
+          "ttfb": 191,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 336,
+          "ttfb": 215,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 277,
+      "avgTtfb": 169
+    },
+    {
+      "scenario": "PENDING_RETRY_MOBILE",
+      "width": 390,
+      "height": 844,
+      "mobile": true,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 276,
+          "ttfb": 145,
+          "shifts": []
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 400,
+          "ttfb": 296,
+          "shifts": []
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 344,
+          "ttfb": 229,
+          "shifts": []
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 340,
+      "avgTtfb": 223
+    }
+  ],
+  "observations": [
+    {
+      "width": 1440,
+      "path": "/",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 836,
+      "ttfb": 363,
+      "url": "/"
+    },
+    {
+      "width": 1440,
+      "path": "/",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 528,
+      "ttfb": 330,
+      "url": "/"
+    },
+    {
+      "width": 1440,
+      "path": "/search",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 316,
+      "ttfb": 155,
+      "url": "/search"
+    },
+    {
+      "width": 1440,
+      "path": "/search",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 248,
+      "ttfb": 126,
+      "url": "/search"
+    },
+    {
+      "width": 1440,
+      "path": "/product/fixture-p",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 416,
+      "ttfb": 212,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 1440,
+      "path": "/product/fixture-p",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 416,
+      "ttfb": 260,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 1440,
+      "path": "/cart",
+      "cache": "cold",
+      "cls": 0.07607,
+      "lcp": 204,
+      "ttfb": 105,
+      "url": "/cart"
+    },
+    {
+      "width": 1440,
+      "path": "/cart",
+      "cache": "warm",
+      "cls": 0.07607,
+      "lcp": 264,
+      "ttfb": 153,
+      "url": "/cart"
+    },
+    {
+      "width": 1440,
+      "path": "/checkout",
+      "cache": "cold",
+      "cls": 0.041996,
+      "lcp": 256,
+      "ttfb": 125,
+      "url": "/checkout"
+    },
+    {
+      "width": 1440,
+      "path": "/checkout",
+      "cache": "warm",
+      "cls": 0.041996,
+      "lcp": 252,
+      "ttfb": 126,
+      "url": "/checkout"
+    },
+    {
+      "width": 1440,
+      "path": "/news",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 256,
+      "ttfb": 151,
+      "url": "/news"
+    },
+    {
+      "width": 1440,
+      "path": "/news",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 276,
+      "ttfb": 171,
+      "url": "/news"
+    },
+    {
+      "width": 390,
+      "path": "/",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 0,
+      "ttfb": 326,
+      "url": "/"
+    },
+    {
+      "width": 390,
+      "path": "/",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 0,
+      "ttfb": 322,
+      "url": "/"
+    },
+    {
+      "width": 390,
+      "path": "/search",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 280,
+      "ttfb": 157,
+      "url": "/search"
+    },
+    {
+      "width": 390,
+      "path": "/search",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 320,
+      "ttfb": 190,
+      "url": "/search"
+    },
+    {
+      "width": 390,
+      "path": "/product/fixture-p",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 352,
+      "ttfb": 195,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 390,
+      "path": "/product/fixture-p",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 356,
+      "ttfb": 191,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 390,
+      "path": "/cart",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 284,
+      "ttfb": 112,
+      "url": "/cart"
+    },
+    {
+      "width": 390,
+      "path": "/cart",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 312,
+      "ttfb": 132,
+      "url": "/cart"
+    },
+    {
+      "width": 390,
+      "path": "/checkout",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 300,
+      "ttfb": 134,
+      "url": "/checkout"
+    },
+    {
+      "width": 390,
+      "path": "/checkout",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 212,
+      "ttfb": 92,
+      "url": "/checkout"
+    },
+    {
+      "width": 390,
+      "path": "/news",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 224,
+      "ttfb": 104,
+      "url": "/news"
+    },
+    {
+      "width": 390,
+      "path": "/news",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 240,
+      "ttfb": 125,
+      "url": "/news"
+    }
+  ]
+}

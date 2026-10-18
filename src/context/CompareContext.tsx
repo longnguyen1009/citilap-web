@@ -82,34 +82,7 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      // Compatibility check: Must belong to compatible kind/template
-      if (items.length > 0) {
-        const first = items[0];
-        const firstKind = first.kind || "LAPTOP";
-        const itemKind = item.kind || "LAPTOP";
-
-        if (firstKind === "LAPTOP" && itemKind !== "LAPTOP") {
-          return {
-            success: false,
-            message: "Không thể so sánh Laptop với Phụ kiện. Vui lòng chọn sản phẩm cùng nhóm.",
-          };
-        }
-
-        if (firstKind !== "LAPTOP" && itemKind === "LAPTOP") {
-          return {
-            success: false,
-            message: "Không thể so sánh Phụ kiện với Laptop. Vui lòng chọn sản phẩm cùng nhóm.",
-          };
-        }
-
-        if (first.template && item.template && first.template !== item.template) {
-          return {
-            success: false,
-            message: `Không thể so sánh ${first.template} với ${item.template}. Vui lòng chọn các sản phẩm cùng loại.`,
-          };
-        }
-      }
-
+      // The compare API validates public product groups; stored client metadata can be stale.
       setItems((prev) => [...prev, item]);
       return { success: true };
     },

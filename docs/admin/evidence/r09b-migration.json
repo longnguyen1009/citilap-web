@@ -1,0 +1,119 @@
+{
+  "recordedAt": "2026-10-17T16:54:16.004Z",
+  "engine": "node:sqlite; synthetic pre-0021 database; not Wrangler ledger or remote D1",
+  "passed": 5,
+  "migrations": [
+    {
+      "name": "0001_initial_schema.sql",
+      "sha256": "cda20ca91c18fe98e34c7dd8ce9d202ddf4643e33010960c74ce7142e6167815"
+    },
+    {
+      "name": "0002_catalog_foundation.sql",
+      "sha256": "ae710bf641254b735f15d36346824e440306f307bdb268b10e9645e18cef5b3a"
+    },
+    {
+      "name": "0003_media_pipeline.sql",
+      "sha256": "7131b5436bc32dff30dbcaca1c49d8477ca90c0ffb36d0ed3abcf5a118b4b18b"
+    },
+    {
+      "name": "0004_inventory_foundation.sql",
+      "sha256": "9d41b443b2f67c737150df43c82e6a4e4db0443fd4598f428ef2eba216ccfeb8"
+    },
+    {
+      "name": "0005_simple_order.sql",
+      "sha256": "4c9cdddab6e8420674504bcfb2a9c1824590d6d96af7456d9f868dc44a41d7aa"
+    },
+    {
+      "name": "0006_order_item_serial.sql",
+      "sha256": "d47e01ba09983bb113e94bcf6032ce32974575de0c09268001cb923f8c6c0ec6"
+    },
+    {
+      "name": "0007_contact_and_security.sql",
+      "sha256": "4731db8ba8278475cbaf841cfb9baa1cfe044048d605f917eb15a51460495fc9"
+    },
+    {
+      "name": "0008_order_confirmation_token_hash.sql",
+      "sha256": "88d278039f75c497a8a142b31902344312bf50593a5d66183ecb0e670f23283f"
+    },
+    {
+      "name": "0009_cms_media_library.sql",
+      "sha256": "286dbd075283d20b0612ba4c027cc8acdeeeb4f673de5731eefd19e4492da08d"
+    },
+    {
+      "name": "0010_product_studio.sql",
+      "sha256": "e36138abe14b867df72293c8587eda6d0d204ed02ea5b28176d9955c414b8fbb"
+    },
+    {
+      "name": "0011_navigation_studio.sql",
+      "sha256": "7a1bc246a1a9754f533f289fcaefabeb1404990f6f69a15484014df614091d43"
+    },
+    {
+      "name": "0012_site_settings.sql",
+      "sha256": "bfbda032a41c4f4bb2487396b0d8a161069071b96da8a629f7bb27c3e8521e37"
+    },
+    {
+      "name": "0013_brand_seo.sql",
+      "sha256": "14f7f308ea3451a9ee8ab52ce242cfcd5f24c1936c542713a32ee3bdd79d9b05"
+    },
+    {
+      "name": "0014_content_cms.sql",
+      "sha256": "a76b2442b662b4c2f1ba4d735f7cdcebea54eb293c42808f67eb4701dbb06ca6"
+    },
+    {
+      "name": "0015_order_management.sql",
+      "sha256": "8ef1c89b4578741d5c4e46e59d0b1177c1d1073a8dfd9bfb7f88f93928220953"
+    },
+    {
+      "name": "0016_contact_management_and_order_cas.sql",
+      "sha256": "9bab1521698a9fae848d3f55a18aafffeaba76a5aac9c22608d190664bac38ed"
+    },
+    {
+      "name": "0017_site_builder.sql",
+      "sha256": "effe68d89c2c32a3ee44b094b871dfa44955b4ec8d51bc1ac2f179851c107d25"
+    },
+    {
+      "name": "0018_campaign_and_order_snapshot.sql",
+      "sha256": "21e4addd3deb133af877d3ba4786e97f18a08fdf326785ac0f0b349a86876d3c"
+    },
+    {
+      "name": "0019_campaign_revision_and_cas.sql",
+      "sha256": "2797d4b00433820b5da07fe64a3a46b5ff5ef493ae2fdba9beb7e8f643e3ab77"
+    },
+    {
+      "name": "0020_campaign_concurrency_and_overlap_guards.sql",
+      "sha256": "85fdcf5c7a71e16752c155492723180307ac0cbb1170d7499f2e9db5af54b301"
+    },
+    {
+      "name": "0021_admin_identity.sql",
+      "sha256": "705aaa1c765ce53d78eae939b4f2b255a16b6b3a7719d5c76fb252959e7e57d0"
+    },
+    {
+      "name": "0022_checkout_snapshot.sql",
+      "sha256": "32239562678d18426185c065fed3fcab411866cc1e6a2524e83ec5db3c818fc0"
+    },
+    {
+      "name": "0023_admin_audit_metadata.sql",
+      "sha256": "b9f9c577b9390ab8922666cab334722e3ae45208cb04d9a2bc90cc2f53103d60"
+    },
+    {
+      "name": "0024_cms_schedule.sql",
+      "sha256": "4f541feb801ecf44c1028c6144f4ad2092fc43531ff4d667b45b47eea2822999"
+    },
+    {
+      "name": "0025_cms_redirect.sql",
+      "sha256": "a1ae8cd47e0f4b4afc7336948274779b301ab73909d2ce27058eeafa640049c0"
+    }
+  ],
+  "baselineHash": "c8a6c111dca45dc421db70261e25ccfce88ca48c4413269bd04bfb67496fa17b",
+  "rows": {
+    "User": 2,
+    "Product": 1,
+    "ProductStudio": 1,
+    "ProductStudioRevision": 1,
+    "Order": 1,
+    "OrderItem": 1,
+    "OrderEvent": 1,
+    "MediaAsset": 1,
+    "MediaUsage": 1
+  }
+}

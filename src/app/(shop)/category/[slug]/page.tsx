@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import {parseSearchParams} from '@/contracts/catalog/search';
 import { notFound } from "next/navigation";
 import { type Metadata } from "next";
 import Breadcrumb from "@/components/layout/Breadcrumb";
@@ -46,6 +48,7 @@ export async function generateMetadata({ params, searchParams }: CategoryPagePro
       `Khám phá các sản phẩm ${category.name} tuyển chọn kỹ lưỡng, chất lượng cao, bảo hành linh hoạt tại CitiLap.`;
 
   return {
+    robots: Object.keys(sp).length ? {index:false,follow:true}:undefined,
     title: pageTitle,
     description: pageDescription,
     alternates: {
@@ -64,61 +67,15 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   if (navigation && !navigation.categories.some((cat) => cat.slug === slug)) notFound();
   const sp = await searchParams;
 
-  // 1. Helper to extract string or array
-  const getStringOrArray = (val: string | string[] | undefined): string[] => {
-    if (!val) return [];
-    return Array.isArray(val) ? val : [val];
-  };
-
-  const getNumberOrArray = (val: string | string[] | undefined): number[] => {
-    if (!val) return [];
-    const arr = Array.isArray(val) ? val : [val];
-    return arr.map(Number).filter((n) => !isNaN(n));
-  };
-
-  // 2. Validate and build filter options
-  let minPrice = sp.minPrice ? Number(sp.minPrice) : undefined;
-  let maxPrice = sp.maxPrice ? Number(sp.maxPrice) : undefined;
-
-  // Gracefully resolve pricePreset query parameter if minPrice/maxPrice not provided
-  if (typeof sp.pricePreset === "string" && !minPrice && !maxPrice) {
-    if (slug === "linh-kien") {
-      if (sp.pricePreset === "under-200k") maxPrice = 200_000;
-      else if (sp.pricePreset === "200k-500k") { minPrice = 200_000; maxPrice = 500_000; }
-      else if (sp.pricePreset === "500k-1m") { minPrice = 500_000; maxPrice = 1_000_000; }
-      else if (sp.pricePreset === "1m-2m") { minPrice = 1_000_000; maxPrice = 2_000_000; }
-      else if (sp.pricePreset === "over-2m") { minPrice = 2_000_000; }
-    } else {
-      if (sp.pricePreset === "under-15" || sp.pricePreset === "under-15m") maxPrice = 15_000_000;
-      else if (sp.pricePreset === "15-20" || sp.pricePreset === "15m-20m") { minPrice = 15_000_000; maxPrice = 20_000_000; }
-      else if (sp.pricePreset === "20-30" || sp.pricePreset === "20m-25m" || sp.pricePreset === "20m-30m") { minPrice = 20_000_000; maxPrice = 30_000_000; }
-      else if (sp.pricePreset === "over-30" || sp.pricePreset === "above-30m") { minPrice = 30_000_000; }
-    }
-  }
-
-  const typeParam = typeof sp.type === "string" ? sp.type : undefined;
-  const accessoryType = slug === "linh-kien" ? getAccessoryTypeBySlug(typeParam) : undefined;
-
-  const filterOptions: CategoryFilterOptions = {
-    categorySlug: slug,
-    brand: getStringOrArray(sp.brand),
-    condition: getStringOrArray(sp.condition),
-    accessoryType: typeParam,
-    type: typeParam,
-    connection: getStringOrArray(sp.connection),
-    power: getStringOrArray(sp.power),
-    minPrice,
-    maxPrice,
-    cpu: getStringOrArray(sp.cpu),
-    gpu: getStringOrArray(sp.gpu),
-    ram: getNumberOrArray(sp.ram),
-    storage: getNumberOrArray(sp.storage),
-    sort: typeof sp.sort === "string" && ["newest", "price-asc", "price-desc", "featured", "best-selling"].includes(sp.sort)
-      ? (sp.sort as CategoryFilterOptions["sort"])
-      : "newest",
-    page: sp.page ? Math.max(1, Number(sp.page)) : 1,
-    limit: 12,
-  };
+  const paramsQuery=new URLSearchParams();
+  for(const [key,value] of Object.entries(sp)) for(const item of Array.isArray(value)?value:value===undefined?[]:[value]) paramsQuery.append(key,item);
+  const sort=typeof sp.sort==='string' && ['newest','price-asc','price-desc','featured','best-selling'].includes(sp.sort)?sp.sort as CategoryFilterOptions['sort']:'newest';
+  paramsQuery.delete('sort');
+  const parsed=parseSearchParams(paramsQuery);
+  if(!parsed.success) return <div className="container mx-auto p-8"><p role="alert">Bộ lọc không hợp lệ. Kiểm tra khoảng giá và số trang.</p><Link href={'/category/'+slug}>Xóa bộ lọc</Link></div>;
+  const typeParam=typeof sp.type==='string'?sp.type:undefined;
+  const accessoryType=slug==='linh-kien'?getAccessoryTypeBySlug(typeParam):undefined;
+  const filterOptions:CategoryFilterOptions={...parsed.data,categorySlug:slug,accessoryType:typeParam,type:typeParam,sort};
 
   // 3. Query Cloudflare D1
   const result = await getCategoryFilteredProducts(filterOptions);

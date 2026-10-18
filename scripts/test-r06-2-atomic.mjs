@@ -11,6 +11,8 @@ await build({
   stdin: {
     contents: `
       export * from './src/server/services/order.service';
+      export * from './src/server/services/checkout.service';
+      export {DEFAULT_ADMIN_SETTINGS} from './src/contracts/cms/settings';
       export * from './src/server/services/contact.service';
       export * from './src/server/services/notification.service';
       export * from './src/server/services/customer.service';
@@ -45,7 +47,9 @@ await build({
 });
 
 const {
-  createOrder,
+  createOrder: createOrderService,
+  calculateCheckout,
+  DEFAULT_ADMIN_SETTINGS,
   transitionOrderStatus,
   addOrderInternalNote,
   getAllOrdersForExport,
@@ -65,6 +69,12 @@ const {
   getPrismaClient,
   setD1Database,
 } = await import('./.r06-2-test-bundle.mjs');
+
+async function createOrder(input,key,db) {
+  const selection={paymentMethod:'COD',shippingMethod:'standard',shippingAddress:'Synthetic fixture address',...input};
+  const {quote}=await calculateCheckout(selection,db);
+  return createOrderService({...selection,items:selection.items.map((item,i)=>({...item,expectedPrice:quote.lines[i].price})),checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}},key,db);
+}
 
 
 // 2. Setup isolated Miniflare D1
@@ -89,7 +99,8 @@ for (const file of migrationFiles) {
     }
   }
 }
-console.log('✓ All 16 migrations applied cleanly to isolated fixture DB.\n');
+console.log(`All ${migrationFiles.length} migrations applied to isolated fixture DB.`);
+await db.prepare("INSERT INTO SiteSettings(id,revision,document) VALUES('site',0,?)").bind(JSON.stringify({...DEFAULT_ADMIN_SETTINGS,codEnabled:true,shippingFee:0})).run();
 
 let passCount = 0;
 let totalCount = 0;

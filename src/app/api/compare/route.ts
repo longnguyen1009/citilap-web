@@ -7,7 +7,7 @@ import {
   type CompareApiResponse,
 } from "@/contracts/catalog/compare";
 import { conditionLabels, attributeTemplateDefinitions } from "@/contracts/cms/product-studio";
-import { getStorefrontPricingContext, calculateEffectivePrice } from "@/server/services/pricing.service";
+import { resolveProductsByIds } from "@/server/services/catalog.service";
 
 export const runtime = "edge";
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
     });
   }
 
-  if (uniqueIds.length > MAX_COMPARE_PRODUCTS) {
+  if (uniqueIds.length > MAX_COMPARE_PRODUCTS || uniqueIds.some(id=>! /^[a-zA-Z0-9_-]{1,128}$/.test(id))) {
     return NextResponse.json(
       {
         success: false,
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
       LEFT JOIN ProductStudio s ON s.productId = p.id
       LEFT JOIN Category c ON c.id = p.categoryId
       WHERE p.id IN (${placeholders})
-        AND p.status = 'ACTIVE'
+        AND p.status IN ('ACTIVE','active')
         AND p.deletedAt IS NULL
         AND (s.published IS NOT NULL OR s.productId IS NULL)
     `;
@@ -109,8 +109,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
     const orderedRows = uniqueIds.map((id) => rowMap.get(id)).filter(Boolean) as ProductRow[];
 
     // Authoritative Storefront Pricing Context
-    const evaluatedAt = new Date();
-    const pricingContext = await getStorefrontPricingContext(DB, evaluatedAt);
+    const cards = new Map((await resolveProductsByIds(uniqueIds)).map(p=>[p.id,p]));
 
     // Parse product details, determine template & kind
     const products: CompareProductItem[] = [];
@@ -118,8 +117,6 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
 
     for (const row of orderedRows) {
       let productName = row.name;
-      let productPrice = row.price;
-      let productOriginalPrice = row.originalPrice;
       let productCondition = row.condition || "NEW";
       let productWarranty = row.warranty || undefined;
       let productBrand = row.brand || undefined;
@@ -133,8 +130,6 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
         try {
           const doc = JSON.parse(row.published);
           if (doc.name) productName = doc.name;
-          if (typeof doc.price === "number") productPrice = doc.price;
-          if (doc.originalPrice !== undefined) productOriginalPrice = doc.originalPrice;
           if (doc.condition) productCondition = doc.condition;
           if (doc.warranty !== undefined) productWarranty = doc.warranty;
           if (doc.brand !== undefined) productBrand = doc.brand;
@@ -201,23 +196,22 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
       const cond = productCondition;
       const conditionLabel = conditionLabels[cond as keyof typeof conditionLabels] || cond;
 
-      const resolved = calculateEffectivePrice(
-        productPrice,
-        productOriginalPrice,
-        Boolean(row.isFlashSale),
-        true,
-        pricingContext,
-        evaluatedAt,
-        { productId: row.id, isVariant: false }
-      );
+      const card=cards.get(row.id);
+      if (!card) continue;
+      if (kind === 'LAPTOP') {
+        for (const [key, value] of Object.entries({CPU:card.specs.cpu,RAM:card.specs.ram,SSD:card.specs.ssd,GPU:card.specs.gpu})) {
+          if (value) parsedSpecs[key] = value;
+        }
+      }
 
       products.push({
         id: row.id,
         name: productName,
-        slug: row.slug,
-        price: resolved.effectivePrice,
-        originalPrice: resolved.compareAtPrice,
-        image: primaryImage,
+        slug: card.slug,
+        price: card.price,
+        availability: card.availability,
+        originalPrice: card.originalPrice,
+        image: card.image || primaryImage,
         kind,
         template,
         brand: productBrand,
@@ -230,6 +224,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
     }
 
     // Compatibility rule: All compared products must belong to the same template or compatible group
+    if (!products.length) return NextResponse.json({success:false,compatible:false,groupType:'',products:[],specs:[],error:'Products unavailable'},{status:404});
     const firstTemplate = products[0].template;
     const firstKind = products[0].kind;
     const isIncompatible = products.some((p) => {
@@ -322,7 +317,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
       groupType: firstTemplate,
       products,
       specs: specRows,
-    });
+    }, {headers:{'Cache-Control':'no-store'}});
   } catch (error) {
     console.error("[CompareAPI] Error evaluating compare products:", error);
     return NextResponse.json({
@@ -332,6 +327,6 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
       error: "Không thể tải thông tin so sánh sản phẩm vào lúc này.",
       products: [],
       specs: [],
-    });
+    }, {status:503,headers:{'Cache-Control':'no-store'}});
   }
 }

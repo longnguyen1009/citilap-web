@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
@@ -14,6 +14,7 @@ try {
   const DB = await mf.getD1Database('DB');
   const PRODUCT_MEDIA = await mf.getR2Bucket('PRODUCT_MEDIA');
   const env = { DB, PRODUCT_MEDIA };
+  globalThis.env=env;
   const files = (await readdir('d1-migrations')).filter((f) => f.endsWith('.sql')).sort();
   for (const file of files.filter((f) => !f.startsWith('0009'))) {
     const statements = unstable_splitSqlQuery(await readFile(`d1-migrations/${file}`, 'utf8'));
@@ -89,12 +90,13 @@ try {
   await check('CSRF denied before storage access, authorized read no-store', async () => {
     const previous = process.env.ADMIN_API_TOKEN;
     try {
-      const token = crypto.randomUUID() + crypto.randomUUID(); process.env.ADMIN_API_TOKEN = token;
-      const expires = String(Math.floor(Date.now() / 1000) + 3600);
-      const cookie = `admin_session=${expires}.${createHmac('sha256', token).update(expires).digest('base64url')}`;
+      const token = randomBytes(32).toString('hex');
+      await DB.prepare("INSERT INTO User(id,email,password,role,updatedAt) VALUES('media-owner','media@fixture.invalid','unused','OWNER',CURRENT_TIMESTAMP)").run();
+      await DB.prepare('INSERT INTO AdminSession(tokenHash,userId,version,expiresAt) VALUES(?,?,0,?)').bind(createHash('sha256').update(token).digest('hex'),'media-owner',Date.now()+3600000).run();
+      const cookie = `admin_session=${token}`;
       const bad = new Request('http://test/', { headers: { cookie, 'sec-fetch-site': 'cross-site', origin: 'https://evil.test' } });
       assert.equal((await api.mediaAdmin(bad, true, async () => null, async () => env)).status, 403);
-      const good = new Request('http://test/', { headers: { authorization: `Bearer ${token}` } });
+      const good = new Request('http://test/api/admin/media', { headers: { cookie } });
       const result = await api.mediaAdmin(good, false, (e) => api.listMedia(e.DB, {}), async () => env);
       assert.equal(result.status, 200); assert.equal(result.headers.get('cache-control'), 'private, no-store');
     } finally { if (previous === undefined) delete process.env.ADMIN_API_TOKEN; else process.env.ADMIN_API_TOKEN = previous; }

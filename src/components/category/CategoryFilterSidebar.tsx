@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from 'react';
 import { Check, RotateCcw } from "lucide-react";
 import type { FacetOption } from "@/server/services/catalog.service";
 import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES } from "@/config/accessory-taxonomy";
@@ -37,7 +38,13 @@ export default function CategoryFilterSidebar({
 }: CategoryFilterSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const urlParams = useSearchParams();
+  const [draftParams,setDraftParams] = useState(()=>new URLSearchParams(urlParams.toString()));
+  const searchParams = onApplyMobile ? draftParams : urlParams;
+  const navigate = (params:URLSearchParams) => {
+    if(onApplyMobile) setDraftParams(params);
+    else router.push(`${pathname}?${params.toString()}`, {scroll:false});
+  };
   const isAccessory =
     categorySlug === "linh-kien" ||
     categorySlug === "chuot" ||
@@ -93,7 +100,7 @@ export default function CategoryFilterSidebar({
       }
     }
 
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    navigate(params);
   };
 
   const handlePricePreset = (presetValue: string) => {
@@ -116,7 +123,7 @@ export default function CategoryFilterSidebar({
       }
     }
 
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    navigate(params);
   };
 
   const clearAllFilters = () => {
@@ -125,8 +132,7 @@ export default function CategoryFilterSidebar({
     if (q) params.set("q", q);
     const sort = searchParams.get("sort");
     if (sort) params.set("sort", sort);
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
-    if (onApplyMobile) onApplyMobile();
+    navigate(params);
   };
 
   return (
@@ -485,7 +491,7 @@ export default function CategoryFilterSidebar({
       {onApplyMobile && (
         <div className="pt-2 sticky bottom-0 bg-surface-card pb-4">
           <button
-            onClick={onApplyMobile}
+            onClick={()=>{router.push(`${pathname}?${draftParams.toString()}`, {scroll:false});onApplyMobile();}}
             className="w-full py-3 bg-brand-primary text-text-inverse font-bold rounded-control hover:bg-brand-primary-hover transition cursor-pointer shadow-md"
           >
             Áp dụng bộ lọc

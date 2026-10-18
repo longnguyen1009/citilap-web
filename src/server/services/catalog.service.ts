@@ -1,4 +1,5 @@
 import { prisma, type PrismaClient } from "@/lib/prisma";
+import {catalogBatches} from './catalog-batches';
 import { getProductImageUrl, getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import { ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 import { normalizeVnd, calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
@@ -8,6 +9,7 @@ import { normalizeVnd, calculateEffectivePrice, getStorefrontPricingContext, typ
  * All fields are sourced from Cloudflare D1 and Cloudflare R2 media metadata.
  */
 export interface HomepageProduct {
+  availability?: string;
   id: string;
   slug: string;
   sku?: string;
@@ -217,6 +219,7 @@ export interface CategoryFilteredResult {
 }
 
 type ProductDbRow = {
+  studio?: {published:string|null}|null;
   id: string;
   name: string;
   slug: string;
@@ -326,6 +329,8 @@ export function buildStorageClauses(storageInput: number | number[]) {
 }
 
 export interface ActiveFilterContext {
+  cpu?: string[];
+  gpu?: string[];
   minPrice?: number;
   maxPrice?: number;
   ram?: number[];
@@ -345,7 +350,12 @@ export function mapD1ProductToHomepageProduct(
   activeFilter?: ActiveFilterContext,
   pricingContext?: PriceEvaluationContext | null,
   at: Date = new Date()
-): HomepageProduct {
+): HomepageProduct & { matchesFilter: boolean } {
+  const published = row.studio?.published ? JSON.parse(row.studio.published) : null;
+  const effectiveVariantPrice = (v: NonNullable<ProductDbRow['variants']>[number]) => calculateEffectivePrice(v.price,v.originalPrice ?? null,Boolean(row.isFlashSale),true,pricingContext,at,{productId:row.id,variantId:v.id,isVariant:true,variantOriginalPrice:v.originalPrice ?? null}).effectivePrice;
+  const originalVariantCount = row.variants?.length || 0;
+  row = {...row, variants:row.variants?.filter(v=>!published || published.variants?.some((pv:{id:string;availability?:string})=>pv.id===v.id && (!pv.availability || ['AVAILABLE','PREORDER'].includes(pv.availability))))
+    .sort((a,b)=>effectiveVariantPrice(a)-effectiveVariantPrice(b) || a.id.localeCompare(b.id))};
   // 1. Resolve primary image from ProductImage table (metadata for Cloudflare R2)
   let resolvedImage: string | null = null;
 
@@ -389,11 +399,14 @@ export function mapD1ProductToHomepageProduct(
 
   // Resolve matching variant based on active filter context (strict variant-level price & spec alignment)
   let chosenVariant = row.variants && row.variants.length > 0 ? row.variants[0] : undefined;
+  let matchesFilter = !originalVariantCount || !!row.variants?.length;
 
   if (activeFilter && row.variants && row.variants.length > 0) {
     const matched = row.variants.find((v) => {
-      if (activeFilter.minPrice !== undefined && v.price < activeFilter.minPrice) return false;
-      if (activeFilter.maxPrice !== undefined && v.price > activeFilter.maxPrice) return false;
+      if (activeFilter.cpu?.length && !activeFilter.cpu.some(cpu => ((v as {cpu?:string|null}).cpu || row.cpu || '').toLowerCase().includes(cpu.toLowerCase()))) return false;
+      if (activeFilter.gpu?.length && !activeFilter.gpu.some(gpu => (v.gpu || '').toLowerCase().includes(gpu.toLowerCase()))) return false;
+      if (activeFilter.minPrice !== undefined && effectiveVariantPrice(v) < activeFilter.minPrice) return false;
+      if (activeFilter.maxPrice !== undefined && effectiveVariantPrice(v) > activeFilter.maxPrice) return false;
       if (activeFilter.ram && activeFilter.ram.length > 0) {
         const vRam = v.ram || "";
         const matchesRam = activeFilter.ram.some(
@@ -449,7 +462,7 @@ export function mapD1ProductToHomepageProduct(
     });
     if (matched) {
       chosenVariant = matched;
-    }
+    } else matchesFilter = false;
   }
 
   const cpu = (chosenVariant as { cpu?: string | null })?.cpu || row.cpu || specsObj.CPU || specsObj.cpu || "";
@@ -487,6 +500,8 @@ export function mapD1ProductToHomepageProduct(
 
   return {
     id: row.id,
+    matchesFilter,
+    availability: originalVariantCount && !row.variants?.length ? 'UNAVAILABLE' : published?.availability || 'AVAILABLE',
     slug: row.slug,
     sku: chosenVariant?.sku,
     variantId: chosenVariant?.id,
@@ -520,6 +535,7 @@ export function mapD1ProductToHomepageProduct(
 }
 
 const defaultInclude = {
+  studio: {select:{published:true}},
   category: {
     select: { id: true, name: true, slug: true },
   },
@@ -534,7 +550,7 @@ const defaultInclude = {
   },
   variants: {
     where: { status: { in: ["ACTIVE", "active"] } },
-    select: { id: true, sku: true, name: true, price: true, ram: true, storage: true, gpu: true, options: true },
+    select: { id: true, sku: true, name: true, price: true, originalPrice: true, cpu: true, ram: true, storage: true, gpu: true, options: true },
     orderBy: { price: "asc" as const },
   },
 };
@@ -1037,9 +1053,7 @@ export async function getCategoryFilteredProducts(
       ? (Array.isArray(options.power) ? options.power : [options.power]).filter(Boolean)
       : [];
 
-    const hasPriceFilter =
-      (options.minPrice !== undefined && options.minPrice > 0) ||
-      (options.maxPrice !== undefined && options.maxPrice > 0);
+    const hasPriceFilter = options.minPrice !== undefined || options.maxPrice !== undefined;
     const hasSpecFilters = ramList.length > 0 || storageList.length > 0 || gpuList.length > 0;
     const hasAccessoryFilters = connectionList.length > 0 || powerList.length > 0;
     const hasConditionFilter = conditionList.length > 0;
@@ -1064,20 +1078,6 @@ export async function getCategoryFilteredProducts(
       const variantMatch: any = { status: { in: ["ACTIVE", "active"] } };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const baseMatch: any = {};
-
-      // 1. Price alignment
-      if (hasPriceFilter) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const priceCond: any = {};
-        if (options.minPrice !== undefined && options.minPrice > 0) {
-          priceCond.gte = Math.round(Number(options.minPrice));
-        }
-        if (options.maxPrice !== undefined && options.maxPrice > 0) {
-          priceCond.lte = Math.round(Number(options.maxPrice));
-        }
-        variantMatch.price = priceCond;
-        baseMatch.price = priceCond;
-      }
 
       // 2. RAM alignment
       if (ramList.length > 0) {
@@ -1225,16 +1225,15 @@ export async function getCategoryFilteredProducts(
     const skip = (page - 1) * pageSize;
 
     // 5. Parallel D1 retrieval for count, paged rows, and category facets
-    const [totalCount, rows, facetPool] = await Promise.all([
-      client.product.count({ where }),
-      client.product.findMany({
+    const [rows, facetPool] = await Promise.all([
+      catalogBatches((skip,take)=>client.product.findMany({
         where,
         include: defaultInclude,
         orderBy,
-        skip,
-        take: pageSize,
-      }),
-      client.product.findMany({
+        skip,take,
+      })),
+      catalogBatches((skip,take)=>client.product.findMany({
+        skip,take,orderBy:{id:'asc'},
         where: category
           ? {
               status: { in: ["ACTIVE", "active"] },
@@ -1268,7 +1267,7 @@ export async function getCategoryFilteredProducts(
             select: { options: true, price: true },
           },
         },
-      }),
+      })),
     ]);
 
     // 6. Aggregate facet options from the category's active catalog
@@ -1422,6 +1421,8 @@ export async function getCategoryFilteredProducts(
       .sort((a, b) => a.value - b.value);
 
     const activeFilter: ActiveFilterContext = {
+      cpu: cpuList,
+      gpu: gpuList,
       minPrice: options.minPrice,
       maxPrice: options.maxPrice,
       ram: ramList,
@@ -1431,9 +1432,17 @@ export async function getCategoryFilteredProducts(
       power: powerList,
     };
 
+    // ponytail: resolve matched rows in memory; add indexed effective-price projection when catalog size requires it.
+    const products = rows.map(r=>mapD1ProductToHomepageProduct(r as unknown as ProductDbRow,activeFilter,context,at)).filter(p=>
+      p.matchesFilter && (!hasPriceFilter || (['AVAILABLE','PREORDER'].includes(p.availability || '') && p.price>0 &&
+      (options.minPrice===undefined || p.price>=options.minPrice) && (options.maxPrice===undefined || p.price<=options.maxPrice))));
+    if(options.sort==='price-asc' || options.sort==='price-desc') products.sort((a,b)=>
+      Number(!['AVAILABLE','PREORDER'].includes(a.availability || ''))-Number(!['AVAILABLE','PREORDER'].includes(b.availability || '')) ||
+      (options.sort==='price-asc'?a.price-b.price:b.price-a.price) || a.id.localeCompare(b.id));
+    const totalCount=products.length;
     return {
       category,
-      products: rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, activeFilter, context, at)),
+      products: products.slice(skip,skip+pageSize),
       totalCount,
       page,
       pageSize,
@@ -1506,6 +1515,7 @@ export async function getProductDetail(
     let activeVariant = product.variants.find(
       (v) => v.id === selectedVariantParam || v.sku === selectedVariantParam
     );
+    if (selectedVariantParam && !activeVariant) return null;
     if (!activeVariant && product.variants.length > 0) {
       activeVariant = product.variants[0];
     }
@@ -1792,7 +1802,7 @@ export async function getRelatedProducts(
 
       resolvedManual = validManualIds
         .map((id) => manualMap.get(id))
-        .filter((item): item is HomepageProduct => Boolean(item));
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
     }
 
     if (resolvedManual.length >= limit) {
@@ -1848,22 +1858,18 @@ export async function resolveProductsByIds(
   const uniqueIds = [...new Set((productIds || []).filter(Boolean))];
   if (uniqueIds.length === 0) return [];
 
-  const rows = await client.product.findMany({
-    where: {
-      id: { in: uniqueIds },
-      status: { in: ["ACTIVE", "active"] },
-      deletedAt: null, NOT: { studio: { is: { published: null } } },
-    },
-    include: defaultInclude,
-  });
-
-  const map = new Map(
-    rows.map((r) => [r.id, mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at)])
-  );
+  const map = new Map<string,HomepageProduct>();
+  for(let offset=0;offset<uniqueIds.length;offset+=80) {
+    const rows=await client.product.findMany({
+      where:{id:{in:uniqueIds.slice(offset,offset+80)},status:{in:['ACTIVE','active']},deletedAt:null,NOT:{studio:{is:{published:null}}}},
+      include:defaultInclude,
+    });
+    for(const row of rows) map.set(row.id,mapD1ProductToHomepageProduct(row as unknown as ProductDbRow,undefined,context,at));
+  }
 
   return uniqueIds
     .map((id) => map.get(id))
-    .filter((p): p is HomepageProduct => Boolean(p));
+    .filter((p): p is NonNullable<typeof p> => Boolean(p));
 }
 
 /**

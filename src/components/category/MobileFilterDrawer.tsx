@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { X, Filter } from "lucide-react";
 import CategoryFilterSidebar, { CategoryFilterSidebarProps } from "./CategoryFilterSidebar";
 
@@ -17,6 +17,14 @@ export default function MobileFilterDrawer({
   facets,
   categorySlug,
 }: MobileFilterDrawerProps) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  useEffect(()=>{
+    const node=dialog.current;
+    const opener=document.activeElement as HTMLElement | null;
+    if(isOpen) node?.showModal();
+    else node?.close();
+    return ()=>{node?.close();if(isOpen) opener?.focus();};
+  },[isOpen]);
   // Lock body scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
@@ -43,11 +51,12 @@ export default function MobileFilterDrawer({
   if (!isOpen) return null;
 
   return (
-    <div
-      role="dialog"
+    <dialog
+      ref={dialog}
+      onCancel={onClose}
       aria-modal="true"
       aria-label="Bộ lọc sản phẩm"
-      className="fixed inset-0 z-50 flex lg:hidden"
+      className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 open:flex lg:hidden"
     >
       {/* Backdrop */}
       <div
@@ -86,6 +95,6 @@ export default function MobileFilterDrawer({
           />
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

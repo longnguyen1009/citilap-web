@@ -22,6 +22,7 @@ import {
 import { useCart } from "@/context/CartContext";
 import type { CategorySummary } from "@/server/services/catalog.service";
 import type { ResolvedNavigation } from "@/contracts/cms/navigation";
+import { businessProfile } from "@/config/business-profile";
 
 const categoryIconMap: Record<string, React.ElementType> = {
   "laptop-gaming": Gamepad2,
@@ -317,7 +318,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
             {/* Bottom Support Call */}
             <div className="p-4 border-t border-border-default bg-surface-subtle">
               <div className="text-caption text-text-muted text-center">
-                Hotline tư vấn: <span className="font-bold text-brand-primary">{settings?.storePhone || "0987.654.321"}</span>
+                Hotline tư vấn: <span className="font-bold text-brand-primary">{settings?.storePhone || businessProfile.displayPhone}</span>
               </div>
             </div>
           </div>

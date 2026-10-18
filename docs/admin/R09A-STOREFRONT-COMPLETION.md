@@ -1,6 +1,6 @@
 # R09A — Hoàn thiện storefront trước UAT
 
-Ngày: 2026-10-16. Đặc tả đề xuất bổ sung V2, chưa triển khai. Tiêu thụ R07B pricing và R07C checkout; không sửa song song các file đang thuộc Antigravity.
+Ngày đặc tả: 2026-10-16. Cập nhật 2026-10-17: đã triển khai và kiểm tra local; xem [R09A-ACCEPTANCE.md](R09A-ACCEPTANCE.md) cho bằng chứng và các gate còn mở. Chưa nghiệm thu phát hành. Tiêu thụ R07B pricing và R07C checkout.
 
 ## 1. Phạm vi kiểm kê trước khi sửa
 

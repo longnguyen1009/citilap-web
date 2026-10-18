@@ -8,6 +8,7 @@ import CartValidationStatus from '@/components/cart/CartValidationStatus';
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { CheckoutQuote } from "@/contracts/checkout";
+import { useTurnstile } from '@/components/Turnstile';
 
 const PROVINCES = [
   "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
@@ -33,6 +34,7 @@ interface PriceChangeDetails {
 }
 
 export default function CheckoutPage() {
+  const turnstile = useTurnstile('order');
   const { cart, clearCart, updateItemPrice, checkoutReady } = useCart();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,9 +81,10 @@ export default function CheckoutPage() {
   const forgetAttempt = () => {setPending(null);sessionStorage.removeItem('citilap-checkout-attempt-v1');};
   const sendAttempt = async (attempt: {key:string;body:string}) => {
     if(sending.current)return;
+    if(!turnstile.ready){setFormError('Vui lòng hoàn tất xác thực bảo mật.');return;}
     sending.current=true;setIsSubmitting(true);setFormError('');
     try {
-      const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':attempt.key},body:attempt.body});
+      const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':attempt.key,'cf-turnstile-response':turnstile.token},body:attempt.body});
       const data=await response.json();
       if(response.ok && data.success){
         forgetAttempt();sessionStorage.removeItem('citilap-checkout-v1');clearCart();
@@ -89,11 +92,13 @@ export default function CheckoutPage() {
         return;
       }
       if(response.status >= 500 || response.status === 429)throw Error(data.error?.message || 'Chưa xác định được kết quả gửi đơn.');
+      // A rejected challenge cannot determine whether an earlier lost response created the order.
+      if(response.status===403){setFormError(data.error?.message || 'Vui lòng xác thực lại rồi thử lại yêu cầu.');return;}
       forgetAttempt();
       if(response.status===409 && ['PRICE_CHANGED','CHECKOUT_CHANGED'].includes(data.error?.code) && data.error?.details?.quote){setPriceChangeDetails(data.error.details);}
       else {setFormError(data.error?.message || 'Không thể gửi đơn.');if(data.error?.code==='PAYMENT_METHOD_DISABLED')setPaymentMethod('');setQuoteRetry(n=>n+1);}
     }catch{setFormError('Chưa xác định được kết quả gửi đơn. Bấm thử lại để lấy cùng đơn, không tạo yêu cầu mới.');}
-    finally{sending.current=false;setIsSubmitting(false);}
+    finally{sending.current=false;setIsSubmitting(false);turnstile.reset();}
   };
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,30 +118,12 @@ export default function CheckoutPage() {
   };
   const handleReviewCart = () => {setPriceChangeDetails(null);router.push('/cart');};
 
-  if (loaded && cart.length === 0 && !isSubmitting && !pending) {
-    return (
-      <div className="bg-[#f8fafc] min-h-[60vh] flex flex-col items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border border-gray-100">
-          <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Truck className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Giỏ hàng của bạn đang trống</h2>
-          <p className="text-gray-500 mb-6">Hãy chọn những chiếc laptop ưng ý trước khi gửi yêu cầu đặt hàng.</p>
-          <Link
-            href="/"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition inline-flex items-center gap-2 w-full justify-center shadow-sm"
-          >
-            Khám phá sản phẩm
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const isCartEmpty = loaded && cart.length === 0 && !isSubmitting && !pending;
 
   return (
-    <div className="bg-[#f8fafc] min-h-screen pb-16">
+    <div className="bg-[#f8fafc] min-h-screen pb-16 flex flex-col">
       {/* Top Header / Breadcrumb */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="bg-white border-b border-gray-200 shrink-0">
         <div className="container mx-auto px-4 max-w-[1240px]">
           <nav className="flex text-sm text-gray-500 py-3.5 font-medium items-center justify-between">
             <Link href="/cart" className="hover:text-blue-600 transition flex items-center gap-1.5 text-gray-600 font-semibold">
@@ -149,10 +136,28 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-[1240px] mt-6">
-        <CartValidationStatus />
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
+      <div className="container mx-auto px-4 max-w-[1240px] mt-6 flex-1 min-h-[760px]">
+        {isCartEmpty ? (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border border-gray-100">
+              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Truck className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Giỏ hàng của bạn đang trống</h2>
+              <p className="text-gray-500 mb-6">Hãy chọn những chiếc laptop ưng ý trước khi gửi yêu cầu đặt hàng.</p>
+              <Link
+                href="/"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition inline-flex items-center gap-2 w-full justify-center shadow-sm"
+              >
+                Khám phá sản phẩm
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            <CartValidationStatus />
+            <div className="mb-6">
+              <h1 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tight">
             Xác Nhận Yêu Cầu Đặt Hàng
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -193,8 +198,17 @@ export default function CheckoutPage() {
           </div>
         )}
 
-        {(!quote || quoteState.key !== quoteKey || quoteState.error) && <div role="status" className="mb-4 rounded border border-amber-300 p-3">{quoteState.error || 'Đang kiểm tra giá và phí giao hàng…'}<button type="button" className="ml-3 underline" onClick={()=>setQuoteRetry(n=>n+1)}>Kiểm tra lại</button></div>}
+        {quoteState.error && (
+          <div role="status" className="mb-4 rounded border border-amber-300 p-3">
+            {quoteState.error}
+            <button type="button" className="ml-3 underline" onClick={()=>setQuoteRetry(n=>n+1)}>Kiểm tra lại</button>
+          </div>
+        )}
+        {(!quote || quoteState.key !== quoteKey) && !quoteState.error && (
+          <div role="status" className="sr-only">Đang kiểm tra giá và phí giao hàng…</div>
+        )}
         {pending && <div role="status" className="mb-4 rounded border border-amber-300 p-3">Yêu cầu đang chờ kết quả. Thông tin đã được giữ để tránh tạo đơn trùng.<button type="button" disabled={isSubmitting} className="ml-3 underline" onClick={()=>sendAttempt(pending)}>Thử lại yêu cầu</button></div>}
+        {turnstile.widget}
         <form onSubmit={handleSubmitOrder}><fieldset disabled={locked} className="grid grid-cols-1 lg:grid-cols-12 gap-8 min-w-0">
           {/* Cột trái: Thông tin nhận hàng (8 cols) */}
           <div className="lg:col-span-7 xl:col-span-8 space-y-6">
@@ -478,12 +492,16 @@ export default function CheckoutPage() {
               {/* Nút gửi đơn hàng */}
               <button
                 type="submit"
-                disabled={isSubmitting || !quoteReady || !!priceChangeDetails}
+                disabled={isSubmitting || !quoteReady || !!priceChangeDetails || !turnstile.ready}
                 className="w-full mt-6 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-black py-3.5 px-4 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-base uppercase tracking-wider cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" /> Đang gửi yêu cầu...
+                  </>
+                ) : !quoteReady ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Đang tính tổng tiền...
                   </>
                 ) : (
                   "Gửi Đơn Đặt Hàng"
@@ -585,6 +603,8 @@ export default function CheckoutPage() {
               </div>
             </div>
           </dialog>
+        )}
+        </>
         )}
       </div>
     </div>

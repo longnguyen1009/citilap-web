@@ -60,13 +60,15 @@ try {
     assert.equal(await js("document.querySelector('[name=title]').value"),'Newer edit kept');
   });
   await check('History restore creates private draft and survives reload',async()=>{
-    const publicBefore=await fetch(base+'/fixture-scheduled').then(r=>r.text());
+    const publicContent=()=>api("fetch('/fixture-scheduled').then(r=>r.text()).then(html=>{const doc=new DOMParser().parseFromString(html,'text/html');doc.querySelectorAll('script').forEach(n=>n.remove());return doc.querySelector('main')?.innerHTML;})");
+    const publicBefore=await publicContent();
+    assert.ok(publicBefore,'public main must exist');
     await click('Lịch sử');await click('Khôi phục thành nháp');
     await until(()=>js("document.body?.innerText.includes('Đã khôi phục phiên bản')"),'restore completed');
     const restored=await api("fetch('/api/admin/pages/"+pageId+"').then(r=>r.json()).then(j=>j.data.document.title)");
     assert.notEqual(restored,'Newer edit kept');
     await cdp('Page.reload');await until(()=>js("document.querySelector('[name=title]')?.value==="+JSON.stringify(restored)),'restored reload');
-    assert.equal(await fetch(base+'/fixture-scheduled').then(r=>r.text()),publicBefore);
+    assert.equal(await publicContent(),publicBefore);
   });
   await check('Concurrent editor conflict preserves local text and stops retry',async()=>{
     await api("(async()=>{const d=(await fetch('/api/admin/pages/"+pageId+"').then(r=>r.json())).data;return fetch('/api/admin/pages/"+pageId+"',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({expectedRevision:d.revision,action:'save',document:{...d.document,title:'Other editor winner'}})}).then(r=>r.status)})()");

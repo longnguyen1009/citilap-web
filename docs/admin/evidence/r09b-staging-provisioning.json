@@ -1,0 +1,70 @@
+{
+  "recordedAt": "2026-10-18T01:12:28.264Z",
+  "accountId": "8952957f4eed25a74e19a3e273c4a589",
+  "database": {
+    "name": "citilap-db-staging",
+    "id": "a812357f-51a3-4139-badf-2079bf2cd2e9",
+    "region": "APAC",
+    "migrationsApplied": 25,
+    "foreignKeyViolations": 0,
+    "users": 0
+  },
+  "r2": "citilap-media-staging",
+  "backup": {
+    "path": ".wrangler/backups/r09b-staging-before-migrations.sql",
+    "sha256": "12b4d609d563571a2bbe9615dadd52fa835ee6f0e29cdf77ef6c64ca8ec3cb68",
+    "scope": "Empty new staging database before migrations; not legacy-data backup/restore rehearsal"
+  },
+  "migrations": {
+    "0001_initial_schema.sql": "cda20ca91c18fe98e34c7dd8ce9d202ddf4643e33010960c74ce7142e6167815",
+    "0002_catalog_foundation.sql": "ae710bf641254b735f15d36346824e440306f307bdb268b10e9645e18cef5b3a",
+    "0003_media_pipeline.sql": "7131b5436bc32dff30dbcaca1c49d8477ca90c0ffb36d0ed3abcf5a118b4b18b",
+    "0004_inventory_foundation.sql": "9d41b443b2f67c737150df43c82e6a4e4db0443fd4598f428ef2eba216ccfeb8",
+    "0005_simple_order.sql": "4c9cdddab6e8420674504bcfb2a9c1824590d6d96af7456d9f868dc44a41d7aa",
+    "0006_order_item_serial.sql": "d47e01ba09983bb113e94bcf6032ce32974575de0c09268001cb923f8c6c0ec6",
+    "0007_contact_and_security.sql": "4731db8ba8278475cbaf841cfb9baa1cfe044048d605f917eb15a51460495fc9",
+    "0008_order_confirmation_token_hash.sql": "88d278039f75c497a8a142b31902344312bf50593a5d66183ecb0e670f23283f",
+    "0009_cms_media_library.sql": "286dbd075283d20b0612ba4c027cc8acdeeeb4f673de5731eefd19e4492da08d",
+    "0010_product_studio.sql": "e36138abe14b867df72293c8587eda6d0d204ed02ea5b28176d9955c414b8fbb",
+    "0011_navigation_studio.sql": "7a1bc246a1a9754f533f289fcaefabeb1404990f6f69a15484014df614091d43",
+    "0012_site_settings.sql": "bfbda032a41c4f4bb2487396b0d8a161069071b96da8a629f7bb27c3e8521e37",
+    "0013_brand_seo.sql": "14f7f308ea3451a9ee8ab52ce242cfcd5f24c1936c542713a32ee3bdd79d9b05",
+    "0014_content_cms.sql": "a76b2442b662b4c2f1ba4d735f7cdcebea54eb293c42808f67eb4701dbb06ca6",
+    "0015_order_management.sql": "8ef1c89b4578741d5c4e46e59d0b1177c1d1073a8dfd9bfb7f88f93928220953",
+    "0016_contact_management_and_order_cas.sql": "9bab1521698a9fae848d3f55a18aafffeaba76a5aac9c22608d190664bac38ed",
+    "0017_site_builder.sql": "effe68d89c2c32a3ee44b094b871dfa44955b4ec8d51bc1ac2f179851c107d25",
+    "0018_campaign_and_order_snapshot.sql": "21e4addd3deb133af877d3ba4786e97f18a08fdf326785ac0f0b349a86876d3c",
+    "0019_campaign_revision_and_cas.sql": "2797d4b00433820b5da07fe64a3a46b5ff5ef493ae2fdba9beb7e8f643e3ab77",
+    "0020_campaign_concurrency_and_overlap_guards.sql": "85fdcf5c7a71e16752c155492723180307ac0cbb1170d7499f2e9db5af54b301",
+    "0021_admin_identity.sql": "705aaa1c765ce53d78eae939b4f2b255a16b6b3a7719d5c76fb252959e7e57d0",
+    "0022_checkout_snapshot.sql": "32239562678d18426185c065fed3fcab411866cc1e6a2524e83ec5db3c818fc0",
+    "0023_admin_audit_metadata.sql": "b9f9c577b9390ab8922666cab334722e3ae45208cb04d9a2bc90cc2f53103d60",
+    "0024_cms_schedule.sql": "4f541feb801ecf44c1028c6144f4ad2092fc43531ff4d667b45b47eea2822999",
+    "0025_cms_redirect.sql": "a1ae8cd47e0f4b4afc7336948274779b301ab73909d2ce27058eeafa640049c0"
+  },
+  "automaticCronEvents": [
+    {
+      "version": "7b48dd41-37c1-409e-9eaf-1cab69d08e0f",
+      "scriptName": "citilap-ecommerce-staging",
+      "outcome": "ok",
+      "event": {
+        "cron": "* * * * *",
+        "scheduledTime": 1792285863000
+      },
+      "eventTimestamp": 1792285863937,
+      "exceptions": []
+    },
+    {
+      "version": "2f1a7b1f-3af2-426c-a09a-b2fdc3c7d4bb",
+      "scriptName": "citilap-ecommerce-staging",
+      "outcome": "ok",
+      "event": {
+        "cron": "* * * * *",
+        "scheduledTime": 1792285923000
+      },
+      "eventTimestamp": 1792285923937,
+      "exceptions": []
+    }
+  ],
+  "cronLimit": "Automatic handler execution observed on empty queue; no publication job DONE proof"
+}

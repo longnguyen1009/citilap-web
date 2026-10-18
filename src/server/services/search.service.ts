@@ -1,4 +1,5 @@
 import { prisma, type PrismaClient } from "@/lib/prisma";
+import {catalogBatches} from './catalog-batches';
 import { getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import {
   type HomepageProduct,
@@ -6,7 +7,7 @@ import {
   buildRamClauses,
   buildStorageClauses,
 } from "./catalog.service";
-import { applyPricingToHomepageProducts, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
+import { calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
 
 export interface SearchFilterOptions {
   query?: string;
@@ -99,6 +100,8 @@ type ProductDbRowWithRelations = {
   isFeatured?: boolean;
   isBestSeller?: boolean;
   createdAt: Date;
+  isFlashSale?: boolean;
+  studio?: {published:string|null}|null;
   category?: { id: string; name: string; slug: string } | null;
   brandRel?: { id: string; name: string; slug: string } | null;
   productImages?: Array<{
@@ -123,6 +126,7 @@ type ProductDbRowWithRelations = {
     storage?: string | null;
     display?: string | null;
     status: string;
+    options?: string | null;
   }>;
 };
 
@@ -201,7 +205,7 @@ function resolveRepresentativeVariant(
     maxPrice?: number;
   }
 ) {
-  const activeVariants = (product.variants || []).filter((v) => v.status === "ACTIVE");
+    const activeVariants = (product.variants || []).filter((v) => ['ACTIVE','active'].includes(v.status));
 
   if (activeVariants.length === 0) {
     const basePrice = Math.round(Number(product.price) || 0);
@@ -437,6 +441,7 @@ export async function searchProducts(
       andConditions.push({
         OR: [
           { name: { contains: t } },
+          { slug: { contains: t.normalize('NFD').replace(/\p{M}/gu,'').replace(/đ/g,'d') } },
           { model: { contains: t } },
           { series: { contains: t } },
           { brand: { contains: t } },
@@ -516,9 +521,7 @@ export async function searchProducts(
     ? (Array.isArray(options.gpu) ? options.gpu : [options.gpu]).filter(Boolean)
     : [];
 
-  const hasPriceFilter =
-    (options.minPrice !== undefined && options.minPrice > 0) ||
-    (options.maxPrice !== undefined && options.maxPrice > 0);
+  const hasPriceFilter = options.minPrice !== undefined || options.maxPrice !== undefined;
   const hasSpecFilters = ramList.length > 0 || storageList.length > 0 || gpuList.length > 0;
   const hasAccessoryFilters = connectionList.length > 0 || powerList.length > 0;
   const hasConditionFilter = conditionList.length > 0;
@@ -540,20 +543,6 @@ export async function searchProducts(
     const variantMatch: any = { status: { in: ["ACTIVE", "active"] } };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const baseMatch: any = {};
-
-    // 1. Price alignment
-    if (hasPriceFilter) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const priceCond: any = {};
-      if (options.minPrice !== undefined && options.minPrice > 0) {
-        priceCond.gte = Math.round(Number(options.minPrice));
-      }
-      if (options.maxPrice !== undefined && options.maxPrice > 0) {
-        priceCond.lte = Math.round(Number(options.maxPrice));
-      }
-      variantMatch.price = priceCond;
-      baseMatch.price = priceCond;
-    }
 
     // 2. RAM alignment
     if (ramList.length > 0) {
@@ -684,21 +673,23 @@ export async function searchProducts(
   }
 
   // 2. Fetch matched products from D1
-  const rawProducts = await client.product.findMany({
+  const rawProducts = await catalogBatches((skip,take)=>client.product.findMany({
+    skip,take,
     where,
     include: {
+      studio: {select:{published:true}},
       brandRel: true,
       category: true,
       productImages: {
         orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
       },
       variants: {
-        where: { status: "ACTIVE" },
+        where: { status: {in:['ACTIVE','active']} },
         orderBy: { price: "asc" },
       },
     },
-    orderBy: { createdAt: "desc" },
-  });
+    orderBy: [{ createdAt: "desc" },{id:'asc'}],
+  }));
 
   // 3. Map products, resolving representative variants and scores
   const specFilterParams = {
@@ -710,15 +701,39 @@ export async function searchProducts(
     maxPrice: options.maxPrice,
   };
 
-  const processedProducts: Array<{
+  let processedProducts: Array<{
     product: HomepageProduct;
     relevanceScore: number;
     createdAt: Date;
     id: string;
     categorySlug?: string;
     brandSlug?: string;
-  }> = rawProducts.map((row) => {
-    const dbRow = row as unknown as ProductDbRowWithRelations;
+  }> = rawProducts.flatMap((row) => {
+    const original = row as unknown as ProductDbRowWithRelations;
+    const published = original.studio?.published ? JSON.parse(original.studio.published) : null;
+    let availability = published?.availability || 'AVAILABLE';
+    const priceFor = (price:number,originalPrice:number|null|undefined,variantId?:string) => calculateEffectivePrice(price,originalPrice ?? null,Boolean(original.isFlashSale),true,context,at,{productId:original.id,variantId,isVariant:!!variantId,variantOriginalPrice:originalPrice ?? null});
+    const base = priceFor(original.price,original.originalPrice);
+    const dbRow:ProductDbRowWithRelations = {...original,price:base.effectivePrice,originalPrice:base.compareAtPrice,
+      variants:original.variants?.filter(v=>!published || published.variants?.some((pv:{id:string;availability?:string})=>pv.id===v.id && (!pv.availability || ['AVAILABLE','PREORDER'].includes(pv.availability)))).map(v=>{
+        const price=priceFor(v.price,v.originalPrice,v.id);
+        return {...v,price:price.effectivePrice,originalPrice:price.compareAtPrice};
+      }).sort((a,b)=>a.price-b.price || a.id.localeCompare(b.id))};
+    if (original.variants?.length && !dbRow.variants?.length) availability='UNAVAILABLE';
+    if (dbRow.variants?.length) {
+      const matchesCapacity = (text:string|null|undefined, values:number[], storage=false) => !values.length || values.some(n=>{
+        const match=(text || '').match(/(?:^|\s)(\d+(?:\.\d+)?)\s*(GB|TB)\b/i);
+        return !!match && (Number(match[1])*(match[2].toUpperCase()==='TB'?1024:1)===n || (storage && n===1024 && Number(match[1])===1000));
+      });
+      dbRow.variants=dbRow.variants.filter(v=>matchesCapacity(v.ram,ramList) && matchesCapacity(v.storage,storageList,true) &&
+        (!gpuList.length || gpuList.some(g=>(v.gpu || '').toLowerCase().includes(g.toLowerCase()))) &&
+        (!cpuList.length || cpuList.some(c=>(v.cpu || original.cpuSeries || original.cpu || '').toLowerCase().includes(c.toLowerCase()))) &&
+        (options.minPrice===undefined || v.price>=options.minPrice) && (options.maxPrice===undefined || v.price<=options.maxPrice) &&
+        (!conditionList.length || conditionList.some(c=>(v.options || '').includes(`"condition":"${c}"`))) &&
+        (!connectionList.length || connectionList.some(c=>(v.options || '').includes(c))) &&
+        (!powerList.length || powerList.some(c=>(v.options || '').includes(c))));
+      if (!dbRow.variants.length) return [];
+    }
     const resolvedImage = resolvePrimaryImageUrl(dbRow);
     const rep = resolveRepresentativeVariant(dbRow, tokens, specFilterParams);
     const relevanceScore = calculateProductRelevanceScore(dbRow, cleanQuery, tokens);
@@ -740,6 +755,7 @@ export async function searchProducts(
       series: dbRow.series || undefined,
       condition: dbRow.condition || "NEW",
       price: rep.price,
+      availability,
       originalPrice: rep.originalPrice,
       discount: rep.discount,
       stock: rep.stock,
@@ -749,15 +765,19 @@ export async function searchProducts(
       specs: rep.specs,
     };
 
-    return {
+    return [{
       product: homepageProduct,
       relevanceScore,
       createdAt: dbRow.createdAt,
       id: dbRow.id,
       categorySlug,
       brandSlug: dbRow.brandRel?.slug,
-    };
+    }];
   });
+
+  processedProducts=processedProducts.filter(({product})=>!hasPriceFilter ||
+    (['AVAILABLE','PREORDER'].includes(product.availability || '') && product.price>0 &&
+    (options.minPrice===undefined || product.price>=options.minPrice) && (options.maxPrice===undefined || product.price<=options.maxPrice)));
 
   // 4. Sort results
   const sortMode = options.sort || (cleanQuery ? "relevance" : "newest");
@@ -767,16 +787,16 @@ export async function searchProducts(
       if (b.relevanceScore !== a.relevanceScore) {
         return b.relevanceScore - a.relevanceScore;
       }
-      return b.createdAt.getTime() - a.createdAt.getTime();
+      return b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
     }
     if (sortMode === "price-asc") {
-      return a.product.price - b.product.price;
+      return Number(!['AVAILABLE','PREORDER'].includes(a.product.availability || ''))-Number(!['AVAILABLE','PREORDER'].includes(b.product.availability || '')) || a.product.price - b.product.price || a.id.localeCompare(b.id);
     }
     if (sortMode === "price-desc") {
-      return b.product.price - a.product.price;
+      return Number(!['AVAILABLE','PREORDER'].includes(a.product.availability || ''))-Number(!['AVAILABLE','PREORDER'].includes(b.product.availability || '')) || b.product.price - a.product.price || a.id.localeCompare(b.id);
     }
     if (sortMode === "newest") {
-      return b.createdAt.getTime() - a.createdAt.getTime();
+      return b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
     }
     return 0;
   });
@@ -792,10 +812,12 @@ export async function searchProducts(
   let minPriceFound = Number.MAX_SAFE_INTEGER;
   let maxPriceFound = 0;
 
+  const shownProducts=new Map(processedProducts.map(p=>[p.id,p.product]));
   for (const item of rawProducts) {
     const row = item as unknown as ProductDbRowWithRelations;
-    if (row.price < minPriceFound) minPriceFound = row.price;
-    if (row.price > maxPriceFound) maxPriceFound = row.price;
+    const shown=shownProducts.get(row.id);
+    if (!shown) continue;
+    if (['AVAILABLE','PREORDER'].includes(shown.availability || '')) {minPriceFound=Math.min(minPriceFound,shown.price);maxPriceFound=Math.max(maxPriceFound,shown.price);}
 
     // Brand
     if (row.brandRel) {
@@ -876,7 +898,7 @@ export async function searchProducts(
   const totalPages = Math.ceil(totalCount / pageSize);
   const startIndex = (page - 1) * pageSize;
   const rawPagedList = processedProducts.slice(startIndex, startIndex + pageSize).map((p) => p.product);
-  const pagedList = applyPricingToHomepageProducts(rawPagedList, context, at);
+  const pagedList = rawPagedList;
 
   return {
     query: cleanQuery,

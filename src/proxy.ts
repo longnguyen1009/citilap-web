@@ -4,6 +4,11 @@ import { mediaEnvironment } from './server/media-http';
 import { publicRedirect } from './server/services/redirect.service';
 // ponytail: DB check per admin page ensures immediate revocation; move to per-page DAL guards if latency grows.
 export async function proxy(request: NextRequest) {
+  const response = await routeRequest(request);
+  if (process.env.APP_ENV === 'staging') response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  return response;
+}
+async function routeRequest(request: NextRequest) {
   if(!/^\/admin(?:\/|$)/.test(request.nextUrl.pathname)){
     if(!['GET','HEAD'].includes(request.method) || /^\/(api|_next|auth|login|logout|preview|checkout|cart|order-tracking)(\/|$)/.test(request.nextUrl.pathname) || /\.[^/]+$/.test(request.nextUrl.pathname))return NextResponse.next();
     try{

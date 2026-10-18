@@ -9,7 +9,7 @@ import { useCompare } from "@/context/CompareContext";
 import { Badge } from "@/components/ui/Badge";
 import { PriceTag } from "@/components/ui/PriceTag";
 import { SpecChip } from "@/components/ui/SpecChip";
-import { ConditionBadge, resolveConditionMeta } from "@/components/ui/ConditionBadge";
+import { ConditionBadge } from "@/components/ui/ConditionBadge";
 import { StockBadge } from "@/components/ui/StockBadge";
 
 export type ProductCardProduct = {
@@ -30,6 +30,7 @@ export type ProductCardProduct = {
   series?: string;
   condition?: string; // Stable codes: "NEW", "LIKE_NEW", "USED", or legacy UI strings
   stock?: number | null;
+  availability?: string;
   warranty?: string; // e.g. "BH 12 tháng"
   badge?: string; // e.g. "Bán chạy", "Deal Sốc"
   specs?: {
@@ -141,9 +142,6 @@ export default function ProductCard({
     } else {
       addToWishlist({
         productId: product.id,
-        name: product.name,
-        price: typeof product.price === "number" ? `${product.price.toLocaleString("vi-VN")}đ` : product.price,
-        image: product.image || "/images/placeholder-laptop.svg",
       });
     }
   };
@@ -160,7 +158,6 @@ export default function ProductCard({
         slug: product.slug || product.id,
         price: Number(product.price) || 0,
         image: product.image,
-        kind: product.specs?.cpu ? "LAPTOP" : "ACCESSORY",
       });
       if (!res.success && res.message) {
         alert(res.message);
@@ -170,12 +167,10 @@ export default function ProductCard({
 
   const variantQuery = product.sku ? `?sku=${encodeURIComponent(product.sku)}` : (product.variantId ? `?variant=${encodeURIComponent(product.variantId)}` : "");
   const productHref = product.slug ? `/product/${product.slug}${variantQuery}` : `/product/${product.id}${variantQuery}`;
-  const conditionMeta = resolveConditionMeta(product.condition, product.name);
-  const isLikeNew = conditionMeta.code === "LIKE_NEW" || conditionMeta.code === "USED";
-  const isOutOfStock = product.stock !== undefined && product.stock !== null && product.stock <= 0;
+  const isOutOfStock = product.availability ? product.availability === 'UNAVAILABLE' : product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const warrantyText = formatWarranty(
     product.warranty,
-    isLikeNew ? "BH 06-12 tháng" : "BH 12-24 tháng"
+    "Chưa cập nhật bảo hành"
   );
 
   // Format key specs for density & clarity
@@ -310,7 +305,7 @@ export default function ProductCard({
 
         {/* Price Row */}
         <PriceTag
-          price={product.price}
+          price={product.availability === 'CONTACT' ? 'Liên hệ' : product.price}
           originalPrice={product.originalPrice ?? product.oldPrice}
           size="md"
           className="mt-2"
@@ -366,7 +361,7 @@ export default function ProductCard({
           </div>
 
           {/* Standardized Stock Indicator */}
-          <StockBadge stock={product.stock} variant="indicator" />
+          {product.availability ? <span>{({AVAILABLE:'Nhận yêu cầu mua',PREORDER:'Nhận đặt trước',CONTACT:'Liên hệ tư vấn',UNAVAILABLE:'Tạm ngừng nhận đơn'} as Record<string,string>)[product.availability] || 'Chưa cập nhật'}</span> : <StockBadge stock={product.stock} variant="indicator" />}
         </div>
 
         {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}

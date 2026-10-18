@@ -36,7 +36,13 @@ try {
   const saveSettings=async patch=>{config={...config,...patch};await db.prepare("INSERT INTO SiteSettings(id,revision,document) VALUES('site',0,?) ON CONFLICT(id) DO UPDATE SET revision=revision+1,document=excluded.document").bind(JSON.stringify(config)).run();};
   await saveSettings({});
   for(const [id,name] of [['fixture-p','Fixture Laptop Alpha'],['fixture-q','Fixture Laptop Beta']])await db.prepare("INSERT INTO Product(id,name,slug,description,price,originalPrice,categoryId,brandId,brand,status,isFeatured,isFlashSale,stock,images,updatedAt) VALUES(?,?,?,'Full app fixture',20000000,22000000,'fixture-cat','fixture-brand','Fixture Brand','ACTIVE',1,1,10,'[]',CURRENT_TIMESTAMP)").bind(id,name,id).run();
-  const navigation={schemaVersion:1,categories:[],collections:[{id:'fixture-collection',name:'Fixture Collection',slug:'fixture-collection',description:'Fixture',visible:true,mode:'manual',productIds:['fixture-p','fixture-q']}],menus:{main:[],footer:[]}};
+  await db.prepare("INSERT INTO Category(id,name,slug,updatedAt) VALUES('linh-kien','Linh Kiện – Phụ Kiện','linh-kien',CURRENT_TIMESTAMP)").run();
+  await db.prepare("INSERT INTO Product(id,name,slug,description,price,categoryId,status,stock,images,updatedAt) VALUES('fixture-mouse','Fixture Chuột Gaming','fixture-chuot-gaming','Chuột gaming fixture',500000,'linh-kien','ACTIVE',20,'[]',CURRENT_TIMESTAMP)").run();
+  await db.prepare("INSERT INTO ProductStudio(productId,draft,published) VALUES('fixture-mouse','{}',?)").bind(JSON.stringify({schemaVersion:1,name:'Fixture Chuột Gaming',template:'MOUSE',condition:'NEW',price:500000,variants:[],specs:[{key:'Chuẩn kết nối',value:'Wireless 2.4GHz'}]})).run();
+  await db.prepare("INSERT INTO Product(id,name,slug,description,price,categoryId,status,stock,images,updatedAt) VALUES('fixture-draft','Fixture Laptop Draft Secret','fixture-laptop-draft-secret','Draft product',25000000,'fixture-cat','ACTIVE',5,'[]',CURRENT_TIMESTAMP)").run();
+  await db.prepare("INSERT INTO ProductStudio(productId,draft,published) VALUES('fixture-draft','{\"name\":\"Fixture Laptop Draft Secret\"}',NULL)").run();
+  await db.prepare("INSERT INTO ProductVariant(id,productId,sku,name,price,originalPrice,stock,ram,storage,status,options,updatedAt) VALUES('var-16','fixture-p','SKU-P-16','16GB RAM / 512GB SSD',20000000,22000000,10,'16GB','512GB','ACTIVE','{}',CURRENT_TIMESTAMP),('var-32','fixture-p','SKU-P-32','32GB RAM / 1TB SSD',25000000,27000000,5,'32GB','1TB','ACTIVE','{}',CURRENT_TIMESTAMP)").run();
+  const navigation={schemaVersion:1,categories:[{id:'fixture-cat',name:'Fixture Laptops',slug:'fixture-laptops',href:'/category/fixture-laptops',visible:true},{id:'linh-kien',name:'Linh Kiện – Phụ Kiện',slug:'linh-kien',href:'/category/linh-kien',visible:true}],collections:[{id:'fixture-collection',name:'Fixture Collection',slug:'fixture-collection',description:'Fixture',visible:true,mode:'manual',productIds:['fixture-p','fixture-q']}],menus:{main:[],footer:[]}};
   await db.prepare("INSERT INTO NavigationStudio(id,draft,published,publishedRevision) VALUES('site',?,?,1)").bind(JSON.stringify(navigation),JSON.stringify(navigation)).run();
   const landing={schemaVersion:1,title:'Fixture Builder',internalName:'Fixture Builder',slug:'fixture-builder',seo:{},sections:[{id:'fixture-grid',type:'product_grid',name:'Fixture Grid',enabled:true,data:{type:'product_grid',title:'Fixture Grid',sourceMode:'manual',manualProductIds:['fixture-p','fixture-q']}}]};
   await db.prepare("INSERT INTO LandingPage(id,slug,name,status) VALUES('fixture-landing','fixture-builder','Fixture Builder','PUBLISHED')").run();
@@ -57,7 +63,9 @@ try {
       if(input.action==='settings')await saveSettings(input.patch || {});
       if(input.action==='unavailable')await db.prepare("UPDATE Product SET status='INACTIVE' WHERE id='fixture-p'").run();
       if(input.action==='available')await db.prepare("UPDATE Product SET status='ACTIVE' WHERE id='fixture-p'").run();
-      if(input.action==='price')await db.prepare("UPDATE Product SET price=? WHERE id='fixture-p'").bind(input.price).run();
+      if(input.action==='variant-unavailable')await db.prepare("UPDATE ProductVariant SET status='INACTIVE' WHERE id='var-16'").run();
+      if(input.action==='variant-available')await db.prepare("UPDATE ProductVariant SET status='ACTIVE' WHERE id='var-16'").run();
+      if(input.action==='price'){await db.prepare("UPDATE Product SET price=? WHERE id='fixture-p'").bind(input.price).run();await db.prepare("UPDATE ProductVariant SET price=? WHERE id='var-16'").bind(input.price).run();}
       if(input.action==='fault')await db.prepare('ALTER TABLE Product RENAME TO FixtureProductUnavailable').run();
       if(input.action==='recover')await db.prepare('ALTER TABLE FixtureProductUnavailable RENAME TO Product').run();
       if(input.action==='archive-all')await db.prepare("UPDATE PromotionCampaign SET status='ARCHIVED',revision=revision+1").run();
@@ -193,6 +201,18 @@ try {
     const exported=await send('/api/admin/orders/export?search=NoSuchFixtureCustomer','GET',undefined,true);assert.equal(exported.status,200,exported.text);assert.ok(!exported.text.includes('Fixture Customer'));
     assert.equal((await db.prepare("SELECT count(*) AS n FROM AdminAudit WHERE action LIKE '%export%'").first()).n,before+1);
   });
+  if(process.argv.includes('--r09a')) {
+    await check('R09A wishlist fresh public data and strict query validation',async()=>{
+      const r=await send('/api/wishlist?ids=fixture-p,missing');assert.equal(r.status,200,r.text);assert.equal(r.json.products[0].id,'fixture-p');assert.deepEqual(r.json.unavailableIds,['missing']);
+      assert.equal((await send('/api/search?page=NaN')).status,400);
+      assert.equal((await send('/api/wishlist?ids=../bad')).status,400);
+    });
+    await check('R09A real search and assistance routes render without fake profile/tracking',async()=>{
+      const search=await send('/search?q=Fixture');assert.equal(search.status,200,search.text.slice(0,300));assert.ok(search.text.includes('Fixture Laptop'));
+      const profile=await send('/profile');assert.equal(profile.status,200);assert.ok(!profile.text.includes('Nguyễn Văn A'));
+      const tracking=await send('/order-tracking');assert.equal(tracking.status,200);assert.ok(tracking.text.includes('Tra cứu tự động'));assert.ok(!tracking.text.includes('Số điện thoại người nhận'));
+    });
+  }
   console.log('R08_FULL_APP_FIXTURE '+base);
   console.log('R08 full Worker HTTP/D1: '+passed+'/'+passed+' PASS');
   if(process.argv.includes('--serve'))await new Promise(r=>process.once('SIGINT',r));

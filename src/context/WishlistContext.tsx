@@ -1,12 +1,10 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { wishlistIds, MAX_WISHLIST_PRODUCTS } from '@/contracts/catalog/wishlist';
 
 type WishlistItem = {
   productId: string;
-  name: string;
-  price: string;
-  image: string;
 };
 
 type WishlistContextType = {
@@ -15,6 +13,8 @@ type WishlistContextType = {
   removeFromWishlist: (productId: string) => void;
   isInWishlist: (productId: string) => boolean;
   wishlistCount: number;
+  storageError: boolean;
+  loaded: boolean;
 };
 
 const WishlistContext = createContext<WishlistContextType | undefined>(undefined);
@@ -22,6 +22,7 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 export function WishlistProvider({ children }: { children: React.ReactNode }) {
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [storageError, setStorageError] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -29,23 +30,29 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem("citilap-wishlist");
       if (stored) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- restore persisted client state after hydration
-        setWishlist(JSON.parse(stored));
+        setWishlist(wishlistIds(JSON.parse(stored)).map(productId => ({productId})));
       }
-    } catch { /* ignore */ }
+    } catch { setStorageError(true); }
     setLoaded(true);
   }, []);
 
   // Save to localStorage on change
   useEffect(() => {
     if (loaded) {
-      localStorage.setItem("citilap-wishlist", JSON.stringify(wishlist));
+      try {
+        localStorage.setItem("citilap-wishlist", JSON.stringify({version:1, ids:wishlist.map(item=>item.productId)}));
+      } catch {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- report blocked storage without losing session edits
+        setStorageError(true);
+      }
     }
   }, [wishlist, loaded]);
 
   const addToWishlist = useCallback((item: WishlistItem) => {
     setWishlist((prev) => {
       if (prev.some((w) => w.productId === item.productId)) return prev;
-      return [...prev, item];
+      if (!wishlistIds([item.productId]).length || prev.length >= MAX_WISHLIST_PRODUCTS) return prev;
+      return [...prev, {productId:item.productId}];
     });
   }, []);
 
@@ -64,6 +71,8 @@ export function WishlistProvider({ children }: { children: React.ReactNode }) {
       removeFromWishlist,
       isInWishlist,
       wishlistCount: wishlist.length,
+      storageError,
+      loaded,
     }}>
       {children}
     </WishlistContext.Provider>

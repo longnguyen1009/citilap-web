@@ -35,7 +35,7 @@ try {
   await mkdir('docs/admin/evidence',{recursive:true});
   await control({action:'settings',patch:{codEnabled:true,bankTransferEnabled:true,bankAccountInfo:'Fixture Bank A - 000001',addressHanoi:'Fixture showroom A',shippingFee:30000,freeShippingThreshold:20000000}});
   await check('PDP to full checkout quote, bank instructions, desktop layout',async()=>{
-    await cdp('Page.navigate',{url:base+'/product/fixture-p'});await waitText('THÊM VÀO GIỎ');await click('THÊM VÀO GIỎ');await waitText('Đã thêm');
+    await cdp('Page.navigate',{url:base+'/product/fixture-p'});await waitText('Thêm vào giỏ');await click('Thêm vào giỏ');await waitText('Đã thêm');
     await cdp('Page.navigate',{url:base+'/checkout'});await waitText('Phương thức thanh toán');await waitText('Chuyển khoản ngân hàng');
     await click('Nhận tại cửa hàng');await click('Chuyển khoản ngân hàng','label');await waitText('Fixture Bank A');
     await fill('fullName','Fixture Browser Customer');await fill('phone','0900000000');await fill('email','browser@example.test');
@@ -56,6 +56,31 @@ try {
     await cdp('Fetch.continueRequest',{requestId:delivery.requestId}).catch(()=>{});await cdp('Fetch.disable');
     assert.ok((await text()).includes('Miễn phí'));assert.ok((await text()).includes('Fixture showroom A'));
   });
+  await check('Variant disabled after quote rejects submit and preserves customer context',async()=>{
+    const before=JSON.parse(await control({action:'stats'})).orders;
+    await control({action:'variant-unavailable'});
+    try {
+      paused=null;await cdp('Fetch.enable',{patterns:[{urlPattern:'*/api/orders',requestStage:'Response'}]});
+      await click('Gửi Đơn Đặt Hàng');await until(()=>paused,'unavailable order response');
+      assert.ok(paused.responseStatusCode>=400 && paused.responseStatusCode<500);
+      await cdp('Fetch.continueResponse',{requestId:paused.requestId});await cdp('Fetch.disable');
+      assert.equal(JSON.parse(await control({action:'stats'})).orders,before);
+      assert.equal(await js("document.querySelector('[name=fullName]').value"),'Fixture Browser Customer');
+      assert.equal(await js("JSON.parse(localStorage.getItem('citilap_cart'))[0].variantId"),'var-16');
+    } finally {await cdp('Fetch.disable');await control({action:'variant-available'});}
+    await cdp('Page.reload');await waitText('Fixture Bank A');
+    await until(()=>js("!document.querySelector('button[type=submit]').disabled"),'variant recovered');
+  });
+  await check('Live price change requires customer review without creating an order',async()=>{
+    const before=JSON.parse(await control({action:'stats'})).orders;
+    await control({action:'price',price:23456000});
+    await click('Gửi Đơn Đặt Hàng');await waitText('Thông tin đặt hàng đã thay đổi');await waitText('23.456.000');
+    assert.equal(JSON.parse(await control({action:'stats'})).orders,before);
+    assert.equal(await js("document.querySelector('[name=fullName]').value"),'Fixture Browser Customer');
+    await click('Xác nhận thông tin mới');
+    await until(()=>js("!document.querySelector('button[type=submit]').disabled"),'price acknowledged');
+    assert.equal(JSON.parse(await control({action:'stats'})).orders,before,'acknowledgment must not submit');
+  });
   await check('Bank text changed after quote: explicit review, form retained, no order before confirmation',async()=>{
     const before=JSON.parse(await control({action:'stats'})).orders;await control({action:'settings',patch:{bankAccountInfo:'Fixture Bank B - 000002'}});
     await click('Gửi Đơn Đặt Hàng');await waitText('Thông tin đặt hàng đã thay đổi');await waitText('Fixture Bank B');
@@ -68,6 +93,12 @@ try {
     await click('Gửi Đơn Đặt Hàng');await until(()=>paused,'order response');assert.equal(paused.responseStatusCode,201);
     await cdp('Fetch.failRequest',{requestId:paused.requestId,errorReason:'ConnectionClosed'});await cdp('Fetch.disable');
     await waitText('Thử lại yêu cầu');assert.equal(JSON.parse(await control({action:'stats'})).orders,before+1);
+    const savedAttempt=await js("sessionStorage.getItem('citilap-checkout-attempt-v1')");
+    await cdp('Fetch.enable',{patterns:[{urlPattern:'*/api/orders',requestStage:'Request'}]});paused=null;
+    await click('Thử lại yêu cầu');await until(()=>paused,'challenge rejection');
+    await cdp('Fetch.fulfillRequest',{requestId:paused.requestId,responseCode:403,responseHeaders:[{name:'Content-Type',value:'application/json'}],body:Buffer.from(JSON.stringify({success:false,error:{code:'timeout-or-duplicate',message:'Challenge expired'}})).toString('base64')});
+    await cdp('Fetch.disable');await waitText('Challenge expired');
+    assert.equal(await js("sessionStorage.getItem('citilap-checkout-attempt-v1')"),savedAttempt,'challenge rejection must retain idempotency key and body');
     await control({action:'settings',patch:{bankTransferEnabled:false,codEnabled:false,bankAccountInfo:'Fixture Bank C',addressHanoi:'Fixture showroom C'}});
     await cdp('Page.reload');await waitText('Thử lại yêu cầu');await click('Thử lại yêu cầu');await waitText('Đã Tiếp Nhận Đơn Đặt Hàng!');await waitText('Fixture Bank B');
     assert.ok((await text()).includes('Fixture showroom A'));assert.ok(!(await text()).includes('Fixture Bank C'));assert.equal(JSON.parse(await control({action:'stats'})).orders,before+1);await shot('order-success');

@@ -1,3 +1,4 @@
+import {getStorefrontSettings} from '@/server/services/storefront-cms.service';
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -48,6 +49,8 @@ export async function generateMetadata({ params }: PostDetailPageProps): Promise
 export default async function PostDetailPage({ params }: PostDetailPageProps) {
   const { slug } = await params;
 
+  const settings=await getStorefrontSettings();
+  const phone=settings?.storePhone || businessProfile.displayPhone;
   let env;
   try {
     env = await mediaEnvironment();
@@ -270,10 +273,10 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
                 Kỹ thuật viên tại CitiLap luôn sẵn sàng hỗ trợ bạn lựa chọn cấu hình phù hợp với nhu cầu và ngân sách thực tế.
               </p>
               <a
-                href={businessProfile.telHref}
+                href={'tel:'+phone.replace(/\s+/g,'')}
                 className="block text-center w-full py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-900 font-bold text-xs uppercase tracking-wider transition shadow-sm"
               >
-                Gọi ngay: {businessProfile.displayPhone}
+                Gọi ngay: {phone}
               </a>
             </div>
           </aside>

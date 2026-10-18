@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useTurnstile } from "@/components/Turnstile";
 import { MessageCircle, Phone, User, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import { siteConfig } from "@/lib/site-config";
 
 export default function ContactSection() {
+  const turnstile = useTurnstile("contact");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [need, setNeed] = useState("gaming");
@@ -16,6 +18,7 @@ export default function ContactSection() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!turnstile.ready) return;
     if (!name.trim() || !phone.trim()) {
       setError("Vui lòng nhập họ tên và số điện thoại.");
       return;
@@ -35,7 +38,7 @@ export default function ContactSection() {
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "cf-turnstile-response": turnstile.token },
         body: JSON.stringify({
           name: name.trim(),
           phone: phone.trim(),
@@ -61,6 +64,7 @@ export default function ContactSection() {
     } catch {
       setError("Không thể kết nối đến máy chủ. Quý khách vui lòng liên hệ hotline " + siteConfig.phone);
     } finally {
+      turnstile.reset();
       setLoading(false);
     }
   };
@@ -198,9 +202,11 @@ export default function ContactSection() {
                     </select>
                   </div>
 
+                  {turnstile.widget}
+
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={!turnstile.ready || loading}
                     className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-bold py-3.5 rounded-xl transition duration-300 uppercase text-sm tracking-wider mt-2 shadow-lg hover:shadow-blue-500/40 flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {loading ? (

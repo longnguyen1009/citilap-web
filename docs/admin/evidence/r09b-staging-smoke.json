@@ -1,0 +1,32 @@
+{
+  "recordedAt": "2026-10-18T01:36:40.001Z",
+  "base": "https://citilap-ecommerce-staging.restless-snowflake-aaae.workers.dev",
+  "results": [
+    {
+      "path": "/",
+      "status": 200,
+      "noindex": true
+    },
+    {
+      "path": "/search",
+      "status": 200,
+      "noindex": true
+    },
+    {
+      "path": "/api/products",
+      "status": 200,
+      "noindex": true
+    },
+    {
+      "path": "/api/admin/settings",
+      "status": 401,
+      "noindex": true
+    },
+    {
+      "path": "/robots.txt",
+      "status": 200,
+      "noindex": true
+    }
+  ],
+  "scope": "Read-only HTTP smoke; no authenticated UAT or populated checkout proof"
+}

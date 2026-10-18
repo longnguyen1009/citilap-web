@@ -1,27 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { X, Scale, ShoppingCart, AlertTriangle, Check, RefreshCw } from "lucide-react";
+import { X, Scale, AlertTriangle, RefreshCw } from "lucide-react";
 import { useCompare } from "@/context/CompareContext";
-import { useCart } from "@/context/CartContext";
 import { MAX_COMPARE_PRODUCTS, type CompareApiResponse } from "@/contracts/catalog/compare";
 
 export default function CompareModal() {
   const { isCompareOpen, closeCompare, items, removeFromCompare, clearCompare } = useCompare();
-  const { addToCart } = useCart();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<CompareApiResponse | null>(null);
   const [onlyDifferences, setOnlyDifferences] = useState(false);
-  const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
+  const dialog = useRef<HTMLDialogElement>(null);
 
   // Keyboard Escape handler and focus return
   useEffect(() => {
     if (!isCompareOpen) return;
 
     const previousActiveElement = document.activeElement as HTMLElement | null;
+    const node = dialog.current;
+    node?.showModal();
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -34,6 +34,7 @@ export default function CompareModal() {
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      node?.close();
       if (previousActiveElement && typeof previousActiveElement.focus === "function") {
         previousActiveElement.focus();
       }
@@ -78,29 +79,17 @@ export default function CompareModal() {
     };
 
     void fetchCompareData();
+    const timer=setInterval(fetchCompareData,30000);
+    window.addEventListener('citilap:price-refresh',fetchCompareData);
     return () => {
+      clearInterval(timer);
+      window.removeEventListener('citilap:price-refresh',fetchCompareData);
       isMounted = false;
     };
   }, [isCompareOpen, items, removeFromCompare]);
 
   if (!isCompareOpen) return null;
 
-  const handleAddToCart = (product: CompareApiResponse["products"][number]) => {
-    addToCart({
-      id: `${product.id}-compare`,
-      productId: product.id,
-      name: product.name,
-      image: product.image || "/images/placeholder-laptop.svg",
-      price: product.price,
-      displayPrice: `${product.price.toLocaleString("vi-VN")}đ`,
-      variantLabel: product.conditionLabel || "Tiêu chuẩn",
-      quantity: 1,
-    });
-    setAddedIds((prev) => ({ ...prev, [product.id]: true }));
-    setTimeout(() => {
-      setAddedIds((prev) => ({ ...prev, [product.id]: false }));
-    }, 2000);
-  };
 
   const filteredSpecs = (data?.specs || []).filter((s) => {
     if (!onlyDifferences) return true;
@@ -108,11 +97,12 @@ export default function CompareModal() {
   });
 
   return (
-    <div
-      role="dialog"
+    <dialog
+      ref={dialog}
+      onCancel={closeCompare}
       aria-modal="true"
       aria-labelledby="compare-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
+      className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none open:flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in"
     >
       <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
         {/* Modal Header */}
@@ -231,31 +221,11 @@ export default function CompareModal() {
                     </h3>
 
                     <div className="text-base font-black text-rose-600 mb-2">
-                      {p.price.toLocaleString("vi-VN")}đ
+                      {p.availability === 'CONTACT' ? 'Liên hệ' : p.price.toLocaleString('vi-VN')+'đ'}
                     </div>
 
                     <div className="mt-auto pt-2">
-                      <button
-                        type="button"
-                        onClick={() => handleAddToCart(p)}
-                        className={`w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold rounded-lg transition cursor-pointer ${
-                          addedIds[p.id]
-                            ? "bg-emerald-600 text-white"
-                            : "bg-blue-600 hover:bg-blue-700 text-white"
-                        }`}
-                      >
-                        {addedIds[p.id] ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Đã thêm giỏ hàng</span>
-                          </>
-                        ) : (
-                          <>
-                            <ShoppingCart className="w-3.5 h-3.5" />
-                            <span>Thêm vào giỏ</span>
-                          </>
-                        )}
-                      </button>
+                      <Link href={"/product/"+p.slug} onClick={closeCompare} className="block text-center py-2 underline">Chọn cấu hình</Link>
                     </div>
                   </div>
                 ))}
@@ -329,6 +299,6 @@ export default function CompareModal() {
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

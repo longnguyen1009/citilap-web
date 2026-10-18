@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-18T01:42:41.136Z",
+  "base": "https://citilap-ecommerce-staging.restless-snowflake-aaae.workers.dev",
+  "widgetMounted": true,
+  "submitWaitsForChallenge": true,
+  "missingTokenStatus": 403,
+  "missingTokenCode": "missing-input-response",
+  "challengeError": "Không thể tải xác thực bảo mật. Kiểm tra kết nối rồi tải lại trang.",
+  "scope": "Widget mount and fail-closed API only; human challenge and submitted order/contact remain unverified",
+  "challengeErrors": [
+    {
+      "code": 110200
+    }
+  ],
+  "diagnosis": "Domain not authorized: add citilap-ecommerce-staging.restless-snowflake-aaae.workers.dev to this widget Hostname Management"
+}

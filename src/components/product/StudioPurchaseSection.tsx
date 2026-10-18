@@ -14,6 +14,7 @@ type StudioPurchaseSectionProps = {
   productId: string;
   image: string;
   selectedSku?: string;
+  phone?: string;
 };
 
 const conditionNames: Record<ProductDocument["variants"][number]["condition"], string> = {
@@ -30,13 +31,13 @@ const availabilityNames: Record<ProductDocument["availability"], string> = {
   UNAVAILABLE: "Tạm ngừng nhận đơn",
 };
 
-export default function StudioPurchaseSection({ studio, productId, image, selectedSku }: StudioPurchaseSectionProps) {
+export default function StudioPurchaseSection({ studio, productId, image, selectedSku, phone=businessProfile.displayPhone }: StudioPurchaseSectionProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { addToCart } = useCart();
   const { isInCompare, addToCompare, removeFromCompare } = useCompare();
-  const [variantId, setVariantId] = useState(() => studio.variants.find((v) => v.sku === selectedSku)?.id || studio.variants[0]?.id || "");
+  const variantId = studio.variants.find((v) => v.sku === selectedSku || v.id === selectedSku)?.id || (selectedSku ? '' : studio.variants[0]?.id || '');
   const [warrantyIndex, setWarrantyIndex] = useState(() => Math.max(0, studio.warranties.findIndex((w) => w.recommended)));
   const [added, setAdded] = useState(false);
 
@@ -68,13 +69,12 @@ export default function StudioPurchaseSection({ studio, productId, image, select
   const price = Math.max(0, (variant?.price ?? studio.price) + (warranty?.adjustment ?? 0));
   // Order intake re-prices from Product/ProductVariant in D1 and has no warranty line item.
   // Keep an adjusted CMS warranty as a consultation request until that contract exists.
-  const canAddToCart = studio.canOrder && (!warranty || warranty.adjustment === 0);
+  const canAddToCart = studio.canOrder && (!studio.variants.length || !!variant) && (!variant?.availability || ['AVAILABLE','PREORDER'].includes(variant.availability)) && (!warranty || warranty.adjustment === 0);
   const originalPrice = studio.originalPrice !== null && !variant
     ? Math.max(price, studio.originalPrice + (warranty?.adjustment ?? 0))
     : null;
 
   const selectVariant = (next: ProductDocument["variants"][number]) => {
-    setVariantId(next.id);
     setAdded(false);
     const query = new URLSearchParams(searchParams.toString());
     query.set("sku", next.sku);
@@ -183,7 +183,7 @@ export default function StudioPurchaseSection({ studio, productId, image, select
         <p className="text-sm mt-2 text-slate-600" role="status">{availabilityNames[studio.availability]}</p>
       </div>
 
-      {studio.canOrder && !canAddToCart && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+      {studio.canOrder && warranty && warranty.adjustment !== 0 && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
         Gói bảo hành này có điều chỉnh giá. Vui lòng liên hệ CitiLap để xác nhận tổng giá trước khi gửi yêu cầu mua.
       </p>}
       {canAddToCart ? <div className="space-y-2">
@@ -207,11 +207,11 @@ export default function StudioPurchaseSection({ studio, productId, image, select
           <span>{inCompare ? "Đang so sánh" : "Thêm vào so sánh"}</span>
         </button>
         <a
-          href={businessProfile.telHref}
+          href={`tel:${phone.replace(/\s+/g,'')}`}
           className="flex items-center justify-center gap-2 flex-1 border-2 border-blue-600 text-blue-700 hover:bg-blue-50 rounded-xl py-3 font-semibold"
         >
           <Phone className="w-4 h-4" />
-          <span>Tư vấn: {businessProfile.displayPhone}</span>
+          <span>Tư vấn: {phone}</span>
         </a>
       </div>
     </div>

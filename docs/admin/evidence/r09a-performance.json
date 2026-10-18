@@ -1,0 +1,622 @@
+{
+  "recordedAt": "2026-10-17T16:11:16.420Z",
+  "browser": "Chrome/155.0.8059.82",
+  "environment": "Local built Worker, ephemeral fixture, Chrome headless, no CPU/network throttle; lab only; INP not measured",
+  "clsTarget": "<= 0.1",
+  "checkoutBenchmarkSummary": [
+    {
+      "scenario": "EMPTY_CART_DESKTOP",
+      "width": 1440,
+      "mobile": false,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 360,
+          "ttfb": 136,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 440,
+          "ttfb": 290,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 512,
+          "ttfb": 348,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 437,
+      "avgTtfb": 258
+    },
+    {
+      "scenario": "EMPTY_CART_DESKTOP",
+      "width": 1440,
+      "mobile": false,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 520,
+          "ttfb": 350,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 608,
+          "ttfb": 384,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 480,
+          "ttfb": 322,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 536,
+      "avgTtfb": 352
+    },
+    {
+      "scenario": "EMPTY_CART_MOBILE",
+      "width": 390,
+      "mobile": true,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 528,
+          "ttfb": 361,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 492,
+          "ttfb": 370,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 364,
+          "ttfb": 255,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 461,
+      "avgTtfb": 329
+    },
+    {
+      "scenario": "EMPTY_CART_MOBILE",
+      "width": 390,
+      "mobile": true,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 428,
+          "ttfb": 310,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 412,
+          "ttfb": 262,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 396,
+          "ttfb": 258,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 412,
+      "avgTtfb": 277
+    },
+    {
+      "scenario": "POPULATED_CART_DESKTOP",
+      "width": 1440,
+      "mobile": false,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.034056,
+          "lcp": 476,
+          "ttfb": 355,
+          "shifts": 2
+        },
+        {
+          "run": 2,
+          "cls": 0.034056,
+          "lcp": 368,
+          "ttfb": 244,
+          "shifts": 2
+        },
+        {
+          "run": 3,
+          "cls": 0.034056,
+          "lcp": 500,
+          "ttfb": 383,
+          "shifts": 2
+        }
+      ],
+      "avgCls": 0.034056,
+      "maxCls": 0.034056,
+      "avgLcp": 448,
+      "avgTtfb": 327
+    },
+    {
+      "scenario": "POPULATED_CART_DESKTOP",
+      "width": 1440,
+      "mobile": false,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.034056,
+          "lcp": 484,
+          "ttfb": 367,
+          "shifts": 2
+        },
+        {
+          "run": 2,
+          "cls": 0.034056,
+          "lcp": 448,
+          "ttfb": 295,
+          "shifts": 2
+        },
+        {
+          "run": 3,
+          "cls": 0.034056,
+          "lcp": 532,
+          "ttfb": 381,
+          "shifts": 2
+        }
+      ],
+      "avgCls": 0.034056,
+      "maxCls": 0.034056,
+      "avgLcp": 488,
+      "avgTtfb": 348
+    },
+    {
+      "scenario": "POPULATED_CART_MOBILE",
+      "width": 390,
+      "mobile": true,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 508,
+          "ttfb": 360,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 500,
+          "ttfb": 367,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 444,
+          "ttfb": 325,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 484,
+      "avgTtfb": 351
+    },
+    {
+      "scenario": "POPULATED_CART_MOBILE",
+      "width": 390,
+      "mobile": true,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 484,
+          "ttfb": 374,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 520,
+          "ttfb": 393,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 580,
+          "ttfb": 443,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 528,
+      "avgTtfb": 403
+    },
+    {
+      "scenario": "PENDING_RETRY_DESKTOP",
+      "width": 1440,
+      "mobile": false,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.063053,
+          "lcp": 484,
+          "ttfb": 350,
+          "shifts": 2
+        },
+        {
+          "run": 2,
+          "cls": 0.063053,
+          "lcp": 464,
+          "ttfb": 344,
+          "shifts": 2
+        },
+        {
+          "run": 3,
+          "cls": 0.063053,
+          "lcp": 424,
+          "ttfb": 297,
+          "shifts": 2
+        }
+      ],
+      "avgCls": 0.063053,
+      "maxCls": 0.063053,
+      "avgLcp": 457,
+      "avgTtfb": 330
+    },
+    {
+      "scenario": "PENDING_RETRY_DESKTOP",
+      "width": 1440,
+      "mobile": false,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0.063053,
+          "lcp": 460,
+          "ttfb": 339,
+          "shifts": 2
+        },
+        {
+          "run": 2,
+          "cls": 0.063053,
+          "lcp": 432,
+          "ttfb": 285,
+          "shifts": 2
+        },
+        {
+          "run": 3,
+          "cls": 0.063053,
+          "lcp": 400,
+          "ttfb": 268,
+          "shifts": 2
+        }
+      ],
+      "avgCls": 0.063053,
+      "maxCls": 0.063053,
+      "avgLcp": 431,
+      "avgTtfb": 297
+    },
+    {
+      "scenario": "PENDING_RETRY_MOBILE",
+      "width": 390,
+      "mobile": true,
+      "cache": "cold",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 412,
+          "ttfb": 298,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 500,
+          "ttfb": 371,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 492,
+          "ttfb": 373,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 468,
+      "avgTtfb": 347
+    },
+    {
+      "scenario": "PENDING_RETRY_MOBILE",
+      "width": 390,
+      "mobile": true,
+      "cache": "warm",
+      "runs": [
+        {
+          "run": 1,
+          "cls": 0,
+          "lcp": 452,
+          "ttfb": 339,
+          "shifts": 0
+        },
+        {
+          "run": 2,
+          "cls": 0,
+          "lcp": 416,
+          "ttfb": 275,
+          "shifts": 0
+        },
+        {
+          "run": 3,
+          "cls": 0,
+          "lcp": 384,
+          "ttfb": 267,
+          "shifts": 0
+        }
+      ],
+      "avgCls": 0,
+      "maxCls": 0,
+      "avgLcp": 417,
+      "avgTtfb": 294
+    }
+  ],
+  "observations": [
+    {
+      "width": 1440,
+      "path": "/",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 1028,
+      "ttfb": 591,
+      "url": "/"
+    },
+    {
+      "width": 1440,
+      "path": "/",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 656,
+      "ttfb": 446,
+      "url": "/"
+    },
+    {
+      "width": 1440,
+      "path": "/search",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 412,
+      "ttfb": 179,
+      "url": "/search"
+    },
+    {
+      "width": 1440,
+      "path": "/search",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 384,
+      "ttfb": 216,
+      "url": "/search"
+    },
+    {
+      "width": 1440,
+      "path": "/product/fixture-p",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 496,
+      "ttfb": 265,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 1440,
+      "path": "/product/fixture-p",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 504,
+      "ttfb": 311,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 1440,
+      "path": "/cart",
+      "cache": "cold",
+      "cls": 0.07607,
+      "lcp": 264,
+      "ttfb": 142,
+      "url": "/cart"
+    },
+    {
+      "width": 1440,
+      "path": "/cart",
+      "cache": "warm",
+      "cls": 0.07607,
+      "lcp": 280,
+      "ttfb": 152,
+      "url": "/cart"
+    },
+    {
+      "width": 1440,
+      "path": "/checkout",
+      "cache": "cold",
+      "cls": 0.063053,
+      "lcp": 268,
+      "ttfb": 126,
+      "url": "/checkout"
+    },
+    {
+      "width": 1440,
+      "path": "/checkout",
+      "cache": "warm",
+      "cls": 0.063053,
+      "lcp": 296,
+      "ttfb": 143,
+      "url": "/checkout"
+    },
+    {
+      "width": 1440,
+      "path": "/news",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 268,
+      "ttfb": 174,
+      "url": "/news"
+    },
+    {
+      "width": 1440,
+      "path": "/news",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 320,
+      "ttfb": 201,
+      "url": "/news"
+    },
+    {
+      "width": 390,
+      "path": "/",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 708,
+      "ttfb": 513,
+      "url": "/"
+    },
+    {
+      "width": 390,
+      "path": "/",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 660,
+      "ttfb": 483,
+      "url": "/"
+    },
+    {
+      "width": 390,
+      "path": "/search",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 332,
+      "ttfb": 168,
+      "url": "/search"
+    },
+    {
+      "width": 390,
+      "path": "/search",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 352,
+      "ttfb": 238,
+      "url": "/search"
+    },
+    {
+      "width": 390,
+      "path": "/product/fixture-p",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 416,
+      "ttfb": 243,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 390,
+      "path": "/product/fixture-p",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 452,
+      "ttfb": 264,
+      "url": "/product/fixture-p"
+    },
+    {
+      "width": 390,
+      "path": "/cart",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 304,
+      "ttfb": 139,
+      "url": "/cart"
+    },
+    {
+      "width": 390,
+      "path": "/cart",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 364,
+      "ttfb": 160,
+      "url": "/cart"
+    },
+    {
+      "width": 390,
+      "path": "/checkout",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 304,
+      "ttfb": 146,
+      "url": "/checkout"
+    },
+    {
+      "width": 390,
+      "path": "/checkout",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 280,
+      "ttfb": 175,
+      "url": "/checkout"
+    },
+    {
+      "width": 390,
+      "path": "/news",
+      "cache": "cold",
+      "cls": 0,
+      "lcp": 272,
+      "ttfb": 149,
+      "url": "/news"
+    },
+    {
+      "width": 390,
+      "path": "/news",
+      "cache": "warm",
+      "cls": 0,
+      "lcp": 308,
+      "ttfb": 185,
+      "url": "/news"
+    }
+  ]
+}

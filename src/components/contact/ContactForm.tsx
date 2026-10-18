@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useTurnstile } from "@/components/Turnstile";
 import { Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 export default function ContactForm() {
+  const turnstile = useTurnstile("contact");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -16,6 +18,7 @@ export default function ContactForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!turnstile.ready) return;
     setError(null);
     setSuccessMessage(null);
     setLoading(true);
@@ -23,7 +26,7 @@ export default function ContactForm() {
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "cf-turnstile-response": turnstile.token },
         body: JSON.stringify({
           name,
           phone,
@@ -48,6 +51,7 @@ export default function ContactForm() {
     } catch {
       setError("Không thể kết nối đến máy chủ. Vui lòng liên hệ hotline 0899.188.186.");
     } finally {
+      turnstile.reset();
       setLoading(false);
     }
   };
@@ -167,9 +171,11 @@ export default function ContactForm() {
             ></textarea>
           </div>
 
+          {turnstile.widget}
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={!turnstile.ready || loading}
             className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition uppercase shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
           >
             {loading ? (
