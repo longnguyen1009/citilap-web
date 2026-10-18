@@ -51,7 +51,7 @@ export function SectionHeader({
       >
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
 
-        <h2 className="text-xl md:text-2xl font-black text-white uppercase flex items-center gap-3 mb-4 lg:mb-0 relative z-10 drop-shadow-xs">
+        <h2 className="text-xl md:text-2xl font-black text-white uppercase flex items-center gap-3 mb-4 lg:mb-0 relative z-10 drop-shadow-xs leading-snug py-0.5">
           {IconComponent ? (
             <div className="bg-white/20 p-2 rounded-control backdrop-blur-xs">
               <IconComponent className="w-6 h-6 md:w-7 md:h-7" />

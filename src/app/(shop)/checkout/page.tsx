@@ -53,6 +53,7 @@ export default function CheckoutPage() {
   const quote = quoteState.data;
   const quoteKey = quoteRequest + ':' + quoteRetry;
   const quoteReady = loaded && quoteState.key === quoteKey && !!quote && !quoteState.error && !!paymentMethod && checkoutReady;
+  const isQuoteCalculating = !loaded || (quoteState.key !== quoteKey && !quoteState.error) || (!quote && !quoteState.error);
   const SHOWROOMS = quote?.showrooms || [];
   const locked = isSubmitting || !!pending;
   // Restore tab-local state after hydration; reading storage during SSR would mismatch HTML.
@@ -499,10 +500,12 @@ export default function CheckoutPage() {
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" /> Đang gửi yêu cầu...
                   </>
-                ) : !quoteReady ? (
+                ) : isQuoteCalculating ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" /> Đang tính tổng tiền...
                   </>
+                ) : !paymentMethod ? (
+                  "Vui lòng chọn phương thức thanh toán"
                 ) : (
                   "Gửi Đơn Đặt Hàng"
                 )}

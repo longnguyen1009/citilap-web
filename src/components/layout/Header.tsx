@@ -384,10 +384,10 @@ export default function Header({ categories = [], brands = [], navigation, setti
           </div>
 
           {/* Action Links */}
-          <div className="hidden lg:flex items-center gap-8 ml-4">
+          <div className="hidden md:flex items-center gap-3 lg:gap-8 ml-2 lg:ml-4 shrink-0">
             <a
               href={settings?.storePhone ? `tel:${settings.storePhone.replace(/\s+/g, "")}` : businessProfile.telHref}
-              className="flex items-center gap-2 hover:text-blue-400 transition"
+              className="hidden xl:flex items-center gap-2 hover:text-blue-400 transition"
               title={`Gọi Hotline tư vấn ${settings?.storePhone || businessProfile.displayPhone}`}
             >
               <PhoneCall className="w-5 h-5 text-gray-300" />
@@ -397,7 +397,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
               </div>
             </a>
 
-            <Link href="/order-tracking" className="flex items-center gap-2 hover:text-blue-400 transition">
+            <Link href="/order-tracking" className="hidden lg:flex items-center gap-2 hover:text-blue-400 transition">
               <ClipboardCheck className="w-5 h-5 text-gray-300" />
               <div className="flex flex-col">
                 <span className="text-[11px] text-gray-400">Tra cứu</span>
@@ -405,12 +405,12 @@ export default function Header({ categories = [], brands = [], navigation, setti
               </div>
             </Link>
 
-            <Link href="/login" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-16 h-10 transition">
+            <Link href="/profile" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-14 lg:w-16 h-10 transition">
               <User className="w-4 h-4 text-gray-300 mb-0.5" />
-              <span className="text-[10px] text-gray-300">Thông tin</span>
+              <span className="text-[10px] text-gray-300">Tài khoản</span>
             </Link>
 
-            <Link href="/wishlist" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-16 h-10 transition relative">
+            <Link href="/wishlist" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-14 lg:w-16 h-10 transition relative">
               <Heart className="w-4 h-4 text-gray-300 mb-0.5" />
               <span className="text-[10px] text-gray-300">Yêu thích</span>
               {wishlistCount > 0 && (

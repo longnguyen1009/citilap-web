@@ -78,9 +78,10 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
 
   const isCategoryActive = pathname.startsWith("/category");
   const isProductPage = pathname.startsWith("/product/");
+  const isCheckoutPage = pathname.startsWith("/checkout");
 
-  // On product detail page, allow the dedicated purchase action bar to own the bottom space
-  if (isProductPage) {
+  // On product detail and checkout pages, allow dedicated action bars to own the bottom space
+  if (isProductPage || isCheckoutPage) {
     return null;
   }
 
@@ -205,66 +206,69 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
               </Link>
 
               {/* Category Items */}
-              {navigation?.menus.main.map((item) => (
-                <div key={item.id} className="rounded-lg border border-border-default overflow-hidden">
-                  <Link href={item.href} onClick={() => setDrawerOpen(false)}
-                    className="flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle">
-                    {item.label}<ChevronRight className="w-4 h-4" />
-                  </Link>
-                  {item.children.length > 0 && <div className="border-t border-border-default bg-surface-subtle px-3 py-1">
-                    {item.children.map((child) => (
-                      <Link key={child.id} href={child.href} onClick={() => setDrawerOpen(false)}
-                        className="block pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary">{child.label}</Link>
-                    ))}
-                  </div>}
-                </div>
-              ))}
-              {!navigation && categories.map((cat) => {
-                const IconComponent = categoryIconMap[cat.slug] || Laptop;
-                const isSelected = pathname === `/category/${cat.slug}`;
+              {navigation?.menus.main && navigation.menus.main.length > 0 ? (
+                navigation.menus.main.map((item) => (
+                  <div key={item.id} className="rounded-lg border border-border-default overflow-hidden">
+                    <Link href={item.href} onClick={() => setDrawerOpen(false)}
+                      className="flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle">
+                      {item.label}<ChevronRight className="w-4 h-4" />
+                    </Link>
+                    {item.children.length > 0 && <div className="border-t border-border-default bg-surface-subtle px-3 py-1">
+                      {item.children.map((child) => (
+                        <Link key={child.id} href={child.href} onClick={() => setDrawerOpen(false)}
+                          className="block pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary">{child.label}</Link>
+                      ))}
+                    </div>}
+                  </div>
+                ))
+              ) : (
+                categories.map((cat) => {
+                  const IconComponent = categoryIconMap[cat.slug] || Laptop;
+                  const isSelected = pathname === `/category/${cat.slug}`;
 
-                return (
-                  <Link
-                    key={cat.id}
-                    href={`/category/${cat.slug}`}
-                    onClick={() => setDrawerOpen(false)}
-                    className={`flex items-center justify-between p-3 rounded-control transition border ${
-                      isSelected
-                        ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
-                        : "bg-surface-card hover:bg-surface-subtle text-text-primary border-border-default hover:border-brand-primary"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-control flex items-center justify-center ${
-                          isSelected ? "bg-white/20 text-white" : "bg-brand-primary-subtle text-brand-primary"
-                        }`}
-                      >
-                        <IconComponent className="w-4 h-4" />
+                  return (
+                    <Link
+                      key={cat.id}
+                      href={`/category/${cat.slug}`}
+                      onClick={() => setDrawerOpen(false)}
+                      className={`flex items-center justify-between p-3 rounded-control transition border ${
+                        isSelected
+                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
+                          : "bg-surface-card hover:bg-surface-subtle text-text-primary border-border-default hover:border-brand-primary"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-control flex items-center justify-center ${
+                            isSelected ? "bg-white/20 text-white" : "bg-brand-primary-subtle text-brand-primary"
+                          }`}
+                        >
+                          <IconComponent className="w-4 h-4" />
+                        </div>
+                        <span className="text-body-sm font-semibold">{cat.name}</span>
                       </div>
-                      <span className="text-body-sm font-semibold">{cat.name}</span>
-                    </div>
 
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={`text-caption ${
-                          isSelected ? "text-text-inverse/80" : "text-text-muted"
-                        }`}
-                      >
-                        {cat.productCount}
-                      </span>
-                      <ChevronRight
-                        className={`w-4 h-4 ${
-                          isSelected ? "text-text-inverse" : "text-text-muted"
-                        }`}
-                      />
-                    </div>
-                  </Link>
-                );
-              })}
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={`text-caption ${
+                            isSelected ? "text-text-inverse/80" : "text-text-muted"
+                          }`}
+                        >
+                          {cat.productCount}
+                        </span>
+                        <ChevronRight
+                          className={`w-4 h-4 ${
+                            isSelected ? "text-text-inverse" : "text-text-muted"
+                          }`}
+                        />
+                      </div>
+                    </Link>
+                  );
+                })
+              )}
 
               {/* Phụ kiện & Đồ chơi công nghệ nổi bật */}
-              {!navigation && <div className="pt-3 border-t border-border-default/60">
+              {(!navigation || !navigation.menus.main || navigation.menus.main.length === 0) && <div className="pt-3 border-t border-border-default/60">
                 <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider px-1 block mb-2">
                   Phụ kiện & Đồ chơi công nghệ
                 </span>

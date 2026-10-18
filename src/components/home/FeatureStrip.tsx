@@ -52,7 +52,7 @@ export default function FeatureStrip() {
                   <h3 className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-blue-600 transition truncate">
                     {feature.title}
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 leading-snug">
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-snug">
                     {feature.desc}
                   </p>
                 </div>

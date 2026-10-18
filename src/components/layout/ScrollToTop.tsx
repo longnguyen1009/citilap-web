@@ -33,10 +33,10 @@ export default function ScrollToTop() {
   return (
     <button
       onClick={scrollToTop}
-      className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50 bg-red-600 hover:bg-red-700 text-white p-2.5 sm:p-3 rounded-full shadow-lg shadow-red-600/30 transition-all hover:scale-110 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+      className="fixed bottom-20 right-3.5 md:bottom-6 md:right-6 z-30 bg-slate-900/85 hover:bg-slate-950 text-white p-2.5 rounded-full shadow-lg backdrop-blur-md border border-slate-700/60 transition-all hover:scale-105 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 cursor-pointer"
       aria-label="Cuộn lên đầu trang"
     >
-      <ArrowUp className="w-6 h-6" />
+      <ArrowUp className="w-5 h-5 sm:w-6 sm:h-6" />
     </button>
   );
 }

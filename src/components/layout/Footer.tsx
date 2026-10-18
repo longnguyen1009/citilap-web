@@ -263,45 +263,48 @@ export default function Footer({
                 Về CitiLap
               </h3>
               <ul className="space-y-2.5 text-sm text-gray-400">
-                {navigation?.menus.footer.map((item) => (
-                  <li key={item.id}>
-                    <Link href={item.href} className="hover:text-white transition font-medium">{item.label}</Link>
-                    {item.children.length > 0 && (
-                      <ul className="pl-3 mt-2 space-y-2 border-l border-gray-700">
-                        {item.children.map((child) => (
-                          <li key={child.id}><Link href={child.href} className="hover:text-white transition">{child.label}</Link></li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                ))}
-                {!navigation && <>
-                <li>
-                  <Link href="/gioi-thieu" className="hover:text-white transition">
-                    Giới thiệu thương hiệu
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/he-thong-cua-hang" className="hover:text-white transition">
-                    Hệ thống cửa hàng
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/lien-he" className="hover:text-white transition">
-                    Liên hệ & Hỗ trợ kỹ thuật
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/dieu-khoan-mua-hang" className="hover:text-white transition">
-                    Điều khoản đặt hàng
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/chinh-sach-bao-mat" className="hover:text-white transition">
-                    Chính sách bảo mật thông tin
-                  </Link>
-                </li>
-                </>}
+                {navigation?.menus.footer && navigation.menus.footer.length > 0 ? (
+                  navigation.menus.footer.map((item) => (
+                    <li key={item.id}>
+                      <Link href={item.href} className="hover:text-white transition font-medium">{item.label}</Link>
+                      {item.children.length > 0 && (
+                        <ul className="pl-3 mt-2 space-y-2 border-l border-gray-700">
+                          {item.children.map((child) => (
+                            <li key={child.id}><Link href={child.href} className="hover:text-white transition">{child.label}</Link></li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  ))
+                ) : (
+                  <>
+                    <li>
+                      <Link href="/gioi-thieu" className="hover:text-white transition">
+                        Giới thiệu thương hiệu
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/he-thong-cua-hang" className="hover:text-white transition">
+                        Hệ thống cửa hàng
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/lien-he" className="hover:text-white transition">
+                        Liên hệ & Hỗ trợ kỹ thuật
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/dieu-khoan-mua-hang" className="hover:text-white transition">
+                        Điều khoản đặt hàng
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/chinh-sach-bao-mat" className="hover:text-white transition">
+                        Chính sách bảo mật thông tin
+                      </Link>
+                    </li>
+                  </>
+                )}
               </ul>
             </div>
           </div>

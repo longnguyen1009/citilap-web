@@ -34,7 +34,7 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                   {settings.heroTitle}{" "}
                   <span className="text-blue-500">{settings.heroHighlight}</span>
                 </h1>
-                <p className="text-sm sm:text-lg md:text-2xl font-bold text-yellow-400 mb-6 sm:mb-8 tracking-wide drop-shadow-md">
+                <p className="text-sm sm:text-lg md:text-2xl font-bold text-yellow-400 mb-6 sm:mb-8 tracking-wide drop-shadow-md text-balance">
                   {settings.heroSlogan}
                 </p>
                 <div className="flex flex-wrap gap-3 sm:gap-4">

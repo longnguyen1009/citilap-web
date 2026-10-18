@@ -170,7 +170,7 @@ export default function ProductCard({
   const isOutOfStock = product.availability ? product.availability === 'UNAVAILABLE' : product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const warrantyText = formatWarranty(
     product.warranty,
-    "Chưa cập nhật bảo hành"
+    "BH chính hãng"
   );
 
   // Format key specs for density & clarity
@@ -350,10 +350,10 @@ export default function ProductCard({
         )}
 
         {/* Footer Meta: Warranty & Stock Status */}
-        <div className="mt-auto pt-2.5 border-t border-border-default flex items-center justify-between text-caption">
+        <div className="mt-auto pt-2.5 border-t border-border-default flex items-center justify-between gap-1.5 text-caption">
           {/* Warranty tag */}
           <div
-            className="flex items-center gap-1 text-text-secondary font-medium truncate"
+            className="flex items-center gap-1 text-text-secondary font-medium truncate min-w-0"
             title={product.warranty || warrantyText}
           >
             <ShieldCheck className="w-3.5 h-3.5 text-brand-primary shrink-0" />
@@ -361,7 +361,13 @@ export default function ProductCard({
           </div>
 
           {/* Standardized Stock Indicator */}
-          {product.availability ? <span>{({AVAILABLE:'Nhận yêu cầu mua',PREORDER:'Nhận đặt trước',CONTACT:'Liên hệ tư vấn',UNAVAILABLE:'Tạm ngừng nhận đơn'} as Record<string,string>)[product.availability] || 'Chưa cập nhật'}</span> : <StockBadge stock={product.stock} variant="indicator" />}
+          {product.availability ? (
+            <span className="shrink-0 text-right whitespace-nowrap text-[11px] font-medium text-text-secondary">
+              {({AVAILABLE:'Nhận yêu cầu mua',PREORDER:'Nhận đặt trước',CONTACT:'Liên hệ tư vấn',UNAVAILABLE:'Tạm ngừng nhận đơn'} as Record<string,string>)[product.availability] || 'Chưa cập nhật'}
+            </span>
+          ) : (
+            <StockBadge stock={product.stock} variant="indicator" />
+          )}
         </div>
 
         {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}

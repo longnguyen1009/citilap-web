@@ -50,7 +50,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="bg-[#f1f5f9] min-h-screen pb-12">
+    <div className="bg-[#f1f5f9] min-h-screen pb-24 md:pb-12">
       <Breadcrumb items={[
         { label: "Trang chủ", href: "/" },
         { label: `Giỏ hàng (${cartCount} sản phẩm)`, href: "/cart" },

@@ -45,7 +45,7 @@ export default async function FlashSaleSection({pricingContext, evaluatedAt = ne
               />
               <Link 
                 href="/hot-sale" 
-                className="text-xs sm:text-sm font-semibold text-white/90 hover:text-white hover:underline flex items-center gap-1 transition"
+                className="text-xs sm:text-sm font-semibold text-white/90 hover:text-white hover:underline flex items-center gap-1 transition shrink-0 whitespace-nowrap"
               >
                 Xem tất cả &gt;
               </Link>
