@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef, ReactNode } from "react";
+import { trackStorefront } from '@/lib/storefront-metrics';
 
 export interface CartItem {
   id: string; // product id + variant id
@@ -70,6 +71,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [cart, isLoaded]);
 
   const addToCart = (item: CartItem) => {
+    const existing = cart.find(i => i.id === item.id);
+    if (!existing?.maxQuantity || existing.quantity + item.quantity <= existing.maxQuantity) trackStorefront('add_to_cart');
     setCart((prev) => {
       const existingItem = prev.find((i) => i.id === item.id);
       if (existingItem) {

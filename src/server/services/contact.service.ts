@@ -3,6 +3,7 @@ import { adminActor, adminAuditStatements } from '../admin-context';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
 import { hashIp } from '@/lib/rate-limiter';
 import type { D1Database } from '@cloudflare/workers-types';
+import { businessProfile } from '@/config/business-profile';
 
 export const ContactInputSchema = z.object({
   name: z
@@ -33,6 +34,15 @@ export const ContactInputSchema = z.object({
     .or(z.literal('')),
   // Honeypot field: real users leave this blank; automated spam bots fill it
   website: z.string().optional().nullable(),
+  appointment: z.object({
+    productId: z.string().regex(/^[a-zA-Z0-9_-]{1,128}$/).optional(),
+    unitCode: z.string().regex(/^[a-zA-Z0-9_-]{2,64}$/).optional(),
+    locationId: z.string().max(30),
+    requestedAt: z.string().datetime({ offset: true }).refine(value => {
+      const difference = Date.parse(value) - Date.now();
+      return difference > 0 && difference <= 30 * 86400000;
+    }, 'Chọn lịch trong 30 ngày tới'),
+  }).optional(),
 });
 
 export type ContactInput = z.infer<typeof ContactInputSchema>;
@@ -107,7 +117,7 @@ export async function submitContactMessage(
 
   // 3. Sanitize text content to prevent script injection
   const safeName = stripHtml(name);
-  const safeMessage = message ? stripHtml(message) : null;
+  let safeMessage = message ? stripHtml(message) : null;
   const safeEmail = email ? email.trim() : null;
   const ipHash = hashIp(clientIp);
 
@@ -115,6 +125,22 @@ export async function submitContactMessage(
   const db = d1Database || getD1Database();
   if (!db) {
     throw new Error('D1_BINDING_REQUIRED: Cloudflare D1 database binding is required for atomic contact submission');
+  }
+  if (parsed.data.appointment) {
+    const appointment = parsed.data.appointment;
+    const location = businessProfile.locations.find(store => store.id === appointment.locationId && store.status === 'ACTIVE' && store.walkInViewingAndPurchaseEnabled);
+    if (!location) return { success: false, error: 'Cơ sở không nhận lịch xem máy.' };
+    let productName = 'Cần tư vấn chọn máy';
+    if (appointment.productId) {
+      const product = await db.prepare(`SELECT p.name FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id WHERE p.id=? AND p.deletedAt IS NULL AND p.status IN ('ACTIVE','active') AND (s.productId IS NULL OR s.published IS NOT NULL)`).bind(appointment.productId).first<{ name: string }>();
+      if (!product) return { success: false, error: 'Sản phẩm không còn công khai. Chọn lại máy hoặc gửi yêu cầu tư vấn.' };
+      productName = product.name;
+    }
+    if (appointment.unitCode && (!appointment.productId || !await db.prepare(`SELECT i.publicCode FROM ProductInspection i JOIN SerialUnit u ON u.id=i.serialUnitId WHERE i.publicCode=? AND u.productId=? AND i.published=1 AND u.status='AVAILABLE'`).bind(appointment.unitCode, appointment.productId).first())) {
+      return { success: false, error: 'Máy đã chọn không còn sẵn để hẹn xem. Vui lòng chọn lại.' };
+    }
+    const time = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(appointment.requestedAt));
+    safeMessage = `[HẸN XEM MÁY — CHỜ XÁC NHẬN]\n${productName}\nMã máy: ${appointment.unitCode || 'Chưa chọn'}\n${location.name}\n${time} GMT+7\nKhông tự giữ hàng.\n${safeMessage || ''}`;
   }
   const contactId = 'c' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
   const now = new Date();
@@ -146,7 +172,7 @@ export async function submitContactMessage(
 
     return {
       success: true,
-      message: 'Cảm ơn quý khách! Yêu cầu tư vấn đã được gửi thành công. Chuyên viên CitiLap sẽ liên hệ hỗ trợ trong thời gian sớm nhất.',
+      message: parsed.data.appointment ? 'Đã nhận yêu cầu hẹn xem máy. Nhân viên sẽ liên hệ xác nhận thời gian, cơ sở và máy; lịch chưa được xác nhận và chưa giữ hàng.' : 'Cảm ơn quý khách! Yêu cầu tư vấn đã được gửi thành công. Chuyên viên CitiLap sẽ liên hệ hỗ trợ trong thời gian sớm nhất.',
       id: contactId,
     };
   } catch (error) {

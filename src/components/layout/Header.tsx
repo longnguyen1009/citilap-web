@@ -199,7 +199,8 @@ export default function Header({ categories = [], brands = [], navigation, setti
   const dynamicNavItems: HeaderNavItem[] = navigation
     ? navigation.menus.main.map((item) => ({
         name: item.label, href: item.href,
-        children: item.children.map((child) => ({ name: child.label, href: child.href })),
+        hot: item.href === '/hot-sale',
+        children: item.children.length ? item.children.map((child) => ({ name: child.label, href: child.href })) : undefined,
       }))
     : legacyNavItems;
 
@@ -212,6 +213,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             {settings?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={settings.logoUrl}
                 alt={settings.storeName || "CitiLap"}
@@ -445,9 +447,12 @@ export default function Header({ categories = [], brands = [], navigation, setti
                   className="relative"
                   onMouseEnter={() => item.children && setHoveredNav(index)}
                   onMouseLeave={() => item.children && setHoveredNav(null)}
+                  onFocus={() => item.children && setHoveredNav(index)}
+                  onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setHoveredNav(null); }}
                 >
                   <Link
                     href={item.href}
+                    aria-expanded={item.children ? hoveredNav === index : undefined}
                     className={`flex items-center gap-1 text-sm font-bold uppercase transition hover:text-blue-600 ${
                       isActive
                         ? "text-blue-600 border-b-2 border-blue-600 pb-0.5"
@@ -462,7 +467,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
 
                   {/* Dropdown */}
                   {item.children && hoveredNav === index && (
-                    <div className="absolute top-full left-0 pt-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <div className={`absolute top-full ${index >= dynamicNavItems.length / 2 ? 'right-0' : 'left-0'} pt-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150`}>
                       <div
                         className={`bg-white rounded-xl shadow-xl shadow-gray-200/70 border border-gray-150 py-2 ${
                           item.children.length > 5

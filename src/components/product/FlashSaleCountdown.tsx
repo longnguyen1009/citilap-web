@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useSyncExternalStore } from "react";
 import { Clock } from "lucide-react";
 
 export interface FlashSaleCountdownProps {
@@ -39,19 +39,23 @@ function evaluateCountdown(
   return { status: "active", msLeft: Math.max(0, endMs - nowMs) };
 }
 
+const emptySubscribe = () => () => {};
+
 export default function FlashSaleCountdown({
   startAt,
   endAt,
   className = "",
   onExpire,
 }: FlashSaleCountdownProps) {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
   const [state, setState] = useState<CountdownState>(() => evaluateCountdown(startAt, endAt));
   const expiredRef = useRef(false);
 
   useEffect(() => {
-    setMounted(true);
-
     const tick = () => {
       const next = evaluateCountdown(startAt, endAt);
       setState(next);

@@ -16,6 +16,8 @@
     "db:migrate:remote": "wrangler d1 migrations apply citilap-db-dev --remote",
     "db:query:local": "wrangler d1 execute citilap-db-dev --local",
     "db:seed:local": "wrangler d1 execute citilap-db-dev --local --file=scripts/seed-development.sql",
+    "db:seed:demo": "node scripts/seed-storefront-demo.mjs --local",
+    "test:storefront-improvements": "node scripts/test-storefront-improvements.mjs",
     "verify:cf": "node scripts/build-verify.mjs && wrangler dev scripts/verify-cf.mjs --port 8787",
     "postinstall": "node scripts/post-prisma-generate.mjs"
   },

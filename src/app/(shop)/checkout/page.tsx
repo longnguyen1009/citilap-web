@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { CheckoutQuote } from "@/contracts/checkout";
 import { useTurnstile } from '@/components/Turnstile';
+import { trackStorefront } from '@/lib/storefront-metrics';
 
 const PROVINCES = [
   "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
@@ -88,6 +89,7 @@ export default function CheckoutPage() {
       const response=await fetch('/api/orders',{method:'POST',headers:{'Content-Type':'application/json','Idempotency-Key':attempt.key,'cf-turnstile-response':turnstile.token},body:attempt.body});
       const data=await response.json();
       if(response.ok && data.success){
+        trackStorefront('order_requested');
         forgetAttempt();sessionStorage.removeItem('citilap-checkout-v1');clearCart();
         router.push('/checkout/success?orderId='+encodeURIComponent(data.orderId)+'&token='+encodeURIComponent(data.confirmationToken));
         return;

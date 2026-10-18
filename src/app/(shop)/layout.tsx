@@ -6,6 +6,8 @@ import { getPublishedNavigation, getStorefrontSettings } from "@/server/services
 import {mediaEnvironment} from '@/server/media-http';
 import PublicPriceRefresh from '@/components/product/PublicPriceRefresh';
 import { connection } from 'next/server';
+import Link from 'next/link';
+import StorefrontMetrics from '@/components/layout/StorefrontMetrics';
 
 export default async function ShopLayout({
   children,
@@ -39,8 +41,10 @@ export default async function ShopLayout({
     <div className="flex flex-col min-h-screen">
       <PublicPriceRefresh nextChange={times.length?Math.min(...times):null} serverTime={serverTime}/>
       <Header categories={categories} brands={brands} navigation={navigation} settings={settings} />
+      <nav aria-label="Hỗ trợ chọn máy" className="border-b border-slate-200 bg-blue-50 px-4 py-2 text-sm text-blue-900"><div className="mx-auto flex max-w-[1370px] flex-wrap items-center gap-x-6 gap-y-2"><Link className="font-semibold underline" href="/chon-laptop">Chọn laptop theo nhu cầu</Link><Link href="/lien-he?intent=appointment">Đặt lịch xem máy</Link><Link href="/news">Cẩm nang mua laptop</Link></div></nav>
       <main className="flex-grow pb-16 md:pb-0">{children}</main>
       <Footer navigation={navigation} settings={settings} />
+      <StorefrontMetrics />
       <MobileBottomNav categories={categories} navigation={navigation} settings={settings} />
     </div>
   );

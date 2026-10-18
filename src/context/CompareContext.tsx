@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { MAX_COMPARE_PRODUCTS } from "@/contracts/catalog/compare";
+import { trackStorefront } from '@/lib/storefront-metrics';
 
 export interface CompareItem {
   id: string;
@@ -99,7 +100,7 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const openCompare = useCallback(() => {
-    if (items.length > 0) setIsCompareOpen(true);
+    if (items.length > 0) { setIsCompareOpen(true); trackStorefront('compare'); }
   }, [items.length]);
 
   const closeCompare = useCallback(() => {

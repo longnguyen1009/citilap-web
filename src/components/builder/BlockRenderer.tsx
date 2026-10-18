@@ -12,9 +12,6 @@ import {
   RefreshCw,
   Store,
   Star,
-  Phone,
-  MessageCircle,
-  ExternalLink,
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -73,19 +70,19 @@ export default function BlockRenderer({ sections }: { sections: ResolvedSectionI
             return <FeaturedCategoriesBlock key={section.id} section={section} />;
 
           case 'featured_brands':
-            return <FeaturedBrandsBlock key={section.id} section={section} />;
+            return <FeaturedBrandsBlock key={section.id} />;
 
           case 'featured_collection':
             return <FeaturedCollectionBlock key={section.id} section={section} />;
 
           case 'news_reviews':
-            return <NewsReviewsBlock key={section.id} data={section.data} />;
+            return <NewsReviewsBlock key={section.id} />;
 
           case 'intro':
             return <IntroBlock key={section.id} data={section.data} />;
 
           case 'cta':
-            return <CtaBlock key={section.id} data={section.data} />;
+            return <CtaBlock key={section.id} />;
 
           default:
             return null;
@@ -359,15 +356,14 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
 }
 
 // 5. FEATURED BRANDS BLOCK
-function FeaturedBrandsBlock({ section }: { section: ResolvedSectionItem }) {
+function FeaturedBrandsBlock() {
   return <BrandSection />;
 }
 
 // 6. FEATURED COLLECTION BLOCK
 function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) {
   const col = section.resolvedCollection;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = section.data as any;
+  const data = (section.data || {}) as { title?: string; subtitle?: string };
 
   if (!col) return null;
 
@@ -413,30 +409,44 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
 }
 
 // 7. NEWS & REVIEWS BLOCK
-function NewsReviewsBlock({ data }: { data: any }) {
+function NewsReviewsBlock() {
   return <MediaSection />;
 }
 
 // 8. INTRO & FEATURE STRIP BLOCK
-function IntroBlock({ data }: { data: any }) {
-  const features = Array.isArray(data.features) && data.features.length > 0 ? data.features : null;
+interface IntroBlockItem {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+}
+
+interface IntroBlockData {
+  title?: string;
+  subtitle?: string;
+  features?: IntroBlockItem[];
+}
+
+function IntroBlock({ data }: { data: unknown }) {
+  const d = (data || {}) as IntroBlockData;
+  const features = Array.isArray(d.features) && d.features.length > 0 ? d.features : null;
 
   if (!features) {
     return <FeatureStrip />;
   }
 
   return (
-    <section className="py-6 md:py-8 bg-white border-y border-slate-100" aria-label={data.title || 'Cam kết dịch vụ'}>
+    <section className="py-6 md:py-8 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
       <div className="container mx-auto px-4 max-w-[1370px]">
-        {data.title && (
+        {d.title && (
           <div className="text-center mb-6">
-            <h2 className="text-xl md:text-2xl font-black text-slate-900">{data.title}</h2>
-            {data.subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-1">{data.subtitle}</p>}
+            <h2 className="text-xl md:text-2xl font-black text-slate-900">{d.title}</h2>
+            {d.subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-1">{d.subtitle}</p>}
           </div>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {features.map((item: { id: string; icon: string; title: string; description: string }) => {
+          {features.map((item) => {
             const Icon = ICON_MAP[item.icon] || Star;
             return (
               <div key={item.id} className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-start gap-3.5 hover:bg-blue-50/50 hover:border-blue-100 transition">
@@ -457,6 +467,6 @@ function IntroBlock({ data }: { data: any }) {
 }
 
 // 9. CTA BLOCK
-function CtaBlock({ data }: { data: any }) {
+function CtaBlock() {
   return <ContactSection />;
 }

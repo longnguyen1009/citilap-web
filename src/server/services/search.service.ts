@@ -1,5 +1,6 @@
 import { prisma, type PrismaClient } from "@/lib/prisma";
 import {catalogBatches} from './catalog-batches';
+import { searchIntent } from '@/contracts/catalog/search-intent';
 import { getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import {
   type HomepageProduct,
@@ -424,7 +425,10 @@ export async function searchProducts(
   at: Date = new Date()
 ): Promise<SearchResult> {
   const context = pricingContext ?? await getStorefrontPricingContext(undefined, at);
-  const { cleanQuery, tokens } = normalizeSearchQuery(options.query || "");
+  const { cleanQuery } = normalizeSearchQuery(options.query || "");
+  const intent = searchIntent(cleanQuery);
+  const { tokens } = normalizeSearchQuery(intent.query);
+  if (intent.maxPrice !== undefined) options = { ...options, maxPrice: Math.min(options.maxPrice ?? intent.maxPrice, intent.maxPrice) };
 
   // 1. Build parameterized WHERE clause
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

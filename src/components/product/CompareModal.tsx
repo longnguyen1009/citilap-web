@@ -180,6 +180,7 @@ export default function CompareModal() {
             </div>
           ) : (
             <div className="space-y-6">
+              {data.groupType === 'LAPTOP' && <section aria-label="Gợi ý chọn giữa các máy" className="grid gap-3 rounded-xl bg-blue-50 p-4 md:grid-cols-3">{data.products.map(product => <div key={product.id} className="min-w-0 text-sm"><h3 className="font-bold text-slate-900">{product.name}</h3><p className="mt-2"><strong>Phù hợp: </strong>{data.specs.find(row => row.key === 'Phù hợp')?.values[product.id] || 'Chưa có đánh giá theo nhu cầu'}</p><p className="mt-2 text-amber-900"><strong>Cân nhắc: </strong>{data.specs.find(row => row.key === 'Hạn chế')?.values[product.id] || 'Kiểm tra pin, màn hình và khả năng nâng cấp trước khi chọn'}</p></div>)}</section>}
               {/* Product Cards Top Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pb-4 border-b border-slate-200">
                 {data.products.map((p) => (

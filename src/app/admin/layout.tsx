@@ -43,6 +43,7 @@ const navGroups: NavGroup[] = [
     groupName: "Tổng quan & Bán hàng",
     items: [
       { name: "Tổng quan", href: "/admin/dashboard", icon: LayoutDashboard },
+      { name: "Hành vi mua hàng", href: "/admin/analytics", icon: LayoutDashboard },
       { name: "Đơn hàng", href: "/admin/orders", icon: ShoppingCart },
       { name: "Hộp thư liên hệ", href: "/admin/contacts", icon: Mail },
       { name: "Khách hàng", href: "/admin/customers", icon: Users },

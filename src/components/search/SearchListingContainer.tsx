@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { trackStorefront } from '@/lib/storefront-metrics';
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Filter, Inbox, Sparkles } from "lucide-react";
@@ -43,6 +44,13 @@ export default function SearchListingContainer({
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const query = initialData.query;
+  const lastSearch = useRef('');
+  useEffect(() => {
+    if (!query || query === lastSearch.current) return;
+    lastSearch.current = query;
+    trackStorefront('search');
+    if (initialData.totalCount === 0) trackStorefront('search_empty');
+  }, [query, initialData.totalCount]);
   const activeCategories = searchParams.getAll("category");
   const activeBrands = searchParams.getAll("brand");
   const activePricePreset = searchParams.get("pricePreset");

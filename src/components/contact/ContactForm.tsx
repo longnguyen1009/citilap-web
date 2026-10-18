@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { useTurnstile } from "@/components/Turnstile";
 import { Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { businessProfile } from '@/config/business-profile';
+import { trackStorefront } from '@/lib/storefront-metrics';
 
-export default function ContactForm() {
+export default function ContactForm({ appointment = false, productId = '', unitCode = '' }: { appointment?: boolean; productId?: string; unitCode?: string }) {
   const turnstile = useTurnstile("contact");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [website, setWebsite] = useState(""); // Honeypot field for bot trap
+  const [locationId, setLocationId] = useState('hanoi');
+  const [requestedAt, setRequestedAt] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +37,7 @@ export default function ContactForm() {
           email: email || undefined,
           message: message || undefined,
           website: website || undefined,
+          ...(appointment ? { appointment: { productId: productId || undefined, unitCode: unitCode || undefined, locationId, requestedAt: `${requestedAt}:00+07:00` } } : {}),
         }),
       });
 
@@ -44,6 +49,7 @@ export default function ContactForm() {
       }
 
       setSuccessMessage(data.message || "Yêu cầu tư vấn của bạn đã được gửi thành công!");
+      if (appointment) trackStorefront('appointment_requested');
       setName("");
       setPhone("");
       setEmail("");
@@ -60,7 +66,7 @@ export default function ContactForm() {
     <div className="bg-white rounded-2xl p-6 sm:p-8 border border-gray-200 shadow-xs space-y-5">
       <div>
         <h2 className="text-lg font-black text-gray-900 uppercase">
-          Gửi tin nhắn tư vấn
+          {appointment ? 'Đặt lịch xem máy' : 'Gửi tin nhắn tư vấn'}
         </h2>
         <p className="text-xs text-gray-500 mt-1">
           Để lại thông tin và nhu cầu sử dụng, tư vấn viên CitiLap sẽ liên hệ hỗ trợ bạn sớm nhất.
@@ -84,6 +90,12 @@ export default function ContactForm() {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {appointment && <fieldset disabled={loading} className="space-y-3 rounded-xl bg-blue-50 p-4"><legend className="text-sm font-semibold">Lịch mong muốn</legend>
+            {unitCode && <p className="text-sm">Mã máy: {unitCode}</p>}
+            <label className="block text-sm">Cơ sở<select className="mt-1 w-full rounded border border-gray-300 bg-white p-2" value={locationId} onChange={e => setLocationId(e.target.value)}>{businessProfile.locations.filter(store => store.status === 'ACTIVE' && store.walkInViewingAndPurchaseEnabled).map(store => <option key={store.id} value={store.id}>{store.name}</option>)}</select></label>
+            <label className="block text-sm">Ngày và giờ (GMT+7)<input className="mt-1 w-full rounded border border-gray-300 bg-white p-2" type="datetime-local" value={requestedAt} onChange={e => setRequestedAt(e.target.value)} required /></label>
+            <p className="text-xs text-slate-600">Chọn trong 30 ngày tới. Nhân viên xác nhận lịch và máy trước khi bạn đến; yêu cầu này chưa giữ hàng. Chủ nhật chỉ theo lịch hẹn.</p>
+          </fieldset>}
           {error && (
             <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
@@ -186,7 +198,7 @@ export default function ContactForm() {
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Gửi yêu cầu tư vấn
+                {appointment ? 'Gửi yêu cầu hẹn xem máy' : 'Gửi yêu cầu tư vấn'}
               </>
             )}
           </button>

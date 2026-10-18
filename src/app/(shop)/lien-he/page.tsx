@@ -34,7 +34,11 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function ContactPage() {
+export default async function ContactPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = await searchParams;
+  const appointment = query.intent === 'appointment';
+  const productId = typeof query.product === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(query.product) ? query.product : '';
+  const unitCode = typeof query.unit === 'string' && /^[a-zA-Z0-9_-]{2,64}$/.test(query.unit) ? query.unit : '';
   const settings = await getStorefrontSettings();
   const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
   const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
@@ -259,7 +263,7 @@ export default async function ContactPage() {
 
           {/* Right: Message Form (5 cols) */}
           <div className="lg:col-span-5">
-            <ContactForm />
+            <ContactForm key={`${appointment}-${productId}-${unitCode}`} appointment={appointment} productId={productId} unitCode={unitCode} />
           </div>
         </div>
       </div>

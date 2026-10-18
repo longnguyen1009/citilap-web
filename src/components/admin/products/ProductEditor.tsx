@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
 import DraftRecovery from '@/components/admin/DraftRecovery';
 import SchedulePanel from '@/components/admin/SchedulePanel';
+import InspectionEditor from './InspectionEditor';
 
 
 import { useEffect, useState, useCallback } from 'react';
@@ -1801,6 +1802,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
           )}
         </AdminCard>
       )}
+
+      {id && <InspectionEditor productId={id} />}
 
       {/* MEDIA PICKER MODAL */}
       {pickerOpen && (

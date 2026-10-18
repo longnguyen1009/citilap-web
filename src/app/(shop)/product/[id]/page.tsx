@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import ProductGallery from "@/components/product/ProductGallery";
+import InspectionReports from '@/components/product/InspectionReports';
 import ProductPurchaseSection from "@/components/product/ProductPurchaseSection";
 import StudioPurchaseSection from "@/components/product/StudioPurchaseSection";
 import ProductSpecsTable from "@/components/product/ProductSpecsTable";
@@ -520,6 +521,8 @@ export default async function ProductDetailPage({
               )}
             </article>
 
+            <InspectionReports productId={product.id} variantId={studioVariant?.id || product.selectedVariantId || null} />
+
             {/* Accessories & Warranty Card */}
             {!studio && <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-6 sm:p-8">
               <h2 className="text-base sm:text-lg font-black text-gray-900 border-b border-gray-100 pb-3 mb-5 uppercase flex items-center gap-2">
@@ -572,7 +575,7 @@ export default async function ProductDetailPage({
                 <div className="space-y-2">
                   <h3 className="font-bold text-gray-900">Giao hàng toàn quốc:</h3>
                   <ul className="space-y-1.5 text-xs sm:text-sm text-gray-600">
-                    <li>✓ Miễn phí giao hàng nội thành bán kính 10km</li>
+                    <li>✓ {businessProfile.shippingPolicy.hanoiFreeShippingNote}</li>
                     <li>✓ Ship COD toàn quốc (kiểm tra hàng trước khi thanh toán)</li>
                     <li>✓ Đóng gói chống sốc chuyên dụng bảo đảm an toàn</li>
                   </ul>
@@ -631,6 +634,8 @@ export default async function ProductDetailPage({
                 <p className="text-xs text-blue-200 leading-relaxed mb-4">
                   Đội ngũ kỹ thuật viên Citilap sẵn sàng hỗ trợ bạn kiểm tra máy thực tế, tư vấn nâng cấp RAM, SSD phù hợp với nhu cầu.
                 </p>
+                <Link href={`/lien-he?intent=appointment&product=${encodeURIComponent(product.id)}`} className="mb-3 block rounded-xl border border-blue-200 px-3 py-2 text-center text-sm font-semibold">Đặt lịch xem máy</Link>
+                <Link href="/chon-laptop" className="mb-3 block text-center text-sm text-blue-100 underline">Chọn máy theo ngân sách</Link>
                 <a
                   href={businessProfile.telHref}
                   className="block text-center bg-white text-blue-900 hover:bg-blue-50 font-black text-sm py-2.5 rounded-xl transition shadow-xs"

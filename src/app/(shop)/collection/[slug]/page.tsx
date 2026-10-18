@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import ProductCard from '@/components/product/ProductCard';
-import { getProductImageUrl } from '@/infra/cloudflare/r2/storage';
 import { MediaError } from '@/server/services/media-library.service';
 import { getPublishedCollection } from '@/server/services/storefront-cms.service';
 

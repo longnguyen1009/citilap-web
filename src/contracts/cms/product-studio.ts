@@ -38,6 +38,11 @@ export const attributeTemplateDefinitions: Record<ProductTemplate, AttributeDefi
     { key: 'Trọng lượng', label: 'Trọng lượng máy', type: 'text', unit: 'kg', isFilterable: false, isComparable: true, displayOrder: 8 },
     { key: 'Cổng kết nối', label: 'Cổng giao tiếp', type: 'text', isFilterable: false, isComparable: true, displayOrder: 9 },
     { key: 'Hệ điều hành', label: 'Hệ điều hành bản quyền', type: 'text', isFilterable: false, isComparable: true, displayOrder: 10 },
+    { key: 'Phù hợp', label: 'Phù hợp với nhu cầu nào', type: 'text', isFilterable: false, isComparable: true, displayOrder: 11 },
+    { key: 'Hạn chế', label: 'Điểm cần cân nhắc', type: 'text', isFilterable: false, isComparable: true, displayOrder: 12 },
+    { key: 'Nâng cấp RAM', label: 'Khả năng nâng cấp RAM', type: 'text', isFilterable: false, isComparable: true, displayOrder: 13 },
+    { key: 'Nâng cấp SSD', label: 'Khả năng nâng cấp SSD', type: 'text', isFilterable: false, isComparable: true, displayOrder: 14 },
+    { key: 'Trọng lượng cả sạc', label: 'Trọng lượng máy và sạc', type: 'text', unit: 'kg', isFilterable: false, isComparable: true, displayOrder: 15 },
   ],
   MOUSE: [
     { key: 'Kết nối', label: 'Kiểu kết nối', type: 'select', options: ['Không dây 2.4GHz', 'Bluetooth', 'Có dây USB', 'Đa chế độ (Tri-mode)'], isFilterable: true, isComparable: true, displayOrder: 1 },
