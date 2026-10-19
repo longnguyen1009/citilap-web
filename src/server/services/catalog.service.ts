@@ -501,7 +501,7 @@ export function mapD1ProductToHomepageProduct(
   return {
     id: row.id,
     matchesFilter,
-    availability: originalVariantCount && !row.variants?.length ? 'UNAVAILABLE' : published?.availability || 'AVAILABLE',
+    availability: published?.availability === 'CONTACT' ? 'CONTACT' : originalVariantCount && !row.variants?.length ? 'UNAVAILABLE' : published?.availability || 'AVAILABLE',
     slug: row.slug,
     sku: chosenVariant?.sku,
     variantId: chosenVariant?.id,

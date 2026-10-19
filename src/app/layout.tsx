@@ -93,7 +93,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const {mediaEnvironment}=await import('@/server/media-http');
   const {seoDefaults}=await import('@/server/services/seo.service');
   const defaults=await seoDefaults((await mediaEnvironment()).DB);
+  const { getPublicStorefrontSettings } = await import('@/server/services/settings.service');
+  const settings = await getPublicStorefrontSettings((await mediaEnvironment()).DB);
   return {...baseMetadata,title:{default:defaults.title,template:'%s | CitiLap'},description:defaults.description,alternates:undefined,
+    icons: { icon: settings.faviconUrl || '/brand/citilap-mark.svg', apple: '/brand/citilap-mark.png' },
     openGraph:{...baseMetadata.openGraph,title:defaults.title,description:defaults.description},twitter:{...baseMetadata.twitter,title:defaults.title,description:defaults.description}};
 }
 

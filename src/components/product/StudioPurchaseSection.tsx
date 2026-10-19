@@ -139,7 +139,7 @@ export default function StudioPurchaseSection({ studio, productId, image, select
                 </div>
                 <p className="text-xs text-slate-500 mt-1">{specText}</p>
                 <div className="flex items-center justify-between mt-3">
-                  <span className="font-bold text-red-600">{item.price.toLocaleString("vi-VN")}đ</span>
+                  <span className="font-bold text-red-600">{item.availability === 'CONTACT' ? 'Liên hệ báo giá' : `${item.price.toLocaleString("vi-VN")}đ`}</span>
                   {item.availability && item.availability !== "AVAILABLE" && (
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">
                       {availabilityNames[item.availability]}
@@ -177,9 +177,10 @@ export default function StudioPurchaseSection({ studio, productId, image, select
 
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div className="flex flex-wrap items-baseline gap-3">
-          <strong className="text-2xl font-black text-red-600">{price.toLocaleString("vi-VN")}đ</strong>
+          <strong className="text-2xl font-black text-red-600">{studio.availability === 'CONTACT' && price === 0 ? 'Liên hệ báo giá' : `${price.toLocaleString("vi-VN")}đ`}</strong>
           {originalPrice !== null && originalPrice > price && <span className="text-sm text-slate-400 line-through">{originalPrice.toLocaleString("vi-VN")}đ</span>}
         </div>
+        {studio.availability === 'CONTACT' && price > 0 && <p className="mt-2 text-sm text-slate-600">Giá tham khảo; xác nhận giá và hàng trước khi mua.</p>}
         <p className="text-sm mt-2 text-slate-600" role="status">{availabilityNames[studio.availability]}</p>
       </div>
 

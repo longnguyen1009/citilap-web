@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-labelledby="title">
+  <title id="title">CitiLap</title>
+  <rect width="120" height="120" rx="24" fill="#0b1221"/>
+  <g transform="translate(5 8)">
+    <path d="M56 30H20a7 7 0 0 0-7 7v38a7 7 0 0 0 7 7h62a7 7 0 0 0 7-7V60" fill="none" stroke="#38a6de" stroke-width="6"/>
+    <path d="M15 82 3 96q-2 5 5 5h89q7 0 5-5L90 82Z" fill="#38a6de"/>
+    <path d="m39 87-4 6h35l-4-6Z" fill="#0b1221"/>
+    <rect x="42" y="96" width="21" height="3" rx="1.5" fill="#0b1221"/>
+    <path d="M61 29h9v9h-9zM83 42h16v16H83z" fill="#60b6f6"/>
+    <path d="M76 22h13v13H76zM60 55h8v8h-8z" fill="#2563eb"/>
+    <path d="M79 10h9v9h-9zM64 41h9v9h-9zM47 58h8v8h-8z" fill="#1d40b8"/>
+    <path d="M92 7h19v19H92zM51 47h7v7h-7zM73 53h9v9h-9z" fill="#f1f5f9"/>
+  </g>
+</svg>

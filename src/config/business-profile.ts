@@ -89,11 +89,11 @@ export interface BusinessProfile {
 
 export const businessProfile: BusinessProfile = {
   brandName: "CitiLap",
-  legalEntityNotice: "Thông tin pháp nhân và đăng ký sàn TMĐT đang được hoàn tất theo quy định pháp luật.",
+  legalEntityNotice: "Đơn vị vận hành: Hộ kinh doanh CitiLap.",
   alternateNames: ["CitiLapVN", "CitiLap.VN"],
   canonicalSiteUrl: "https://citilap.vn",
-  logoAsset: "/brand/brand-logo-original.jpg",
-  bannerAsset: "/brand/marketing-banner-original.png",
+  logoAsset: "/brand/citilap-mark.png",
+  bannerAsset: "/brand/citilap-hero.webp",
   primaryTagline: "CitiLap - Laptop - Công Nghệ - Cho cuộc sống tốt hơn",
   traditionalMotto: "Một chữ tín - Vạn niềm tin",
   founded: "07/2024",

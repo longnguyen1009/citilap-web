@@ -114,7 +114,7 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
               </div>
               <div className="text-xs text-gray-500 font-medium">Hỗ trợ kỹ thuật</div>
               <div className="text-base font-bold text-gray-900 mt-0.5">{phone}</div>
-              <div className="text-[11px] text-gray-500 font-medium mt-1">Hỗ trợ 24/7</div>
+              <div className="text-[11px] text-gray-500 font-medium mt-1">{businessProfile.supportHours}</div>
             </div>
           )}
 

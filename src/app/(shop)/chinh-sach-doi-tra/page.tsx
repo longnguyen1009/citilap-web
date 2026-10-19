@@ -99,6 +99,15 @@ export default async function ReturnPolicyPage() {
       isPublished={false}
     >
       <section className="space-y-6">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <h2 className="text-lg font-bold text-gray-900 mb-3">Chuẩn bị yêu cầu hỗ trợ</h2>
+          <ol className="list-decimal pl-5 space-y-2 text-sm">
+            <li>Gửi mã đơn hoặc phiếu mua hàng, serial máy, mô tả lỗi và thời điểm phát hiện; bổ sung ảnh hoặc video nếu có.</li>
+            <li>Liên hệ CitiLap để xác nhận nơi tiếp nhận và cách gửi máy. Trao đổi phí vận chuyển theo tình huống trước khi gửi.</li>
+            <li>Sao lưu dữ liệu; không gửi mật khẩu, mã OTP trong biểu mẫu. Ghi nhận ngoại hình, phụ kiện và serial khi bàn giao.</li>
+            <li>Giữ biên bản tiếp nhận và thông tin phương án xử lý. Thời gian kiểm tra, đổi hoặc hoàn tiền được xác nhận theo hồ sơ.</li>
+          </ol>
+        </div>
         <div>
           <h2 className="text-lg font-bold text-gray-900 mb-3">1. Quy định đổi trả trong 7 ngày đầu</h2>
           <p className="text-sm leading-relaxed">
@@ -114,7 +123,7 @@ export default async function ReturnPolicyPage() {
         <div>
           <h2 className="text-lg font-bold text-gray-900 mb-3">2. Phương án hoàn tiền</h2>
           <p className="text-sm leading-relaxed">
-            Trong trường hợp sản phẩm phát sinh lỗi kỹ thuật trong thời gian áp dụng nhưng CitiLap không còn máy tương đương để đổi và hai bên không thống nhất được phương án thay thế, cửa hàng sẽ hỗ trợ <strong>hoàn tiền 100%</strong> giá trị sản phẩm cho quý khách.
+            Khi sản phẩm lỗi thuộc điều kiện đổi trả hoặc bảo hành nhưng không có phương án xử lý phù hợp, CitiLap trao đổi phương án hoàn tiền theo kết quả kiểm tra và quyền lợi hợp pháp của khách hàng. Số tiền, phương thức, thời gian hoàn và chi phí vận chuyển cần được xác nhận bằng thông tin trao đổi hoặc biên bản trước khi thực hiện.
           </p>
         </div>
 

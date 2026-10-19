@@ -34,7 +34,7 @@ npm.cmd run dev:cloudflare
 
 Thống kê mặc định tắt, người dùng bật/tắt ở footer. Payload chỉ có tên sự kiện; không gửi câu tìm kiếm, URL, email hay điện thoại. Số lượt không phải số khách duy nhất, doanh thu hoặc số đơn đã thanh toán. Rate limiter dùng cơ chế IP hash hiện có; log hạ tầng chịu chính sách lưu log riêng.
 
-Bộ chọn máy là luật cấu hình: RAM từ 16GB, GPU rời cho gaming/đồ họa, nhẹ tối đa 1,6 kg khi chọn mang đi. Không đảm bảo FPS, thời lượng pin hay tương thích phần mềm. Giới hạn 500 mẫu laptop; vượt giới hạn báo lỗi rõ thay vì trả kết quả bị cắt âm thầm. Một cấu hình đại diện được xét cho mỗi sản phẩm; chưa xếp hạng mọi biến thể độc lập.
+Bộ chọn máy là luật cấu hình: RAM từ 16GB, GPU rời cho gaming/đồ họa, nhẹ tối đa 1,6 kg khi chọn mang đi. Không đảm bảo FPS, thời lượng pin hay tương thích phần mềm. Đọc toàn bộ danh mục laptop đang xuất bản; resolver chia truy vấn theo giới hạn tham số D1. Một cấu hình đại diện được xét cho mỗi sản phẩm; chưa xếp hạng mọi biến thể độc lập.
 
 ## Migration và kiểm tra
 

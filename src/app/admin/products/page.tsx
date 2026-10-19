@@ -175,7 +175,13 @@ export default function UnifiedProductsPage() {
       }
 
       const json = await res.json();
-      setData(json);
+      const catalog = json?.data;
+      if (json?.success !== true || !catalog ||
+          !Array.isArray(catalog.items) || !Array.isArray(catalog.categories) || !Array.isArray(catalog.brands) ||
+          ![catalog.total, catalog.page, catalog.limit, catalog.totalPages].every(Number.isSafeInteger)) {
+        throw new Error("Phản hồi danh mục không hợp lệ. Vui lòng thử lại.");
+      }
+      setData(catalog);
     } catch (err) {
       setError((err as Error).message || "Không thể kết nối đến máy chủ.");
     } finally {
@@ -204,12 +210,12 @@ export default function UnifiedProductsPage() {
         headers: { Accept: "application/json" },
       });
       const resJson = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      if (!res.ok || resJson?.success !== true) {
         throw new Error(resJson.error || "Không thể xử lý thao tác lưu trữ");
       }
       setActionNotice({
         type: "success",
-        text: resJson.archived
+        text: resJson.data?.archived
           ? `Đã lưu trữ sản phẩm "${item.name}" (giữ nguyên lịch sử đơn hàng).`
           : `Đã xóa sản phẩm "${item.name}".`,
       });

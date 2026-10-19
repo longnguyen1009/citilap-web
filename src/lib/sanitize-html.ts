@@ -3,7 +3,7 @@ const ALLOWED_TAGS = new Set([
   "h1", "h2", "h3", "h4", "h5", "h6",
   "ul", "ol", "li", "a", "blockquote",
   "img", "table", "thead", "tbody", "tfoot", "tr", "th", "td",
-  "span", "div", "pre", "code"
+  "span", "div", "pre", "code", "details", "summary"
 ]);
 
 /**

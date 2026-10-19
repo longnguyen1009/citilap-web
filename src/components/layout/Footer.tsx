@@ -254,6 +254,7 @@ export default function Footer({
                     Tra cứu yêu cầu đặt hàng
                   </Link>
                 </li>
+                <li><Link href="/cau-hoi-thuong-gap" className="hover:text-white transition">Câu hỏi thường gặp</Link></li>
               </ul>
             </div>
 
@@ -315,6 +316,7 @@ export default function Footer({
       <div className="bg-[#050a14] pt-4 pb-20 md:pb-4 text-center text-gray-500 text-xs border-t border-gray-800">
         <div className="container mx-auto px-4 max-w-[1370px] space-y-1">
           <p>{copyright}</p>
+          <p>{businessProfile.legalEntityNotice}</p>
           <p className="text-[11px] text-gray-600">
             Website phục vụ giới thiệu sản phẩm và tiếp nhận yêu cầu mua hàng. Không thực hiện giao dịch thanh toán trực tuyến trên trang.
           </p>

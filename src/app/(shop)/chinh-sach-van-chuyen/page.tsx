@@ -114,7 +114,7 @@ export default async function ShippingPolicyPage() {
               • <strong>Khoảng cước phí tham khảo:</strong> Dao động từ <strong>100.000đ – 300.000đ</strong> tùy thuộc vào phương thức vận chuyển (hỏa tốc hoặc chuyển phát tiêu chuẩn), trọng lượng đóng gói và khoảng cách địa lý.
             </p>
             <p>
-              • <strong>Xác nhận cước phí:</strong> Khi quý khách đặt hàng qua website, mức phí sẽ hiển thị là <em>&quot;Xác nhận khi tư vấn&quot;</em>. Chuyên viên CitiLap sẽ thông báo chính xác số tiền cước và thống nhất với quý khách trước khi đóng gói gửi hàng.
+              • <strong>Xác nhận cước phí:</strong> Kiểm tra phí giao hàng và tổng tiền hiển thị ở bước đặt hàng. Nhân viên xác nhận cước theo địa chỉ và phương thức giao trước khi gửi; mọi thay đổi cần được thông báo và thống nhất với khách hàng. Mức tham khảo không phải bảng giá cố định cho mọi đơn.
             </p>
             <p>
               • <strong>Chính sách giao hàng gần cơ sở:</strong> CitiLap hỗ trợ <strong>miễn phí giao hàng trong bán kính 10 km quanh cơ sở Hà Nội</strong> ({hanoi.address}). Chính sách này không mặc định áp dụng cho cơ sở Bắc Ninh. Điều kiện và khoảng cách cụ thể được tư vấn viên xác nhận theo từng đơn.

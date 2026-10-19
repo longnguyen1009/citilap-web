@@ -128,8 +128,8 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   addressBacNinh: bacNinh?.address || "Số 40 Trần Hưng Đạo, P. Đại Phúc, TP. Bắc Ninh",
   openingHours: "T2 - T7: 09:00 - 20:00 (CN hẹn trước)",
 
-  logoUrl: "/brand/brand-logo-original.jpg",
-  faviconUrl: "/favicon.ico",
+  logoUrl: "/brand/citilap-logo.svg",
+  faviconUrl: "/brand/citilap-mark.svg",
   motto: "Một chữ tín - Vạn niềm tin",
   copyrightText: "© 2024 - 2026 CitiLap. Tất cả quyền được bảo lưu.",
   facebookUrl: businessProfile.socialProfiles.facebook || "https://facebook.com/citilapvn",

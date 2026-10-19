@@ -217,7 +217,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
               <img
                 src={settings.logoUrl}
                 alt={settings.storeName || "CitiLap"}
-                className="h-8 sm:h-10 w-auto max-w-[160px] object-contain rounded"
+                className="h-auto w-[156px] sm:w-[210px] xl:w-[260px] object-contain"
               />
             ) : (
               <>

@@ -33,7 +33,7 @@ try {
   assert(recommended.length > 0);
   assert(recommended.every(item => item.product.price <= 20000000 && item.product.specs.ram.includes('16')));
   assert.equal(api.advisorSchema.safeParse({ budget: -1 }).success, false);
-  assert.equal(api.matchLaptop(input, { price: 15000000, condition: 'NEW', availability: 'CONTACT', specs: { ram: '16GB' } }, { 'Trọng lượng': '1.3 kg' }), null);
+  assert.match(api.matchLaptop(input, { price: 15000000, condition: 'NEW', availability: 'CONTACT', specs: { ram: '16GB' } }, { 'Trọng lượng': '1.3 kg' }).reasons[0], /Giá tham khảo/);
   assert.equal(api.matchLaptop(input, { price: 15000000, condition: 'NEW', specs: { ram: '16GB' } }, {}), null);
   assert.equal(api.searchIntent('laptop gaming 20 triệu').maxPrice, 20000000);
   assert.equal(api.searchIntent('RTX4060').query, 'rtx 4060');

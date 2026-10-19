@@ -19,8 +19,9 @@ import ProductCard from '@/components/product/ProductCard';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
 import CategoryGridSection from '@/components/home/CategoryGridSection';
 import BrandSection from '@/components/home/BrandSection';
-import MediaSection from '@/components/home/MediaSection';
-import ContactSection from '@/components/home/ContactSection';
+import { mediaEnvironment } from '@/server/media-http';
+import { publicPostList } from '@/server/services/post.service';
+import { newsReviewsSectionDataSchema, ctaSectionDataSchema } from '@/contracts/cms/site-builder';
 import FeatureStrip from '@/components/home/FeatureStrip';
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -76,13 +77,13 @@ export default function BlockRenderer({ sections }: { sections: ResolvedSectionI
             return <FeaturedCollectionBlock key={section.id} section={section} />;
 
           case 'news_reviews':
-            return <NewsReviewsBlock key={section.id} />;
+            return <NewsReviewsBlock key={section.id} data={section.data} />;
 
           case 'intro':
             return <IntroBlock key={section.id} data={section.data} />;
 
           case 'cta':
-            return <CtaBlock key={section.id} />;
+            return <CtaBlock key={section.id} data={section.data} />;
 
           default:
             return null;
@@ -409,8 +410,20 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
 }
 
 // 7. NEWS & REVIEWS BLOCK
-function NewsReviewsBlock() {
-  return <MediaSection />;
+async function NewsReviewsBlock({ data }: { data: unknown }) {
+  const d = newsReviewsSectionDataSchema.parse(data);
+  const { DB } = await mediaEnvironment();
+  const { items } = await publicPostList(DB, { ids: d.postIds, categoryId: d.categoryId || undefined, limit: d.limit });
+  if (d.postIds.length) items.sort((a, b) => d.postIds.indexOf(a.id) - d.postIds.indexOf(b.id));
+  if (!items.length) return null;
+  return <section className="mx-auto max-w-[1370px] px-4 py-10">
+    <h2 className="text-2xl font-black text-slate-900">{d.title}</h2>
+    <p className="mt-2 text-slate-600">{d.subtitle}</p>
+    <div className="mt-6 grid gap-6 md:grid-cols-3">{items.map(post => <Link key={post.id} href={`/news/${post.slug}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {post.coverImage && <Image src={post.coverImage.url} alt={post.coverImage.alt} width={640} height={360} className="aspect-video w-full object-contain bg-white" />}
+      <div className="p-5"><h3 className="font-bold text-slate-900">{post.title}</h3><p className="mt-2 text-sm text-slate-600">{post.excerpt}</p></div>
+    </Link>)}</div>
+  </section>;
 }
 
 // 8. INTRO & FEATURE STRIP BLOCK
@@ -467,6 +480,18 @@ function IntroBlock({ data }: { data: unknown }) {
 }
 
 // 9. CTA BLOCK
-function CtaBlock() {
-  return <ContactSection />;
+function CtaBlock({ data }: { data: unknown }) {
+  const d = ctaSectionDataSchema.parse(data);
+  return <section className="mx-auto max-w-[1370px] px-4 py-10">
+    <div className="grid gap-8 overflow-hidden rounded-3xl bg-slate-900 text-white md:grid-cols-2">
+      <div className="p-8 md:p-12"><h2 className="text-3xl font-black">{d.title}</h2><p className="mt-4 text-slate-300">{d.subtitle}</p>
+        <div className="mt-6 flex flex-wrap gap-4">
+          {d.primaryLink && <Link href={d.primaryLink} className="rounded-xl bg-blue-600 px-5 py-3 font-bold">{d.primaryText}</Link>}
+          {d.secondaryLink && <Link href={d.secondaryLink} className="rounded-xl border border-slate-500 px-5 py-3 font-bold">{d.secondaryText}</Link>}
+        </div>
+        {d.phone && <a href={`tel:${d.phone.replace(/[^+\d]/g, '')}`} className="mt-6 inline-block text-xl font-bold">{d.phone}</a>}
+      </div>
+      {d.bgImageUrl && <Image src={d.bgImageUrl} alt="Showroom CitiLap" width={800} height={600} className="h-full min-h-64 w-full object-cover" />}
+    </div>
+  </section>;
 }

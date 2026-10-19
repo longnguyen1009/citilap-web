@@ -299,12 +299,16 @@ export async function publicPostBySlug(db: D1Database, slug: string) {
   return toPublicPost(db, row.id, row.published, row.updatedAt, row.publishedAt);
 }
 
-export async function publicPostList(db: D1Database, opts: { categoryId?: string; page?: number; limit?: number } = {}) {
+export async function publicPostList(db: D1Database, opts: { categoryId?: string; ids?: string[]; page?: number; limit?: number } = {}) {
   const page = Math.max(1, Math.floor(Number(opts.page) || 1));
   const limit = Math.min(50, Math.max(1, Math.floor(Number(opts.limit) || 12)));
   const offset = (page - 1) * limit;
   const whereClauses = ['p.deletedAt IS NULL', 's.published IS NOT NULL'];
   const params: string[] = [];
+  if (opts.ids?.length) {
+    whereClauses.push(`p.id IN (${opts.ids.map(() => '?').join(',')})`);
+    params.push(...opts.ids);
+  }
   if (opts.categoryId) {
     whereClauses.push("json_extract(s.published, '$.categoryId') = ?");
     params.push(opts.categoryId);
