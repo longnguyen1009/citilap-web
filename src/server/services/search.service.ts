@@ -1,7 +1,9 @@
-import { prisma, type PrismaClient } from "@/lib/prisma";
+import { prisma, getD1Database, getPrismaClient, type PrismaClient } from "@/lib/prisma";
+import { mediaEnvironment } from '../media-http';
+import { readSearchPage } from './search-read-model';
 import {catalogBatches} from './catalog-batches';
 import { searchIntent } from '@/contracts/catalog/search-intent';
-import { getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
+import { getProductImageUrl } from "@/infra/cloudflare/r2/storage";
 import {
   type HomepageProduct,
   type FacetOption,
@@ -160,7 +162,7 @@ export function normalizeSearchQuery(raw: string): { cleanQuery: string; tokens:
 /**
  * Resolves the primary image URL for a product, favoring R2 ProductImage metadata.
  */
-function resolvePrimaryImageUrl(row: ProductDbRowWithRelations): string | null {
+function resolvePrimaryImageUrl(row: Pick<ProductDbRowWithRelations, 'images' | 'productImages'>): string | null {
   if (row.productImages && row.productImages.length > 0) {
     const sorted = [...row.productImages].sort((a, b) => {
       if (a.isPrimary && !b.isPrimary) return -1;
@@ -168,9 +170,8 @@ function resolvePrimaryImageUrl(row: ProductDbRowWithRelations): string | null {
       return a.sortOrder - b.sortOrder;
     });
     const first = sorted[0];
-    if (first?.r2Key) {
-      return getPublicMediaUrl(first.r2Key);
-    }
+    const url = getProductImageUrl(first?.r2Key, first?.url);
+    if (url) return url;
   }
 
   if (row.images) {
@@ -423,6 +424,20 @@ export async function searchProducts(
   client: PrismaClient = prisma,
   pricingContext?: PriceEvaluationContext | null,
   at: Date = new Date()
+): Promise<SearchResult> {
+  if (client !== prisma || pricingContext) return computeSearchProducts(options, client, pricingContext, at);
+  const db = getD1Database() ?? (await mediaEnvironment()).DB;
+  const boundClient = getPrismaClient(db);
+  const result = await readSearchPage(db, options, at, async () => computeSearchProducts(options, boundClient, await getStorefrontPricingContext(db, at), at, true));
+  return { ...result, products: await searchImages(result.products, boundClient) };
+}
+
+async function computeSearchProducts(
+  options: SearchFilterOptions,
+  client: PrismaClient = prisma,
+  pricingContext?: PriceEvaluationContext | null,
+  at: Date = new Date(),
+  allResults = false
 ): Promise<SearchResult> {
   const context = pricingContext ?? await getStorefrontPricingContext(undefined, at);
   const { cleanQuery } = normalizeSearchQuery(options.query || "");
@@ -680,13 +695,16 @@ export async function searchProducts(
   const rawProducts = await catalogBatches((skip,take)=>client.product.findMany({
     skip,take,
     where,
-    include: {
+    select: {
+      id: true, name: true, slug: true, description: true, brand: true,
+      model: true, series: true, warranty: true, condition: true,
+      price: true, originalPrice: true, images: true, stock: true, status: true,
+      cpu: true, cpuSeries: true, gpu: true, gpuSeries: true,
+      ram: true, ramGb: true, storage: true, storageGb: true, display: true,
+      tags: true, isFeatured: true, isBestSeller: true, isFlashSale: true, createdAt: true,
       studio: {select:{published:true}},
-      brandRel: true,
-      category: true,
-      productImages: {
-        orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
-      },
+      brandRel: { select: { id: true, name: true, slug: true } },
+      category: { select: { id: true, name: true, slug: true } },
       variants: {
         where: { status: {in:['ACTIVE','active']} },
         orderBy: { price: "asc" },
@@ -901,18 +919,28 @@ export async function searchProducts(
   const totalCount = processedProducts.length;
   const totalPages = Math.ceil(totalCount / pageSize);
   const startIndex = (page - 1) * pageSize;
-  const rawPagedList = processedProducts.slice(startIndex, startIndex + pageSize).map((p) => p.product);
-  const pagedList = rawPagedList;
-
+  const rawPagedList = (allResults ? processedProducts : processedProducts.slice(startIndex, startIndex + pageSize)).map((p) => p.product);
   return {
     query: cleanQuery,
-    products: pagedList,
-    totalCount,
-    page,
-    pageSize,
-    totalPages,
-    facets,
+    products: allResults ? rawPagedList : await searchImages(rawPagedList, client),
+    totalCount, page, pageSize, totalPages, facets,
   };
+}
+
+async function searchImages(rawPagedList: HomepageProduct[], client: PrismaClient) {
+  // Fetch image relations only for the visible page (at most 48 D1 parameters).
+  const imageRows = rawPagedList.length ? await client.product.findMany({
+    where: { id: { in: rawPagedList.map(p => p.id) } },
+    select: { id: true, images: true, productImages: {
+      orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }], take: 1,
+    } },
+  }) : [];
+  const images = new Map(imageRows.map(row => [row.id, resolvePrimaryImageUrl(row)]));
+  return rawPagedList.map(product => ({ ...product,
+    image: images.get(product.id) ?? product.image,
+    primaryImage: images.get(product.id) ?? product.primaryImage,
+  }));
+
 }
 
 /**

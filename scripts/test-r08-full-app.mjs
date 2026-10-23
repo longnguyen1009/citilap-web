@@ -209,6 +209,9 @@ try {
     });
     await check('R09A real search and assistance routes render without fake profile/tracking',async()=>{
       const search=await send('/search?q=Fixture');assert.equal(search.status,200,search.text.slice(0,300));assert.ok(search.text.includes('Fixture Laptop'));
+      const cold=await send('/api/search?q=Fixture&limit=1');assert.equal(cold.status,200,cold.text);
+      const warm=await send('/api/search?q=Fixture&limit=1');assert.deepEqual(warm.json,cold.json);
+      assert((await db.prepare('SELECT count(*) AS n FROM SearchResultSet').first()).n>0,'Worker search must populate read model');
       const profile=await send('/profile');assert.equal(profile.status,200);assert.ok(!profile.text.includes('Nguyễn Văn A'));
       const tracking=await send('/order-tracking');assert.equal(tracking.status,200);assert.ok(tracking.text.includes('Tra cứu tự động'));assert.ok(!tracking.text.includes('Số điện thoại người nhận'));
     });

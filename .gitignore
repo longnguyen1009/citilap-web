@@ -45,5 +45,6 @@ next-env.d.ts
 .vinext/
 .wrangler/
 scripts/.*bundle*.mjs
+scripts/verify-cf.mjs
 /.worktrees/
 /.claude/settings.local.json

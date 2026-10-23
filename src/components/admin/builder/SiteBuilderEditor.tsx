@@ -75,11 +75,17 @@ const SECTION_TYPE_META: Record<
   news_reviews: { label: 'Tin tức & Đánh giá', icon: Newspaper, desc: 'Các bài viết hoặc đánh giá nổi bật' },
   intro: { label: 'Giới thiệu & Số liệu', icon: Info, desc: 'Khối giới thiệu thương hiệu và các chỉ số' },
   cta: { label: 'Kêu gọi hành động (CTA)', icon: Sparkles, desc: 'Khối chốt hành động với nút nổi bật' },
+  video_reviews: { label: 'Video review', icon: Eye, desc: 'Video YouTube và TikTok' },
+  customer_gallery: { label: 'Ảnh khách hàng', icon: ImageIcon, desc: 'Ảnh trải nghiệm tại cửa hàng' },
 };
 
 function createDefaultSection(type: SectionType): SectionItem {
   const id = `sec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   switch (type) {
+    case 'video_reviews':
+      return { id, type, name: 'Video review', enabled: true, data: { type, title: 'Video review sản phẩm', videos: [] } };
+    case 'customer_gallery':
+      return { id, type, name: 'Ảnh khách hàng', enabled: true, data: { type, title: 'Hình ảnh khách hàng tại CitiLap', images: [] } };
     case 'banner':
       return {
         id,
@@ -1132,6 +1138,8 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                       update={updateSelectedSectionData}
                     />
                   )}
+                  {selectedSection.data.type === 'video_reviews' && <div className="space-y-3"><label className="block text-sm font-bold">Tiêu đề<input value={selectedSection.data.title} onChange={e => updateSelectedSectionData({ title: e.target.value })} className="mt-1 w-full rounded border p-2" /></label>{selectedSection.data.videos.map((v, index) => <div key={index} className="space-y-2 rounded border p-3">{(['title', 'url', 'thumbnail'] as const).map(field => <label key={field} className="block text-xs">{field === 'title' ? 'Tên video' : field === 'url' ? 'URL video YouTube / TikTok' : 'URL ảnh đại diện'}<input value={v[field]} onChange={e => { if (selectedSection.data.type !== 'video_reviews') return; updateSelectedSectionData({ videos: selectedSection.data.videos.map((x, i) => i === index ? { ...x, [field]: e.target.value } : x) }); }} className="mt-1 w-full rounded border p-2" /></label>)}<button type="button" className="text-xs text-red-600" onClick={() => { if (selectedSection.data.type === 'video_reviews') updateSelectedSectionData({ videos: selectedSection.data.videos.filter((_, i) => i !== index) }); }}>Xóa video</button></div>)}<button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => { if (selectedSection.data.type === 'video_reviews') updateSelectedSectionData({ videos: [...selectedSection.data.videos, { title: '', url: '', thumbnail: '' }] }); }}>Thêm video</button></div>}
+                  {selectedSection.data.type === 'customer_gallery' && <div className="space-y-3"><label className="block text-sm font-bold">Tiêu đề<input value={selectedSection.data.title} onChange={e => updateSelectedSectionData({ title: e.target.value })} className="mt-1 w-full rounded border p-2" /></label>{selectedSection.data.images.map((img, index) => <div key={index} className="space-y-2 rounded border p-3">{(['url', 'alt'] as const).map(field => <label key={field} className="block text-xs">{field === 'url' ? 'URL ảnh' : 'Mô tả ảnh'}<input value={img[field]} onChange={e => { if (selectedSection.data.type !== 'customer_gallery') return; updateSelectedSectionData({ images: selectedSection.data.images.map((x, i) => i === index ? { ...x, [field]: e.target.value } : x) }); }} className="mt-1 w-full rounded border p-2" /></label>)}<button type="button" className="text-xs text-red-600" onClick={() => { if (selectedSection.data.type === 'customer_gallery') updateSelectedSectionData({ images: selectedSection.data.images.filter((_, i) => i !== index) }); }}>Xóa ảnh</button></div>)}<button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => { if (selectedSection.data.type === 'customer_gallery') updateSelectedSectionData({ images: [...selectedSection.data.images, { url: '', alt: '' }] }); }}>Thêm ảnh</button></div>}
                   {selectedSection.data.type === 'cta' && (
                     <CtaForm
                       data={selectedSection.data}
@@ -1731,6 +1739,7 @@ function ProductGridForm({
 }) {
   return (
     <div className="space-y-4">
+      {!!data.tabs?.length && <fieldset className="space-y-3 rounded-xl border p-3"><legend className="px-1 font-bold">Các tab sản phẩm</legend>{data.tabs.map((tab, index) => <div key={tab.id} className="space-y-2 rounded border bg-slate-50 p-3"><label className="block text-xs">Tên tab<input value={tab.label} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, label: e.target.value } : t) })} className="mt-1 w-full rounded border p-2" /></label><label className="block text-xs">Link xem tất cả<input value={tab.href} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, href: e.target.value } : t) })} className="mt-1 w-full rounded border p-2" /></label><label className="block text-xs">ID sản phẩm, mỗi dòng một ID<textarea value={tab.productIds.join('\n')} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, productIds: e.target.value.split(/\s+/).filter(Boolean) } : t) })} rows={3} className="mt-1 w-full rounded border p-2 font-mono" /></label></div>)}</fieldset>}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="font-bold text-slate-700 block mb-1">Tiêu đề lưới sản phẩm</label>
@@ -2011,6 +2020,8 @@ function FeaturedCategoriesForm({
 }) {
   return (
     <div className="space-y-4">
+      <label className="block text-xs font-bold">Bố cục<select value={data.layout || 'cards'} onChange={e => update({ layout: e.target.value as 'cards' | 'board' })} className="mt-1 w-full rounded border p-2"><option value="cards">Thẻ danh mục</option><option value="board">Bảng phân loại</option></select></label>
+      {!!data.items.length && <fieldset className="space-y-3 rounded border p-3"><legend className="px-1 font-bold">Ô phân loại</legend>{data.items.map((item, index) => <div key={index} className="space-y-2 rounded border p-2">{(['customName', 'customImage', 'href'] as const).map(field => <label key={field} className="block text-xs">{field === 'customName' ? 'Tên hiển thị' : field === 'customImage' ? 'URL ảnh đại diện' : 'Liên kết'}<input value={item[field] || ''} onChange={e => update({ items: data.items.map((x, i) => i === index ? { ...x, [field]: e.target.value } : x) })} className="mt-1 w-full rounded border p-2" /></label>)}</div>)}</fieldset>}
       <div>
         <label className="font-bold text-slate-700 block mb-1">Tiêu đề danh mục</label>
         <input

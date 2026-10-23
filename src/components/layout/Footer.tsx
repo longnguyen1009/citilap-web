@@ -223,91 +223,21 @@ export default function Footer({
               </div>
             </div>
 
-            {/* Column 3: Hỗ trợ khách hàng */}
-            <div>
-              <h3 className="text-base font-bold mb-4 text-white uppercase tracking-wide">
-                Hỗ trợ mua hàng
-              </h3>
-              <ul className="space-y-2.5 text-sm text-gray-400">
-                <li>
-                  <Link href="/huong-dan-mua-hang" className="hover:text-white transition">
-                    Hướng dẫn đặt hàng
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/chinh-sach-bao-hanh" className="hover:text-white transition">
-                    Chính sách bảo hành
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/chinh-sach-doi-tra" className="hover:text-white transition">
-                    Chính sách đổi trả & hoàn tiền
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/chinh-sach-van-chuyen" className="hover:text-white transition">
-                    Chính sách vận chuyển & giao nhận
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/order-tracking" className="hover:text-white transition">
-                    Tra cứu yêu cầu đặt hàng
-                  </Link>
-                </li>
-                <li><Link href="/cau-hoi-thuong-gap" className="hover:text-white transition">Câu hỏi thường gặp</Link></li>
-              </ul>
-            </div>
+            {[{ title: 'Chính sách khách hàng', id: 'footer-policies', links: [
+              { label: 'Chính sách bảo hành', href: '/chinh-sach-bao-hanh' },
+              { label: 'Đổi trả & hoàn tiền', href: '/chinh-sach-doi-tra' },
+              { label: 'Vận chuyển & giao nhận', href: '/chinh-sach-van-chuyen' },
+              { label: 'Bảo vệ thông tin cá nhân', href: '/chinh-sach-bao-mat' },
+              { label: 'Điều khoản mua hàng', href: '/dieu-khoan-mua-hang' },
+            ] }, { title: 'Về CitiLap', id: 'footer-about', links: [
+              { label: 'Giới thiệu CitiLap', href: '/gioi-thieu' },
+              { label: 'Hệ thống cửa hàng', href: '/he-thong-cua-hang' },
+              { label: 'Liên hệ CitiLap', href: '/lien-he' },
+              { label: 'Hướng dẫn đặt hàng', href: '/huong-dan-mua-hang' },
+              { label: 'Tra cứu đơn hàng', href: '/order-tracking' },
+              { label: 'Câu hỏi thường gặp', href: '/cau-hoi-thuong-gap' },
+            ] }].map(group => <div key={group.id}><h3 className="mb-4 text-base font-bold uppercase tracking-wide text-white">{group.title}</h3><ul className="space-y-2.5 text-sm text-gray-400">{(navigation?.menus.footer.find(item => item.id === group.id)?.children || group.links).map(item => <li key={item.href}><Link href={item.href} className="transition hover:text-white">{item.label}</Link></li>)}</ul></div>)}
 
-            {/* Column 4: Giới thiệu & Pháp lý */}
-            <div>
-              <h3 className="text-base font-bold mb-4 text-white uppercase tracking-wide">
-                Về CitiLap
-              </h3>
-              <ul className="space-y-2.5 text-sm text-gray-400">
-                {navigation?.menus.footer && navigation.menus.footer.length > 0 ? (
-                  navigation.menus.footer.map((item) => (
-                    <li key={item.id}>
-                      <Link href={item.href} className="hover:text-white transition font-medium">{item.label}</Link>
-                      {item.children.length > 0 && (
-                        <ul className="pl-3 mt-2 space-y-2 border-l border-gray-700">
-                          {item.children.map((child) => (
-                            <li key={child.id}><Link href={child.href} className="hover:text-white transition">{child.label}</Link></li>
-                          ))}
-                        </ul>
-                      )}
-                    </li>
-                  ))
-                ) : (
-                  <>
-                    <li>
-                      <Link href="/gioi-thieu" className="hover:text-white transition">
-                        Giới thiệu thương hiệu
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/he-thong-cua-hang" className="hover:text-white transition">
-                        Hệ thống cửa hàng
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/lien-he" className="hover:text-white transition">
-                        Liên hệ & Hỗ trợ kỹ thuật
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/dieu-khoan-mua-hang" className="hover:text-white transition">
-                        Điều khoản đặt hàng
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/chinh-sach-bao-mat" className="hover:text-white transition">
-                        Chính sách bảo mật thông tin
-                      </Link>
-                    </li>
-                  </>
-                )}
-              </ul>
-            </div>
           </div>
         </div>
       </div>

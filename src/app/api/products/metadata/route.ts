@@ -3,25 +3,9 @@ import { NextResponse } from "next/server";
 import { requireAdmin, requireAdminMutation } from "@/lib/auth";
 
 const hasDatabase = !!process.env.DATABASE_URL;
-const PRODUCT_STATUSES = new Set(["active", "draft", "archived"]);
-const MAX_ROWS = 200;
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ success: false, error: message }, { status });
-}
-
-function parseBoolean(value: unknown): boolean | undefined {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string" && ["true", "1"].includes(value.trim().toLowerCase())) return true;
-  if (typeof value === "string" && ["false", "0"].includes(value.trim().toLowerCase())) return false;
-  return undefined;
-}
-
-function parseDate(value: unknown): Date | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null || value === "") return null;
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 async function GETHandler(request: Request) {

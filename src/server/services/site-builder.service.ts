@@ -17,6 +17,7 @@ import {
   getActiveBrands,
   type HomepageProduct,
 } from './catalog.service';
+import { publicPostList } from './post.service';
 import { publicCollection } from './navigation.service';
 import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
 import { getStorefrontPricingContext } from './pricing.service';
@@ -469,7 +470,9 @@ export async function getLandingPageRevisions(db: D1Database, id: string) {
 // --- Public Resolvers for StoreFront ---
 
 export interface ResolvedSectionItem extends SectionItem {
+  resolvedPosts?: Awaited<ReturnType<typeof publicPostList>>['items'];
   resolvedProducts?: HomepageProduct[];
+  resolvedTabs?: { id: string; label: string; href: string; products: HomepageProduct[] }[];
   resolvedCategories?: Awaited<ReturnType<typeof getActiveCategories>>;
   resolvedBrands?: Awaited<ReturnType<typeof getActiveBrands>>;
   resolvedCollection?: Awaited<ReturnType<typeof publicCollection>>;
@@ -513,6 +516,16 @@ export async function resolveSectionsForStorefront(
         prods = await resolveProductsByCriteria(data.ruleCriteria, getPrismaClient(db), pricingContext, evaluatedAt);
       }
       resolvedSec.resolvedProducts = prods;
+      if (data.tabs?.length) {
+        const ids = [...new Set(data.tabs.flatMap(t => t.productIds))];
+        const all = await resolveProductsByIds(ids, getPrismaClient(db), pricingContext, evaluatedAt);
+        const byId = new Map(all.map(p => [p.id, p]));
+        resolvedSec.resolvedTabs = data.tabs.map(t => ({ ...t, products: t.productIds.flatMap(id => byId.has(id) ? [byId.get(id)!] : []) }));
+      }
+    } else if (data.type === 'news_reviews') {
+      const { items } = await publicPostList(db, { ids: data.postIds, categoryId: data.categoryId || undefined, limit: data.limit });
+      if (data.postIds.length) items.sort((a, b) => data.postIds.indexOf(a.id) - data.postIds.indexOf(b.id));
+      resolvedSec.resolvedPosts = items;
     } else if (data.type === 'featured_collection') {
       try {
         const col = await publicCollection(db, data.collectionId, pricingContext, evaluatedAt);

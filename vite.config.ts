@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import vinext from "vinext";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
+import { imagesOptimizer } from "@vinext/cloudflare/images/images-optimizer";
 
 export default defineConfig({
   // Vinext's client-reference analysis runs outside the Workers environment.
@@ -9,7 +10,7 @@ export default defineConfig({
   build: { rollupOptions: { external: ['cloudflare:workers'] } },
   plugins: [
     tailwindcss(),
-    vinext(),
+    vinext({ images: { optimizer: imagesOptimizer() } }),
     cloudflare({
       viteEnvironment: {
         name: "rsc",

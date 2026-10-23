@@ -1,12 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { CartProvider } from "@/context/CartContext";
-import { WishlistProvider } from "@/context/WishlistContext";
-import { CompareProvider } from "@/context/CompareContext";
-import CompareFloatingBar from "@/components/product/CompareFloatingBar";
-import CompareModal from "@/components/product/CompareModal";
-import ScrollToTop from "@/components/layout/ScrollToTop";
 import { businessProfile } from "@/config/business-profile";
 import {
   generateOrganizationJsonLd,
@@ -91,10 +85,9 @@ const baseMetadata: Metadata = {
 
 export async function generateMetadata(): Promise<Metadata> {
   const {mediaEnvironment}=await import('@/server/media-http');
-  const {seoDefaults}=await import('@/server/services/seo.service');
-  const defaults=await seoDefaults((await mediaEnvironment()).DB);
   const { getPublicStorefrontSettings } = await import('@/server/services/settings.service');
   const settings = await getPublicStorefrontSettings((await mediaEnvironment()).DB);
+  const defaults = { title: settings.defaultSeoTitle, description: settings.defaultSeoDescription };
   return {...baseMetadata,title:{default:defaults.title,template:'%s | CitiLap'},description:defaults.description,alternates:undefined,
     icons: { icon: settings.faviconUrl || '/brand/citilap-mark.svg', apple: '/brand/citilap-mark.png' },
     openGraph:{...baseMetadata.openGraph,title:defaults.title,description:defaults.description},twitter:{...baseMetadata.twitter,title:defaults.title,description:defaults.description}};
@@ -123,16 +116,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <CartProvider>
-          <WishlistProvider>
-            <CompareProvider>
-              {children}
-              <CompareFloatingBar />
-              <CompareModal />
-              <ScrollToTop />
-            </CompareProvider>
-          </WishlistProvider>
-        </CartProvider>
+        {children}
       </body>
     </html>
   );

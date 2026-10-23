@@ -1,3 +1,4 @@
+import { publishedDocument } from './published-document-cache';
 import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -200,10 +201,10 @@ export async function restorePageRevision(env: MediaEnvironment, pageId: string,
  */
 export async function publicPageBySlug(db: D1Database, slug: string) {
   let row = await db.prepare(`
-    SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+    SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
     FROM Page p JOIN PageStudio s ON s.pageId = p.id
     WHERE json_extract(s.published, '$.slug')=? AND p.deletedAt IS NULL AND s.published IS NOT NULL
-  `).bind(slug).first<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+  `).bind(slug).first<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
 
   if (!row) {
     const alias = await db.prepare(`
@@ -215,15 +216,15 @@ export async function publicPageBySlug(db: D1Database, slug: string) {
     `).bind(slug).first<{ pageId: string }>();
     if (alias) {
       row = await db.prepare(`
-        SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+        SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
         FROM Page p JOIN PageStudio s ON s.pageId = p.id
         WHERE p.id=? AND p.deletedAt IS NULL AND s.published IS NOT NULL
-      `).bind(alias.pageId).first<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+      `).bind(alias.pageId).first<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
     }
   }
 
   if (!row) throw new MediaError('Không tìm thấy trang đã xuất bản.', 404);
-  return toPublicPage(db, row.id, row.published, row.updatedAt, row.publishedAt);
+  return toPublicPage(db, row.id, row.publishedRevision, row.updatedAt, row.publishedAt);
 }
 
 /**
@@ -233,14 +234,14 @@ export async function publicPageBySlug(db: D1Database, slug: string) {
  */
 export async function publicPageByType(db: D1Database, pageType: string) {
   const row = await db.prepare(`
-    SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+    SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
     FROM Page p JOIN PageStudio s ON s.pageId = p.id
     WHERE (p.pageType = ? OR json_extract(s.published, '$.pageType') = ?)
       AND p.deletedAt IS NULL AND s.published IS NOT NULL
     ORDER BY s.publicUpdatedAt DESC, p.id DESC LIMIT 1
-  `).bind(pageType, pageType).first<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+  `).bind(pageType, pageType).first<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
   if (!row) return null;
-  return toPublicPage(db, row.id, row.published, row.updatedAt, row.publishedAt);
+  return toPublicPage(db, row.id, row.publishedRevision, row.updatedAt, row.publishedAt);
 }
 
 export type SystemPageResolution =
@@ -257,15 +258,15 @@ export type SystemPageResolution =
 export async function getSystemPageResolution(db: D1Database, pageType: PageType): Promise<SystemPageResolution> {
   // 1. Check for published page
   const publishedRow = await db.prepare(`
-    SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+    SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
     FROM Page p JOIN PageStudio s ON s.pageId = p.id
     WHERE (p.pageType = ? OR json_extract(s.published, '$.pageType') = ?)
       AND p.deletedAt IS NULL AND s.published IS NOT NULL
     ORDER BY s.publicUpdatedAt DESC, p.id DESC LIMIT 1
-  `).bind(pageType, pageType).first<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+  `).bind(pageType, pageType).first<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
 
   if (publishedRow) {
-    const page = await toPublicPage(db, publishedRow.id, publishedRow.published, publishedRow.updatedAt, publishedRow.publishedAt);
+    const page = await toPublicPage(db, publishedRow.id, publishedRow.publishedRevision, publishedRow.updatedAt, publishedRow.publishedAt);
     return { state: 'PUBLISHED', page };
   }
 
@@ -294,8 +295,8 @@ export async function getSystemPageResolution(db: D1Database, pageType: PageType
   return { state: 'DRAFT_ONLY', pageId: studioRow.id };
 }
 
-async function toPublicPage(db: D1Database, id: string, publishedJson: string, updatedAt: string, publishedAt: string) {
-  const d = JSON.parse(publishedJson) as PageDocument;
+async function toPublicPage(db: D1Database, id: string, revision: number, updatedAt: string, publishedAt: string) {
+  const d = await publishedDocument<PageDocument>(db, 'Page', id, revision);
   let ogImageUrl: string | null = null;
   if (d.seo.ogImageAssetId) {
     const { asset } = await mediaDetail(db, d.seo.ogImageAssetId);

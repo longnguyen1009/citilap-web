@@ -113,9 +113,23 @@ export async function saveAdminSettings(
   };
 }
 
+const publicSettingsCache = new WeakMap<D1Database, { revision: number; document: PublicStorefrontSettings }>();
+
 export async function getPublicStorefrontSettings(
   db: D1Database
 ): Promise<PublicStorefrontSettings> {
-  const { document } = await getAdminSettings(db);
-  return publicStorefrontSettingsSchema.parse(document);
+  const cached = publicSettingsCache.get(db);
+  // Read revision and snapshot atomically; never serve cached data on a DB error.
+  const row = await db.prepare("SELECT revision, CASE WHEN revision = ? THEN NULL ELSE document END AS document FROM SiteSettings WHERE id = 'site'")
+    .bind(cached?.revision ?? -1).first<{ revision: number; document: string | null }>();
+  if (!row) {
+    publicSettingsCache.delete(db);
+    return publicStorefrontSettingsSchema.parse(DEFAULT_ADMIN_SETTINGS);
+  }
+  if (cached && row.revision === cached.revision) return structuredClone(cached.document);
+  const document = publicStorefrontSettingsSchema.parse(adminSettingsDocumentSchema.parse({
+    ...DEFAULT_ADMIN_SETTINGS, ...JSON.parse(row.document!),
+  }));
+  publicSettingsCache.set(db, { revision: row.revision, document });
+  return structuredClone(document);
 }

@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parseSearchParams } from '@/contracts/catalog/search';
 import { searchProducts } from '@/server/services/search.service';
-import { mediaEnvironment } from '@/server/media-http';
-import { getStorefrontPricingContext } from '@/server/services/pricing.service';
 
 export async function GET(request: Request) {
   try {
@@ -23,16 +21,7 @@ export async function GET(request: Request) {
 
     const { data: validParams } = parsed;
 
-    const env = await mediaEnvironment();
-    const evaluatedAt = new Date();
-    const pricingContext = await getStorefrontPricingContext(env.DB, evaluatedAt);
-
-    const result = await searchProducts(
-      validParams,
-      undefined,
-      pricingContext,
-      evaluatedAt
-    );
+    const result = await searchProducts(validParams);
 
     return NextResponse.json({
       success: true,

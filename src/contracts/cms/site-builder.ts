@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { RESERVED_SLUGS, seoSchema } from './post';
-import { internalPathSchema } from './v1';
+import { youtubeId } from './media';
 
 const text = (maxLen: number) =>
   z
@@ -90,6 +90,7 @@ export const sectionLinkItemSchema = z.object({
 });
 
 export const productGridSectionDataSchema = z.object({
+  tabs: z.array(z.object({ id: text(60).min(1), label: text(100).min(1), productIds: z.array(z.string().max(128)).max(48), href: safeUrlOrPath })).max(6).optional(),
   title: text(200).min(1, 'Tiêu đề lưới sản phẩm không được để trống'),
   subtitle: text(300).default(''),
   badge: text(100).default(''),
@@ -113,12 +114,14 @@ export const productGridSectionDataSchema = z.object({
 
 // 4. Featured Categories Section
 export const featuredCategoryItemSchema = z.object({
+  href: safeUrlOrPath.optional(),
   categoryId: z.string().max(128),
   customName: text(100).default(''),
   customImage: safeUrlOrPath.default(''),
 });
 
 export const featuredCategoriesSectionDataSchema = z.object({
+  layout: z.enum(['cards', 'board']).optional(),
   title: text(200).default('Khám Phá Hệ Sinh Thái Danh Mục'),
   subtitle: text(300).default(''),
   categoryIds: z.array(z.string().max(128)).max(16).default([]),
@@ -142,6 +145,7 @@ export const featuredCollectionSectionDataSchema = z.object({
 
 // 7. News & Reviews Section
 export const newsReviewsSectionDataSchema = z.object({
+  layout: z.enum(['featured', 'grid']).optional(),
   title: text(200).default('Góc CitiLap Media & Đánh Giá'),
   subtitle: text(300).default(''),
   postIds: z.array(z.string().max(128)).max(8).default([]),
@@ -176,6 +180,23 @@ export const ctaSectionDataSchema = z.object({
   bgImageUrl: safeUrlOrPath.default(''),
 });
 
+export const videoReviewsSectionDataSchema = z.object({
+  title: text(200).default('Video review sản phẩm'),
+  videos: z.array(z.object({
+    title: text(200).min(1),
+    url: z.string().max(1000).refine(v => {
+      if (youtubeId(v)) return true;
+      try { const u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password && !u.port && ['www.tiktok.com', 'tiktok.com'].includes(u.hostname) && /^\/@[^/]+\/video\/\d+$/.test(u.pathname); } catch { return false; }
+    }, 'Dùng URL video YouTube hoặc TikTok.'),
+    thumbnail: safeUrlOrPath.default(''),
+  })).max(12).default([]),
+});
+
+export const customerGallerySectionDataSchema = z.object({
+  title: text(200).default('Hình ảnh khách hàng tại CitiLap'),
+  images: z.array(z.object({ url: safeUrlOrPath, alt: text(300).min(1) })).max(20).default([]),
+});
+
 // --- Generic Section Union ---
 export const SECTION_TYPES = [
   'banner',
@@ -187,6 +208,8 @@ export const SECTION_TYPES = [
   'news_reviews',
   'intro',
   'cta',
+  'video_reviews',
+  'customer_gallery',
 ] as const;
 
 export type SectionType = (typeof SECTION_TYPES)[number];
@@ -206,6 +229,8 @@ export const sectionItemSchema = z.object({
     z.object({ type: z.literal('news_reviews'), ...newsReviewsSectionDataSchema.shape }),
     z.object({ type: z.literal('intro'), ...introSectionDataSchema.shape }),
     z.object({ type: z.literal('cta'), ...ctaSectionDataSchema.shape }),
+    z.object({ type: z.literal('video_reviews'), ...videoReviewsSectionDataSchema.shape }),
+    z.object({ type: z.literal('customer_gallery'), ...customerGallerySectionDataSchema.shape }),
   ]),
 });
 

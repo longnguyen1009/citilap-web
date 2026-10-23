@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, Flame, ShieldCheck, Zap, Gift, Truck, AlertCircle, ShoppingBag } from "lucide-react";
+import { ChevronRight, Flame, AlertCircle, ShoppingBag } from "lucide-react";
 import { getFlashSaleProducts, type HomepageProduct } from "@/server/services/catalog.service";
 import { isFlashSaleActive, getStorefrontPricingContext } from "@/server/services/pricing.service";
 import FlashSaleCountdown from "@/components/product/FlashSaleCountdown";
@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: `${title} | CitiLap`,
     description:
-      "Săn Laptop Gaming, Ultrabook, MacBook và phụ kiện chính hãng với mức giá giảm sốc tại CitiLap. Số lượng có hạn!",
+      "Theo dõi chương trình HOT SALE tại CitiLap và đối chiếu ưu đãi được công bố trên từng cấu hình.",
   };
 }
 
@@ -20,7 +20,7 @@ export default async function HotSalePage() {
   const evaluatedAt = new Date();
   const settings = await getStorefrontPricingContext(undefined, evaluatedAt);
   const isActive = isFlashSaleActive(settings, evaluatedAt);
-  const title = settings?.flashSaleTitle || "Giá Sốc Giờ Vàng";
+  const title = "HOT SALE";
 
   let products: HomepageProduct[] = [];
   try {
@@ -66,10 +66,10 @@ export default async function HotSalePage() {
               </h1>
               <p className="text-sm sm:text-base text-red-100 mt-2 max-w-xl">
                 {isActive
-                  ? "Cơ hội sở hữu Laptop Gaming, Ultrabook cao cấp và máy like-new chuẩn zin với mức giá tốt nhất thị trường!"
+                  ? "Các cấu hình tham gia ưu đãi đang được hiển thị bên dưới. Kiểm tra giá và điều kiện trên từng sản phẩm."
                   : isUpcoming
                   ? "Sắp diễn ra đợt giảm giá cực sốc. Hãy chuẩn bị sẵn sàng để săn deal hời nhất!"
-                  : "Đợt Hot Sale hiện tại đã khép lại. Vui lòng theo dõi để không bỏ lỡ đợt ưu đãi tiếp theo!"}
+                  : "Hiện chưa có chương trình ưu đãi đang hoạt động. Theo dõi CitiLap để cập nhật đợt HOT SALE tiếp theo."}
               </p>
             </div>
 
@@ -81,25 +81,7 @@ export default async function HotSalePage() {
             </div>
           </div>
 
-          {/* Benefits bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8 pt-6 border-t border-white/15 text-xs text-white/90">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-amber-300 shrink-0" />
-              <span>Bảo hành chính hãng 12T</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-300 shrink-0" />
-              <span>Cam kết giá tốt nhất thị trường</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Gift className="w-4 h-4 text-amber-300 shrink-0" />
-              <span>Tặng balo + chuột gaming</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-amber-300 shrink-0" />
-              <span>Đồng kiểm trước khi nhận hàng</span>
-            </div>
-          </div>
+
         </div>
       </div>
 
@@ -129,7 +111,7 @@ export default async function HotSalePage() {
               Hiện chưa có sản phẩm nào được cấu hình trong chương trình Flash Sale này.
             </p>
             <Link
-              href="/category/laptop"
+              href="/search"
               className="inline-flex items-center justify-center px-6 py-2.5 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 transition"
             >
               Khám phá Laptop tại CitiLap

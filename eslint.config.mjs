@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     ".claude/worktrees/**",
+    ".worktrees/**",
+    ".vinext/**",
     "mcp-web-reader/**",
     "generated/**",
     "test-prisma.ts",

@@ -9,6 +9,21 @@ import { getStorefrontPricingContext, type PriceEvaluationContext } from './pric
 import { getPrismaClient } from '../../lib/prisma';
 
 type Row = { revision: number; draft: string; published: string | null; publishedRevision: number | null };
+const publishedNavigationCache = new WeakMap<D1Database, { revision: number; document: NavigationDocument }>();
+
+async function navigationSnapshot(db: D1Database) {
+  const cached = publishedNavigationCache.get(db);
+  const row = await db.prepare("SELECT publishedRevision, published IS NOT NULL AS available, CASE WHEN publishedRevision = ? THEN NULL ELSE published END AS published FROM NavigationStudio WHERE id='site'")
+    .bind(cached?.revision ?? -1).first<{ publishedRevision: number; available: number; published: string | null }>();
+  if (!row?.available) {
+    publishedNavigationCache.delete(db);
+    return null;
+  }
+  if (cached && cached.revision === row.publishedRevision) return cached;
+  const snapshot = { revision: row.publishedRevision, document: JSON.parse(row.published!) as NavigationDocument };
+  publishedNavigationCache.set(db, snapshot);
+  return snapshot;
+}
 type CategoryRow = { id: string; name: string; slug: string; description: string | null; parentId: string | null; image: string | null; status: string; sortOrder: number };
 
 const categoryRows = async (db: D1Database) => (await db.prepare('SELECT * FROM Category ORDER BY sortOrder,name').all<CategoryRow>()).results.map(c => ({
@@ -142,10 +157,12 @@ export async function resolveNavigation(db: D1Database, d: NavigationDocument, r
 
   const products = new Map<string, string>();
   const menuProducts = new Set(Object.values(d.menus).flatMap(items => items.flatMap(i => [i, ...i.children])).flatMap(i => i.target.kind === 'product' ? [i.target.id] : []));
-  for (const id of menuProducts) {
-    if (await db.prepare("SELECT id FROM Product WHERE id=? AND deletedAt IS NULL AND status IN ('ACTIVE','active')").bind(id).first()) {
-      products.set(id, '/product/' + id);
-    }
+  const ids = [...menuProducts];
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const rows = await db.prepare(`SELECT id FROM Product WHERE id IN (${chunk.map(() => '?').join(',')}) AND deletedAt IS NULL AND status IN ('ACTIVE','active')`)
+      .bind(...chunk).all<{ id: string }>();
+    for (const { id } of rows.results) products.set(id, '/product/' + id);
   }
 
   const href = (t: NavigationTarget): string | undefined => {
@@ -187,14 +204,14 @@ export async function resolveNavigation(db: D1Database, d: NavigationDocument, r
 }
 
 export async function publicNavigation(db: D1Database) {
-  const row = await db.prepare("SELECT published,publishedRevision FROM NavigationStudio WHERE id='site'").first<Row>();
-  if (!row?.published) throw new MediaError('Chưa xuất bản điều hướng.', 404);
-  return resolveNavigation(db, JSON.parse(row.published), row.publishedRevision!);
+  const snapshot = await navigationSnapshot(db);
+  if (!snapshot) throw new MediaError('Chưa xuất bản điều hướng.', 404);
+  return resolveNavigation(db, snapshot.document, snapshot.revision);
 }
 
 export async function publicCollection(db: D1Database, slug: string, pricingContext?:PriceEvaluationContext, at:Date = new Date()) {
-  const row = await db.prepare("SELECT published,publishedRevision FROM NavigationStudio WHERE id='site'").first<Row>();
-  const d: NavigationDocument | null = row?.published ? JSON.parse(row.published) : null;
+  const snapshot = await navigationSnapshot(db);
+  const d = snapshot?.document;
   const c = d?.collections.find(c => c.slug === slug && c.visible);
   if (!c) throw new MediaError('Không tìm thấy bộ sưu tập.', 404);
 
@@ -208,21 +225,20 @@ export async function publicCollection(db: D1Database, slug: string, pricingCont
 
   return {
     schemaVersion: 1,
-    revision: row!.publishedRevision,
+    revision: snapshot!.revision,
     id: c.id,
     name: c.name,
     slug: c.slug,
     description: c.description,
     image: c.image || null,
-    seo: c.seo || null,
+    seo: c.seo ? structuredClone(c.seo) : null,
     mode: c.mode || 'manual',
     products,
   };
 }
 
 export async function publicCollectionList(db: D1Database) {
-  const row = await db.prepare("SELECT published,publishedRevision FROM NavigationStudio WHERE id='site'").first<Row>();
-  const d: NavigationDocument | null = row?.published ? JSON.parse(row.published) : null;
+  const d = (await navigationSnapshot(db))?.document;
   if (!d) return [];
 
   const visibleCollections = d.collections.filter(c => c.visible);

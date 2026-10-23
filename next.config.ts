@@ -34,10 +34,10 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://images.unsplash.com https://media.citilap.vn",
+      "img-src 'self' data: blob: https://images.unsplash.com https://media.citilap.vn https://i.ytimg.com",
       "font-src 'self' data:",
       "connect-src 'self' https://challenges.cloudflare.com",
-      "frame-src 'self' https://challenges.cloudflare.com",
+      "frame-src 'self' https://challenges.cloudflare.com https://www.youtube-nocookie.com https://www.tiktok.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -47,6 +47,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   images: {
+    formats: ['image/avif', 'image/webp'],
     remotePatterns: [
       {
         protocol: "https",

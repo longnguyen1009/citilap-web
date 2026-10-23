@@ -1,3 +1,4 @@
+import { publishedDocument } from './published-document-cache';
 import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -273,10 +274,10 @@ export async function restorePostRevision(env: MediaEnvironment, postId: string,
  */
 export async function publicPostBySlug(db: D1Database, slug: string) {
   let row = await db.prepare(`
-    SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+    SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
     FROM Post p JOIN PostStudio s ON s.postId = p.id
     WHERE json_extract(s.published, '$.slug')=? AND p.deletedAt IS NULL AND s.published IS NOT NULL
-  `).bind(slug).first<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+  `).bind(slug).first<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
 
   if (!row) {
     const alias = await db.prepare(`
@@ -288,15 +289,15 @@ export async function publicPostBySlug(db: D1Database, slug: string) {
     `).bind(slug).first<{ postId: string }>();
     if (alias) {
       row = await db.prepare(`
-        SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+        SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
         FROM Post p JOIN PostStudio s ON s.postId = p.id
         WHERE p.id=? AND p.deletedAt IS NULL AND s.published IS NOT NULL
-      `).bind(alias.postId).first<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+      `).bind(alias.postId).first<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
     }
   }
 
   if (!row) throw new MediaError('Không tìm thấy bài viết đã xuất bản.', 404);
-  return toPublicPost(db, row.id, row.published, row.updatedAt, row.publishedAt);
+  return toPublicPost(db, row.id, row.publishedRevision, row.updatedAt, row.publishedAt);
 }
 
 export async function publicPostList(db: D1Database, opts: { categoryId?: string; ids?: string[]; page?: number; limit?: number } = {}) {
@@ -319,35 +320,35 @@ export async function publicPostList(db: D1Database, opts: { categoryId?: string
   const total = countRow?.total ?? 0;
 
   const rows = await db.prepare(`
-    SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+    SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
     FROM Post p JOIN PostStudio s ON s.postId = p.id
     WHERE ${whereSql}
     ORDER BY s.publicUpdatedAt DESC, p.id DESC
     LIMIT ? OFFSET ?
-  `).bind(...params, limit, offset).all<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+  `).bind(...params, limit, offset).all<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
 
   const items = [];
   for (const r of rows.results || []) {
-    items.push(await toPublicPost(db, r.id, r.published, r.updatedAt, r.publishedAt));
+    items.push(await toPublicPost(db, r.id, r.publishedRevision, r.updatedAt, r.publishedAt));
   }
   return { items, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
 }
 
 export async function publicFeaturedPosts(db: D1Database, limit = 3) {
   const rows = await db.prepare(`
-    SELECT p.id, s.published, s.publicUpdatedAt AS updatedAt, s.publishedAt
+    SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
     FROM Post p JOIN PostStudio s ON s.postId = p.id
     WHERE p.deletedAt IS NULL AND s.published IS NOT NULL AND json_extract(s.published, '$.isFeatured') = 1
     ORDER BY s.publicUpdatedAt DESC, p.id DESC
     LIMIT ?
-  `).bind(limit).all<{ id: string; published: string; updatedAt: string; publishedAt: string }>();
+  `).bind(limit).all<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
   const items = [];
-  for (const r of rows.results || []) items.push(await toPublicPost(db, r.id, r.published, r.updatedAt, r.publishedAt));
+  for (const r of rows.results || []) items.push(await toPublicPost(db, r.id, r.publishedRevision, r.updatedAt, r.publishedAt));
   return items;
 }
 
-async function toPublicPost(db: D1Database, id: string, publishedJson: string, updatedAt: string, publishedAt: string) {
-  const d = JSON.parse(publishedJson) as PostDocument;
+async function toPublicPost(db: D1Database, id: string, revision: number, updatedAt: string, publishedAt: string) {
+  const d = await publishedDocument<PostDocument>(db, 'Post', id, revision);
   let coverImage: { url: string; alt: string } | null = null;
   if (d.coverImage) {
     const { asset } = await mediaDetail(db, d.coverImage.assetId);

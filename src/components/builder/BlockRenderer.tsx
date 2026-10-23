@@ -19,10 +19,13 @@ import ProductCard from '@/components/product/ProductCard';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
 import CategoryGridSection from '@/components/home/CategoryGridSection';
 import BrandSection from '@/components/home/BrandSection';
-import { mediaEnvironment } from '@/server/media-http';
-import { publicPostList } from '@/server/services/post.service';
 import { newsReviewsSectionDataSchema, ctaSectionDataSchema } from '@/contracts/cms/site-builder';
 import FeatureStrip from '@/components/home/FeatureStrip';
+import MediaSection from '@/components/home/MediaSectionView';
+import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
+import VideoReviews from '@/components/home/VideoReviews';
+import CustomerGallery from '@/components/home/CustomerGallery';
+import { customerGallerySectionDataSchema, videoReviewsSectionDataSchema } from '@/contracts/cms/site-builder';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   sparkles: Sparkles,
@@ -77,13 +80,19 @@ export default function BlockRenderer({ sections }: { sections: ResolvedSectionI
             return <FeaturedCollectionBlock key={section.id} section={section} />;
 
           case 'news_reviews':
-            return <NewsReviewsBlock key={section.id} data={section.data} />;
+            return <NewsReviewsBlock key={section.id} section={section} />;
 
           case 'intro':
             return <IntroBlock key={section.id} data={section.data} />;
 
           case 'cta':
             return <CtaBlock key={section.id} data={section.data} />;
+          case 'video_reviews':
+            return <VideoReviews key={section.id} {...videoReviewsSectionDataSchema.parse(section.data)} />;
+          case 'customer_gallery': {
+            const data = customerGallerySectionDataSchema.parse(section.data);
+            return <CustomerGallery key={section.id} title={data.title} images={data.images} />;
+          }
 
           default:
             return null;
@@ -142,7 +151,7 @@ function BannerBlock({ data }: { data: any }) {
 
   return (
     <section className="bg-[#0f172a] relative overflow-hidden" aria-label={data.title || 'Hero Banner'}>
-      <div className="w-full relative h-[320px] sm:h-[380px] md:h-[420px] lg:h-[500px]">
+      <div className="w-full relative h-[260px] sm:h-[280px] lg:h-[300px]">
         <Image
           src={imageUrl}
           alt={data.title || 'Hero banner'}
@@ -161,11 +170,11 @@ function BannerBlock({ data }: { data: any }) {
                   </span>
                 </div>
               )}
-              <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black mb-3 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-400 drop-shadow-sm">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-400 drop-shadow-sm">
                 {data.title}
               </h1>
               {data.subtitle && (
-                <p className="text-sm sm:text-lg md:text-xl font-bold text-yellow-400 mb-6 tracking-wide drop-shadow-md">
+                <p className="text-xs sm:text-base font-bold text-yellow-400 mb-4 tracking-wide drop-shadow-md">
                   {data.subtitle}
                 </p>
               )}
@@ -238,6 +247,7 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
   const products = section.resolvedProducts || [];
   const colorClass = THEME_GRADIENT_MAP[data.colorTheme] || THEME_GRADIENT_MAP.blue;
   const links = Array.isArray(data.links) ? data.links : [];
+  if (section.resolvedTabs?.length) return <ProductTabs title={data.title} tabs={section.resolvedTabs} />;
 
   return (
     <section className="pb-16" aria-label={data.title}>
@@ -264,7 +274,7 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
 
             {/* Quick links */}
             {links.length > 0 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none text-xs">
+              <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:max-w-[60%] sm:pb-0 scrollbar-none text-xs">
                 {links.map((link: { label: string; href: string }, idx: number) => (
                   <Link
                     key={idx}
@@ -284,7 +294,7 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
               <div className="text-center py-12 text-slate-500">
                 <p className="text-sm">Chưa có sản phẩm nào phù hợp trong danh mục này.</p>
               </div>
-            ) : (
+            ) : section.id === 'sec-hot-sale' ? <ProductCarousel products={products} label={data.title} /> : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
                 {products.map((p, idx) => (
                   <ProductCard
@@ -317,35 +327,39 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
 function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = section.data as any;
-  const categories = section.resolvedCategories || [];
+  const resolved = section.resolvedCategories || [];
+  const categories = data.items?.length ? data.items.flatMap((item: { categoryId: string; customName?: string; customImage?: string; href?: string }) => {
+    const category = resolved.find(c => c.id === item.categoryId);
+    return category ? [{ ...category, name: item.customName || category.name, image: item.customImage || category.image, href: item.href || `/category/${category.slug}` }] : [];
+  }) : resolved.map(c => ({ ...c, href: `/category/${c.slug}` }));
 
   if (categories.length === 0) {
     return <CategoryGridSection />;
   }
 
   return (
-    <section className="py-8 md:py-12" aria-label={data.title}>
+    <section className="py-4 md:py-6" aria-label={data.title}>
       <div className="container mx-auto px-4 max-w-[1370px]">
-        <div className="mb-6">
+        {data.title && <div className="mb-6">
           <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{data.title}</h2>
           {data.subtitle && <p className="text-slate-600 text-xs md:text-sm mt-1">{data.subtitle}</p>}
-        </div>
+        </div>}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-          {categories.map((c) => (
+        <div className={data.layout === 'board' ? 'grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 lg:grid-cols-5' : 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5'}>
+          {categories.map((c: { id: string; name: string; href: string; image: string | null }, index: number) => (
             <Link
-              key={c.id}
-              href={`/category/${c.slug}`}
-              className="group p-4 bg-white rounded-2xl border border-slate-200/80 hover:border-blue-500 shadow-xs hover:shadow-md transition duration-200 flex flex-col items-center text-center"
+              key={`${c.id}-${index}`}
+              href={c.href}
+              className={data.layout === 'board' ? 'group flex min-w-0 items-center gap-3 border-b border-r border-slate-100 p-3 hover:bg-blue-50 sm:p-4' : 'group flex flex-col items-center rounded-2xl border border-slate-200/80 bg-white p-4 text-center shadow-xs transition hover:border-blue-500 hover:shadow-md'}
             >
-              <div className="w-14 h-14 relative mb-3 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden group-hover:scale-105 transition">
+              <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white transition group-hover:scale-105 ${data.layout === 'board' ? 'h-14 w-14' : 'mb-3 h-20 w-24'}`}>
                 {c.image ? (
                   <Image src={c.image} alt={c.name} fill className="object-contain p-1" sizes="56px" />
                 ) : (
                   <Store className="w-6 h-6 text-slate-400" />
                 )}
               </div>
-              <h3 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition line-clamp-1">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition">
                 {c.name}
               </h3>
             </Link>
@@ -410,20 +424,12 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
 }
 
 // 7. NEWS & REVIEWS BLOCK
-async function NewsReviewsBlock({ data }: { data: unknown }) {
-  const d = newsReviewsSectionDataSchema.parse(data);
-  const { DB } = await mediaEnvironment();
-  const { items } = await publicPostList(DB, { ids: d.postIds, categoryId: d.categoryId || undefined, limit: d.limit });
-  if (d.postIds.length) items.sort((a, b) => d.postIds.indexOf(a.id) - d.postIds.indexOf(b.id));
+function NewsReviewsBlock({ section }: { section: ResolvedSectionItem }) {
+  const d = newsReviewsSectionDataSchema.parse(section.data);
+  const items = section.resolvedPosts ?? [];
   if (!items.length) return null;
-  return <section className="mx-auto max-w-[1370px] px-4 py-10">
-    <h2 className="text-2xl font-black text-slate-900">{d.title}</h2>
-    <p className="mt-2 text-slate-600">{d.subtitle}</p>
-    <div className="mt-6 grid gap-6 md:grid-cols-3">{items.map(post => <Link key={post.id} href={`/news/${post.slug}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      {post.coverImage && <Image src={post.coverImage.url} alt={post.coverImage.alt} width={640} height={360} className="aspect-video w-full object-contain bg-white" />}
-      <div className="p-5"><h3 className="font-bold text-slate-900">{post.title}</h3><p className="mt-2 text-sm text-slate-600">{post.excerpt}</p></div>
-    </Link>)}</div>
-  </section>;
+  if (d.layout !== 'grid') return <MediaSection posts={items} title={d.title} />;
+  return <section className="pb-10" aria-label={d.title}><div className="container mx-auto max-w-[1370px] px-4"><div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6"><h2 className="mb-5 text-xl font-black uppercase text-slate-900">{d.title}</h2><div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">{items.map(post => <Link key={post.id} href={`/news/${post.slug}`} className="group min-w-0">{post.coverImage && <Image src={post.coverImage.url} alt={post.coverImage.alt} width={400} height={240} sizes="(max-width: 768px) 50vw, 260px" className="mb-3 aspect-[5/3] w-full rounded-xl bg-slate-50 object-cover" />}<h3 className="line-clamp-3 text-sm font-bold leading-relaxed text-slate-900 group-hover:text-blue-600">{post.title}</h3></Link>)}</div><div className="mt-5 text-center"><Link href="/news" className="inline-flex rounded-xl bg-red-600 px-6 py-3 text-sm font-bold uppercase text-white hover:bg-red-700">Xem thêm tin công nghệ</Link></div></div></div></section>;
 }
 
 // 8. INTRO & FEATURE STRIP BLOCK
@@ -449,7 +455,7 @@ function IntroBlock({ data }: { data: unknown }) {
   }
 
   return (
-    <section className="py-6 md:py-8 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
+    <section className="py-3 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
       <div className="container mx-auto px-4 max-w-[1370px]">
         {d.title && (
           <div className="text-center mb-6">
@@ -458,17 +464,17 @@ function IntroBlock({ data }: { data: unknown }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
           {features.map((item) => {
             const Icon = ICON_MAP[item.icon] || Star;
             return (
-              <div key={item.id} className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-start gap-3.5 hover:bg-blue-50/50 hover:border-blue-100 transition">
-                <div className="p-2.5 rounded-xl bg-blue-600 text-white shrink-0 shadow-xs">
-                  <Icon className="w-5 h-5" />
+              <div key={item.id} className="p-2 sm:p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-start gap-2 hover:bg-blue-50/50 hover:border-blue-100 transition">
+                <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 shadow-xs">
+                  <Icon className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900">{item.title}</h3>
-                  <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{item.description}</p>
+                  <h3 className="font-bold text-xs sm:text-sm text-slate-900">{item.title}</h3>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">{item.description}</p>
                 </div>
               </div>
             );

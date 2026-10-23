@@ -121,9 +121,9 @@ export const businessProfile: BusinessProfile = {
     consultationTarget: "Liên hệ tư vấn trong 1 – 4 giờ trong thời gian làm việc",
   },
   warrantySummary: {
-    newLaptop: "6 hoặc 12 tháng tùy gói cấu hình & SKU",
-    usedLaptop: "3, 6 hoặc 12 tháng tùy gói cấu hình & SKU",
-    components: "3 – 6 tháng tùy phạm vi gói linh kiện",
+    newLaptop: "12 tháng theo gói tiêu chuẩn CitiLap",
+    usedLaptop: "6 tháng theo gói tiêu chuẩn CitiLap",
+    components: "6 tháng theo gói tiêu chuẩn CitiLap",
     returnPolicyDays: 7,
     returnPolicyNote: "Đổi trả trong 7 ngày đầu nếu phát sinh lỗi kỹ thuật phần cứng do nhà sản xuất",
   },

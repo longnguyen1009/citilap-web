@@ -7,7 +7,6 @@ import SearchListingContainer from "@/components/search/SearchListingContainer";
 import {
   searchProducts,
 } from "@/server/services/search.service";
-import { getStorefrontPricingContext } from "@/server/services/pricing.service";
 
 interface SearchPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -49,9 +48,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   if (!parsed.success) return <main className="container mx-auto p-8"><p role="alert">Bộ lọc không hợp lệ. Kiểm tra khoảng giá, số trang và giá trị đã nhập.</p><Link href="/search">Xóa bộ lọc</Link></main>;
   const options=parsed.data, query=options.query || '';
 
-  const evaluatedAt = new Date();
-  const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);
-  const searchResult = await searchProducts(options, undefined, pricingContext, evaluatedAt);
+  const searchResult = await searchProducts(options);
 
   const breadcrumbItems = [
     { label: "Trang chủ", href: "/" },

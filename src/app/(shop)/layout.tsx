@@ -1,4 +1,5 @@
 import Header from "@/components/layout/Header";
+import StorefrontProviders from '@/components/layout/StorefrontProviders';
 import Footer from "@/components/layout/Footer";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import { getActiveCategories, getActiveBrands } from "@/server/services/catalog.service";
@@ -37,13 +38,13 @@ export default async function ShopLayout({
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <StorefrontProviders><div className="flex flex-col min-h-screen">
       <PublicPriceRefresh nextChange={times.length?Math.min(...times):null} serverTime={serverTime}/>
       <Header categories={categories} brands={brands} navigation={navigation} settings={settings} />
       <main className="flex-grow pb-16 md:pb-0">{children}</main>
       <Footer navigation={navigation} settings={settings} />
       <StorefrontMetrics />
       <MobileBottomNav categories={categories} navigation={navigation} settings={settings} />
-    </div>
+    </div></StorefrontProviders>
   );
 }
