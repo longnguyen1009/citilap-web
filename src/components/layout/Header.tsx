@@ -99,7 +99,10 @@ export default function Header({ categories = [], brands = [], navigation, setti
 
   // Build dynamic dropdown categories from D1 data
   const dynamicCategoryMenu: HeaderCategoryItem[] = navigation
-    ? navigation.categories.filter(cat => !cat.parentId).map(cat => {
+    ? navigation.menus.main.flatMap(item => {
+        const cat = navigation.categories.find(cat => cat.href === item.href);
+        return cat ? [{ ...cat, name: item.label }] : [];
+      }).map(cat => {
         const menu = navigation.menus.main.find(item => item.href === cat.href);
         return {
           id: cat.id, name: cat.name, slug: cat.slug, href: cat.href,
@@ -113,12 +116,12 @@ export default function Header({ categories = [], brands = [], navigation, setti
         const children = cat.subCategories && cat.subCategories.length > 0
           ? cat.subCategories.map((sub) => ({
               name: sub.name,
-              href: `/category/${sub.slug}`,
+              href: sub.href || `/${sub.slug}`,
             }))
           : brands.length > 0 && !cat.slug.includes("linh-kien") && !cat.slug.includes("camera")
             ? brands.map((b) => ({
                 name: `${cat.name.replace("Laptop ", "")} ${b.name}`,
-                href: `/category/${cat.slug}?brand=${b.slug}`,
+                href: `${cat.href || `/${cat.slug}`}?brand=${b.slug}`,
               }))
             : undefined;
 
@@ -126,29 +129,29 @@ export default function Header({ categories = [], brands = [], navigation, setti
           id: cat.id,
           name: cat.name,
           slug: cat.slug,
-          href: `/category/${cat.slug}`,
+          href: cat.href || `/${cat.slug}`,
           productCount: cat.productCount,
           children,
         };
       })
     : [
-        { name: "Laptop Gaming", slug: "laptop-gaming", href: "/category/laptop-gaming" },
-        { name: "Laptop Văn Phòng", slug: "laptop-van-phong", href: "/category/laptop-van-phong" },
-        { name: "Laptop Đồ Họa – Kĩ Thuật", slug: "laptop-do-hoa", href: "/category/laptop-do-hoa" },
-        { name: "Laptop Like New", slug: "laptop-cu", href: "/category/laptop-cu" },
-        { name: "Linh Kiện – Phụ Kiện", slug: "linh-kien", href: "/category/linh-kien" },
+        { name: "Laptop Gaming", slug: "laptop-gaming", href: "/laptop-gaming" },
+        { name: "Laptop Văn Phòng", slug: "laptop-van-phong", href: "/laptop-van-phong" },
+        { name: "Laptop Đồ Họa – Kĩ Thuật", slug: "laptop-do-hoa", href: "/laptop-workstation" },
+        { name: "Laptop Like New", slug: "laptop-cu", href: "/laptop-likenew" },
+        { name: "Linh Kiện – Phụ Kiện", slug: "linh-kien", href: "/phu-kien" },
       ];
 
   // 1. Phụ kiện Laptop dropdown items
   const accessoryNavChildren = [
-    { name: "Chuột & Bàn phím", href: "/category/linh-kien?type=mouse-keyboard" },
-    { name: "Balo & Túi chống sốc", href: "/category/linh-kien?type=bag" },
-    { name: "Củ sạc GaN & Cáp sạc", href: "/category/linh-kien?type=charger" },
-    { name: "Hub chuyển đổi Type-C", href: "/category/linh-kien?type=hub" },
-    { name: "Đế tản nhiệt & Giá đỡ", href: "/category/linh-kien?type=stand" },
-    { name: "Đèn màn hình & Desk Setup", href: "/category/linh-kien?type=screenbar" },
-    { name: "Tai nghe & Âm thanh", href: "/category/linh-kien?type=audio" },
-    { name: "Nâng cấp RAM & SSD", href: "/category/linh-kien?type=hardware" },
+    { name: "Chuột & Bàn phím", href: "/phu-kien?type=mouse-keyboard" },
+    { name: "Balo & Túi chống sốc", href: "/phu-kien?type=bag" },
+    { name: "Củ sạc GaN & Cáp sạc", href: "/phu-kien?type=charger" },
+    { name: "Hub chuyển đổi Type-C", href: "/phu-kien?type=hub" },
+    { name: "Đế tản nhiệt & Giá đỡ", href: "/phu-kien?type=stand" },
+    { name: "Đèn màn hình & Desk Setup", href: "/phu-kien?type=screenbar" },
+    { name: "Tai nghe & Âm thanh", href: "/phu-kien?type=audio" },
+    { name: "Nâng cấp RAM & SSD", href: "/phu-kien?type=hardware" },
   ];
 
   // 2. Về CitiLap dropdown items (gộp Cửa hàng và Giới thiệu)
@@ -163,19 +166,19 @@ export default function Header({ categories = [], brands = [], navigation, setti
         .filter((cat) => cat.slug !== "laptop-cu" && !cat.slug.includes("linh-kien") && !cat.slug.startsWith("temp-") && !cat.id.startsWith("temp-"))
         .map((cat) => ({
           name: cat.name,
-          href: `/category/${cat.slug}`,
+          href: cat.href || `/${cat.slug}`,
           children: brands.length > 0 && !cat.slug.includes("camera")
             ? brands.map((b) => ({
                 name: `${cat.name.replace("Laptop ", "").replace("Apple - ", "")} ${b.name}`,
-                href: `/category/${cat.slug}?brand=${b.slug}`,
+                href: `${cat.href || `/${cat.slug}`}?brand=${b.slug}`,
               }))
             : undefined,
         }))
     : [
-        { name: "Laptop Gaming", href: "/category/laptop-gaming" },
-        { name: "Laptop Văn Phòng", href: "/category/laptop-van-phong" },
-        { name: "Laptop Đồ Hoạ", href: "/category/laptop-do-hoa" },
-        { name: "Apple - MacBook", href: "/category/macbook" },
+        { name: "Laptop Gaming", href: "/laptop-gaming" },
+        { name: "Laptop Văn Phòng", href: "/laptop-van-phong" },
+        { name: "Laptop Đồ Hoạ", href: "/laptop-workstation" },
+        { name: "Apple - MacBook", href: "/macbook" },
       ];
 
   const legacyNavItems: HeaderNavItem[] = [
@@ -183,7 +186,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
     ...laptopNavCategories,
     {
       name: "PHỤ KIỆN LAPTOP",
-      href: "/category/linh-kien",
+      href: "/phu-kien",
       children: accessoryNavChildren,
     },
     {
@@ -198,7 +201,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
     ? navigation.menus.main.map((item) => ({
         name: item.label, href: item.href,
         hot: item.href === '/hot-sale',
-        children: item.children.length ? item.children.map((child) => ({ name: child.label, href: child.href })) : undefined,
+        children: item.children.length ? item.children.map((child) => ({ name: child.label, href: child.href, children:child.children })) : undefined,
       }))
     : legacyNavItems;
 

@@ -74,7 +74,7 @@ export default async function Home() {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <BlockRenderer sections={cmsHomepage.sections} />
+        <BlockRenderer sections={cmsHomepage.sections} flashSale={<FlashSaleSection />} />
       </div>
     );
   }
@@ -109,10 +109,10 @@ export default async function Home() {
           icon={Sparkles}
           colorClass="bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800"
           links={[
-            { label: "Gaming Mới", href: "/category/laptop-gaming?sort=newest" },
-            { label: "Ultrabook Mới", href: "/category/laptop-van-phong?sort=newest" },
-            { label: "Apple M3", href: "/category/macbook" },
-            { label: "Đồ Hoạ Mới", href: "/category/laptop-do-hoa?sort=newest" },
+            { label: "Gaming Mới", href: "/laptop-gaming?sort=newest" },
+            { label: "Ultrabook Mới", href: "/laptop-van-phong?sort=newest" },
+            { label: "Apple M3", href: "/macbook" },
+            { label: "Đồ Hoạ Mới", href: "/laptop-workstation?sort=newest" },
           ]}
           slug="laptop-gaming"
           sectionKey="new"
@@ -127,10 +127,10 @@ export default async function Home() {
           icon={Zap}
           colorClass="bg-gradient-to-r from-red-700 via-red-600 to-red-800"
           links={[
-            { label: "RTX 4060", href: "/category/laptop-gaming?gpu=RTX+4060" },
-            { label: "RTX 4070", href: "/category/laptop-gaming?gpu=RTX+4070" },
-            { label: "Legion", href: "/category/laptop-gaming?brand=lenovo" },
-            { label: "ROG Strix", href: "/category/laptop-gaming?brand=asus" },
+            { label: "RTX 4060", href: "/laptop-gaming?gpu=RTX+4060" },
+            { label: "RTX 4070", href: "/laptop-gaming?gpu=RTX+4070" },
+            { label: "Legion", href: "/laptop-gaming?brand=lenovo" },
+            { label: "ROG Strix", href: "/laptop-gaming?brand=asus" },
           ]}
           slug="laptop-gaming"
           sectionKey="gaming"
@@ -144,10 +144,10 @@ export default async function Home() {
           icon={Briefcase}
           colorClass="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800"
           links={[
-            { label: "MacBook Air", href: "/category/macbook" },
-            { label: "Dell XPS", href: "/category/laptop-van-phong?brand=dell" },
-            { label: "ThinkPad X1", href: "/category/laptop-van-phong?brand=lenovo" },
-            { label: "Zenbook", href: "/category/laptop-van-phong?brand=asus" },
+            { label: "MacBook Air", href: "/macbook" },
+            { label: "Dell XPS", href: "/laptop-van-phong?brand=dell" },
+            { label: "ThinkPad X1", href: "/laptop-van-phong?brand=lenovo" },
+            { label: "Zenbook", href: "/laptop-van-phong?brand=asus" },
           ]}
           slug="laptop-van-phong"
           sectionKey="ultrabook"
@@ -162,10 +162,10 @@ export default async function Home() {
           icon={Server}
           colorClass="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-900"
           links={[
-            { label: "Dell Precision", href: "/category/laptop-do-hoa?brand=dell" },
-            { label: "ThinkPad P", href: "/category/laptop-do-hoa?brand=lenovo" },
-            { label: "HP ZBook", href: "/category/laptop-do-hoa?brand=hp" },
-            { label: "GPU Chuyên Dụng", href: "/category/laptop-do-hoa" },
+            { label: "Dell Precision", href: "/laptop-workstation?brand=dell" },
+            { label: "ThinkPad P", href: "/laptop-workstation?brand=lenovo" },
+            { label: "HP ZBook", href: "/laptop-workstation?brand=hp" },
+            { label: "GPU Chuyên Dụng", href: "/laptop-workstation" },
           ]}
           slug="laptop-do-hoa"
           sectionKey="workstation"
@@ -180,10 +180,10 @@ export default async function Home() {
           icon={Headphones}
           colorClass="bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-800"
           links={[
-            { label: "Chuột & Bàn Phím", href: "/category/linh-kien?type=mouse-keyboard" },
-            { label: "Balo & Túi Chống Sốc", href: "/category/linh-kien?type=bag" },
-            { label: "Củ Sạc GaN & Cáp", href: "/category/linh-kien?type=charger" },
-            { label: "Hub Type-C", href: "/category/linh-kien?type=hub" },
+            { label: "Chuột & Bàn Phím", href: "/phu-kien?type=mouse-keyboard" },
+            { label: "Balo & Túi Chống Sốc", href: "/phu-kien?type=bag" },
+            { label: "Củ Sạc GaN & Cáp", href: "/phu-kien?type=charger" },
+            { label: "Hub Type-C", href: "/phu-kien?type=hub" },
           ]}
           slug="linh-kien"
           sectionKey="accessories"
@@ -198,10 +198,10 @@ export default async function Home() {
           icon={TrendingUp}
           colorClass="bg-gradient-to-r from-orange-600 via-orange-500 to-orange-700"
           links={[
-            { label: "Top Gaming", href: "/category/laptop-gaming?sort=best-selling" },
-            { label: "Top Mỏng Nhẹ", href: "/category/laptop-van-phong?sort=best-selling" },
-            { label: "Top Đồ Hoạ", href: "/category/laptop-do-hoa?sort=best-selling" },
-            { label: "MacBook Hot", href: "/category/macbook?sort=best-selling" },
+            { label: "Top Gaming", href: "/laptop-gaming?sort=best-selling" },
+            { label: "Top Mỏng Nhẹ", href: "/laptop-van-phong?sort=best-selling" },
+            { label: "Top Đồ Hoạ", href: "/laptop-workstation?sort=best-selling" },
+            { label: "MacBook Hot", href: "/macbook?sort=best-selling" },
           ]}
           slug="laptop-gaming"
           sectionKey="best-selling"

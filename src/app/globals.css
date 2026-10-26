@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+/* CMS HTML needs explicit typography: Tailwind preflight resets native headings and lists. */
+.prose {
+  color: #334155;
+  font-size: 1rem;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.prose :where(h1, h2, h3, h4) {
+  color: #0f172a;
+  font-weight: 750;
+  line-height: 1.35;
+  margin: 1.6em 0 .65em;
+  scroll-margin-top: 10rem;
+}
+.prose :where(h1) { font-size: 1.85em; }
+.prose :where(h2) { font-size: 1.5em; }
+.prose :where(h3) { font-size: 1.2em; }
+.prose :where(h4) { font-size: 1.05em; }
+.prose :where(p, ul, ol, blockquote, pre, table, figure) { margin-block: 1em; }
+.prose :where(ul, ol) { padding-left: 1.5em; }
+.prose :where(ul) { list-style: disc; }
+.prose :where(ol) { list-style: decimal; }
+.prose :where(li) { margin-block: .4em; padding-left: .25em; }
+.prose :where(li > ul, li > ol) { margin-block: .4em; }
+.prose :where(a) { color: #1d4ed8; text-decoration: underline; text-underline-offset: 3px; }
+.prose :where(a:hover) { color: #1e40af; }
+.prose :where(a:focus-visible) { outline: 2px solid #2563eb; outline-offset: 3px; }
+.prose :where(strong, b) { color: #0f172a; font-weight: 700; }
+.prose :where(blockquote) { border-left: 3px solid #60a5fa; padding: .7em 1em; background: #eff6ff; border-radius: 0 .5rem .5rem 0; }
+.prose :where(img, video) { max-width: 100%; height: auto; border-radius: .75rem; margin-block: 1.5em; }
+.prose :where(iframe) { max-width: 100%; }
+.prose :where(table) { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: .9em; }
+.prose :where(th, td) { border: 1px solid #cbd5e1; padding: .65em .9em; text-align: left; vertical-align: top; }
+.prose :where(th) { background: #f1f5f9; color: #0f172a; font-weight: 700; }
+.prose :where(pre) { overflow-x: auto; padding: 1em; border-radius: .5rem; background: #f1f5f9; }
+.prose :where(code) { font-family: monospace; font-size: .9em; }
+.prose :where(hr) { border: 0; border-top: 1px solid #e2e8f0; margin-block: 2em; }
+.prose :where(figcaption) { font-size: .875em; color: #64748b; text-align: center; }
+.prose > :first-child { margin-top: 0; }
+.prose > :last-child { margin-bottom: 0; }
+@media (max-width: 639px) { .prose { font-size: .9375rem; line-height: 1.8; } }
+
 :root {
   --background: #ffffff;
   --foreground: #0f172a;

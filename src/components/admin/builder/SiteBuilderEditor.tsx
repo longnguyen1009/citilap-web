@@ -42,6 +42,8 @@ import type {
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
 import BlockRenderer from '@/components/builder/BlockRenderer';
+import { WishlistProvider } from '@/context/WishlistContext';
+import { CompareProvider } from '@/context/CompareContext';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
 
 interface ProductItem {
@@ -94,15 +96,15 @@ function createDefaultSection(type: SectionType): SectionItem {
         enabled: true,
         data: {
           type: 'banner',
-          title: 'LAPTOP GAMING & ULTRABOOK',
-          subtitle: 'Hiệu Năng Mạnh Mẽ - Giá Tốt Nhất',
-          badge: 'ƯU ĐÃI ĐẶC BIỆT',
-          imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop',
+          title: '',
+          subtitle: '',
+          badge: '',
+          imageUrl: '',
           imageAssetId: null,
-          link: '/category/laptop-gaming',
-          buttonText: 'Khám Phá Ngay',
-          secondaryLink: '/category/laptop-van-phong',
-          secondaryButtonText: 'Ultrabook Cao Cấp',
+          link: '',
+          buttonText: '',
+          secondaryLink: '',
+          secondaryButtonText: '',
           layout: 'hero',
         },
       };
@@ -119,13 +121,13 @@ function createDefaultSection(type: SectionType): SectionItem {
           slides: [
             {
               id: `slide_${Date.now()}_1`,
-              title: 'Laptop Gaming Đỉnh Cao',
-              subtitle: 'Trải nghiệm sức mạnh đồ hoạ vượt trội',
-              badge: 'Hot Deal',
-              imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop',
+              title: '',
+              subtitle: '',
+              badge: '',
+              imageUrl: '',
               imageAssetId: null,
-              link: '/category/laptop-gaming',
-              buttonText: 'Khám phá ngay',
+              link: '',
+              buttonText: '',
             },
           ],
         },
@@ -156,7 +158,7 @@ function createDefaultSection(type: SectionType): SectionItem {
             limit: 8,
           },
           rankNumbering: false,
-          viewAllLink: '/category/laptop-gaming',
+          viewAllLink: '/laptop-gaming',
         },
       };
     case 'featured_categories':
@@ -353,6 +355,110 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isDirty]);
 
+  // Close popovers & menus on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (mediaPickerTarget) setMediaPickerTarget(null);
+        else if (productPickerTarget) setProductPickerTarget(null);
+        else if (showAddMenu) setShowAddMenu(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mediaPickerTarget, productPickerTarget, showAddMenu]);
+
+  const previewModalRef = useRef<HTMLDivElement>(null);
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
+  const revisionsModalRef = useRef<HTMLDivElement>(null);
+  const revisionsTriggerRef = useRef<HTMLElement | null>(null);
+
+  const closePreviewModal = () => {
+    setShowPreviewModal(false);
+    previewTriggerRef.current?.focus();
+  };
+
+  const closeRevisionsModal = () => {
+    setShowRevisionsModal(false);
+    revisionsTriggerRef.current?.focus();
+  };
+
+  // Focus trap for Preview Modal
+  useEffect(() => {
+    if (!showPreviewModal) return;
+
+    const timer = setTimeout(() => {
+      const closeBtn = previewModalRef.current?.querySelector<HTMLElement>('button[aria-label="Đóng cửa sổ xem trước"]');
+      closeBtn?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closePreviewModal();
+        return;
+      }
+      if (e.key === 'Tab' && previewModalRef.current) {
+        const focusables = previewModalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showPreviewModal]);
+
+  // Focus trap for Revisions Modal
+  useEffect(() => {
+    if (!showRevisionsModal) return;
+
+    const timer = setTimeout(() => {
+      const closeBtn = revisionsModalRef.current?.querySelector<HTMLElement>('button[aria-label="Đóng lịch sử phiên bản"]');
+      closeBtn?.focus();
+    }, 50);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeRevisionsModal();
+        return;
+      }
+      if (e.key === 'Tab' && revisionsModalRef.current) {
+        const focusables = revisionsModalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showRevisionsModal]);
+
   // Section manipulation helpers
   const handleAddSection = (type: SectionType) => {
     const newSec = createDefaultSection(type);
@@ -363,13 +469,16 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
   const handleDuplicateSection = (index: number) => {
     const sec = sections[index];
+    if (!sec) return;
+    const deepCopiedData =
+      typeof structuredClone === 'function'
+        ? structuredClone(sec.data)
+        : JSON.parse(JSON.stringify(sec.data));
     const clone: SectionItem = {
       ...sec,
       id: `sec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       name: `${sec.name} (Bản sao)`,
-      data: {
-        ...sec.data,
-      },
+      data: deepCopiedData,
     } as SectionItem;
     const next = [...sections];
     next.splice(index + 1, 0, clone);
@@ -378,6 +487,11 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   };
 
   const handleDeleteSection = (id: string) => {
+    const target = sections.find((s) => s.id === id);
+    const confirmMessage = target
+      ? `Bạn có chắc chắn muốn xóa khối "${target.name}"?`
+      : 'Bạn có chắc chắn muốn xóa khối này?';
+    if (!window.confirm(confirmMessage)) return;
     const next = sections.filter((s) => s.id !== id);
     setSections(next);
     if (selectedSectionId === id) {
@@ -427,7 +541,19 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   // Save / Publish / Unpublish actions
   const handleSave = async (action: 'save' | 'publish' | 'unpublish') => {
     if (!data || lock.current) return false;
-    lock.current=true;const submitted=currentJson;
+    if (action === 'publish') {
+      const confirmed = window.confirm(
+        'Bạn có chắc chắn muốn xuất bản ngay?\nThay đổi này sẽ hiển thị trực tiếp cho khách hàng trên website.'
+      );
+      if (!confirmed) return false;
+    } else if (action === 'unpublish') {
+      const confirmed = window.confirm(
+        'Bạn có chắc chắn muốn gỡ xuất bản?\nTrang này sẽ chuyển về trạng thái lưu trữ/ẩn.'
+      );
+      if (!confirmed) return false;
+    }
+    lock.current = true;
+    const submitted = currentJson;
     setSaving(true);
     setError(null);
     setConflictError(null);
@@ -553,6 +679,16 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
     }
   };
 
+  const openPreviewModal = () => {
+    previewTriggerRef.current = document.activeElement as HTMLElement;
+    void handleOpenPreview();
+  };
+
+  const openRevisionsModal = () => {
+    revisionsTriggerRef.current = document.activeElement as HTMLElement;
+    void handleOpenRevisions();
+  };
+
   const handleRestoreRevision = async (targetRev: number) => {
     if (!data || lock.current) return;
     if (!confirm(`Bạn có chắc muốn khôi phục bản nháp từ phiên bản r${targetRev}?`)) return;
@@ -569,7 +705,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
           expectedRevision: data.revision,
         }),
       });
-      setShowRevisionsModal(false);
+      closeRevisionsModal();
       await loadPageData();
       setSuccessMsg(`Đã khôi phục thành công bản r${targetRev} thành bản nháp mới.`);
     } catch (err: unknown) {
@@ -613,7 +749,6 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 bg-slate-100 overflow-hidden">
-      <div className="bg-white px-4 py-2 overflow-y-auto max-h-48 shrink-0"><p role="status">{autosaveStatus}</p>{isDirty && <DraftRecovery draft={JSON.parse(currentJson)} endpoint={`/api/admin/builder/${pageId}`}/>}<SchedulePanel entityType="landing" entityId={data?.id || pageId} revision={data?.revision||0} dirty={isDirty||saving}/></div>
       {/* 1. TOP STATUS & ACTION BAR */}
       <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20">
         <div className="flex items-center gap-3 min-w-0">
@@ -665,6 +800,14 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
               ) : (
                 <span className="text-amber-700">Chưa có bản public</span>
               )}
+              {autosaveStatus && (
+                <>
+                  <span>•</span>
+                  <span className="text-slate-400 italic text-[11px]" role="status">
+                    {autosaveStatus}
+                  </span>
+                </>
+              )}
               {isDirty && (
                 <>
                   <span>•</span>
@@ -682,7 +825,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleOpenRevisions}
+            onClick={openRevisionsModal}
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition cursor-pointer"
           >
             <History className="w-3.5 h-3.5 text-slate-500" />
@@ -691,7 +834,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
           <button
             type="button"
-            onClick={handleOpenPreview}
+            onClick={openPreviewModal}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition cursor-pointer"
           >
             <Eye className="w-3.5 h-3.5 text-blue-600" />
@@ -732,7 +875,24 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
         </div>
       </header>
 
-      {/* Notifications / Conflict Alert */}
+      {/* Notifications / Error / Conflict Alert */}
+      {error && (
+        <div className="bg-rose-50 border-b border-rose-200 px-6 py-2.5 flex items-center justify-between text-xs text-rose-900">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="text-rose-700 hover:text-rose-900 p-1 rounded hover:bg-rose-100 transition cursor-pointer"
+            aria-label="Đóng thông báo lỗi"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {conflictError && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between text-xs text-amber-900">
           <div className="flex items-center gap-2">
@@ -1033,6 +1193,26 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                   </div>
                 </div>
               </div>
+
+              <div className="pt-3 border-t border-slate-200">
+                <h4 className="font-bold text-slate-800 text-sm mb-2">Lịch xuất bản tự động</h4>
+                <SchedulePanel
+                  entityType="landing"
+                  entityId={data?.id || pageId}
+                  revision={data?.revision || 0}
+                  dirty={isDirty || saving}
+                />
+              </div>
+
+              {isDirty && (
+                <div className="pt-3 border-t border-slate-200">
+                  <h4 className="font-bold text-slate-800 text-sm mb-2">Sao lưu & Khôi phục nháp</h4>
+                  <DraftRecovery
+                    draft={JSON.parse(currentJson)}
+                    endpoint={`/api/admin/builder/${pageId}`}
+                  />
+                </div>
+              )}
             </div>
           )}
         </aside>
@@ -1099,6 +1279,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     <SliderForm
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
+                      onPickMedia={(slideIdx) => setMediaPickerTarget(`slide_image:${slideIdx}`)}
                     />
                   )}
                   {selectedSection.data.type === 'product_grid' && (
@@ -1138,8 +1319,21 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                       update={updateSelectedSectionData}
                     />
                   )}
-                  {selectedSection.data.type === 'video_reviews' && <div className="space-y-3"><label className="block text-sm font-bold">Tiêu đề<input value={selectedSection.data.title} onChange={e => updateSelectedSectionData({ title: e.target.value })} className="mt-1 w-full rounded border p-2" /></label>{selectedSection.data.videos.map((v, index) => <div key={index} className="space-y-2 rounded border p-3">{(['title', 'url', 'thumbnail'] as const).map(field => <label key={field} className="block text-xs">{field === 'title' ? 'Tên video' : field === 'url' ? 'URL video YouTube / TikTok' : 'URL ảnh đại diện'}<input value={v[field]} onChange={e => { if (selectedSection.data.type !== 'video_reviews') return; updateSelectedSectionData({ videos: selectedSection.data.videos.map((x, i) => i === index ? { ...x, [field]: e.target.value } : x) }); }} className="mt-1 w-full rounded border p-2" /></label>)}<button type="button" className="text-xs text-red-600" onClick={() => { if (selectedSection.data.type === 'video_reviews') updateSelectedSectionData({ videos: selectedSection.data.videos.filter((_, i) => i !== index) }); }}>Xóa video</button></div>)}<button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => { if (selectedSection.data.type === 'video_reviews') updateSelectedSectionData({ videos: [...selectedSection.data.videos, { title: '', url: '', thumbnail: '' }] }); }}>Thêm video</button></div>}
-                  {selectedSection.data.type === 'customer_gallery' && <div className="space-y-3"><label className="block text-sm font-bold">Tiêu đề<input value={selectedSection.data.title} onChange={e => updateSelectedSectionData({ title: e.target.value })} className="mt-1 w-full rounded border p-2" /></label>{selectedSection.data.images.map((img, index) => <div key={index} className="space-y-2 rounded border p-3">{(['url', 'alt'] as const).map(field => <label key={field} className="block text-xs">{field === 'url' ? 'URL ảnh' : 'Mô tả ảnh'}<input value={img[field]} onChange={e => { if (selectedSection.data.type !== 'customer_gallery') return; updateSelectedSectionData({ images: selectedSection.data.images.map((x, i) => i === index ? { ...x, [field]: e.target.value } : x) }); }} className="mt-1 w-full rounded border p-2" /></label>)}<button type="button" className="text-xs text-red-600" onClick={() => { if (selectedSection.data.type === 'customer_gallery') updateSelectedSectionData({ images: selectedSection.data.images.filter((_, i) => i !== index) }); }}>Xóa ảnh</button></div>)}<button type="button" className="rounded border px-3 py-2 text-sm" onClick={() => { if (selectedSection.data.type === 'customer_gallery') updateSelectedSectionData({ images: [...selectedSection.data.images, { url: '', alt: '' }] }); }}>Thêm ảnh</button></div>}
+                  {selectedSection.data.type === 'video_reviews' && (
+                    <VideoReviewsForm
+                      data={selectedSection.data}
+                      update={updateSelectedSectionData}
+                      onPickMedia={(videoIdx) => setMediaPickerTarget(`video_thumb:${videoIdx}`)}
+                    />
+                  )}
+                  {selectedSection.data.type === 'customer_gallery' && (
+                    <CustomerGalleryForm
+                      data={selectedSection.data}
+                      update={updateSelectedSectionData}
+                      onPickMedia={(imgIdx) => setMediaPickerTarget(`gallery_image:${imgIdx}`)}
+                      onAddMedia={() => setMediaPickerTarget('gallery_image_add')}
+                    />
+                  )}
                   {selectedSection.data.type === 'cta' && (
                     <CtaForm
                       data={selectedSection.data}
@@ -1167,9 +1361,35 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
             picker
             onSelect={(asset) => {
               if (mediaPickerTarget === 'banner_image' && selectedSection?.data.type === 'banner') {
-                updateSelectedSectionData({ imageUrl: asset.url || '' });
+                updateSelectedSectionData({ imageUrl: asset.url || '', imageAssetId: asset.id });
               } else if (mediaPickerTarget === 'og_image') {
                 setOgImageAssetId(asset.id);
+              } else if (mediaPickerTarget.startsWith('slide_image:') && selectedSection?.data.type === 'slider') {
+                const sIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                const slides = [...(selectedSection.data.slides || [])];
+                if (slides[sIdx]) {
+                  slides[sIdx] = { ...slides[sIdx], imageUrl: asset.url || '', imageAssetId: asset.id };
+                  updateSelectedSectionData({ slides });
+                }
+              } else if (mediaPickerTarget.startsWith('video_thumb:') && selectedSection?.data.type === 'video_reviews') {
+                const vIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                const videos = [...(selectedSection.data.videos || [])];
+                if (videos[vIdx]) {
+                  videos[vIdx] = { ...videos[vIdx], thumbnail: asset.url || '' };
+                  updateSelectedSectionData({ videos });
+                }
+              } else if (mediaPickerTarget.startsWith('gallery_image:') && selectedSection?.data.type === 'customer_gallery') {
+                const gIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                const images = [...(selectedSection.data.images || [])];
+                if (images[gIdx]) {
+                  images[gIdx] = { ...images[gIdx], url: asset.url || '' };
+                  updateSelectedSectionData({ images });
+                }
+              } else if (mediaPickerTarget === 'gallery_image_add' && selectedSection?.data.type === 'customer_gallery') {
+                const current = selectedSection.data.images || [];
+                updateSelectedSectionData({
+                  images: [...current, { url: asset.url || '', alt: 'Khách hàng CitiLap' }],
+                });
               }
               setMediaPickerTarget(null);
             }}
@@ -1197,14 +1417,23 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="preview-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closePreviewModal();
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 sm:p-6"
         >
-          <div className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+          <div
+            ref={previewModalRef}
+            className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+          >
             {/* Modal Header */}
             <div className="h-14 px-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-bold text-slate-900">Xem trước bản dựng</span>
+                <span id="preview-modal-title" className="text-sm font-bold text-slate-900">
+                  Xem trước bản dựng
+                </span>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
                   DRAFT PREVIEW
                 </span>
@@ -1215,7 +1444,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                 <button
                   type="button"
                   onClick={() => setPreviewViewport('desktop')}
-                  className={`p-1.5 rounded flex items-center gap-1 text-xs font-semibold ${
+                  className={`p-1.5 rounded flex items-center gap-1 text-xs font-semibold cursor-pointer ${
                     previewViewport === 'desktop'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -1227,7 +1456,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                 <button
                   type="button"
                   onClick={() => setPreviewViewport('mobile')}
-                  className={`p-1.5 rounded flex items-center gap-1 text-xs font-semibold ${
+                  className={`p-1.5 rounded flex items-center gap-1 text-xs font-semibold cursor-pointer ${
                     previewViewport === 'mobile'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -1240,8 +1469,9 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
               <button
                 type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100"
+                onClick={closePreviewModal}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
+                aria-label="Đóng cửa sổ xem trước"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1262,7 +1492,11 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                   </div>
                 ) : (
                   <div className="p-4 sm:p-6 space-y-6">
-                    <BlockRenderer sections={previewSections} />
+                    <WishlistProvider>
+                      <CompareProvider>
+                        <BlockRenderer sections={previewSections} />
+                      </CompareProvider>
+                    </WishlistProvider>
                   </div>
                 )}
               </div>
@@ -1276,18 +1510,28 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="revisions-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeRevisionsModal();
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
         >
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+          <div
+            ref={revisionsModalRef}
+            className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+          >
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <History className="w-4 h-4 text-blue-600" />
-                <h3 className="text-sm font-bold text-slate-900">Lịch sử các phiên bản</h3>
+                <h3 id="revisions-modal-title" className="text-sm font-bold text-slate-900">
+                  Lịch sử các phiên bản
+                </h3>
               </div>
               <button
                 type="button"
-                onClick={() => setShowRevisionsModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded"
+                onClick={closeRevisionsModal}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded cursor-pointer"
+                aria-label="Đóng lịch sử phiên bản"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1485,6 +1729,8 @@ type FeaturedCollectionData = Extract<SectionItem['data'], { type: 'featured_col
 type NewsReviewsData = Extract<SectionItem['data'], { type: 'news_reviews' }>;
 type IntroData = Extract<SectionItem['data'], { type: 'intro' }>;
 type CtaData = Extract<SectionItem['data'], { type: 'cta' }>;
+type VideoReviewsData = Extract<SectionItem['data'], { type: 'video_reviews' }>;
+type CustomerGalleryData = Extract<SectionItem['data'], { type: 'customer_gallery' }>;
 
 function BannerForm({
   data,
@@ -1590,7 +1836,7 @@ function BannerForm({
             value={data.link || ''}
             onChange={(e) => update({ link: e.target.value })}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="/category/laptop-gaming"
+            placeholder="/laptop-gaming"
           />
         </div>
       </div>
@@ -1613,7 +1859,7 @@ function BannerForm({
             value={data.secondaryLink || ''}
             onChange={(e) => update({ secondaryLink: e.target.value })}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="/category/laptop-van-phong"
+            placeholder="/laptop-van-phong"
           />
         </div>
       </div>
@@ -1624,9 +1870,11 @@ function BannerForm({
 function SliderForm({
   data,
   update,
+  onPickMedia,
 }: {
   data: SliderData;
   update: (p: Partial<SliderData>) => void;
+  onPickMedia: (slideIdx: number) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -1665,61 +1913,177 @@ function SliderForm({
               const newSlide = {
                 id: `slide_${Date.now()}_${currentSlides.length + 1}`,
                 title: `Slide ${currentSlides.length + 1}`,
-                subtitle: 'Mô tả slide',
-                badge: '',
+                subtitle: 'Mô tả ngắn gọn ưu đãi hoặc cấu hình',
+                badge: 'Hot Deal',
                 imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop',
                 imageAssetId: null,
-                link: '/category/laptop-gaming',
-                buttonText: 'Xem ngay',
+                link: '/laptop-gaming',
+                buttonText: 'Khám phá ngay',
               };
               update({ slides: [...currentSlides, newSlide] });
             }}
-            className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg"
+            className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
           >
             + Thêm slide
           </button>
         </div>
 
         {data.slides?.map((slide, sIdx) => (
-          <div key={slide.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-700">Slide #{sIdx + 1}</span>
-              {data.slides.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = data.slides.filter((_, idx) => idx !== sIdx);
+          <div key={slide.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <span className="font-bold text-slate-700 text-xs">Slide #{sIdx + 1}</span>
+              <div className="flex items-center gap-2">
+                {sIdx > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = [...data.slides];
+                      const [moved] = next.splice(sIdx, 1);
+                      next.splice(sIdx - 1, 0, moved);
+                      update({ slides: next });
+                    }}
+                    className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded text-xs"
+                    title="Di chuyển lên"
+                  >
+                    ↑
+                  </button>
+                )}
+                {sIdx < data.slides.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = [...data.slides];
+                      const [moved] = next.splice(sIdx, 1);
+                      next.splice(sIdx + 1, 0, moved);
+                      update({ slides: next });
+                    }}
+                    className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded text-xs"
+                    title="Di chuyển xuống"
+                  >
+                    ↓
+                  </button>
+                )}
+                {data.slides.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!window.confirm(`Xóa slide #${sIdx + 1}?`)) return;
+                      const next = data.slides.filter((_, idx) => idx !== sIdx);
+                      update({ slides: next });
+                    }}
+                    className="text-red-500 hover:text-red-700 text-xs font-medium cursor-pointer"
+                  >
+                    Xóa slide
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="sm:col-span-2">
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Tiêu đề slide</label>
+                <input
+                  type="text"
+                  value={slide.title}
+                  onChange={(e) => {
+                    const next = [...data.slides];
+                    next[sIdx] = { ...next[sIdx], title: e.target.value };
                     update({ slides: next });
                   }}
-                  className="text-red-500 hover:text-red-700 text-xs font-medium"
+                  placeholder="Tiêu đề chính"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Huy hiệu (Badge)</label>
+                <input
+                  type="text"
+                  value={slide.badge || ''}
+                  onChange={(e) => {
+                    const next = [...data.slides];
+                    next[sIdx] = { ...next[sIdx], badge: e.target.value };
+                    update({ slides: next });
+                  }}
+                  placeholder="Ví dụ: Hot Deal"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Mô tả phụ (Subtitle)</label>
+              <input
+                type="text"
+                value={slide.subtitle || ''}
+                onChange={(e) => {
+                  const next = [...data.slides];
+                  next[sIdx] = { ...next[sIdx], subtitle: e.target.value };
+                  update({ slides: next });
+                }}
+                placeholder="Mô tả phụ của slide"
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Ảnh nền / banner (URL)</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={slide.imageUrl}
+                  onChange={(e) => {
+                    const next = [...data.slides];
+                    next[sIdx] = { ...next[sIdx], imageUrl: e.target.value };
+                    update({ slides: next });
+                  }}
+                  placeholder="URL hình ảnh"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => onPickMedia(sIdx)}
+                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
                 >
-                  Xóa slide
+                  Chọn ảnh
                 </button>
+              </div>
+              {slide.imageUrl && (
+                <div className="mt-2 h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 max-w-xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={slide.imageUrl} alt={slide.title || 'Slide preview'} className="w-full h-full object-cover" />
+                </div>
               )}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                type="text"
-                value={slide.title}
-                onChange={(e) => {
-                  const next = [...data.slides];
-                  next[sIdx] = { ...next[sIdx], title: e.target.value };
-                  update({ slides: next });
-                }}
-                placeholder="Tiêu đề slide"
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-              />
-              <input
-                type="text"
-                value={slide.imageUrl}
-                onChange={(e) => {
-                  const next = [...data.slides];
-                  next[sIdx] = { ...next[sIdx], imageUrl: e.target.value };
-                  update({ slides: next });
-                }}
-                placeholder="URL hình ảnh"
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Liên kết nút (Link)</label>
+                <input
+                  type="text"
+                  value={slide.link || ''}
+                  onChange={(e) => {
+                    const next = [...data.slides];
+                    next[sIdx] = { ...next[sIdx], link: e.target.value };
+                    update({ slides: next });
+                  }}
+                  placeholder="/laptop-gaming"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Chữ nút bấm (Button Text)</label>
+                <input
+                  type="text"
+                  value={slide.buttonText || ''}
+                  onChange={(e) => {
+                    const next = [...data.slides];
+                    next[sIdx] = { ...next[sIdx], buttonText: e.target.value };
+                    update({ slides: next });
+                  }}
+                  placeholder="Khám phá ngay"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
             </div>
           </div>
         ))}
@@ -1992,7 +2356,7 @@ function ProductGridForm({
             value={data.viewAllLink || ''}
             onChange={(e) => update({ viewAllLink: e.target.value })}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="/category/laptop-gaming"
+            placeholder="/laptop-gaming"
           />
         </div>
         <div className="pt-6">
@@ -2292,6 +2656,290 @@ function CtaForm({
             placeholder="tel:0987654321"
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoReviewsForm({
+  data,
+  update,
+  onPickMedia,
+}: {
+  data: VideoReviewsData;
+  update: (p: Partial<VideoReviewsData>) => void;
+  onPickMedia: (videoIdx: number) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối</label>
+        <input
+          type="text"
+          value={data.title}
+          onChange={(e) => update({ title: e.target.value })}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          placeholder="Video review sản phẩm"
+        />
+      </div>
+
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-slate-800">Danh sách video ({data.videos?.length || 0})</span>
+          <button
+            type="button"
+            onClick={() => {
+              const current = data.videos || [];
+              update({
+                videos: [
+                  ...current,
+                  {
+                    title: '',
+                    url: '',
+                    thumbnail: '',
+                  },
+                ],
+              });
+            }}
+            className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
+          >
+            + Thêm video
+          </button>
+        </div>
+
+        {data.videos?.map((v, index) => (
+          <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+              <span className="font-bold text-slate-700 text-xs">Video #{index + 1}</span>
+              <button
+                type="button"
+                className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                onClick={() => {
+                  if (!window.confirm(`Xóa video #${index + 1}?`)) return;
+                  update({ videos: data.videos.filter((_, i) => i !== index) });
+                }}
+              >
+                Xóa video
+              </button>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Tên video</label>
+              <input
+                type="text"
+                value={v.title}
+                onChange={(e) => {
+                  const next = [...data.videos];
+                  next[index] = { ...next[index], title: e.target.value };
+                  update({ videos: next });
+                }}
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                placeholder="Ví dụ: Đánh giá chi tiết laptop CitiLap Gaming"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">
+                URL video (YouTube hoặc TikTok) *
+              </label>
+              <input
+                type="text"
+                value={v.url}
+                onChange={(e) => {
+                  const next = [...data.videos];
+                  next[index] = { ...next[index], url: e.target.value };
+                  update({ videos: next });
+                }}
+                className={`w-full px-2.5 py-1.5 border rounded text-xs bg-white ${
+                  !v.url.trim() ? 'border-amber-300' : 'border-slate-300'
+                }`}
+                placeholder="https://www.youtube.com/watch?v=... hoặc https://www.tiktok.com/@.../video/..."
+              />
+              {!v.url.trim() ? (
+                <p className="text-[11px] text-rose-500 font-medium mt-1">
+                  Vui lòng nhập URL video (YouTube hoặc TikTok)
+                </p>
+              ) : !v.url.startsWith('https://') ? (
+                <p className="text-[11px] text-amber-600 font-medium mt-1">
+                  Đường dẫn video phải bắt đầu bằng https://
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">
+                URL ảnh đại diện thumbnail (tùy chọn, tự lấy nếu dùng YouTube)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={v.thumbnail || ''}
+                  onChange={(e) => {
+                    const next = [...data.videos];
+                    next[index] = { ...next[index], thumbnail: e.target.value };
+                    update({ videos: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                  placeholder="URL ảnh hoặc chọn từ thư viện"
+                />
+                <button
+                  type="button"
+                  onClick={() => onPickMedia(index)}
+                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
+                >
+                  Chọn ảnh
+                </button>
+              </div>
+              {v.thumbnail && (
+                <div className="mt-2 h-16 w-28 rounded overflow-hidden border border-slate-200 bg-slate-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CustomerGalleryForm({
+  data,
+  update,
+  onPickMedia,
+  onAddMedia,
+}: {
+  data: CustomerGalleryData;
+  update: (p: Partial<CustomerGalleryData>) => void;
+  onPickMedia: (imgIdx: number) => void;
+  onAddMedia: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối</label>
+        <input
+          type="text"
+          value={data.title}
+          onChange={(e) => update({ title: e.target.value })}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          placeholder="Hình ảnh khách hàng tại CitiLap"
+        />
+      </div>
+
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-slate-800">Danh sách ảnh ({data.images?.length || 0})</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onAddMedia}
+              className="px-2.5 py-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer"
+            >
+              + Chọn từ thư viện
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const current = data.images || [];
+                update({
+                  images: [
+                    ...current,
+                    {
+                      url: '',
+                      alt: '',
+                    },
+                  ],
+                });
+              }}
+              className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
+            >
+              + Nhập URL
+            </button>
+          </div>
+        </div>
+
+        {data.images?.map((img, index) => (
+          <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex gap-3 items-start">
+            <div className="w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0">
+              {img.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={img.url} alt={img.alt || 'Gallery image'} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-400 text-[10px]">
+                  Chưa có ảnh
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-700 text-xs">Ảnh #{index + 1}</span>
+                <button
+                  type="button"
+                  className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                  onClick={() => {
+                    if (!window.confirm(`Xóa ảnh #${index + 1}?`)) return;
+                    update({ images: data.images.filter((_, i) => i !== index) });
+                  }}
+                >
+                  Xóa
+                </button>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">URL ảnh *</label>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={img.url}
+                    onChange={(e) => {
+                      const next = [...data.images];
+                      next[index] = { ...next[index], url: e.target.value };
+                      update({ images: next });
+                    }}
+                    className={`w-full px-2.5 py-1 border rounded text-xs bg-white ${
+                      !img.url.trim() ? 'border-amber-300' : 'border-slate-300'
+                    }`}
+                    placeholder="https://... hoặc /images/..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onPickMedia(index)}
+                    className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
+                  >
+                    Chọn
+                  </button>
+                </div>
+                {!img.url.trim() ? (
+                  <p className="text-[11px] text-rose-500 font-medium mt-1">
+                    Vui lòng nhập URL ảnh hoặc chọn từ thư viện Media
+                  </p>
+                ) : !img.url.startsWith('http://') && !img.url.startsWith('https://') && !img.url.startsWith('/') ? (
+                  <p className="text-[11px] text-amber-600 font-medium mt-1">
+                    Đường dẫn ảnh phải bắt đầu bằng https:// hoặc /
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Mô tả ảnh (Alt / Caption)</label>
+                <input
+                  type="text"
+                  value={img.alt}
+                  onChange={(e) => {
+                    const next = [...data.images];
+                    next[index] = { ...next[index], alt: e.target.value };
+                    update({ images: next });
+                  }}
+                  className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white"
+                  placeholder="Ví dụ: Khách hàng nhận máy MacBook Air M3"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

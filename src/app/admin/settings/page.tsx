@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from 'next/link';
 import {
   Save,
   Store,
@@ -23,7 +24,7 @@ import { DEFAULT_ADMIN_SETTINGS as DEFAULT_SETTINGS } from "@/contracts/cms/sett
 
 const STORAGE_KEY = "citilap_admin_settings_v2_draft";
 
-type TabId = "store" | "flashsale" | "banners" | "features" | "shipping";
+type TabId = "store" | "flashsale" | "banners" | "features" | "shipping" | "product";
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("store");
@@ -227,6 +228,7 @@ export default function SettingsPage() {
     { id: "banners", label: "Banners & Trang Chủ", icon: LayoutTemplate },
     { id: "features", label: "Cam kết dịch vụ", icon: ShieldCheck },
     { id: "shipping", label: "Vận chuyển & Thanh toán", icon: Truck },
+    { id: "product", label: "Trang sản phẩm", icon: LayoutTemplate },
   ];
 
   const handleReloadLatest = () => {
@@ -309,7 +311,7 @@ export default function SettingsPage() {
 
 
       {/* Tabs navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar border-b border-slate-200 mb-8 pb-px">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 mb-8 pb-px">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -333,6 +335,22 @@ export default function SettingsPage() {
 
       {/* Form Content */}
       <form onSubmit={handleSave} className="space-y-8">
+        {activeTab === 'product' && <div className="rounded-2xl border bg-white p-6 space-y-6">
+          <h2 className="text-lg font-bold">Nội dung chung trang chi tiết sản phẩm</h2>
+          <p className="text-sm text-slate-500">FAQ, quà tặng, bảo hành và phụ kiện riêng sửa trong từng sản phẩm. Địa chỉ, hotline, giờ mở cửa dùng tab Cửa hàng; phí và phương thức thanh toán dùng tab Vận chuyển.</p>
+          {(['productTrustItems','productShippingItems'] as const).map(key => <section key={key} className="space-y-2">
+            <h3 className="text-sm font-bold">{key === 'productTrustItems' ? 'Đặc quyền an tâm' : 'Chính sách vận chuyển & cam kết'}</h3>
+            {(settings[key] || []).map((value,index) => <div key={index} className="flex gap-2"><input aria-label={(key === 'productTrustItems' ? 'Đặc quyền ' : 'Cam kết ')+(index+1)} value={value} maxLength={key === 'productTrustItems' ? 300 : 500} onChange={e => update(key,settings[key].map((item,i) => i === index ? e.target.value : item))} className="w-full rounded-lg border px-3 py-2 text-sm" /><button type="button" className="text-xs text-red-700" onClick={() => update(key,settings[key].filter((_,i) => i !== index))}>Xóa</button></div>)}
+            <button type="button" disabled={(settings[key] || []).length >= 8} className="text-sm font-semibold text-blue-700" onClick={() => update(key,[...(settings[key] || []),''])}>+ Thêm nội dung</button>
+          </section>)}
+          <section className="space-y-3"><h3 className="text-sm font-bold">Banner ưu đãi bên cạnh thông số (tối đa 2)</h3>
+            {(settings.productBanners || []).map((banner,index) => <div key={index} className="rounded-xl border p-3 space-y-2">
+              {(['title','description','href'] as const).map(field => <label key={field} className="block text-xs">{field === 'title' ? 'Tiêu đề' : field === 'description' ? 'Nội dung' : 'Liên kết'}<input value={banner[field]} maxLength={field === 'title' ? 120 : field === 'description' ? 500 : 1000} onChange={e => update('productBanners',settings.productBanners.map((item,i) => i === index ? {...item,[field]:e.target.value} : item))} className="w-full rounded-lg border px-3 py-2 text-sm" /></label>)}
+              <button type="button" className="text-xs text-red-700" onClick={() => update('productBanners',settings.productBanners.filter((_,i) => i !== index))}>Xóa banner</button>
+            </div>)}
+            <button type="button" disabled={(settings.productBanners || []).length >= 2} className="text-sm font-semibold text-blue-700" onClick={() => update('productBanners',[...(settings.productBanners || []),{title:'',description:'',href:'/lien-he'}])}>+ Thêm banner</button>
+          </section>
+        </div>}
         {/* TAB 1: CỬA HÀNG & HOTLINE */}
         {activeTab === "store" && (
           <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-6 sm:p-8 space-y-6">
@@ -528,6 +546,16 @@ export default function SettingsPage() {
         {/* TAB 2: FLASH SALE & GIỜ VÀNG */}
         {activeTab === "flashsale" && (
           <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-6 sm:p-8 space-y-6">
+            <div className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4">
+              <h2 className="font-bold text-red-800">HOT SALE — Banner & chiến dịch</h2>
+              <p className="text-sm text-slate-700">HOT SALE tập hợp nhiều chiến dịch. <Link href="/admin/campaigns" className="font-bold text-red-700 underline">Tạo chiến dịch, đặt lịch và chọn sản phẩm</Link></p>
+              <label className="block text-sm font-semibold">Ảnh banner ngang (khuyến nghị 1600 × 160)
+                <input value={settings.hotSaleBannerImage} onChange={e => update('hotSaleBannerImage', e.target.value)} placeholder="/api/library/... hoặc https://..." className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" />
+              </label>
+              <label className="block text-sm font-semibold">Liên kết banner
+                <input value={settings.hotSaleBannerLink} onChange={e => update('hotSaleBannerLink', e.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-normal" />
+              </label>
+            </div>
             <div className="border-b border-slate-100 pb-4">
               <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Flame className="w-5 h-5 text-red-600" /> Cấu hình Giá Sốc Giờ Vàng (Flash Sale)
@@ -552,7 +580,7 @@ export default function SettingsPage() {
                 />
                 <div>
                   <div className="font-bold text-slate-900 text-sm">Bật chương trình Flash Sale trên toàn trang</div>
-                  <div className="text-xs text-slate-500">Nếu tắt, khối Flash Sale trên Trang chủ và trang `/hot-sale` sẽ tạm ẩn hoặc chuyển về trạng thái không hoạt động.</div>
+                  <div className="text-xs text-slate-500">Áp dụng cho sản phẩm gắn cờ Flash Sale cũ. Các chiến dịch tại mục Chiến dịch giá có lịch và trạng thái riêng.</div>
                 </div>
               </label>
 

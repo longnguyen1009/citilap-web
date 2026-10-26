@@ -7,6 +7,7 @@ import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
 import { resolveProductsByIds, resolveProductsByCriteria, type HomepageProduct } from './catalog.service';
 import { getStorefrontPricingContext, type PriceEvaluationContext } from './pricing.service';
 import { getPrismaClient } from '../../lib/prisma';
+import { categoryHref, canonicalCategoryPath } from '../../lib/category-paths';
 
 type Row = { revision: number; draft: string; published: string | null; publishedRevision: number | null };
 const publishedNavigationCache = new WeakMap<D1Database, { revision: number; document: NavigationDocument }>();
@@ -85,6 +86,16 @@ export async function writeNavigation(env: MediaEnvironment, input: unknown) {
   const db = env.DB;
   const current = await navigationDetail(db);
   if (current.revision !== expectedRevision) throw new MediaError('Nội dung đã được sửa ở nơi khác. Tải lại trước khi lưu.',409);
+  if (action === 'publish') {
+    const accessoryRoot = d.categories.find(c => !c.parentId && c.slug === 'phu-kien');
+    const slugs = d.categories.filter(c => c.visible && c.parentId === accessoryRoot?.id).map(c => c.slug);
+    const collision = slugs.length ? await db.prepare("SELECT p.slug FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id WHERE p.deletedAt IS NULL AND p.status IN ('ACTIVE','active') AND (s.productId IS NULL OR s.published IS NOT NULL) AND COALESCE(json_extract(s.published,'$.template'),CASE WHEN p.categoryId=? THEN 'ACCESSORY' ELSE 'LAPTOP' END)!='LAPTOP' AND p.slug IN (SELECT value FROM json_each(?)) LIMIT 1").bind(accessoryRoot?.id || '', JSON.stringify(slugs)).first<{slug:string}>() : null;
+    if (collision) throw new MediaError('Đường dẫn danh mục trùng sản phẩm phụ kiện đã xuất bản: ' + collision.slug, 409);
+  }
+  for (const c of d.categories.filter(c => !c.parentId)) {
+    const page = await db.prepare("SELECT p.id FROM Page p LEFT JOIN PageStudio s ON s.pageId=p.id WHERE p.deletedAt IS NULL AND (p.slug=? OR json_extract(s.draft,'$.slug')=? OR json_extract(s.published,'$.slug')=?)").bind(c.slug,c.slug,c.slug).first();
+    if (page) throw new MediaError('Slug phân loại trùng trang CMS: ' + c.slug,409);
+  }
   
   // Preserve every existing identity, including categories referenced by older products.
   const existing = await categoryRows(db);
@@ -113,6 +124,22 @@ export async function writeNavigation(env: MediaEnvironment, input: unknown) {
   }
 
   if (action === 'publish') {
+    const previous = (await navigationSnapshot(db))?.document;
+    for (const old of previous?.categories.filter(c => c.visible) || []) {
+      const next = d.categories.find(c => c.id === old.id && c.visible);
+      if (!next) continue;
+      const source = categoryHref(old, previous!.categories), target = categoryHref(next, d.categories);
+      if (source === target) continue;
+      const occupied = d.categories.some(c => c.visible && categoryHref(c,d.categories) === source);
+      if (occupied) throw new MediaError('Đường dẫn cũ đang thuộc phân loại khác: ' + source,409);
+      // Returning to an earlier slug retires its redirect before reversing the edge.
+      statements.push(db.prepare('UPDATE CmsRedirect SET enabled=0,revision=revision+1 WHERE source=? AND target=?').bind(target,source));
+      statements.push(db.prepare('UPDATE CmsRedirect SET target=?,revision=revision+1 WHERE target IN (?,?) AND source!=?').bind(target,source,'/phan-loai'+source,target));
+      statements.push(db.prepare("INSERT INTO CmsRedirect(id,source,target,note) VALUES(?,?,?,'Category path changed') ON CONFLICT(source) DO UPDATE SET target=excluded.target,enabled=1,revision=CmsRedirect.revision+1").bind(crypto.randomUUID(),source,target));
+      for (const legacy of ['/category/'+old.slug, '/phan-loai'+source]) {
+        statements.push(db.prepare("INSERT INTO CmsRedirect(id,source,target,note) VALUES(?,?,?,'Category legacy URL') ON CONFLICT(source) DO UPDATE SET target=excluded.target,enabled=1,revision=CmsRedirect.revision+1").bind(crypto.randomUUID(),legacy,target));
+      }
+    }
     // Insert/update identities first, then parents so array order does not affect FK checks.
     for (const [i,c] of d.categories.entries()) {
       statements.push(db.prepare(`INSERT INTO Category(id,name,slug,description,image,sortOrder,status,updatedAt) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET name=excluded.name,slug=excluded.slug,description=excluded.description,image=excluded.image,sortOrder=excluded.sortOrder,status=excluded.status,updatedAt=CURRENT_TIMESTAMP`).bind(c.id,c.name,c.slug,c.description,c.assetId ? '/api/library/'+c.assetId : c.image || null,i,c.visible?'ACTIVE':'INACTIVE'));
@@ -125,7 +152,7 @@ export async function writeNavigation(env: MediaEnvironment, input: unknown) {
   try {
     await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'navigation.' + action, 'site', 'CMS mutation',null,'order',{before:expectedRevision,after:revision})]);
   } catch (e) {
-    if (e instanceof Error && /NAVIGATION_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
+    if (e instanceof Error && /NAVIGATION_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY|REDIRECT_CHAIN/.test(e.message)) {
       throw new MediaError('Xung đột phiên bản, tên, slug hoặc ảnh. Tải lại trước khi lưu.',409);
     }
     throw e;
@@ -142,7 +169,7 @@ export async function resolveNavigation(db: D1Database, d: NavigationDocument, r
     parentId: c.parentId,
     image: c.assetId ? '/api/library/'+c.assetId : c.image || null,
     alt: c.alt,
-    href: '/category/' + c.slug
+    href: categoryHref(c, d.categories)
   }));
 
   const collections = d.collections.filter(c => c.visible).map(c => ({
@@ -160,13 +187,16 @@ export async function resolveNavigation(db: D1Database, d: NavigationDocument, r
   const ids = [...menuProducts];
   for (let offset = 0; offset < ids.length; offset += 80) {
     const chunk = ids.slice(offset, offset + 80);
-    const rows = await db.prepare(`SELECT id FROM Product WHERE id IN (${chunk.map(() => '?').join(',')}) AND deletedAt IS NULL AND status IN ('ACTIVE','active')`)
-      .bind(...chunk).all<{ id: string }>();
-    for (const { id } of rows.results) products.set(id, '/product/' + id);
+    const rows = await db.prepare(`SELECT p.id,COALESCE(json_extract(s.published,'$.slug'),p.slug) slug,CASE WHEN COALESCE(json_extract(s.published,'$.template'),CASE WHEN p.categoryId='cat-phu-kien' THEN 'ACCESSORY' ELSE 'LAPTOP' END)='LAPTOP' THEN '/laptop/' ELSE '/phu-kien/' END prefix FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id WHERE p.id IN (${chunk.map(() => '?').join(',')}) AND p.deletedAt IS NULL AND p.status IN ('ACTIVE','active') AND (s.productId IS NULL OR s.published IS NOT NULL)`)
+      .bind(...chunk).all<{ id: string; slug: string; prefix: string }>();
+    for (const { id, slug, prefix } of rows.results) products.set(id, prefix + slug);
   }
 
   const href = (t: NavigationTarget): string | undefined => {
-    if (t.kind === 'path') return t.path;
+    if (t.kind === 'path') {
+      const index = t.path.search(/[?#]/), path = index < 0 ? t.path : t.path.slice(0,index);
+      return (canonicalCategoryPath(path, categories) || path) + (index < 0 ? '' : t.path.slice(index));
+    }
     if (t.kind === 'category') return categories.find(c => c.id === t.id)?.href;
     if (t.kind === 'collection') return collections.find(c => c.id === t.id)?.href;
     if (t.kind === 'product') return products.get(t.id);
@@ -190,6 +220,7 @@ export async function resolveNavigation(db: D1Database, d: NavigationDocument, r
         })
       }] : [];
     });
+
 
   return {
     schemaVersion: 1,

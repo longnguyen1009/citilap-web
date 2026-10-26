@@ -72,7 +72,7 @@ export default async function ProductSection({
                 description="Danh mục này hiện đang được cập nhật sản phẩm mới. Quý khách vui lòng quay lại sau."
                 action={
                   slug ? (
-                    <Link href={`/category/${slug}`}>
+                    <Link href={`/${slug}`}>
                       <Button variant="outline" size="sm">
                         Xem tất cả danh mục
                       </Button>

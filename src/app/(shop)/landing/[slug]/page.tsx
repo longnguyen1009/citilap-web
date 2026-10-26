@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChevronRight, Eye } from 'lucide-react';
 import { getPublishedLandingPage } from '@/server/services/storefront-cms.service';
 import BlockRenderer from '@/components/builder/BlockRenderer';
+import FlashSaleSection from '@/components/home/FlashSaleSection';
 import { businessProfile } from '@/config/business-profile';
 
 interface LandingPageProps {
@@ -88,7 +89,7 @@ export default async function StorefrontLandingPage({ params, searchParams }: La
       </div>
 
       {/* Dynamic Sections */}
-      <BlockRenderer sections={page.sections} />
+      <BlockRenderer sections={page.sections} flashSale={<FlashSaleSection />} />
     </div>
   );
 }

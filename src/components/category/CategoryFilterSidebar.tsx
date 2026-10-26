@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from 'react';
+import Form from 'next/form';
 import { Check, RotateCcw } from "lucide-react";
 import type { FacetOption } from "@/server/services/catalog.service";
 import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES } from "@/config/accessory-taxonomy";
@@ -68,6 +69,7 @@ export default function CategoryFilterSidebar({
   const activeGpus = searchParams.getAll("gpu");
 
   const hasAnyFilter =
+    searchParams.has("tag") || searchParams.has("minPrice") || searchParams.has("maxPrice") ||
     Boolean(activeType) ||
     activeCategories.length > 0 ||
     activeBrands.length > 0 ||
@@ -163,6 +165,7 @@ export default function CategoryFilterSidebar({
               return (
                 <button
                   key={c.value}
+                  aria-pressed={isSelected}
                   onClick={() => updateParam("category", c.value, true)}
                   className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                     isSelected
@@ -192,6 +195,7 @@ export default function CategoryFilterSidebar({
               return (
                 <button
                   key={t.slug}
+                  aria-pressed={isSelected}
                   onClick={() => updateParam("type", t.slug, false)}
                   className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                     isSelected
@@ -224,6 +228,7 @@ export default function CategoryFilterSidebar({
               return (
                 <button
                   key={b.value}
+                  aria-pressed={isSelected}
                   onClick={() => updateParam("brand", b.value, true)}
                   className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                     isSelected
@@ -256,6 +261,7 @@ export default function CategoryFilterSidebar({
               return (
                 <button
                   key={c.value}
+                  aria-pressed={isSelected}
                   onClick={() => updateParam("connection", c.value, true)}
                   className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                     isSelected
@@ -288,6 +294,7 @@ export default function CategoryFilterSidebar({
               return (
                 <button
                   key={p.value}
+                  aria-pressed={isSelected}
                   onClick={() => updateParam("power", p.value, true)}
                   className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                     isSelected
@@ -319,6 +326,7 @@ export default function CategoryFilterSidebar({
             return (
               <button
                 key={p.value}
+                aria-pressed={isSelected}
                 onClick={() => handlePricePreset(p.value)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-control text-body-sm font-medium transition cursor-pointer border text-left ${
                   isSelected
@@ -340,6 +348,18 @@ export default function CategoryFilterSidebar({
             );
           })}
         </div>
+        <Form action={pathname} className="mt-3 space-y-2" onSubmit={event => {
+          event.preventDefault();
+          const params = new URLSearchParams();
+          new FormData(event.currentTarget).forEach((value, key) => { if (typeof value === "string" && value.trim()) params.append(key, value); });
+          navigate(params);
+        }}>
+          {[...searchParams.entries()].filter(([key]) => !["minPrice", "maxPrice", "pricePreset", "page"].includes(key)).map(([key, value], i) => <input key={i} type="hidden" name={key} value={value} />)}
+          <div className="grid grid-cols-2 gap-2">
+            {[["minPrice", "Giá từ (₫)"], ["maxPrice", "Giá đến (₫)"]].map(([name, label]) => <label key={name} className="min-w-0 text-xs text-text-secondary">{label}<input key={searchParams.get(name)} name={name} type="number" min={0} max={1000000000} step="any" defaultValue={searchParams.get(name) || ""} className="mt-1 w-full min-w-0 rounded-control border border-border-default bg-surface px-2 py-2 text-sm text-text-primary" /></label>)}
+          </div>
+          <button type="submit" className="min-h-11 w-full rounded-control border border-brand-primary px-3 py-2 text-sm font-semibold text-brand-primary">Áp dụng khoảng giá</button>
+        </Form>
       </div>
 
       {/* 3. Tình trạng máy / hàng */}
@@ -354,6 +374,7 @@ export default function CategoryFilterSidebar({
               return (
                 <button
                   key={c.value}
+                  aria-pressed={isSelected}
                   onClick={() => updateParam("condition", c.value, true)}
                   className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                     isSelected
@@ -389,7 +410,8 @@ export default function CategoryFilterSidebar({
                   return (
                     <button
                       key={r.value}
-                      onClick={() => updateParam("ram", String(r.value), true)}
+                      aria-pressed={isSelected}
+                  onClick={() => updateParam("ram", String(r.value), true)}
                       className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
                         isSelected
                           ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
@@ -416,7 +438,8 @@ export default function CategoryFilterSidebar({
                   return (
                     <button
                       key={s.value}
-                      onClick={() => updateParam("storage", String(s.value), true)}
+                      aria-pressed={isSelected}
+                  onClick={() => updateParam("storage", String(s.value), true)}
                       className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
                         isSelected
                           ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
@@ -443,7 +466,8 @@ export default function CategoryFilterSidebar({
                   return (
                     <button
                       key={c.value}
-                      onClick={() => updateParam("cpu", c.value, true)}
+                      aria-pressed={isSelected}
+                  onClick={() => updateParam("cpu", c.value, true)}
                       className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                         isSelected
                           ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
@@ -470,7 +494,8 @@ export default function CategoryFilterSidebar({
                   return (
                     <button
                       key={g.value}
-                      onClick={() => updateParam("gpu", g.value, true)}
+                      aria-pressed={isSelected}
+                  onClick={() => updateParam("gpu", g.value, true)}
                       className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
                         isSelected
                           ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"

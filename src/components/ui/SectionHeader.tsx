@@ -66,7 +66,7 @@ export function SectionHeader({
           <div className="flex flex-wrap items-center gap-2 md:gap-3 text-sm font-medium relative z-10">
             {links?.map((link, i) => {
               const label = typeof link === "string" ? link : link.label;
-              const href = typeof link === "string" ? `/category/${slug}` : link.href;
+              const href = typeof link === "string" ? `/${slug}` : link.href;
               return (
                 <Link
                   key={i}
@@ -78,7 +78,7 @@ export function SectionHeader({
               );
             })}
             <Link
-              href={`/category/${slug}`}
+              href={`/${slug}`}
               className="flex items-center text-white hover:text-yellow-300 font-bold ml-2 text-xs md:text-sm transition group"
             >
               <span>Xem tất cả</span>

@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
+import { Fragment, type ReactNode } from 'react';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
 import CategoryGridSection from '@/components/home/CategoryGridSection';
 import BrandSection from '@/components/home/BrandSection';
@@ -50,7 +51,7 @@ const THEME_GRADIENT_MAP: Record<string, string> = {
   orange: 'bg-gradient-to-r from-orange-600 via-orange-500 to-orange-700',
 };
 
-export default function BlockRenderer({ sections }: { sections: ResolvedSectionItem[] }) {
+export default function BlockRenderer({ sections, flashSale }: { sections: ResolvedSectionItem[]; flashSale?: ReactNode }) {
   if (!sections || sections.length === 0) {
     return null;
   }
@@ -68,6 +69,7 @@ export default function BlockRenderer({ sections }: { sections: ResolvedSectionI
             return <SliderBlock key={section.id} data={section.data} />;
 
           case 'product_grid':
+            if (section.id === 'sec-hot-sale' && flashSale !== undefined) return <Fragment key={section.id}>{flashSale}</Fragment>;
             return <ProductGridBlock key={section.id} section={section} />;
 
           case 'featured_categories':
@@ -102,6 +104,8 @@ export default function BlockRenderer({ sections }: { sections: ResolvedSectionI
   );
 }
 
+import SliderSection from '@/components/home/SliderSection';
+
 // 1. BANNER BLOCK
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function BannerBlock({ data }: { data: any }) {
@@ -119,13 +123,13 @@ function BannerBlock({ data }: { data: any }) {
                   {data.badge}
                 </span>
               )}
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight">{data.title}</h2>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">{data.title}</h2>
               {data.subtitle && <p className="text-slate-300 text-sm sm:text-base leading-relaxed">{data.subtitle}</p>}
               <div className="pt-2 flex flex-wrap gap-3">
                 {data.link && data.buttonText && (
                   <Link
                     href={data.link}
-                    className="inline-flex items-center px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition"
+                    className="inline-flex items-center px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.buttonText}
                   </Link>
@@ -133,15 +137,21 @@ function BannerBlock({ data }: { data: any }) {
                 {data.secondaryLink && data.secondaryButtonText && (
                   <Link
                     href={data.secondaryLink}
-                    className="inline-flex items-center px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold text-sm transition"
+                    className="inline-flex items-center px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 text-white font-semibold text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.secondaryButtonText}
                   </Link>
                 )}
               </div>
             </div>
-            <div className="relative h-64 md:h-80 rounded-2xl overflow-hidden">
-              <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+            <div className="relative h-64 md:h-80 rounded-2xl overflow-hidden group">
+              {data.link ? (
+                <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-2xl overflow-hidden" aria-label={data.title || 'Banner'}>
+                  <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none" sizes="(max-width: 768px) 100vw, 50vw" />
+                </Link>
+              ) : (
+                <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+              )}
             </div>
           </div>
         </div>
@@ -164,13 +174,13 @@ function BannerBlock({ data }: { data: any }) {
           <div className="container mx-auto px-4 max-w-[1370px]">
             <div className="max-w-2xl text-white">
               {data.badge && (
-                <div className="inline-block border border-blue-500/50 rounded-lg px-3.5 py-1.5 mb-4 backdrop-blur-md bg-blue-900/40 shadow-lg">
+                <div className="inline-block border border-blue-500/50 rounded-lg px-3.5 py-1.5 mb-3 sm:mb-4 backdrop-blur-md bg-blue-900/40 shadow-lg">
                   <span className="text-blue-400 font-black text-xs sm:text-sm tracking-widest uppercase">
                     {data.badge}
                   </span>
                 </div>
               )}
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-400 drop-shadow-sm">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-400 drop-shadow-sm leading-tight">
                 {data.title}
               </h1>
               {data.subtitle && (
@@ -182,7 +192,7 @@ function BannerBlock({ data }: { data: any }) {
                 {data.link && data.buttonText && (
                   <Link
                     href={data.link}
-                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-300 transform hover:-translate-y-0.5"
+                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.buttonText}
                   </Link>
@@ -190,7 +200,7 @@ function BannerBlock({ data }: { data: any }) {
                 {data.secondaryLink && data.secondaryButtonText && (
                   <Link
                     href={data.secondaryLink}
-                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm transition duration-300"
+                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.secondaryButtonText}
                   </Link>
@@ -205,39 +215,9 @@ function BannerBlock({ data }: { data: any }) {
 }
 
 // 2. SLIDER BLOCK
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function SliderBlock({ data }: { data: any }) {
-  const slides = Array.isArray(data.slides) && data.slides.length > 0 ? data.slides : [];
-  if (slides.length === 0) return null;
-
-  return (
-    <section className="py-6 bg-slate-900" aria-label="Slider quảng cáo">
-      <div className="container mx-auto px-4 max-w-[1370px]">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {slides.slice(0, 3).map((slide: { id: string; title: string; subtitle: string; imageUrl: string; link: string; buttonText: string }) => (
-            <div key={slide.id} className="relative h-48 md:h-56 rounded-2xl overflow-hidden group shadow-md border border-slate-800">
-              <Image
-                src={slide.imageUrl || 'https://images.unsplash.com/photo-1598550476439-6847785fcea6?q=80&w=1200&auto=format&fit=crop'}
-                alt={slide.title || 'Slide'}
-                fill
-                className="object-cover group-hover:scale-105 transition duration-500"
-                sizes="(max-width: 768px) 100vw, 33vw"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex flex-col justify-end p-5 text-white">
-                <h3 className="font-extrabold text-base md:text-lg drop-shadow-sm">{slide.title}</h3>
-                {slide.subtitle && <p className="text-xs text-slate-300 line-clamp-1 mt-0.5">{slide.subtitle}</p>}
-                {slide.link && (
-                  <Link href={slide.link} className="inline-flex items-center gap-1 text-xs text-blue-400 font-bold mt-2 hover:underline">
-                    {slide.buttonText || 'Xem ngay'} <ChevronRight className="w-3 h-3" />
-                  </Link>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+function SliderBlock({ data }: { data: unknown }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <SliderSection data={data as any} />;
 }
 
 // 3. PRODUCT GRID BLOCK
@@ -310,7 +290,7 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
               <div className="mt-6 text-center">
                 <Link
                   href={data.viewAllLink}
-                  className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition"
+                  className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                 >
                   Xem tất cả sản phẩm <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
@@ -330,29 +310,32 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
   const resolved = section.resolvedCategories || [];
   const categories = data.items?.length ? data.items.flatMap((item: { categoryId: string; customName?: string; customImage?: string; href?: string }) => {
     const category = resolved.find(c => c.id === item.categoryId);
-    return category ? [{ ...category, name: item.customName || category.name, image: item.customImage || category.image, href: item.href || `/category/${category.slug}` }] : [];
-  }) : resolved.map(c => ({ ...c, href: `/category/${c.slug}` }));
+    return category ? [{ ...category, name: item.customName || category.name, image: item.customImage || category.image, href: item.href || category.href || `/${category.slug}` }] : [];
+  }) : resolved.map(c => ({ ...c, href: c.href || `/${c.slug}` }));
 
   if (categories.length === 0) {
     return <CategoryGridSection />;
   }
 
   return (
-    <section className="py-4 md:py-6" aria-label={data.title}>
+    <section className="py-4 md:py-6" aria-label={data.title || 'Danh mục nổi bật'}>
       <div className="container mx-auto px-4 max-w-[1370px]">
         {data.title && <div className="mb-6">
           <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{data.title}</h2>
           {data.subtitle && <p className="text-slate-600 text-xs md:text-sm mt-1">{data.subtitle}</p>}
         </div>}
 
-        <div className={data.layout === 'board' ? 'grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 lg:grid-cols-5' : 'grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5'}>
+        <div className={data.layout === 'board' ? 'grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 lg:grid-cols-5' : 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5'}>
           {categories.map((c: { id: string; name: string; href: string; image: string | null }, index: number) => (
             <Link
               key={`${c.id}-${index}`}
               href={c.href}
-              className={data.layout === 'board' ? 'group flex min-w-0 items-center gap-3 border-b border-r border-slate-100 p-3 hover:bg-blue-50 sm:p-4' : 'group flex flex-col items-center rounded-2xl border border-slate-200/80 bg-white p-4 text-center shadow-xs transition hover:border-blue-500 hover:shadow-md'}
+              className={data.layout === 'board'
+                ? 'group flex min-w-0 items-center gap-3 border-b border-r border-slate-100 p-3 hover:bg-blue-50 active:scale-[0.99] transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden sm:p-4'
+                : 'group flex flex-col items-center rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 text-center shadow-xs transition duration-150 hover:border-blue-500 hover:shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden'
+              }
             >
-              <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white transition group-hover:scale-105 ${data.layout === 'board' ? 'h-14 w-14' : 'mb-3 h-20 w-24'}`}>
+              <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white transition group-hover:scale-105 motion-reduce:group-hover:scale-100 ${data.layout === 'board' ? 'h-14 w-14' : 'mb-2 h-16 w-20 sm:mb-3 sm:h-20 sm:w-24'}`}>
                 {c.image ? (
                   <Image src={c.image} alt={c.name} fill className="object-contain p-1" sizes="56px" />
                 ) : (
@@ -398,7 +381,7 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
             </div>
             <Link
               href={`/collection/${col.slug}`}
-              className="text-xs font-bold px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition flex items-center gap-1"
+              className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
             >
               Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
             </Link>
@@ -427,9 +410,7 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
 function NewsReviewsBlock({ section }: { section: ResolvedSectionItem }) {
   const d = newsReviewsSectionDataSchema.parse(section.data);
   const items = section.resolvedPosts ?? [];
-  if (!items.length) return null;
-  if (d.layout !== 'grid') return <MediaSection posts={items} title={d.title} />;
-  return <section className="pb-10" aria-label={d.title}><div className="container mx-auto max-w-[1370px] px-4"><div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6"><h2 className="mb-5 text-xl font-black uppercase text-slate-900">{d.title}</h2><div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">{items.map(post => <Link key={post.id} href={`/news/${post.slug}`} className="group min-w-0">{post.coverImage && <Image src={post.coverImage.url} alt={post.coverImage.alt} width={400} height={240} sizes="(max-width: 768px) 50vw, 260px" className="mb-3 aspect-[5/3] w-full rounded-xl bg-slate-50 object-cover" />}<h3 className="line-clamp-3 text-sm font-bold leading-relaxed text-slate-900 group-hover:text-blue-600">{post.title}</h3></Link>)}</div><div className="mt-5 text-center"><Link href="/news" className="inline-flex rounded-xl bg-red-600 px-6 py-3 text-sm font-bold uppercase text-white hover:bg-red-700">Xem thêm tin công nghệ</Link></div></div></div></section>;
+  return <MediaSection posts={items} title={d.title} />;
 }
 
 // 8. INTRO & FEATURE STRIP BLOCK
@@ -488,16 +469,49 @@ function IntroBlock({ data }: { data: unknown }) {
 // 9. CTA BLOCK
 function CtaBlock({ data }: { data: unknown }) {
   const d = ctaSectionDataSchema.parse(data);
-  return <section className="mx-auto max-w-[1370px] px-4 py-10">
-    <div className="grid gap-8 overflow-hidden rounded-3xl bg-slate-900 text-white md:grid-cols-2">
-      <div className="p-8 md:p-12"><h2 className="text-3xl font-black">{d.title}</h2><p className="mt-4 text-slate-300">{d.subtitle}</p>
-        <div className="mt-6 flex flex-wrap gap-4">
-          {d.primaryLink && <Link href={d.primaryLink} className="rounded-xl bg-blue-600 px-5 py-3 font-bold">{d.primaryText}</Link>}
-          {d.secondaryLink && <Link href={d.secondaryLink} className="rounded-xl border border-slate-500 px-5 py-3 font-bold">{d.secondaryText}</Link>}
+  return (
+    <section className="mx-auto max-w-[1370px] px-4 py-10" aria-label={d.title || 'Kêu gọi hành động'}>
+      <div className="grid gap-8 overflow-hidden rounded-3xl bg-slate-900 text-white md:grid-cols-2">
+        <div className="p-8 md:p-12">
+          <h2 className="text-3xl font-black">{d.title}</h2>
+          <p className="mt-4 text-slate-300">{d.subtitle}</p>
+          <div className="mt-6 flex flex-wrap gap-4">
+            {d.primaryLink && (
+              <Link
+                href={d.primaryLink}
+                className="rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 px-5 py-3 font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+              >
+                {d.primaryText}
+              </Link>
+            )}
+            {d.secondaryLink && (
+              <Link
+                href={d.secondaryLink}
+                className="rounded-xl border border-slate-500 hover:bg-white/10 active:scale-95 px-5 py-3 font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+              >
+                {d.secondaryText}
+              </Link>
+            )}
+          </div>
+          {d.phone && (
+            <a
+              href={`tel:${d.phone.replace(/[^+\d]/g, '')}`}
+              className="mt-6 inline-block text-xl font-bold text-yellow-400 hover:text-yellow-300 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+            >
+              {d.phone}
+            </a>
+          )}
         </div>
-        {d.phone && <a href={`tel:${d.phone.replace(/[^+\d]/g, '')}`} className="mt-6 inline-block text-xl font-bold">{d.phone}</a>}
+        {d.bgImageUrl && (
+          <Image
+            src={d.bgImageUrl}
+            alt="Showroom CitiLap"
+            width={800}
+            height={600}
+            className="h-full min-h-64 w-full object-cover"
+          />
+        )}
       </div>
-      {d.bgImageUrl && <Image src={d.bgImageUrl} alt="Showroom CitiLap" width={800} height={600} className="h-full min-h-64 w-full object-cover" />}
-    </div>
-  </section>;
+    </section>
+  );
 }

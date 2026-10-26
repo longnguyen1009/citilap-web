@@ -1,4 +1,5 @@
 "use client";
+import { productHref } from '@/lib/product-paths';
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -641,7 +642,7 @@ export default function UnifiedProductsPage() {
                           {/* Public Storefront link if published */}
                           {item.isPublished && (
                             <a
-                              href={`/product/${item.slug}`}
+                              href={productHref(item)}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Xem trên website"

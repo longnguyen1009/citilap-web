@@ -65,7 +65,7 @@ try {
     const chunks=[];for await(const c of req)chunks.push(c);
     const result=await mf.dispatchFetch(base+req.url,{method:req.method,headers:req.headers,...(['GET','HEAD'].includes(req.method)?{}:{body:Buffer.concat(chunks)})});
     res.writeHead(result.status,Object.fromEntries(result.headers));res.end(Buffer.from(await result.arrayBuffer()));
-  }catch(e){console.error('Fixture host:',e.message);res.writeHead(500);res.end('Fixture host error');}});
+  }catch(e){if(res.destroyed || res.writableEnded)return;console.error('Fixture host:',e.message);if(!res.headersSent)res.writeHead(500);res.end('Fixture host error');}});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));base=`http://127.0.0.1:${server.address().port}`;
   const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json',origin:base},body:JSON.stringify({email:'fixture@example.invalid',password:'FixtureOnlyPassword-2026'})});
   assert.equal(login.status,200,await login.text());
@@ -152,6 +152,9 @@ try {
     const list=await send('/api/orders','GET',undefined,true);assert.equal(list.status,200,list.text);
     const html=await send('/checkout');assert.equal(html.status,200);assert.match(html.text,/<html/);
   });
+  if (process.argv.includes('--product-detail')) {
+    await (await import('./test-product-detail-functions.mjs')).runProductDetailChecks({db,send,base,cookie,bucket:await mf.getR2Bucket('PRODUCT_MEDIA')});
+  }
   console.log('R07C_FULL_APP_FIXTURE '+base);
   console.log('R07C full Worker HTTP/D1: '+passed+'/'+passed+' PASS');
   if(process.argv.includes('--serve'))await new Promise(r=>process.once('SIGINT',r));

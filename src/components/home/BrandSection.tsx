@@ -3,14 +3,14 @@ import { Award, ArrowRight } from "lucide-react";
 
 export default function BrandSection() {
   const brands = [
-    { name: "ASUS", subtitle: "ROG • TUF • Zenbook", href: "/category/laptop-gaming?brand=asus" },
-    { name: "DELL", subtitle: "XPS • Precision • Inspiron", href: "/category/laptop-van-phong?brand=dell" },
-    { name: "LENOVO", subtitle: "Legion • ThinkPad • Yoga", href: "/category/laptop-gaming?brand=lenovo" },
-    { name: "HP", subtitle: "Omen • Victus • Envy", href: "/category/laptop-van-phong?brand=hp" },
-    { name: "APPLE", subtitle: "MacBook Air • Pro M-Series", href: "/category/macbook" },
-    { name: "ACER", subtitle: "Predator • Nitro • Swift", href: "/category/laptop-gaming?brand=acer" },
-    { name: "MSI", subtitle: "Titan • Raider • Katana", href: "/category/laptop-gaming?brand=msi" },
-    { name: "GIGABYTE", subtitle: "Aorus • G5 Gaming", href: "/category/laptop-gaming?brand=gigabyte" },
+    { name: "ASUS", subtitle: "ROG • TUF • Zenbook", href: "/laptop-gaming?brand=asus" },
+    { name: "DELL", subtitle: "XPS • Precision • Inspiron", href: "/laptop-van-phong?brand=dell" },
+    { name: "LENOVO", subtitle: "Legion • ThinkPad • Yoga", href: "/laptop-gaming?brand=lenovo" },
+    { name: "HP", subtitle: "Omen • Victus • Envy", href: "/laptop-van-phong?brand=hp" },
+    { name: "APPLE", subtitle: "MacBook Air • Pro M-Series", href: "/macbook" },
+    { name: "ACER", subtitle: "Predator • Nitro • Swift", href: "/laptop-gaming?brand=acer" },
+    { name: "MSI", subtitle: "Titan • Raider • Katana", href: "/laptop-gaming?brand=msi" },
+    { name: "GIGABYTE", subtitle: "Aorus • G5 Gaming", href: "/laptop-gaming?brand=gigabyte" },
   ];
 
   return (
@@ -32,7 +32,7 @@ export default function BrandSection() {
               </div>
             </div>
             <Link
-              href="/category"
+              href="/phan-loai"
               className="text-xs sm:text-sm font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 transition"
             >
               <span>Xem tất cả danh mục</span>
@@ -45,9 +45,9 @@ export default function BrandSection() {
               <Link
                 key={brand.name}
                 href={brand.href}
-                className="flex flex-col items-center justify-center p-4 sm:p-5 bg-slate-50/70 border border-slate-200/80 rounded-xl hover:border-blue-500 hover:bg-white hover:shadow-md transition duration-300 group"
+                className="flex flex-col items-center justify-center p-4 sm:p-5 bg-slate-50/70 border border-slate-200/80 rounded-xl hover:border-blue-500 hover:bg-white hover:shadow-md active:scale-95 transition-all duration-200 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden group"
               >
-                <span className="text-lg sm:text-xl font-black tracking-widest text-slate-800 group-hover:text-blue-600 transition group-hover:scale-105">
+                <span className="text-lg sm:text-xl font-black tracking-widest text-slate-800 group-hover:text-blue-600 transition group-hover:scale-105 motion-reduce:group-hover:scale-100">
                   {brand.name}
                 </span>
                 <span className="text-[11px] text-slate-500 font-medium mt-1 group-hover:text-slate-700 transition text-center line-clamp-1">

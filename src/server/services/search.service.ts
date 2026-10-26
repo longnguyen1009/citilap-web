@@ -2,6 +2,10 @@ import { prisma, getD1Database, getPrismaClient, type PrismaClient } from "@/lib
 import { mediaEnvironment } from '../media-http';
 import { readSearchPage } from './search-read-model';
 import {catalogBatches} from './catalog-batches';
+import { categoryHref } from '../../lib/category-paths';
+import { getAccessoryTypeBySlug } from '@/config/accessory-taxonomy';
+import { catalogNeedTag } from '../../lib/catalog-needs';
+import { productHref } from '../../lib/product-paths';
 import { searchIntent } from '@/contracts/catalog/search-intent';
 import { getProductImageUrl } from "@/infra/cloudflare/r2/storage";
 import {
@@ -9,10 +13,14 @@ import {
   type FacetOption,
   buildRamClauses,
   buildStorageClauses,
+  categoryProductScope,
 } from "./catalog.service";
 import { calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
 
 export interface SearchFilterOptions {
+  inStock?: boolean;
+  type?: string;
+  tag?: string[];
   query?: string;
   brand?: string | string[];
   category?: string | string[];
@@ -25,12 +33,17 @@ export interface SearchFilterOptions {
   gpu?: string | string[];
   ram?: number | number[];
   storage?: number | number[];
-  sort?: "relevance" | "price-asc" | "price-desc" | "newest";
+  year?: string | string[];
+  sort?: "relevance" | "price-asc" | "price-desc" | "newest" | "featured" | "best-selling";
   page?: number;
   limit?: number;
 }
 
 export interface SearchFacets {
+  connections?: FacetOption[];
+  powers?: FacetOption[];
+  tags?: FacetOption[];
+  years?: FacetOption[];
   categories: FacetOption[];
   brands: FacetOption[];
   conditions: FacetOption[];
@@ -52,6 +65,7 @@ export interface SearchResult {
 }
 
 export interface SearchSuggestionItem {
+  href?: string;
   id: string;
   name: string;
   slug: string;
@@ -69,7 +83,7 @@ export interface SearchSuggestionsResult {
   query: string;
   products: SearchSuggestionItem[];
   brands: Array<{ id: string; name: string; slug: string }>;
-  categories: Array<{ id: string; name: string; slug: string }>;
+  categories: Array<{ id: string; name: string; slug: string; href?: string }>;
   totalMatches: number;
 }
 
@@ -419,6 +433,16 @@ function calculateProductRelevanceScore(
  * Searches products in Cloudflare D1 with multi-keyword tokenization,
  * variant matching, server-side filtering, deterministic ranking, and pagination.
  */
+function productReleaseYears(row: { name: string; model?: string | null; specs?: string | null }) {
+  let explicit = '';
+  try {
+    const specs = JSON.parse(row.specs || '{}');
+    explicit = String(specs?.['Năm ra mắt'] || specs?.['Năm sản xuất'] || specs?.year || '').trim();
+  } catch { /* Legacy malformed specs still permit the name/model fallback. */ }
+  if (explicit) return /^(19|20)\d{2}$/.test(explicit) ? [explicit] : [];
+  return [...new Set(`${row.name} ${row.model || ''}`.match(/\b(?:19|20)\d{2}\b/g) || [])];
+}
+
 export async function searchProducts(
   options: SearchFilterOptions,
   client: PrismaClient = prisma,
@@ -511,9 +535,17 @@ async function computeSearchProducts(
     ? (Array.isArray(options.category) ? options.category : [options.category]).filter(Boolean)
     : [];
   if (categoryList.length > 0) {
-    andConditions.push({
-      OR: [{ category: { slug: { in: categoryList } } }, { categoryId: { in: categoryList } }],
-    });
+    const tree = await client.category.findMany({ select: { id: true, slug: true, parentId: true } });
+    const scopes = tree.filter(c => categoryList.includes(c.id) || categoryList.includes(c.slug)).map(c => categoryProductScope(c, tree));
+    andConditions.push(scopes.length ? { OR: scopes } : { categoryId: { in: [] } });
+  }
+  if (options.type) {
+    const type = getAccessoryTypeBySlug(options.type);
+    const keywords = type?.keywords || [options.type];
+    andConditions.push({ OR: [
+      { tags: { contains: options.type } }, { series: { contains: options.type } }, { model: { contains: options.type } },
+      ...keywords.flatMap(value => [{ name: { contains: value } }, { slug: { contains: value } }]),
+    ] });
   }
 
   // Condition, specs, price & accessory atomic matching
@@ -538,6 +570,9 @@ async function computeSearchProducts(
     : [];
   const gpuList = options.gpu
     ? (Array.isArray(options.gpu) ? options.gpu : [options.gpu]).filter(Boolean)
+    : [];
+  const yearList = options.year
+    ? (Array.isArray(options.year) ? options.year : [options.year]).filter(Boolean)
     : [];
 
   const hasPriceFilter = options.minPrice !== undefined || options.maxPrice !== undefined;
@@ -701,7 +736,7 @@ async function computeSearchProducts(
       price: true, originalPrice: true, images: true, stock: true, status: true,
       cpu: true, cpuSeries: true, gpu: true, gpuSeries: true,
       ram: true, ramGb: true, storage: true, storageGb: true, display: true,
-      tags: true, isFeatured: true, isBestSeller: true, isFlashSale: true, createdAt: true,
+      tags: true, specs: true, isFeatured: true, isBestSeller: true, isFlashSale: true, createdAt: true,
       studio: {select:{published:true}},
       brandRel: { select: { id: true, name: true, slug: true } },
       category: { select: { id: true, name: true, slug: true } },
@@ -733,6 +768,15 @@ async function computeSearchProducts(
   }> = rawProducts.flatMap((row) => {
     const original = row as unknown as ProductDbRowWithRelations;
     const published = original.studio?.published ? JSON.parse(original.studio.published) : null;
+    if (options.tag?.length) {
+      let tags: string[] = [];
+      try { tags = original.tags?.startsWith('[') ? JSON.parse(original.tags) : (original.tags || '').split(','); } catch { tags = []; }
+      const normalized = Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string').map(catalogNeedTag) : [];
+      if (!options.tag.every(tag => normalized.includes(catalogNeedTag(tag)))) return [];
+    }
+    if (yearList.length > 0) {
+      if (!yearList.some(year => productReleaseYears(original).includes(year))) return [];
+    }
     let availability = published?.availability || 'AVAILABLE';
     const priceFor = (price:number,originalPrice:number|null|undefined,variantId?:string) => calculateEffectivePrice(price,originalPrice ?? null,Boolean(original.isFlashSale),true,context,at,{productId:original.id,variantId,isVariant:!!variantId,variantOriginalPrice:originalPrice ?? null});
     const base = priceFor(original.price,original.originalPrice);
@@ -753,11 +797,13 @@ async function computeSearchProducts(
         (options.minPrice===undefined || v.price>=options.minPrice) && (options.maxPrice===undefined || v.price<=options.maxPrice) &&
         (!conditionList.length || conditionList.some(c=>(v.options || '').includes(`"condition":"${c}"`))) &&
         (!connectionList.length || connectionList.some(c=>(v.options || '').includes(c))) &&
-        (!powerList.length || powerList.some(c=>(v.options || '').includes(c))));
+        (!powerList.length || powerList.some(c=>(v.options || '').includes(c))) &&
+        (!options.inStock || (v.stock > 0 && (!published || published.variants?.some((pv:{id:string;availability?:string}) => pv.id === v.id && (!pv.availability || pv.availability === 'AVAILABLE'))))));
       if (!dbRow.variants.length) return [];
     }
     const resolvedImage = resolvePrimaryImageUrl(dbRow);
     const rep = resolveRepresentativeVariant(dbRow, tokens, specFilterParams);
+    if (options.inStock && (rep.stock <= 0 || availability !== 'AVAILABLE')) return [];
     const relevanceScore = calculateProductRelevanceScore(dbRow, cleanQuery, tokens);
 
     const brandName = dbRow.brandRel?.name || dbRow.brand || undefined;
@@ -765,6 +811,8 @@ async function computeSearchProducts(
     const categorySlug = dbRow.category?.slug || undefined;
 
     const homepageProduct: HomepageProduct = {
+      template: published?.template,
+      href: productHref({ slug: dbRow.slug, template: published?.template, kind: /phu-kien|linh-kien|chuot|ban-phim/.test(categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' }),
       id: dbRow.id,
       slug: dbRow.slug,
       sku: rep.sku,
@@ -803,8 +851,12 @@ async function computeSearchProducts(
 
   // 4. Sort results
   const sortMode = options.sort || (cleanQuery ? "relevance" : "newest");
+  const promoted = new Set(rawProducts.filter(p => sortMode === "featured" ? p.isFeatured : p.isBestSeller).map(p => p.id));
 
   processedProducts.sort((a, b) => {
+    if (sortMode === "featured" || sortMode === "best-selling") {
+      return Number(promoted.has(b.id)) - Number(promoted.has(a.id)) || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+    }
     if (sortMode === "relevance") {
       if (b.relevanceScore !== a.relevanceScore) {
         return b.relevanceScore - a.relevanceScore;
@@ -825,12 +877,15 @@ async function computeSearchProducts(
 
   // 5. Build dynamic facets from the matched product pool
   const brandCountMap = new Map<string, { label: string; count: number }>();
+  const tagCounts = new Map<string, number>();
   const categoryCountMap = new Map<string, { label: string; count: number }>();
   const conditionCountMap = new Map<string, { label: string; count: number }>();
   const cpuSeriesCountMap = new Map<string, { label: string; count: number }>();
   const gpuSeriesCountMap = new Map<string, { label: string; count: number }>();
   const ramCountMap = new Map<number, number>();
   const storageCountMap = new Map<number, number>();
+  const connectionCounts = new Map<string, number>();
+  const powerCounts = new Map<string, number>();
   let minPriceFound = Number.MAX_SAFE_INTEGER;
   let maxPriceFound = 0;
 
@@ -839,6 +894,17 @@ async function computeSearchProducts(
     const row = item as unknown as ProductDbRowWithRelations;
     const shown=shownProducts.get(row.id);
     if (!shown) continue;
+    // Count each option once per product, across product specs and active variants.
+    for (const [counts, keys] of [[connectionCounts, ['connection','Connection','Chuẩn kết nối','Kết nối']], [powerCounts, ['power','Power','Công suất','Tổng công suất','Chuẩn sạc']]] as const) {
+      const values = new Set<string>();
+      for (const document of [row.specs, ...row.variants?.map(v => v.options) || []]) {
+        try {
+          const data = JSON.parse(document || '{}');
+          for (const key of keys) if (typeof data?.[key] === 'string' && data[key].trim()) values.add(data[key].trim());
+        } catch { /* Legacy free text has no structured accessory options. */ }
+      }
+      for (const value of values) counts.set(value, (counts.get(value) || 0) + 1);
+    }
     if (['AVAILABLE','PREORDER'].includes(shown.availability || '')) {minPriceFound=Math.min(minPriceFound,shown.price);maxPriceFound=Math.max(maxPriceFound,shown.price);}
 
     // Brand
@@ -881,7 +947,27 @@ async function computeSearchProducts(
     }
   }
 
+  const yearCounts = new Map<string, number>();
+  for (const row of rawProducts) {
+    if (!shownProducts.has(row.id)) continue;
+    const matches = productReleaseYears(row);
+    if (matches) {
+      for (const y of new Set(matches)) {
+        yearCounts.set(y, (yearCounts.get(y) || 0) + 1);
+      }
+    }
+    let tags: unknown;
+    try { tags = row.tags?.startsWith('[') ? JSON.parse(row.tags) : (row.tags || '').split(','); } catch { continue; }
+    if (!Array.isArray(tags)) continue;
+    for (const tag of new Set(tags.filter((t): t is string => typeof t === 'string').map(catalogNeedTag).filter(Boolean))) {
+      tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+    }
+  }
   const facets: SearchFacets = {
+    connections: [...connectionCounts].map(([value,count]) => ({value,label:value,count})).sort((a,b) => b.count-a.count || a.value.localeCompare(b.value)),
+    powers: [...powerCounts].map(([value,count]) => ({value,label:value,count})).sort((a,b) => b.count-a.count || a.value.localeCompare(b.value)),
+    tags: [...tagCounts].map(([value, count]) => ({ value, label: value, count })).sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
+    years: [...yearCounts.entries()].map(([value, count]) => ({ value, label: value, count })).sort((a, b) => b.value.localeCompare(a.value)),
     categories: Array.from(categoryCountMap.entries())
       .map(([value, d]) => ({ value, label: d.label, count: d.count }))
       .sort((a, b) => b.count - a.count),
@@ -976,6 +1062,7 @@ export async function getSearchSuggestions(
       id: p.id,
       name: p.name,
       slug: p.slug,
+      href: p.href,
       sku: p.sku,
       price: p.price,
       originalPrice: p.originalPrice,
@@ -1013,11 +1100,12 @@ export async function getSearchSuggestions(
     take: 3,
   });
 
+  const categoryTree = await client.category.findMany({where:{status:'ACTIVE'},select:{id:true,slug:true,parentId:true}});
   return {
     query: cleanQuery,
     products,
     brands,
-    categories,
+    categories: categories.map(c => ({...c,href:categoryHref(categoryTree.find(node=>node.id===c.id)!,categoryTree)})),
     totalMatches: searchResult.totalCount,
   };
 }

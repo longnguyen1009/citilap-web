@@ -43,6 +43,7 @@ export const attributeTemplateDefinitions: Record<ProductTemplate, AttributeDefi
     { key: 'Nâng cấp RAM', label: 'Khả năng nâng cấp RAM', type: 'text', isFilterable: false, isComparable: true, displayOrder: 13 },
     { key: 'Nâng cấp SSD', label: 'Khả năng nâng cấp SSD', type: 'text', isFilterable: false, isComparable: true, displayOrder: 14 },
     { key: 'Trọng lượng cả sạc', label: 'Trọng lượng máy và sạc', type: 'text', unit: 'kg', isFilterable: false, isComparable: true, displayOrder: 15 },
+    { key: 'Năm ra mắt', label: 'Năm ra mắt', type: 'number', isFilterable: true, isComparable: true, displayOrder: 16 },
   ],
   MOUSE: [
     { key: 'Kết nối', label: 'Kiểu kết nối', type: 'select', options: ['Không dây 2.4GHz', 'Bluetooth', 'Có dây USB', 'Đa chế độ (Tri-mode)'], isFilterable: true, isComparable: true, displayOrder: 1 },
@@ -172,6 +173,7 @@ export const productDocumentSchema = z.object({
   isBestSeller: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
   isFlashSale: z.boolean().default(false),
+  tags: z.array(z.string().trim().min(1).max(60)).max(30).default([]).transform(values => [...new Set(values.map(value => value.toLocaleLowerCase('vi-VN')))]),
   description: z.string().max(2000),
   contentHtml: z.string().max(100000),
   price: money,
@@ -188,6 +190,9 @@ export const productDocumentSchema = z.object({
     adjustment: z.number().int().min(-2_000_000_000).max(2_000_000_000),
     recommended: z.boolean(),
   })).max(10),
+  faqs: z.array(z.object({ q: text.min(1).max(300), a: text.min(1).max(2000) })).max(20).default([]),
+  gifts: z.array(text.min(1).max(500)).max(10).default([]),
+  accessoryProductIds: z.array(z.string().trim().min(1).max(200)).max(8).default([]),
   relatedProductIds: z.array(z.string()).max(10).optional().default([]),
 }).superRefine((d, ctx) => {
   const issue = (message: string) => ctx.addIssue({ code: 'custom', message });
@@ -220,6 +225,8 @@ export const productDocumentSchema = z.object({
   if (d.warranties.filter(w => w.recommended).length > 1) {
     issue('Chỉ chọn một gói bảo hành khuyên dùng.');
   }
+  if (new Set(d.warranties.map(w => w.name)).size !== d.warranties.length) issue('Tên gói bảo hành không được trùng.');
+  if (new Set(d.accessoryProductIds).size !== d.accessoryProductIds.length) issue('Phụ kiện mua kèm không được trùng.');
   if (d.warranties.some(w => Math.min(d.price, ...d.variants.map(v => v.price)) + w.adjustment < 0)) {
     issue('Giá sau bảo hành không được âm.');
   }
@@ -248,6 +255,7 @@ export function blankProduct(template: ProductTemplate = 'LAPTOP'): ProductDocum
     isBestSeller: false,
     isFeatured: false,
     isFlashSale: false,
+    tags: [],
     description: '',
     contentHtml: '',
     price: 0,
@@ -259,6 +267,9 @@ export function blankProduct(template: ProductTemplate = 'LAPTOP'): ProductDocum
     media: [],
     variants: [],
     warranties: [],
+    faqs: [],
+    gifts: [],
+    accessoryProductIds: [],
     relatedProductIds: [],
   };
 }

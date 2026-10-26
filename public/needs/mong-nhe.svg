@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+  <defs>
+    <linearGradient id="mn-body" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC"/>
+      <stop offset="50%" stop-color="#E2E8F0"/>
+      <stop offset="100%" stop-color="#94A3B8"/>
+    </linearGradient>
+    <linearGradient id="mn-screen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022C22"/>
+      <stop offset="50%" stop-color="#065F46"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Ground Shadow -->
+  <ellipse cx="80" cy="106" rx="55" ry="6" fill="#94A3B8" opacity="0.4"/>
+
+  <!-- Slim Angle Isometric Laptop Profile -->
+  <g transform="translate(18, 14)">
+    <!-- Thin Open Screen at Angle -->
+    <polygon points="50,14 116,28 88,80 22,66" fill="#1E293B"/>
+    <!-- Vibrant Emerald Wallpaper -->
+    <polygon points="52,17 114,30 87,77 25,64" fill="url(#mn-screen)"/>
+    <!-- Organic Wave Lines on Screen -->
+    <path d="M35,60 Q70,40 105,48" stroke="#6EE7B7" stroke-width="1.5" fill="none" opacity="0.8"/>
+    <path d="M40,68 Q75,48 100,56" stroke="#A7F3D0" stroke-width="1.2" fill="none" opacity="0.7"/>
+
+    <!-- Razor-thin Laptop Base -->
+    <polygon points="12,70 94,84 118,94 36,80" fill="url(#mn-body)"/>
+    <!-- Keyboard Deck Outline -->
+    <polygon points="26,73 90,84 104,89 40,78" fill="#CBD5E1"/>
+    <!-- Precision Trackpad -->
+    <polygon points="52,81 74,85 70,88 48,84" fill="#94A3B8"/>
+    <!-- Razor Edge Highlight -->
+    <polygon points="12,70 12,72 36,82 36,80" fill="#64748B"/>
+  </g>
+
+  <!-- Feather / Lightness symbol floating subtle -->
+  <g transform="translate(118, 16)" opacity="0.85">
+    <path d="M2,24 C10,18 16,8 24,2 C22,10 18,18 8,24 Z" fill="#38BDF8"/>
+    <line x1="2" y1="24" x2="24" y2="2" stroke="#0284C7" stroke-width="1.5"/>
+  </g>
+</svg>

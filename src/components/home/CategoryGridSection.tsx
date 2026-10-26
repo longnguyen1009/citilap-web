@@ -50,7 +50,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
 
   // Chia 16 danh mục thành 2 hàng đều đặn (mỗi hàng 8 mục)
   const displayCategories: DisplayCategory[] = navigation
-    ? navigation.categories.map((cat) => ({ id: cat.id, name: cat.name, href: cat.href, icon: Layers, image: cat.image, alt: cat.alt }))
+    ? navigation.categories.filter(cat => !cat.parentId).map((cat) => ({ id: cat.id, name: cat.name, href: cat.href, icon: Layers, image: cat.image, alt: cat.alt }))
     : SHOWCASE_CATEGORIES;
   const rows = Array.from({ length: Math.ceil(displayCategories.length / 8) }, (_, index) =>
     displayCategories.slice(index * 8, (index + 1) * 8)
@@ -87,7 +87,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
             {/* Điều hướng & Link xem tất cả */}
             <div className="flex items-center gap-3">
               <Link
-                href="/category"
+                href="/phan-loai"
                 className="hidden sm:inline-flex items-center gap-1 text-xs md:text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition"
               >
                 <span>Xem tất cả danh mục</span>
@@ -102,7 +102,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
                     onClick={() => scroll("left")}
                     disabled={!canScrollLeft}
                     aria-label="Cuộn danh mục sang trái"
-                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95"
+                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -111,7 +111,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
                     onClick={() => scroll("right")}
                     disabled={!canScrollRight}
                     aria-label="Cuộn danh mục sang phải"
-                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95"
+                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -123,7 +123,10 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
           {/* Container danh mục 2 hàng (Horizontal Scrollable) */}
           <div
             ref={scrollContainerRef}
-            className="overflow-x-auto scrollbar-none pb-2 -mx-2 px-2 snap-x snap-mandatory scroll-smooth"
+            tabIndex={0}
+            role="region"
+            aria-label="Danh mục nổi bật"
+            className="overflow-x-auto scrollbar-none pb-2 -mx-2 px-2 snap-x snap-mandatory scroll-smooth focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-xl"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
             <div className="flex flex-col gap-4 min-w-[760px] md:min-w-[980px] lg:min-w-full">
@@ -135,14 +138,14 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
                     <Link
                       key={item.id}
                       href={item.href}
-                      className="group flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 transition-all duration-200 snap-start text-center cursor-pointer"
+                      className="group flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all duration-150 snap-start text-center cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                     >
                       {/* Vòng tròn Icon */}
                       <div className="relative mb-2">
-                        <div className="w-13 h-13 md:w-16 md:h-16 rounded-full bg-slate-100/80 border border-slate-200/70 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50 group-hover:border-blue-400 group-hover:text-blue-600 group-hover:scale-105 group-hover:shadow-md group-hover:shadow-blue-500/10">
+                        <div className="w-13 h-13 md:w-16 md:h-16 rounded-full bg-slate-100/80 border border-slate-200/70 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50 group-hover:border-blue-400 group-hover:text-blue-600 group-hover:scale-105 motion-reduce:group-hover:scale-100 group-hover:shadow-md group-hover:shadow-blue-500/10">
                           {item.image
                             ? <Image src={item.image} alt={item.alt || item.name} width={64} height={64} unoptimized className="w-full h-full rounded-full object-cover" />
-                            : <Icon className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-300 group-hover:scale-110" />}
+                            : <Icon className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100" />}
                         </div>
                         {item.badge && (
                           <span
@@ -169,7 +172,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
           {/* Link Xem tất cả cho Mobile */}
           <div className="sm:hidden pt-3 mt-1 border-t border-slate-100 text-center">
             <Link
-              href="/category"
+              href="/phan-loai"
               className="inline-flex items-center gap-1 text-xs font-bold text-blue-600"
             >
               <span>Xem tất cả danh mục sản phẩm</span>

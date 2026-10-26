@@ -1,5 +1,7 @@
 import { prisma, type PrismaClient } from "@/lib/prisma";
 import {catalogBatches} from './catalog-batches';
+import { productHref } from '../../lib/product-paths';
+import { categoryHref, categoryDescendantIds, type CategoryNode } from '../../lib/category-paths';
 import { getProductImageUrl, getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import { ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 import { normalizeVnd, calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
@@ -9,6 +11,8 @@ import { normalizeVnd, calculateEffectivePrice, getStorefrontPricingContext, typ
  * All fields are sourced from Cloudflare D1 and Cloudflare R2 media metadata.
  */
 export interface HomepageProduct {
+  href?: string;
+  template?: string;
   availability?: string;
   id: string;
   slug: string;
@@ -146,6 +150,7 @@ export interface HomepageCatalogData {
 }
 
 export interface CategorySummary {
+  href?: string;
   id: string;
   name: string;
   slug: string;
@@ -155,6 +160,17 @@ export interface CategorySummary {
   sortOrder: number;
   productCount: number;
   subCategories?: CategorySummary[];
+}
+
+export function categoryProductScope(category: CategoryNode, categories: CategoryNode[]) {
+  if (['laptop-cu','laptop-likenew','laptop-moi'].includes(category.slug)) {
+    const accessories = categories.filter(c => ['linh-kien','phu-kien'].includes(c.slug)).flatMap(c => categoryDescendantIds(c,categories));
+    return {AND:[
+      {condition:category.slug === 'laptop-moi' ? 'NEW' : {in:['LIKE_NEW','USED','REFURBISHED','LIQUIDATION']}},
+      {categoryId:{notIn:accessories}},
+    ]};
+  }
+  return {categoryId:{in:categoryDescendantIds(category,categories)}};
 }
 
 export interface BrandSummary {
@@ -193,6 +209,7 @@ export interface FacetOption<T = string> {
 
 export interface CategoryFilteredResult {
   category: {
+    href?: string;
     id: string;
     name: string;
     slug: string;
@@ -218,7 +235,7 @@ export interface CategoryFilteredResult {
   };
 }
 
-type ProductDbRow = {
+export type ProductDbRow = {
   studio?: {published:string|null}|null;
   id: string;
   name: string;
@@ -501,6 +518,8 @@ export function mapD1ProductToHomepageProduct(
   return {
     id: row.id,
     matchesFilter,
+    template: published?.template,
+    href: productHref({ slug: row.slug, template: published?.template, kind: /phu-kien|linh-kien|chuot|ban-phim/.test(categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' }),
     availability: published?.availability === 'CONTACT' ? 'CONTACT' : originalVariantCount && !row.variants?.length ? 'UNAVAILABLE' : published?.availability || 'AVAILABLE',
     slug: row.slug,
     sku: chosenVariant?.sku,
@@ -683,11 +702,14 @@ export async function getCategoryProducts(
   const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
     const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
+    const categories = await getActiveCategories(client);
+    const category = categories.find(c => c.slug === categorySlug);
+    if (!category) return [];
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
         deletedAt: null, NOT: { studio: { is: { published: null } } },
-        category: { slug: categorySlug },
+        ...categoryProductScope(category,categories),
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
@@ -783,10 +805,10 @@ export async function getHomepageCatalog(
       getNewArrivals(10, client, context, at),
       getCategoryProducts("laptop-gaming", 10, client, context, at),
       getCategoryProducts("laptop-van-phong", 10, client, context, at),
-      getCategoryProducts("laptop-do-hoa", 10, client, context, at),
+      getCategoryProducts("laptop-workstation", 10, client, context, at),
       getBestSellingProducts(10, client, context, at),
       getLikeNewProducts(10, client, context, at),
-      getCategoryProducts("linh-kien", 10, client, context, at),
+      getCategoryProducts("phu-kien", 10, client, context, at),
     ]);
 
     return {
@@ -833,6 +855,7 @@ export async function getActiveCategories(client: PrismaClient = prisma): Promis
       parentId: cat.parentId,
       sortOrder: cat.sortOrder,
       productCount: cat._count.products,
+      href: categoryHref(cat, rows),
     }));
   } catch (error) {
     console.error("[CatalogService] Failed to query active categories from D1:", error);
@@ -963,15 +986,12 @@ export async function getCategoryFilteredProducts(
     };
 
     if (category) {
-      if (category.slug === "laptop-cu") {
-        where.OR = [
-          { categoryId: category.id },
-          { condition: { in: ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"] } },
-        ];
-      } else {
-        where.categoryId = category.id;
-      }
+      const categories = await getActiveCategories(client);
+      category.href = categoryHref(category, categories);
+      Object.assign(where, categoryProductScope(category,categories));
     }
+
+    const categoryWhere = structuredClone(where);
 
     // Brand filter
     const brandList = options.brand
@@ -1234,20 +1254,7 @@ export async function getCategoryFilteredProducts(
       })),
       catalogBatches((skip,take)=>client.product.findMany({
         skip,take,orderBy:{id:'asc'},
-        where: category
-          ? {
-              status: { in: ["ACTIVE", "active"] },
-              deletedAt: null, NOT: { studio: { is: { published: null } } },
-              ...(category.slug === "laptop-cu"
-                ? {
-                    OR: [
-                      { categoryId: category.id },
-                      { condition: { in: ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"] } },
-                    ],
-                  }
-                : { categoryId: category.id }),
-            }
-          : { status: { in: ["ACTIVE", "active"] }, deletedAt: null, NOT: { studio: { is: { published: null } } } },
+        where: categoryWhere,
         select: {
           name: true,
           slug: true,
@@ -1897,14 +1904,16 @@ export async function resolveProductsByCriteria(
     deletedAt: null, NOT: { studio: { is: { published: null } } },
   };
 
-  if (criteria.productType === "accessory") {
-    where.category = { slug: { in: ["linh-kien", "phu-kien"] } };
-  } else if (criteria.productType === "laptop") {
-    where.category = { slug: { notIn: ["linh-kien", "phu-kien"] } };
-  }
-
-  if (criteria.categoryId) {
-    where.categoryId = criteria.categoryId;
+  if (criteria.productType === 'accessory' || criteria.productType === 'laptop' || criteria.categoryId) {
+    const categories = await getActiveCategories(client);
+    const accessories = categories.filter(c=>['linh-kien','phu-kien'].includes(c.slug)).flatMap(c=>categoryDescendantIds(c,categories));
+    where.AND = [];
+    if (criteria.productType === 'accessory') where.AND.push({categoryId:{in:accessories}});
+    if (criteria.productType === 'laptop') where.AND.push({categoryId:{notIn:accessories}});
+    if (criteria.categoryId) {
+      const category = categories.find(c=>c.id===criteria.categoryId);
+      where.AND.push(category ? categoryProductScope(category,categories) : {categoryId:criteria.categoryId});
+    }
   }
 
   if (criteria.brandId) {

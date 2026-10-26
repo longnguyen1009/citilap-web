@@ -96,7 +96,7 @@ export default async function AboutPage() {
             </p>
             <div className="pt-4 flex flex-wrap gap-4">
               <Link
-                href="/category"
+                href="/phan-loai"
                 className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition shadow-lg shadow-blue-600/30"
               >
                 Khám phá sản phẩm

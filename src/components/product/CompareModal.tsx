@@ -1,4 +1,5 @@
 "use client";
+import { productHref } from '@/lib/product-paths';
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -213,7 +214,7 @@ export default function CompareModal() {
 
                     <h3 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 min-h-[36px] mb-1">
                       <Link
-                        href={`/product/${p.slug}`}
+                        href={productHref(p)}
                         onClick={closeCompare}
                         className="hover:text-blue-600 transition"
                       >
@@ -226,7 +227,7 @@ export default function CompareModal() {
                     </div>
 
                     <div className="mt-auto pt-2">
-                      <Link href={"/product/"+p.slug} onClick={closeCompare} className="block text-center py-2 underline">Chọn cấu hình</Link>
+                      <Link href={productHref(p)} onClick={closeCompare} className="block text-center py-2 underline">Chọn cấu hình</Link>
                     </div>
                   </div>
                 ))}

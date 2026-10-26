@@ -1,0 +1,1978 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bản vẽ UI Mẫu: Trang Chi Tiết Sản Phẩm CitiLap (Chuẩn Thế Giới Số 365 & Tối ưu Trải Nghiệm Mua Hàng)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    
+    /* Custom Scrollbar */
+    .custom-scroll::-webkit-scrollbar { height: 5px; width: 5px; }
+    .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Selection card animation */
+    .option-card {
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .option-card:hover {
+      transform: translateY(-1.5px);
+    }
+
+    /* Pulse effect for hot deal */
+    @keyframes subtle-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.9; transform: scale(1.02); }
+    }
+    .pulse-badge {
+      animation: subtle-pulse 2.2s infinite ease-in-out;
+    }
+
+    /* Floating Bar Slide Animation */
+    .floating-bar-hidden {
+      transform: translateY(120%);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .floating-bar-visible {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Modal Backdrop Transitions */
+    .modal-backdrop {
+      background-color: rgba(15, 23, 42, 0.7);
+      backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen pb-28 lg:pb-16">
+
+  <!-- ===================================================================== -->
+  <!-- TOP PROTOTYPE CONTROL BAR (Dành cho việc đánh giá & kiểm thử của User) -->
+  <!-- ===================================================================== -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wide">
+          🎨 Bản vẽ UI mẫu (Chưa sửa code)
+        </span>
+        <div>
+          <h1 class="text-sm font-bold text-white flex items-center gap-2">
+            Trang Chi Tiết Sản Phẩm: Đơn giản hóa & Trực quan Cấu hình, Màu sắc, Bảo hành
+          </h1>
+          <p class="text-[11px] text-slate-400">
+            Mô phỏng cơ chế tính giá động theo chuẩn Thế Giới Số 365 kết hợp giao diện tương tác cao cấp của CitiLap.
+          </p>
+        </div>
+      </div>
+
+      <!-- Controls Switcher -->
+      <div class="flex items-center flex-wrap gap-2 text-xs">
+        <span class="text-slate-400 font-medium hidden sm:inline">Xem mẫu máy:</span>
+        <div class="inline-flex rounded-lg bg-slate-800 p-1 border border-slate-700">
+          <button id="btn-prod-loq" onclick="switchProduct('loq')" class="px-3 py-1.5 rounded-md font-bold transition bg-blue-600 text-white shadow-xs cursor-pointer">
+            1. Lenovo LOQ (Thegioiso365)
+          </button>
+          <button id="btn-prod-vivobook" onclick="switchProduct('vivobook')" class="px-3 py-1.5 rounded-md font-bold transition text-slate-300 hover:text-white cursor-pointer">
+            2. Asus Vivobook (Link hiện tại)
+          </button>
+        </div>
+
+        <div class="inline-flex rounded-lg bg-slate-800 p-1 border border-slate-700 ml-1">
+          <button id="btn-style-thegioiso" onclick="switchOptionStyle('cards')" class="px-2.5 py-1.5 rounded-md font-semibold transition bg-slate-700 text-white cursor-pointer" title="Dạng card hiển thị cấu hình + giá trực tiếp">
+            Dạng Card 365
+          </button>
+          <button id="btn-style-compact" onclick="switchOptionStyle('pills')" class="px-2.5 py-1.5 rounded-md font-semibold transition text-slate-300 hover:text-white cursor-pointer" title="Dạng pill gọn nhẹ tối giản">
+            Dạng Pill gọn
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- STOREFRONT HEADER MOCKUP (Header của CitiLap) -->
+  <!-- ===================================================================== -->
+  <div class="bg-white border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-6">
+        <a href="#" class="flex items-center gap-2 font-black text-xl tracking-tight text-blue-600">
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white font-black text-sm">CL</span>
+          <span>CITILAP<span class="text-slate-900">.VN</span></span>
+        </a>
+        <nav class="hidden md:flex items-center gap-5 text-sm font-semibold text-slate-600">
+          <a href="#" class="text-blue-600">Laptop Gaming</a>
+          <a href="#" class="hover:text-blue-600 transition">Laptop Đồ Họa</a>
+          <a href="#" class="hover:text-blue-600 transition">Laptop Doanh Nhân</a>
+          <a href="#" class="hover:text-blue-600 transition">Phụ Kiện</a>
+        </nav>
+      </div>
+
+      <!-- Quick Search bar mockup -->
+      <div class="hidden lg:flex flex-1 max-w-md mx-4">
+        <div class="relative w-full">
+          <input 
+            type="text" 
+            placeholder="Tìm theo tên máy, CPU, GPU, mã sản phẩm..." 
+            class="w-full pl-9 pr-4 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+          />
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3 text-xs">
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
+          <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Hotline: <strong class="text-emerald-950 font-bold">0853.111.999</strong></span>
+        </div>
+        <a href="http://localhost:3001/laptop/ref-tgs-30648?sku=LOCAL150-8-2" target="_blank" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-400 font-medium transition flex items-center gap-1.5">
+          <span>Xem trang cũ trên máy bạn</span>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- BREADCRUMB -->
+  <div class="max-w-7xl mx-auto px-4 py-2.5 text-xs text-slate-500 flex items-center gap-2 overflow-x-auto whitespace-nowrap">
+    <a href="#" class="hover:text-blue-600 transition">Trang chủ</a>
+    <span>/</span>
+    <a href="#" id="bc-category" class="hover:text-blue-600 transition">Laptop Gaming</a>
+    <span>/</span>
+    <a href="#" id="bc-series" class="hover:text-blue-600 transition">Lenovo LOQ Series</a>
+    <span>/</span>
+    <span id="bc-product-name" class="text-slate-900 font-bold truncate max-w-xs sm:max-w-md">Lenovo LOQ 15IRH11E 83Y9003YVN</span>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MAIN CONTAINER -->
+  <!-- ===================================================================== -->
+  <main class="max-w-7xl mx-auto px-4 py-2 space-y-6">
+
+    <!-- KHU VỰC TOP: 2 CỘT CHÍNH (GALLERY & TOÀN BỘ KHỐI MUA HÀNG TRỌNG TÂM) -->
+    <div id="product-hero-container" class="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-4 sm:p-6 lg:p-7">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+
+        <!-- ========================================== -->
+        <!-- CỘT TRÁI (COL 5): GALLERY ẢNH & CAM KẾT HẬU MÃI -->
+        <!-- ========================================== -->
+        <div class="lg:col-span-5 space-y-4">
+          <!-- Main Image Box with Badges -->
+          <div class="relative rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 flex items-center justify-center min-h-[340px] sm:min-h-[410px] overflow-hidden group cursor-pointer" onclick="openLightbox(0)">
+            
+            <!-- Badges góc trên -->
+            <div class="absolute top-3 left-3 flex flex-col gap-1.5 z-10 pointer-events-none">
+              <span id="badge-discount" class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-black text-xs shadow-xs">
+                Giảm 17%
+              </span>
+              <span id="badge-condition" class="px-2.5 py-0.5 rounded-lg bg-blue-600 text-white font-bold text-[11px] shadow-xs">
+                Mới 100% Fullbox
+              </span>
+            </div>
+
+            <!-- Tình trạng kho góc trên phải -->
+            <div class="absolute top-3 right-3 z-10 pointer-events-none">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
+                Sẵn hàng tại HN & HCM
+              </span>
+            </div>
+
+            <!-- Ảnh chính phóng to được -->
+            <img 
+              id="main-product-img"
+              src="https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-ct1-03.webp" 
+              alt="Laptop Lenovo LOQ 15IRH11E"
+              class="max-h-[300px] sm:max-h-[360px] max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
+            />
+
+            <!-- Nút Phóng to -->
+            <button 
+              type="button" 
+              onclick="event.stopPropagation(); openLightbox(0);" 
+              class="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-xs border border-slate-200 text-slate-700 hover:text-blue-600 text-xs font-semibold shadow-xs transition"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg>
+              <span>Xem ảnh to</span>
+            </button>
+          </div>
+
+          <!-- Thumbnail Carousel Slider -->
+          <div class="flex items-center gap-2 overflow-x-auto pb-1 custom-scroll" id="thumbnail-gallery">
+            <!-- Render dynamically -->
+          </div>
+
+          <!-- Cam kết dịch vụ & Quyền lợi độc quyền (Gọn, rõ ràng, tạo niềm tin ngay dưới ảnh) -->
+          <div class="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+            <h3 class="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+              <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+              Đặc quyền an tâm khi mua tại CitiLap
+            </h3>
+            <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-700">
+              <div class="flex items-start gap-1.5">
+                <span class="text-emerald-600 font-bold shrink-0">✓</span>
+                <span>Bảo hành phần cứng <strong>12 - 24 tháng</strong> chính hãng</span>
+              </div>
+              <div class="flex items-start gap-1.5">
+                <span class="text-emerald-600 font-bold shrink-0">✓</span>
+                <span><strong>Lỗi 1 đổi 1</strong> trong 30 ngày nếu có lỗi kỹ thuật</span>
+              </div>
+              <div class="flex items-start gap-1.5">
+                <span class="text-emerald-600 font-bold shrink-0">✓</span>
+                <span>Miễn phí <strong>vệ sinh, cài đặt tra keo</strong> trọn đời máy</span>
+              </div>
+              <div class="flex items-start gap-1.5">
+                <span class="text-emerald-600 font-bold shrink-0">✓</span>
+                <span>Giao hàng COD toàn quốc, <strong>kiểm tra mới trả tiền</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mua kèm Deal sốc (Cross-sell combo - giống Thế Giới Số 365, TÍNH TIỀN THẬT VÀO TỔNG) -->
+          <div class="rounded-2xl border border-blue-100 bg-blue-50/30 p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-900">
+              <span class="flex items-center gap-1.5 text-blue-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                Ưu đãi mua kèm tiết kiệm (Deal sốc)
+              </span>
+              <span class="text-[11px] text-blue-600 font-semibold">Tự động cộng vào giá</span>
+            </div>
+            <div class="space-y-1.5 text-xs" id="combo-accessories">
+              <!-- Render accessories list -->
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- CỘT PHẢI (COL 7): TIÊU ĐỀ, GIÁ, OPTION CẤU HÌNH, MÀU, BẢO HÀNH -->
+        <!-- ============================================================ -->
+        <div class="lg:col-span-7 flex flex-col space-y-4">
+          
+          <!-- 1. TIÊU ĐỀ SẢN PHẨM & THÔNG TIN ĐÁNH GIÁ NHANH -->
+          <div>
+            <h1 id="product-title" class="text-lg sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
+              <!-- Dynamic title -->
+            </h1>
+            <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+              <a href="#danh-gia-khach-hang" class="flex items-center gap-1 text-amber-500 font-bold hover:underline">
+                <span>★★★★★</span>
+                <span class="text-slate-800 ml-1">4.9</span>
+                <span class="text-slate-400 font-normal">(32 đánh giá)</span>
+              </a>
+              <span class="text-slate-300">•</span>
+              <span>Mã model: <strong id="product-model-code" class="text-slate-700 font-semibold font-mono">83Y9003YVN</strong></span>
+              <span class="text-slate-300">•</span>
+              <span>Thương hiệu: <strong id="product-brand" class="text-blue-600 font-semibold">Lenovo</strong></span>
+              <span class="text-slate-300">•</span>
+              <button onclick="openFullSpecsModal()" class="text-blue-600 hover:underline font-semibold flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Xem cấu hình chi tiết
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. KHỐI GIÁ & FLASH DEAL TRỰC QUAN (NẰM NGAY TRÊN ĐẦU, DỄ THEO DÕI NHẤT) -->
+          <div class="rounded-2xl border-2 border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 shadow-xs relative overflow-hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider pulse-badge">
+                    🔥 GIÁ KHUYẾN MÃI HÔM NAY
+                  </span>
+                  <span class="text-[11px] text-slate-500 font-medium">(Đã bao gồm VAT)</span>
+                </div>
+                <div class="flex items-baseline gap-3">
+                  <span id="display-final-price" class="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
+                    27.390.000₫
+                  </span>
+                  <span id="display-original-price" class="text-sm sm:text-base text-slate-400 line-through">
+                    32.990.000₫
+                  </span>
+                  <span id="display-saving-badge" class="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-xs">
+                    Tiết kiệm 5.600.000₫
+                  </span>
+                </div>
+              </div>
+
+              <!-- Trả góp & tình trạng -->
+              <div class="sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
+                <span class="text-xs font-semibold text-slate-700 block">
+                  Trả góp 0% chỉ từ:
+                </span>
+                <span id="display-installment" class="text-sm font-black text-blue-600 block">
+                  2.282.500₫ / tháng
+                </span>
+                <button onclick="openInstallmentModal()" class="text-[11px] text-blue-600 hover:underline font-bold mt-0.5 inline-block">
+                  Bảng tính góp chi tiết →
+                </button>
+              </div>
+            </div>
+
+            <!-- Tóm tắt cấu hình đang chọn ngay dưới giá -->
+            <div class="mt-3 pt-3 border-t border-rose-100/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center flex-wrap gap-1.5 text-slate-700">
+                <span class="font-bold text-slate-900">Đang chọn:</span>
+                <span id="summary-spec-text" class="font-semibold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                  Core 7 230H · 8GB · 512GB · RTX 3050 6GB
+                </span>
+                <span id="summary-color-text" class="text-slate-600 font-medium">
+                  - Màu Xám Bão
+                </span>
+                <span id="summary-addons-text" class="text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 hidden">
+                  + 0 phụ kiện
+                </span>
+              </div>
+              <span id="summary-warranty-tag" class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                BH 12 Tháng Tiêu Chuẩn
+              </span>
+            </div>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- 3. MỤC 1: LỰA CHỌN CẤU HÌNH (THIẾT KẾ THEO YÊU CẦU CỦA USER) -->
+          <!-- ======================================================== -->
+          <section class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-bold">1</span>
+                <span>CHỌN CẤU HÌNH PHẦN CỨNG (CPU / RAM / SSD / VGA):</span>
+              </label>
+              <span class="text-[11px] text-slate-400 font-medium">Bấm chọn để đổi giá tức thì</span>
+            </div>
+
+            <!-- Grid Option Cấu hình (Hiển thị to, rõ, có sẵn mức giá từng option) -->
+            <div id="config-options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <!-- Rendered via JS -->
+            </div>
+          </section>
+
+          <!-- ======================================================== -->
+          <!-- 4. MỤC 2: LỰA CHỌN MÀU SẮC (CÓ TRƯỜNG HỢP MÀU LỆCH GIÁ) -->
+          <!-- ======================================================== -->
+          <section class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-bold">2</span>
+                <span>CHỌN MÀU SẮC MÁY:</span>
+              </label>
+              <span id="selected-color-name" class="text-xs font-bold text-blue-700">Xám Bão (Storm Grey)</span>
+            </div>
+
+            <div id="color-options-container" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <!-- Rendered via JS -->
+            </div>
+          </section>
+
+          <!-- ======================================================== -->
+          <!-- 5. MỤC 3: LỰA CHỌN GÓI BẢO HÀNH (GIÁ TĂNG GIẢM THEO GÓI) -->
+          <!-- ======================================================== -->
+          <section class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <span class="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[11px] font-bold">3</span>
+                <span>CHỌN GÓI BẢO HÀNH & AN TÂM SỬ DỤNG:</span>
+              </label>
+              <a href="#chinh-sach-bao-hanh" class="text-[11px] text-blue-600 hover:underline font-semibold">Chi tiết điều khoản BH →</a>
+            </div>
+
+            <div id="warranty-options-container" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <!-- Rendered via JS -->
+            </div>
+          </section>
+
+          <!-- ======================================================== -->
+          <!-- 6. KHỐI QUÀ TẶNG & KHUYẾN MÃI ĐI KÈM (CHUẨN THEGIOISO365) -->
+          <!-- ======================================================== -->
+          <div class="rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50/70 to-orange-50/30 p-4 space-y-2 relative">
+            <div class="flex items-center gap-2 text-xs font-black text-amber-950 uppercase tracking-wide">
+              <span class="text-base">🎁</span>
+              <span>QUÀ TẶNG KÈM THEO MÁY (TRỊ GIÁ ĐẾN 1.250.000₫):</span>
+            </div>
+            <ul class="space-y-1.5 text-xs text-slate-700">
+              <li class="flex items-start gap-2">
+                <span class="text-rose-600 font-bold shrink-0">●</span>
+                <span>Tặng <strong>Balo Gaming Modern cao cấp</strong> chống sốc chống nước (trị giá 450.000₫).</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-rose-600 font-bold shrink-0">●</span>
+                <span>Tặng <strong>Chuột quang không dây Silent</strong> + Bàn di chuột Speed CitiLap (trị giá 250.000₫).</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-rose-600 font-bold shrink-0">●</span>
+                <span>Tặng gói <strong>Cài đặt hệ điều hành, Office và vệ sinh, tra keo tản nhiệt</strong> trọn đời máy.</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-rose-600 font-bold shrink-0">●</span>
+                <span class="text-rose-700 font-semibold">Giảm thêm 300.000₫ cho Học sinh - Sinh viên khi xuất trình thẻ HSSV tại cửa hàng.</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- 7. CỤM NÚT HÀNH ĐỘNG MUA HÀNG (TO RÕ, RẤT DỄ BẤM TRÊN MỌI THIẾT BỊ) -->
+          <!-- ======================================================== -->
+          <div class="space-y-2.5 pt-1">
+            <!-- Nút MUA NGAY (Hero Button) -->
+            <button 
+              type="button"
+              onclick="openQuickCheckoutModal()"
+              class="w-full flex flex-col items-center justify-center py-3.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black shadow-lg shadow-rose-600/25 transition cursor-pointer active:scale-[0.99]"
+            >
+              <div class="flex items-center gap-2 text-base sm:text-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                <span>MUA NGAY - GIAO TẬN NƠI HOẶC NHẬN TẠI SHOP</span>
+              </div>
+              <span class="text-[11px] font-normal text-rose-100 mt-0.5">
+                Kiểm tra máy chuẩn 100%, hài lòng mới thanh toán
+              </span>
+            </button>
+
+            <!-- 2 Nút phụ: TRẢ GÓP & THÊM VÀO GIỎ -->
+            <div class="grid grid-cols-2 gap-2.5">
+              <button 
+                type="button"
+                onclick="openInstallmentModal()"
+                class="flex flex-col items-center justify-center py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 hover:bg-blue-100/70 text-blue-800 transition cursor-pointer"
+              >
+                <span class="font-bold text-xs sm:text-sm">TRẢ GÓP 0% QUA THẺ</span>
+                <span class="text-[10px] text-blue-600">Thủ tục chỉ mất 3 phút</span>
+              </button>
+
+              <button 
+                type="button"
+                onclick="handleAddToCart()"
+                class="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-800 transition cursor-pointer font-bold text-xs sm:text-sm"
+              >
+                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                <span>THÊM VÀO GIỎ</span>
+              </button>
+            </div>
+
+            <!-- Hotline tư vấn nhanh -->
+            <div class="flex items-center justify-center gap-2 pt-1 text-xs text-slate-500">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+              <span>Tư vấn kỹ thuật & cấu hình riêng: <a href="tel:0853111999" class="text-blue-600 font-bold hover:underline">0853.111.999</a> (Zalo / Miễn phí)</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- KHU VỰC DƯỚI: THÔNG SỐ KỸ THUẬT & BÀI ĐÁNH GIÁ CHUYÊN SÂU -->
+    <!-- ===================================================================== -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Cột trái (8 col): Đánh giá chuyên sâu & Bảng thông số chi tiết -->
+      <div class="lg:col-span-8 space-y-6">
+
+        <!-- 1. BẢNG THÔNG SỐ KỸ THUẬT CHÍNH -->
+        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h2 class="text-base sm:text-lg font-black text-slate-900 uppercase flex items-center gap-2">
+              <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+              Thông số kỹ thuật nổi bật
+            </h2>
+            <button onclick="openFullSpecsModal()" class="text-xs text-blue-600 hover:underline font-bold flex items-center gap-1">
+              Xem tất cả thông số →
+            </button>
+          </div>
+
+          <!-- Spec Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs sm:text-sm text-left">
+              <tbody id="specs-table-body" class="divide-y divide-slate-100">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. BÀI VIẾT ĐÁNH GIÁ CHI TIẾT (CHUẨN CHUYÊN GIA CỦA CITILAP) -->
+        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-sm space-y-4 relative overflow-hidden" id="review-article-box">
+          <h2 class="text-base sm:text-lg font-black text-slate-900 uppercase flex items-center gap-2 pb-3 border-b border-slate-100">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+            Đánh giá chi tiết từ chuyên gia CitiLap
+          </h2>
+
+          <!-- Nội dung bài viết động theo máy -->
+          <div id="review-content" class="text-xs sm:text-sm text-slate-700 leading-relaxed space-y-4 max-h-[380px] overflow-hidden transition-all duration-500">
+            <!-- Render via JS -->
+          </div>
+
+          <!-- Gradient che mờ khi thu gọn -->
+          <div id="review-fade-overlay" class="absolute bottom-16 left-0 right-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none"></div>
+
+          <!-- Nút Đọc tiếp / Thu gọn -->
+          <div class="text-center pt-2 relative z-10">
+            <button 
+              id="btn-toggle-review"
+              type="button"
+              onclick="toggleReviewArticle()" 
+              class="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full border-2 border-blue-600 bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs sm:text-sm transition shadow-xs cursor-pointer"
+            >
+              <span id="review-toggle-text">Đọc tiếp bài đánh giá chi tiết</span>
+              <svg id="review-toggle-icon" class="w-4 h-4 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. CÂU HỎI THƯỜNG GẶP (AEO / FAQ ACCORDION CHUẨN GOOGLE) -->
+        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-sm space-y-4">
+          <h2 class="text-base sm:text-lg font-black text-slate-900 uppercase flex items-center gap-2 pb-3 border-b border-slate-100">
+            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Câu hỏi thường gặp về sản phẩm (FAQ)
+          </h2>
+
+          <div class="space-y-2.5" id="faq-container">
+            <!-- Render via JS -->
+          </div>
+        </div>
+
+        <!-- 4. KHỐI ĐÁNH GIÁ CỦA KHÁCH HÀNG THỰC TẾ -->
+        <div id="danh-gia-khach-hang" class="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-sm space-y-5">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h2 class="text-base sm:text-lg font-black text-slate-900 uppercase flex items-center gap-2">
+              <svg class="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+              Khách hàng đánh giá & nhận xét
+            </h2>
+            <button onclick="openFeedbackModal()" class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition">
+              Viết đánh giá
+            </button>
+          </div>
+
+          <!-- Tổng điểm & phân bổ sao -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 items-center">
+            <div class="md:col-span-4 text-center border-b md:border-b-0 md:border-r border-slate-200 pb-3 md:pb-0">
+              <div class="text-4xl font-black text-amber-500">4.9<span class="text-lg text-slate-400">/5</span></div>
+              <div class="text-amber-500 text-sm mt-1">★★★★★</div>
+              <div class="text-xs text-slate-500 mt-1">32 đánh giá thực tế từ khách mua</div>
+            </div>
+            <div class="md:col-span-8 space-y-1.5 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-10 text-slate-600 font-medium">5 sao</span>
+                <div class="flex-1 bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div class="bg-amber-400 h-full w-[90%] rounded-full"></div>
+                </div>
+                <span class="w-8 text-right text-slate-500">29</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-10 text-slate-600 font-medium">4 sao</span>
+                <div class="flex-1 bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div class="bg-amber-400 h-full w-[10%] rounded-full"></div>
+                </div>
+                <span class="w-8 text-right text-slate-500">3</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-10 text-slate-400">3-1 sao</span>
+                <div class="flex-1 bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div class="bg-amber-400 h-full w-[0%] rounded-full"></div>
+                </div>
+                <span class="w-8 text-right text-slate-400">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Danh sách nhận xét mẫu -->
+          <div class="space-y-3.5 divide-y divide-slate-100" id="customer-reviews-list">
+            <!-- Render via JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Cột phải (4 col): Hệ thống Showroom & Chính sách (Tạo độ tin tưởng cao) -->
+      <div class="lg:col-span-4 space-y-4">
+        
+        <!-- HỆ THỐNG SHOWROOM -->
+        <div class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-sm space-y-3.5">
+          <h2 class="text-sm font-black text-slate-900 uppercase flex items-center gap-2 pb-2.5 border-b border-slate-100">
+            <svg class="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            Hệ thống cửa hàng CitiLap
+          </h2>
+          <div class="space-y-2.5 text-xs text-slate-700">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70 hover:border-blue-300 transition">
+              <div class="flex items-center justify-between">
+                <strong class="text-slate-900 font-bold">1. Showroom Hai Bà Trưng (Hà Nội):</strong>
+                <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Có sẵn máy</span>
+              </div>
+              <p class="text-slate-600 mt-1">79 Lê Thanh Nghị, P. Đồng Tâm, Q. Hai Bà Trưng, HN</p>
+              <div class="mt-1 flex items-center justify-between text-[11px]">
+                <span class="text-slate-500">Mở cửa: 8h30 - 21h30</span>
+                <a href="tel:0853111999" class="text-blue-600 font-bold hover:underline">Gọi Shop</a>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70 hover:border-blue-300 transition">
+              <div class="flex items-center justify-between">
+                <strong class="text-slate-900 font-bold">2. Showroom Cầu Giấy (Hà Nội):</strong>
+                <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Có sẵn máy</span>
+              </div>
+              <p class="text-slate-600 mt-1">273 Trần Quốc Hoàn, Dịch Vọng Hậu, Cầu Giấy, HN</p>
+              <div class="mt-1 flex items-center justify-between text-[11px]">
+                <span class="text-slate-500">Mở cửa: 8h30 - 21h30</span>
+                <a href="tel:0853111999" class="text-blue-600 font-bold hover:underline">Gọi Shop</a>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70 hover:border-blue-300 transition">
+              <div class="flex items-center justify-between">
+                <strong class="text-slate-900 font-bold">3. Showroom Quận 10 (TP.HCM):</strong>
+                <span class="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Có sẵn máy</span>
+              </div>
+              <p class="text-slate-600 mt-1">464 Cao Thắng, Phường 12, Quận 10, TP. Hồ Chí Minh</p>
+              <div class="mt-1 flex items-center justify-between text-[11px]">
+                <span class="text-slate-500">Mở cửa: 8h30 - 21h30</span>
+                <a href="tel:0853111999" class="text-blue-600 font-bold hover:underline">Gọi Shop</a>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/70 hover:border-blue-300 transition">
+              <div class="flex items-center justify-between">
+                <strong class="text-slate-900 font-bold">4. Showroom Vĩnh Yên:</strong>
+                <span class="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">Giao 2h</span>
+              </div>
+              <p class="text-slate-600 mt-1">300 Mê Linh, Khai Quang, TP. Vĩnh Yên, Vĩnh Phúc</p>
+              <div class="mt-1 flex items-center justify-between text-[11px]">
+                <span class="text-slate-500">Mở cửa: 8h30 - 21h00</span>
+                <a href="tel:0853111999" class="text-blue-600 font-bold hover:underline">Gọi Shop</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHÍNH SÁCH BẢO HÀNH & GIAO NHẬN -->
+        <div id="chinh-sach-bao-hanh" class="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-sm space-y-3 text-xs text-slate-700">
+          <strong class="text-slate-900 font-bold block text-sm pb-2 border-b border-slate-100">
+            Chính sách vận chuyển & cam kết
+          </strong>
+          <div class="space-y-2">
+            <p class="flex items-start gap-1.5">
+              <span class="text-emerald-600 font-bold">✓</span>
+              <span><strong>Giao hàng hỏa tốc:</strong> Trong vòng 2 giờ tại nội thành Hà Nội & TP.HCM.</span>
+            </p>
+            <p class="flex items-start gap-1.5">
+              <span class="text-emerald-600 font-bold">✓</span>
+              <span><strong>Ship COD toàn quốc:</strong> Khách hàng kiểm tra máy đúng mô tả, nguyên vẹn mới thanh toán.</span>
+            </p>
+            <p class="flex items-start gap-1.5">
+              <span class="text-emerald-600 font-bold">✓</span>
+              <span><strong>Hỗ trợ kỹ thuật 24/7:</strong> Cài đặt phần mềm online từ xa qua Ultraview / Teamviewer.</span>
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- FLOATING BOTTOM PURCHASE BAR (XUẤT HIỆN KHI CUỘN QUA KHỐI MUA HÀNG) -->
+  <!-- ===================================================================== -->
+  <div id="floating-purchase-bar" class="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 z-30 shadow-2xl transition-all duration-300 floating-bar-hidden">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      
+      <!-- Left: Mini info -->
+      <div class="flex items-center gap-3 min-w-0">
+        <img id="floating-bar-img" src="" alt="Thumbnail" class="h-11 w-11 object-contain rounded-lg border border-slate-200 bg-slate-50 shrink-0 p-0.5" />
+        <div class="min-w-0">
+          <p id="floating-bar-title" class="text-xs font-bold text-slate-900 truncate max-w-[200px] sm:max-w-md"></p>
+          <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span id="floating-bar-spec" class="text-blue-700 font-semibold truncate max-w-[150px] sm:max-w-xs"></span>
+            <span>•</span>
+            <span id="floating-bar-color" class="truncate"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Price & CTA buttons -->
+      <div class="flex items-center gap-3 shrink-0">
+        <div class="text-right">
+          <span class="text-[10px] text-slate-400 block font-medium">Giá thanh toán:</span>
+          <span id="floating-bar-price" class="text-base sm:text-xl font-black text-rose-600"></span>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <button 
+            type="button" 
+            onclick="handleAddToCart()" 
+            class="hidden sm:flex items-center justify-center p-2.5 rounded-xl border border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 text-slate-800 transition font-bold text-xs" 
+            title="Thêm vào giỏ"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+          </button>
+          <button 
+            type="button" 
+            onclick="openQuickCheckoutModal()" 
+            class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer"
+          >
+            MUA NGAY
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: ĐẶT MUA NHANH 1 PHÚT (1-MINUTE QUICK CHECKOUT DRAWER / MODAL) -->
+  <!-- ===================================================================== -->
+  <div id="modal-quick-checkout" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+    <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-xl w-full max-h-[92vh] overflow-y-auto custom-scroll relative animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 rounded-t-3xl sticky top-0 z-10">
+        <div>
+          <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <span>⚡</span> Đặt Hàng Nhanh (Chỉ mất 1 phút)
+          </h3>
+          <p class="text-xs text-slate-500">Nhân viên CitiLap sẽ gọi xác nhận ngay sau khi gửi đơn</p>
+        </div>
+        <button onclick="closeQuickCheckoutModal()" class="h-8 w-8 rounded-full bg-slate-200/80 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition">
+          ✕
+        </button>
+      </div>
+
+      <div id="checkout-form-container" class="p-5 space-y-4">
+        
+        <!-- Recap Box -->
+        <div class="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/80 space-y-2">
+          <div class="flex items-center gap-3">
+            <img id="checkout-summary-img" src="" alt="Thumb" class="h-12 w-12 object-contain rounded-lg bg-white border border-slate-200 p-0.5 shrink-0" />
+            <div class="min-w-0">
+              <h4 id="checkout-summary-title" class="text-xs font-bold text-slate-900 truncate"></h4>
+              <p id="checkout-summary-spec" class="text-[11px] text-blue-800 font-semibold truncate"></p>
+            </div>
+          </div>
+          <div class="pt-2 border-t border-blue-200/60 flex items-center justify-between text-xs">
+            <span class="text-slate-600">Tổng thanh toán dự kiến:</span>
+            <span id="checkout-summary-price" class="text-base font-black text-rose-600"></span>
+          </div>
+        </div>
+
+        <!-- Hình thức nhận hàng -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-slate-900 block">Hình thức nhận máy:</label>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-blue-600 bg-blue-50/50 cursor-pointer">
+              <input type="radio" name="delivery-type" value="home" checked onchange="toggleDeliveryMode('home')" class="text-blue-600 accent-blue-600" />
+              <span class="font-bold text-slate-900">Giao hàng tận nơi</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 cursor-pointer">
+              <input type="radio" name="delivery-type" value="store" onchange="toggleDeliveryMode('store')" class="text-blue-600 accent-blue-600" />
+              <span class="font-bold text-slate-900">Nhận tại Showroom</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Form Fields -->
+        <div class="space-y-2.5 text-xs">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="font-semibold text-slate-700 block mb-1">Họ và tên quý khách <span class="text-rose-500">*</span></label>
+              <input id="checkout-name" type="text" placeholder="Ví dụ: Nguyễn Văn An" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+            </div>
+            <div>
+              <label class="font-semibold text-slate-700 block mb-1">Số điện thoại liên hệ <span class="text-rose-500">*</span></label>
+              <input id="checkout-phone" type="tel" placeholder="Ví dụ: 0912 345 678" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+            </div>
+          </div>
+
+          <!-- Địa chỉ nhận hàng (hiện khi chọn Home) -->
+          <div id="field-address">
+            <label class="font-semibold text-slate-700 block mb-1">Địa chỉ giao hàng chi tiết <span class="text-rose-500">*</span></label>
+            <input id="checkout-address" type="text" placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh thành" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+          </div>
+
+          <!-- Chọn Showroom (hiện khi chọn Store) -->
+          <div id="field-store" class="hidden">
+            <label class="font-semibold text-slate-700 block mb-1">Chọn Showroom nhận máy:</label>
+            <select id="checkout-store-select" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+              <option value="HN1">Showroom 1: 79 Lê Thanh Nghị, Hai Bà Trưng, Hà Nội</option>
+              <option value="HN2">Showroom 2: 273 Trần Quốc Hoàn, Cầu Giấy, Hà Nội</option>
+              <option value="HCM">Showroom 3: 464 Cao Thắng, Phường 12, Quận 10, TP.HCM</option>
+              <option value="VY">Showroom 4: 300 Mê Linh, TP. Vĩnh Yên, Vĩnh Phúc</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="font-semibold text-slate-700 block mb-1">Ghi chú thêm (yêu cầu cài đặt Win, Office, xuất VAT...):</label>
+            <textarea id="checkout-note" rows="2" placeholder="Ghi chú về thời gian giao hàng hoặc phần mềm cần cài..." class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+          </div>
+        </div>
+
+        <!-- Phương thức thanh toán -->
+        <div class="space-y-1.5 pt-1">
+          <label class="text-xs font-bold text-slate-900 block">Phương thức thanh toán:</label>
+          <div class="grid grid-cols-3 gap-2 text-[11px]">
+            <label class="p-2 rounded-xl border border-slate-200 bg-white hover:border-blue-400 cursor-pointer flex flex-col items-center text-center gap-1">
+              <input type="radio" name="payment-method" value="cod" checked class="text-blue-600" />
+              <span class="font-bold text-slate-800">COD Tiền mặt</span>
+              <span class="text-[9px] text-slate-400">Khi nhận máy</span>
+            </label>
+            <label class="p-2 rounded-xl border border-slate-200 bg-white hover:border-blue-400 cursor-pointer flex flex-col items-center text-center gap-1">
+              <input type="radio" name="payment-method" value="qr" class="text-blue-600" />
+              <span class="font-bold text-slate-800">Chuyển khoản QR</span>
+              <span class="text-[9px] text-slate-400">VietQR 24/7</span>
+            </label>
+            <label class="p-2 rounded-xl border border-slate-200 bg-white hover:border-blue-400 cursor-pointer flex flex-col items-center text-center gap-1">
+              <input type="radio" name="payment-method" value="installment" class="text-blue-600" />
+              <span class="font-bold text-slate-800">Trả góp 0%</span>
+              <span class="text-[9px] text-slate-400">Qua thẻ / CCCD</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="pt-2">
+          <button 
+            type="button" 
+            onclick="submitQuickOrder()" 
+            class="w-full py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-sm shadow-md transition active:scale-98 cursor-pointer"
+          >
+            XÁC NHẬN ĐẶT HÀNG NGAY
+          </button>
+          <p class="text-[10px] text-slate-400 text-center mt-1.5">
+            🔒 Thông tin của bạn được cam kết bảo mật 100% theo chính sách CitiLap.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Success Screen (ẩn ban đầu) -->
+      <div id="checkout-success-container" class="p-8 text-center space-y-4 hidden">
+        <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto shadow-inner">
+          ✓
+        </div>
+        <h3 class="text-lg font-black text-slate-900">ĐẶT HÀNG THÀNH CÔNG!</h3>
+        <p class="text-xs text-slate-600 max-w-sm mx-auto">
+          Cảm ơn bạn <strong id="success-customer-name" class="text-slate-900"></strong>. Mã đơn hàng của bạn là:
+          <span id="success-order-code" class="block text-sm font-mono font-black text-blue-600 mt-1 bg-blue-50 py-1 px-3 rounded-lg border border-blue-200">#CTL-84920</span>
+        </p>
+        <p class="text-xs text-slate-500">
+          Chuyên viên tư vấn CitiLap sẽ liên hệ tới số <strong id="success-customer-phone" class="text-slate-900"></strong> trong vòng <strong>5 phút</strong> để xác nhận thời gian giao máy!
+        </p>
+        <button onclick="closeQuickCheckoutModal()" class="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition">
+          Đóng và tiếp tục xem
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: BẢNG TÍNH TRẢ GÓP 0% TƯƠNG TÁC (INSTALLMENT CALCULATOR MODAL) -->
+  <!-- ===================================================================== -->
+  <div id="modal-installment" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+    <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-lg w-full max-h-[90vh] overflow-y-auto custom-scroll relative">
+      
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-blue-50/60 rounded-t-3xl sticky top-0 z-10">
+        <div>
+          <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <span>💳</span> Bảng Tính Trả Góp 0% Lãi Suất
+          </h3>
+          <p class="text-xs text-slate-500">Áp dụng cho thẻ tín dụng (Visa/Master/JCB) hoặc CCCD</p>
+        </div>
+        <button onclick="closeInstallmentModal()" class="h-8 w-8 rounded-full bg-slate-200/80 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition">
+          ✕
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4 text-xs">
+        
+        <!-- Số tiền mua máy -->
+        <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+          <span class="text-slate-600 font-medium">Giá trị sản phẩm:</span>
+          <span id="installment-calc-price" class="text-base font-black text-rose-600">27.390.000₫</span>
+        </div>
+
+        <!-- Chọn tỷ lệ trả trước -->
+        <div class="space-y-1.5">
+          <label class="font-bold text-slate-800 block">1. Chọn số tiền trả trước:</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" onclick="setPrepayPercent(0)" id="btn-prepay-0" class="py-2 rounded-xl border border-blue-600 bg-blue-50 text-blue-900 font-bold">0% (0₫)</button>
+            <button type="button" onclick="setPrepayPercent(20)" id="btn-prepay-20" class="py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold">20%</button>
+            <button type="button" onclick="setPrepayPercent(30)" id="btn-prepay-30" class="py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold">30%</button>
+            <button type="button" onclick="setPrepayPercent(50)" id="btn-prepay-50" class="py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold">50%</button>
+          </div>
+        </div>
+
+        <!-- Chọn kỳ hạn góp -->
+        <div class="space-y-1.5">
+          <label class="font-bold text-slate-800 block">2. Chọn kỳ hạn trả góp:</label>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" onclick="setInstallmentMonths(3)" id="btn-month-3" class="py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold">3 tháng</button>
+            <button type="button" onclick="setInstallmentMonths(6)" id="btn-month-6" class="py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold">6 tháng</button>
+            <button type="button" onclick="setInstallmentMonths(9)" id="btn-month-9" class="py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold">9 tháng</button>
+            <button type="button" onclick="setInstallmentMonths(12)" id="btn-month-12" class="py-2 rounded-xl border border-blue-600 bg-blue-50 text-blue-900 font-bold">12 tháng</button>
+          </div>
+        </div>
+
+        <!-- Bảng tính kết quả chi tiết -->
+        <div class="rounded-2xl border border-blue-200 bg-blue-50/40 p-4 space-y-2">
+          <div class="flex items-center justify-between text-slate-600">
+            <span>Số tiền trả trước:</span>
+            <span id="calc-prepay-amount" class="font-bold text-slate-900">0₫</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-600">
+            <span>Số tiền cần trả góp:</span>
+            <span id="calc-loan-amount" class="font-bold text-slate-900">27.390.000₫</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-600">
+            <span>Lãi suất:</span>
+            <span class="font-bold text-emerald-600">0% (Ưu đãi đặc biệt)</span>
+          </div>
+          <div class="pt-2 border-t border-blue-200 flex items-center justify-between">
+            <span class="font-bold text-slate-800">Số tiền trả mỗi tháng:</span>
+            <span id="calc-monthly-pay" class="text-base font-black text-blue-700">2.282.500₫ / tháng</span>
+          </div>
+        </div>
+
+        <!-- Ngân hàng hỗ trợ -->
+        <div class="space-y-1 text-slate-500 text-[11px]">
+          <p class="font-semibold text-slate-700">Hỗ trợ hơn 25 ngân hàng liên kết:</p>
+          <p>Vietcombank, Techcombank, VPBank, MB Bank, TPBank, Shinhan, ACB, Sacombank, VIB, HSBC...</p>
+        </div>
+
+        <button 
+          type="button" 
+          onclick="closeInstallmentModal(); openQuickCheckoutModal();"
+          class="w-full py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition"
+        >
+          ĐĂNG KÝ HỒ SƠ TRẢ GÓP NGAY
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: XEM TOÀN BỘ ẢNH (IMAGE LIGHTBOX FULLSCREEN) -->
+  <!-- ===================================================================== -->
+  <div id="modal-lightbox" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden" onclick="closeLightbox()">
+    <div class="relative max-w-4xl w-full bg-slate-950/90 rounded-3xl p-4 sm:p-6 flex flex-col items-center justify-center space-y-4" onclick="event.stopPropagation()">
+      <button onclick="closeLightbox()" class="absolute top-4 right-4 h-9 w-9 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-lg transition z-20">
+        ✕
+      </button>
+
+      <!-- Main lightbox image -->
+      <div class="relative w-full h-[55vh] sm:h-[65vh] flex items-center justify-center">
+        <button onclick="prevLightboxImage()" class="absolute left-2 sm:left-4 h-11 w-11 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-xl transition z-10">
+          ‹
+        </button>
+        <img id="lightbox-img" src="" alt="Full view" class="max-h-full max-w-full object-contain" />
+        <button onclick="nextLightboxImage()" class="absolute right-2 sm:right-4 h-11 w-11 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center text-xl transition z-10">
+          ›
+        </button>
+      </div>
+
+      <!-- Caption & Thumbnails strip -->
+      <div class="w-full flex items-center justify-between text-white text-xs border-t border-slate-800 pt-3">
+        <span id="lightbox-label" class="font-bold">Mặt trước</span>
+        <span id="lightbox-counter" class="text-slate-400">1 / 5</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 4: BẢNG THÔNG SỐ KỸ THUẬT ĐẦY ĐỦ (FULL SPECS MODAL) -->
+  <!-- ===================================================================== -->
+  <div id="modal-full-specs" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop hidden">
+    <div class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[88vh] overflow-y-auto custom-scroll relative">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 rounded-t-3xl sticky top-0 z-10">
+        <div>
+          <h3 class="text-base font-black text-slate-900 flex items-center gap-2">
+            <span>⚙️</span> Bảng Chi Tiết Toàn Bộ Cấu Hình & Phần Cứng
+          </h3>
+          <p id="fullspecs-product-name" class="text-xs text-blue-700 font-semibold"></p>
+        </div>
+        <button onclick="closeFullSpecsModal()" class="h-8 w-8 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition">
+          ✕
+        </button>
+      </div>
+
+      <div class="p-5">
+        <table class="w-full text-xs sm:text-sm text-left">
+          <tbody id="full-specs-table-body" class="divide-y divide-slate-100">
+            <!-- Render via JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TOAST NOTIFICATION -->
+  <!-- ===================================================================== -->
+  <div id="toast-modal" class="fixed top-20 right-4 z-50 transform translate-y-[-100px] opacity-0 transition-all duration-300 pointer-events-none">
+    <div class="bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3">
+      <span id="toast-icon" class="flex h-8 w-8 rounded-full bg-emerald-500/20 text-emerald-400 items-center justify-center font-bold">✓</span>
+      <div>
+        <p id="toast-title" class="text-xs font-bold text-white">Thành công</p>
+        <p id="toast-desc" class="text-[11px] text-slate-300">Đã cập nhật cấu hình và giá tương ứng.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- JAVASCRIPT STATE & LOGIC -->
+  <!-- ===================================================================== -->
+  <script>
+    // Dữ liệu mô phỏng 2 sản phẩm: Lenovo LOQ (Thegioiso365) & Asus Vivobook (Link hiện tại)
+    const PRODUCTS = {
+      loq: {
+        id: "lenovo-loq-15irh11e",
+        name: "Lenovo LOQ 15IRH11E 83Y9003YVN",
+        fullTitle: "[New 100%] Lenovo LOQ 15IRH11E 83Y9003YVN (Core 7 230H, 8GB, 512GB, RTX 3050 6GB, 15.3 FHD+ 165Hz)",
+        modelCode: "83Y9003YVN",
+        brand: "Lenovo",
+        category: "Laptop Gaming",
+        series: "Lenovo LOQ Series",
+        condition: "Mới 100% Fullbox",
+        images: [
+          { url: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-ct1-03.webp", label: "Mặt trước & Bàn phím" },
+          { url: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-83y9003vvn-2.webp", label: "Góc mở máy 135 độ" },
+          { url: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-83y9003vvn-5.webp", label: "Cận cảnh bàn phím TrueStrike" },
+          { url: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-83y9003vvn-6.webp", label: "Cổng kết nối phía sau" },
+          { url: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-83y9003vvn-4.webp", label: "Mặt lưng nhám thanh lịch" }
+        ],
+        configs: [
+          {
+            id: "cfg-1",
+            sku: "LOQ-I5-8-512-3050",
+            name: "Core 5 205H · 8GB RAM · 512GB SSD",
+            subSpecs: "Core 5 205H | 8GB DDR5 | 512GB NVMe | RTX 3050 6GB | 15.3\" 165Hz",
+            price: 25690000,
+            originalPrice: 30990000,
+            tag: "Giá tốt nhất"
+          },
+          {
+            id: "cfg-2",
+            sku: "LOQ-I7-8-512-3050",
+            name: "Core 7 230H · 8GB RAM · 512GB SSD",
+            subSpecs: "Core 7 230H | 8GB DDR5 | 512GB NVMe | RTX 3050 6GB | 15.3\" 165Hz",
+            price: 27390000,
+            originalPrice: 32990000,
+            tag: "Bán chạy nhất ⭐",
+            isDefault: true
+          },
+          {
+            id: "cfg-3",
+            sku: "LOQ-I7-16-512-3050",
+            name: "Core 7 230H · 16GB RAM · 512GB SSD",
+            subSpecs: "Core 7 230H | 16GB DDR5 | 512GB NVMe | RTX 3050 6GB | 15.3\" 165Hz",
+            price: 30390000,
+            originalPrice: 35990000,
+            tag: "Đa nhiệm mượt"
+          },
+          {
+            id: "cfg-4",
+            sku: "LOQ-R7-16-512-5050",
+            name: "Ryzen 7 250 · 16GB RAM · 512GB SSD",
+            subSpecs: "Ryzen 7 250 | 16GB DDR5 | 512GB NVMe | RTX 5050 8GB | 15.3\" 165Hz",
+            price: 46990000,
+            originalPrice: 50990000,
+            tag: "Đồ họa đỉnh"
+          }
+        ],
+        colors: [
+          { id: "c-grey", name: "Xám Bão (Storm Grey)", hex: "#64748b", priceDiff: 0, previewImg: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-ct1-03.webp" },
+          { id: "c-black", name: "Đen Huyền Bí (Phantom Black)", hex: "#1e293b", priceDiff: 0, previewImg: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-83y9003vvn-2.webp" },
+          { id: "c-white", name: "Trắng Băng Tuyết (Glacier White)", hex: "#f8fafc", priceDiff: 300000, previewImg: "https://thegioiso365.vn/wp-content/uploads/2026/09/loq-15irh11e-83y9003vvn-4.webp" }
+        ],
+        warranties: [
+          { id: "w-std", name: "Bảo hành Tiêu Chuẩn 12 Tháng", desc: "12 tháng phần cứng tại CitiLap, 1 đổi 1 15 ngày", priceDiff: 0, isDefault: true },
+          { id: "w-gold", name: "Bảo hành Vàng 24 Tháng", desc: "24 tháng chính hãng, 1 đổi 1 30 ngày, bảo hành cả nguồn & màn hình", priceDiff: 890000, tag: "Khuyên dùng ⭐" },
+          { id: "w-diamond", name: "Bảo hành Kim Cương 36 Tháng", desc: "36 tháng VIP, bảo hiểm rơi vỡ ngấm nước năm 1, mượn máy tận nơi", priceDiff: 1690000, tag: "VIP Cao Cấp" }
+        ],
+        accessories: [
+          { id: "acc-1", name: "Giá đỡ nhôm tản nhiệt Laptop N3", original: 150000, sale: 120000, img: "https://thegioiso365.vn/wp-content/uploads/2025/07/3016_z4706133317296_41450c4cd653290d81ef0808db1a0889-300x300.jpg" },
+          { id: "acc-2", name: "Bộ chuyển đổi Rapoo Hub Type-C 5 in 1", original: 590000, sale: 390000, img: "https://thegioiso365.vn/wp-content/uploads/2026/05/Bo-chuyen-doi-Rapoo-XD51-300x300.webp" },
+          { id: "acc-3", name: "Chuột Gaming Logitech G102 Lightsync", original: 599000, sale: 450000, img: "https://thegioiso365.vn/wp-content/uploads/2025/06/chuot-gaming-logitech-g102-light-300x300.jpg" }
+        ],
+        specs: [
+          ["Bộ vi xử lý (CPU)", "Intel® Core™ 7 230H (2.50GHz up to 5.20GHz, 24MB Cache, 10 nhân 16 luồng)"],
+          ["Bộ nhớ trong (RAM)", "8GB SODIMM DDR5-4800MHz (Hỗ trợ 2 khe cắm, nâng cấp tối đa 64GB)"],
+          ["Ổ cứng lưu trữ (SSD)", "512GB SSD M.2 2242 PCIe® 4.0x4 NVMe® (Có thêm 1 khe M.2 trống nâng cấp)"],
+          ["Card đồ họa (VGA)", "NVIDIA GeForce RTX™ 3050 6GB GDDR6, Boost Clock 1732MHz, TGP 75W, 142 AI TOPS"],
+          ["Màn hình (Display)", "15.3\" WUXGA (1920x1200) IPS 300nits Anti-glare, 100% sRGB, 165Hz, G-SYNC®"],
+          ["Hệ điều hành", "Windows® 11 Home Single Language bản quyền theo máy"],
+          ["Bàn phím & Touchpad", "Bàn phím Full-size TrueStrike hành trình 1.5mm, đèn nền phím màu trắng chống mỏi"],
+          ["Cổng kết nối", "1x USB-C (USB 5Gbps, PD 65-100W), 3x USB-A 3.2, 1x HDMI 2.1 (4K/60Hz), RJ-45, Jack 3.5mm"],
+          ["Pin & Nguồn", "Pin 3 Cell 60 Wh, Sạc nhanh Super Rapid Charge (nạp 80% trong 60 phút)"],
+          ["Trọng lượng", "Khoảng 2.1 kg (Vỏ máy hoàn thiện tông màu tối sang trọng, tản nhiệt Coldfront Hyper)"]
+        ],
+        reviewHtml: `
+          <h3 class="text-sm font-bold text-slate-900">1. Thiết kế hầm hố nhưng tinh tế, tản nhiệt Coldfront Hyper đột phá</h3>
+          <p>Lenovo LOQ 15IRH11E sở hữu ngôn ngữ thiết kế thừa hưởng trọn vẹn từ dòng đàn anh cao cấp Legion. Các góc cạnh được vát vuông vức, khe tản nhiệt bố trí thông minh đẩy luồng gió nóng ra phía sau, giúp tay cầm chuột của game thủ luôn mát mẻ.</p>
+          
+          <h3 class="text-sm font-bold text-slate-900">2. Hiệu năng vượt trội với Core 7 230H & RTX 3050 6GB</h3>
+          <p>Trang bị vi xử lý Intel Core 7 thế hệ mới cùng card đồ họa rời NVIDIA RTX 3050 6GB VRAM, máy sẵn sàng cân tốt các tựa game Esport (Valorant, CS2 > 200 FPS) cũng như các tựa game AAA hạng nặng ở thiết lập đồ họa hợp lý. Công nghệ DLSS 3.5 và Frame Generation giúp tăng tốc khung hình mượt mà.</p>
+
+          <h3 class="text-sm font-bold text-slate-900">3. Màn hình 15.3 inch 165Hz, chuẩn màu 100% sRGB</h3>
+          <p>Điểm cộng lớn của phiên bản 2026 là tấm nền chuẩn màu 100% sRGB, độ phân giải WUXGA tỉ lệ 16:10 hiển thị nhiều thông tin hơn. Đây là lợi thế rất lớn cho các bạn sinh viên kiến trúc, đồ họa hay dựng video trên Premiere/Photoshop.</p>
+        `,
+        faqs: [
+          { q: "Lenovo LOQ 15IRH11E có nâng cấp thêm RAM và ổ cứng SSD được không?", a: "Hoàn toàn được! Máy có sẵn 2 khe RAM DDR5 (hỗ trợ nâng cấp tối đa 64GB) và có 2 khe cắm SSD M.2 NVMe PCIe Gen 4, cho phép gắn thêm ổ cứng thứ 2 dễ dàng." },
+          { q: "Máy bán ra là mới 100% nguyên seal hay đã qua sử dụng?", a: "Sản phẩm tại CitiLap là máy New 100% Fullbox nguyên hộp, nguyên tem niêm phong của nhà sản xuất. Khách hàng được tự tay bóc seal khi nhận máy." },
+          { q: "Chính sách đổi trả trong 30 ngày áp dụng thế nào?", a: "Nếu máy gặp lỗi phần cứng do nhà sản xuất trong vòng 30 ngày đầu, CitiLap cam kết 1 đổi 1 ngay lập tức sang máy mới nguyên hộp mà không tính thêm bất kỳ khoản phí nào." },
+          { q: "Khách hàng ở tỉnh xa nhận hàng có được kiểm tra trước khi trả tiền không?", a: "CitiLap hỗ trợ giao hàng COD toàn quốc. Quý khách được quyền bóc hộp kiểm tra máy, phụ kiện sạc đúng với đơn đặt hàng mới phải thanh toán tiền cho nhân viên giao vận." }
+        ]
+      },
+
+      vivobook: {
+        id: "asus-vivobook-14se-s3452m",
+        name: "Asus Vivobook 14SE S3452M",
+        fullTitle: "[New 100%] Asus Vivobook 14SE S3452M (Core i5, 16GB, 512GB / 1TB, Intel Iris Xe, 14\" FHD OLED)",
+        modelCode: "S3452M-LOCAL",
+        brand: "Asus",
+        category: "Laptop Doanh Nhân & Học Tập",
+        series: "Asus Vivobook Series",
+        condition: "Mới 100% Fullbox",
+        images: [
+          { url: "/api/library/00c7f89f-c054-4a91-821f-943c5de7d545", label: "Mặt trước máy" },
+          { url: "/api/library/00c7f89f-c054-4a91-821f-943c5de7d545", label: "Góc mở máy siêu mỏng" },
+          { url: "/api/library/00c7f89f-c054-4a91-821f-943c5de7d545", label: "Bàn phím ErgoSense êm ái" }
+        ],
+        configs: [
+          {
+            id: "cfg-v1",
+            sku: "LOCAL150-8-1",
+            name: "16GB RAM · 512GB SSD",
+            subSpecs: "Intel Core i5 | 16GB RAM | 512GB SSD NVMe | Intel Iris Xe | 14\" FHD",
+            price: 17200000,
+            originalPrice: 19500000,
+            tag: "Tiết kiệm"
+          },
+          {
+            id: "cfg-v2",
+            sku: "LOCAL150-8-2",
+            name: "16GB RAM · 1TB SSD",
+            subSpecs: "Intel Core i5 | 16GB RAM | 1TB SSD NVMe | Intel Iris Xe | 14\" FHD",
+            price: 18200000,
+            originalPrice: 20900000,
+            tag: "Bán chạy nhất ⭐",
+            isDefault: true
+          },
+          {
+            id: "cfg-v3",
+            sku: "LOCAL150-8-3",
+            name: "32GB RAM · 1TB SSD",
+            subSpecs: "Intel Core i5 | 32GB RAM | 1TB SSD NVMe | Intel Iris Xe | 14\" FHD",
+            price: 18700000,
+            originalPrice: 21900000,
+            tag: "Nâng cấp tối đa"
+          }
+        ],
+        colors: [
+          { id: "c-silver", name: "Bạc Ánh Trăng (Cool Silver)", hex: "#e2e8f0", priceDiff: 0, previewImg: "/api/library/00c7f89f-c054-4a91-821f-943c5de7d545" },
+          { id: "c-blue", name: "Xanh Thầm Lặng (Quiet Blue)", hex: "#334155", priceDiff: 0, previewImg: "/api/library/00c7f89f-c054-4a91-821f-943c5de7d545" },
+          { id: "c-terracotta", name: "Đồng Đất Hiếm (Terracotta)", hex: "#9a3412", priceDiff: 200000, previewImg: "/api/library/00c7f89f-c054-4a91-821f-943c5de7d545" }
+        ],
+        warranties: [
+          { id: "w-v-std", name: "Bảo hành Tiêu Chuẩn 12 Tháng", desc: "12 tháng tại CitiLap, 1 đổi 1 15 ngày", priceDiff: 0, isDefault: true },
+          { id: "w-v-gold", name: "Bảo hành Vàng 24 Tháng", desc: "24 tháng chính hãng Asus & CitiLap, 1 đổi 1 30 ngày", priceDiff: 650000, tag: "Khuyên dùng ⭐" },
+          { id: "w-v-diamond", name: "Bảo hành Toàn Diện 36 Tháng", desc: "36 tháng VIP, bảo hiểm rơi vỡ ngấm nước năm đầu", priceDiff: 1200000, tag: "VIP" }
+        ],
+        accessories: [
+          { id: "acc-1", name: "Túi chống sốc cao cấp thời trang 14 inch", original: 220000, sale: 150000, img: "https://thegioiso365.vn/wp-content/uploads/2025/07/3016_z4706133317296_41450c4cd653290d81ef0808db1a0889-300x300.jpg" },
+          { id: "acc-2", name: "Chuột không dây Silent Bluetooth Asus", original: 350000, sale: 220000, img: "https://thegioiso365.vn/wp-content/uploads/2025/06/chuot-gaming-logitech-g102-light-300x300.jpg" }
+        ],
+        specs: [
+          ["Bộ vi xử lý (CPU)", "Intel® Core™ i5 (10 nhân 12 luồng, xung nhịp tối đa 4.60GHz)"],
+          ["Bộ nhớ trong (RAM)", "16GB DDR4 bus 3200MHz đa nhiệm mượt mà"],
+          ["Ổ cứng lưu trữ (SSD)", "1TB PCIe® NVMe® M.2 SSD tốc độ cao"],
+          ["Đồ họa (VGA)", "Intel® Iris® Xe Graphics cho văn phòng và chỉnh ảnh 2D"],
+          ["Màn hình (Display)", "14.0 inch FHD (1920 x 1080) 16:9, tấm nền IPS chống chói, 250 nits"],
+          ["Hệ điều hành", "Windows 11 Home bản quyền"],
+          ["Bàn phím & Touchpad", "Bàn phím ErgoSense khoảng cách phím tối ưu, Touchpad rộng tích hợp phím số ảo"],
+          ["Cổng kết nối", "1x USB 3.2 Gen 1 Type-C, 2x USB 3.2 Gen 1 Type-A, 1x HDMI 1.4, Jack 3.5mm combo"],
+          ["Pin & Nguồn", "Pin Li-ion 3 Cell 42WHrs, củ sạc nhanh Type-C 45W"],
+          ["Trọng lượng", "1.40 kg siêu nhẹ, dễ dàng mang theo học tập làm việc hằng ngày"]
+        ],
+        reviewHtml: `
+          <h3 class="text-sm font-bold text-slate-900">1. Thiết kế mỏng nhẹ, sang trọng cho dân văn phòng</h3>
+          <p>Asus Vivobook 14SE chỉ nặng 1.4kg với độ mỏng 17.9mm, hoàn hảo cho các bạn sinh viên và nhân viên văn phòng thường xuyên phải di chuyển. Bản lề 180 độ cho phép dễ dàng chia sẻ nội dung với đồng nghiệp trong các buổi họp nhóm.</p>
+
+          <h3 class="text-sm font-bold text-slate-900">2. Hiệu năng ổn định, pin dùng trọn ngày làm việc</h3>
+          <p>Trang bị chip Intel Core i5 kết hợp cùng 16GB RAM và ổ cứng SSD lên tới 1TB, bạn có thể thoải mái mở hàng chục tab Chrome, xử lý file Excel dung lượng lớn mà không hề gặp hiện tượng giật lag.</p>
+        `,
+        faqs: [
+          { q: "Asus Vivobook 14SE có đủ nhẹ để mang đi học hằng ngày không?", a: "Trọng lượng máy chỉ 1.4kg, vừa vặn trong mọi balo hoặc túi xách thông thường, rất thoải mái mang theo cả ngày." },
+          { q: "Máy có cài sẵn Windows bản quyền không?", a: "Có, máy đã được kích hoạt sẵn bản quyền Windows 11 Home chính hãng trọn đời máy, tự động cập nhật bảo mật từ Microsoft." }
+        ]
+      }
+    };
+
+    // State hiện tại
+    let currentProdKey = 'loq';
+    let currentConfigId = 'cfg-2';
+    let currentColorId = 'c-grey';
+    let currentWarrantyId = 'w-std';
+    let currentOptionStyle = 'cards'; // 'cards' hoặc 'pills'
+    let selectedAddonIds = new Set(); // Set of accessory IDs
+    let currentLightboxIdx = 0;
+    let isReviewExpanded = false;
+
+    // State bảng tính trả góp
+    let prepayPercent = 0;
+    let installmentMonths = 12;
+
+    // Format tiền tệ Việt Nam
+    function formatVND(amount) {
+      return amount.toLocaleString('vi-VN') + '₫';
+    }
+
+    // Chuyển đổi giữa 2 sản phẩm mẫu
+    function switchProduct(key) {
+      currentProdKey = key;
+      const prod = PRODUCTS[key];
+      
+      // Reset selections to defaults
+      currentConfigId = prod.configs.find(c => c.isDefault)?.id || prod.configs[0].id;
+      currentColorId = prod.colors[0].id;
+      currentWarrantyId = prod.warranties.find(w => w.isDefault)?.id || prod.warranties[0].id;
+      selectedAddonIds.clear();
+      isReviewExpanded = false;
+
+      // Update control button styles
+      document.getElementById('btn-prod-loq').className = key === 'loq' 
+        ? "px-3 py-1.5 rounded-md font-bold transition bg-blue-600 text-white shadow-xs cursor-pointer"
+        : "px-3 py-1.5 rounded-md font-bold transition text-slate-300 hover:text-white cursor-pointer";
+      document.getElementById('btn-prod-vivobook').className = key === 'vivobook'
+        ? "px-3 py-1.5 rounded-md font-bold transition bg-blue-600 text-white shadow-xs cursor-pointer"
+        : "px-3 py-1.5 rounded-md font-bold transition text-slate-300 hover:text-white cursor-pointer";
+
+      renderAll();
+      showToast("Đã tải dữ liệu mẫu: " + prod.name);
+    }
+
+    // Chuyển đổi giữa phong cách hiển thị Card vs Pill
+    function switchOptionStyle(style) {
+      currentOptionStyle = style;
+      document.getElementById('btn-style-thegioiso').className = style === 'cards'
+        ? "px-2.5 py-1.5 rounded-md font-semibold transition bg-slate-700 text-white cursor-pointer"
+        : "px-2.5 py-1.5 rounded-md font-semibold transition text-slate-300 hover:text-white cursor-pointer";
+      document.getElementById('btn-style-compact').className = style === 'pills'
+        ? "px-2.5 py-1.5 rounded-md font-semibold transition bg-slate-700 text-white cursor-pointer"
+        : "px-2.5 py-1.5 rounded-md font-semibold transition text-slate-300 hover:text-white cursor-pointer";
+
+      renderConfigs();
+    }
+
+    // Tính toán giá động (Config + Color + Warranty + Combo Accessories)
+    function calculateTotal() {
+      const prod = PRODUCTS[currentProdKey];
+      const cfg = prod.configs.find(c => c.id === currentConfigId) || prod.configs[0];
+      const clr = prod.colors.find(c => c.id === currentColorId) || prod.colors[0];
+      const war = prod.warranties.find(w => w.id === currentWarrantyId) || prod.warranties[0];
+
+      let addonsCost = 0;
+      selectedAddonIds.forEach(id => {
+        const item = prod.accessories?.find(a => a.id === id);
+        if (item) addonsCost += item.sale;
+      });
+
+      const basePrice = cfg.price;
+      const baseOriginal = cfg.originalPrice;
+      const colorDiff = clr.priceDiff || 0;
+      const warrantyDiff = war.priceDiff || 0;
+
+      const finalPrice = basePrice + colorDiff + warrantyDiff + addonsCost;
+      const finalOriginal = baseOriginal + colorDiff + warrantyDiff + addonsCost;
+      const saving = finalOriginal - finalPrice;
+      const installmentMonthly = Math.round(finalPrice / 12);
+
+      return {
+        finalPrice,
+        finalOriginal,
+        saving,
+        installmentMonthly,
+        addonsCost,
+        cfg,
+        clr,
+        war,
+        addonsCount: selectedAddonIds.size
+      };
+    }
+
+    // Cập nhật giá trên UI
+    function updatePriceUI() {
+      const { finalPrice, finalOriginal, saving, installmentMonthly, addonsCost, addonsCount, cfg, clr, war } = calculateTotal();
+
+      document.getElementById('display-final-price').innerText = formatVND(finalPrice);
+      document.getElementById('display-original-price').innerText = formatVND(finalOriginal);
+      document.getElementById('display-saving-badge').innerText = `Tiết kiệm ${formatVND(saving)}`;
+      document.getElementById('display-installment').innerText = `${formatVND(installmentMonthly)} / tháng`;
+
+      // Cập nhật floating bar
+      document.getElementById('floating-bar-price').innerText = formatVND(finalPrice);
+      document.getElementById('floating-bar-spec').innerText = cfg.name;
+      document.getElementById('floating-bar-color').innerText = clr.name.split('(')[0].trim();
+
+      // Cập nhật text tóm tắt
+      document.getElementById('summary-spec-text').innerText = cfg.name;
+      document.getElementById('summary-color-text').innerText = `- Màu ${clr.name.split('(')[0].trim()}${clr.priceDiff > 0 ? ` (+${formatVND(clr.priceDiff)})` : ''}`;
+      document.getElementById('summary-warranty-tag').innerText = war.name + (war.priceDiff > 0 ? ` (+${formatVND(war.priceDiff)})` : ' (Đã bao gồm)');
+      document.getElementById('selected-color-name').innerText = clr.name + (clr.priceDiff > 0 ? ` (+${formatVND(clr.priceDiff)})` : '');
+
+      const addonSummary = document.getElementById('summary-addons-text');
+      if (addonsCount > 0) {
+        addonSummary.classList.remove('hidden');
+        addonSummary.innerText = `+ ${addonsCount} phụ kiện (+${formatVND(addonsCost)})`;
+      } else {
+        addonSummary.classList.add('hidden');
+      }
+
+      // Cập nhật modal trả góp nếu đang mở
+      updateInstallmentModalCalc();
+    }
+
+    // Render danh sách Option Cấu hình
+    function renderConfigs() {
+      const prod = PRODUCTS[currentProdKey];
+      const container = document.getElementById('config-options-container');
+      container.innerHTML = '';
+
+      if (currentOptionStyle === 'cards') {
+        // DẠNG CARD CHUẨN THẾ GIỚI SỐ 365: Có tên specs, giá đỏ nổi bật, giá gạch mờ, badge đã chọn
+        prod.configs.forEach(cfg => {
+          const isSelected = cfg.id === currentConfigId;
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.onclick = () => {
+            currentConfigId = cfg.id;
+            renderConfigs();
+            updatePriceUI();
+            showToast("Đã chọn cấu hình: " + cfg.name);
+          };
+
+          card.className = `option-card relative text-left rounded-2xl p-3 sm:p-3.5 border-2 transition select-none cursor-pointer flex flex-col justify-between ${
+            isSelected 
+              ? 'border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/50 text-blue-950 shadow-sm ring-2 ring-blue-500/25' 
+              : 'border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/50 text-slate-800'
+          }`;
+
+          card.innerHTML = `
+            <div>
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-xs sm:text-sm font-black uppercase tracking-tight ${isSelected ? 'text-blue-900' : 'text-slate-900'}">
+                  ${cfg.name}
+                </span>
+                ${isSelected ? `
+                  <span class="flex h-4.5 w-4.5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-black shrink-0 shadow-2xs">
+                    ✓
+                  </span>
+                ` : ''}
+              </div>
+              <p class="text-[11px] text-slate-500 line-clamp-1 mt-1 font-medium">
+                ${cfg.subSpecs}
+              </p>
+            </div>
+
+            <div class="mt-2.5 pt-2 border-t border-slate-200/70 flex items-baseline justify-between">
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-xs sm:text-sm font-black text-rose-600">
+                  ${formatVND(cfg.price)}
+                </span>
+                <span class="text-[10px] sm:text-[11px] text-slate-400 line-through">
+                  ${formatVND(cfg.originalPrice)}
+                </span>
+              </div>
+              ${cfg.tag ? `
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${isSelected ? 'bg-blue-200/70 text-blue-900' : 'bg-slate-100 text-slate-600'}">
+                  ${cfg.tag}
+                </span>
+              ` : ''}
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      } else {
+        // DẠNG PILL GỌN: Dành cho ai thích tối giản
+        prod.configs.forEach(cfg => {
+          const isSelected = cfg.id === currentConfigId;
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.onclick = () => {
+            currentConfigId = cfg.id;
+            renderConfigs();
+            updatePriceUI();
+            showToast("Đã chọn cấu hình: " + cfg.name);
+          };
+
+          card.className = `option-card relative text-left rounded-xl px-3 py-2 border transition select-none cursor-pointer flex items-center justify-between ${
+            isSelected 
+              ? 'border-blue-600 bg-blue-50 text-blue-900 font-bold shadow-2xs' 
+              : 'border-slate-200 bg-white hover:border-blue-300 text-slate-700 font-medium'
+          }`;
+
+          card.innerHTML = `
+            <div class="flex items-center gap-2">
+              <span class="flex h-3.5 w-3.5 rounded-full border ${isSelected ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'} items-center justify-center">
+                ${isSelected ? '<span class="h-1.5 w-1.5 rounded-full bg-white"></span>' : ''}
+              </span>
+              <span class="text-xs">${cfg.name}</span>
+            </div>
+            <span class="text-xs font-bold text-rose-600">${formatVND(cfg.price)}</span>
+          `;
+          container.appendChild(card);
+        });
+      }
+    }
+
+    // Render danh sách Màu sắc (Có giá lệch nếu có)
+    function renderColors() {
+      const prod = PRODUCTS[currentProdKey];
+      const container = document.getElementById('color-options-container');
+      container.innerHTML = '';
+
+      prod.colors.forEach(clr => {
+        const isSelected = clr.id === currentColorId;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.onclick = () => {
+          currentColorId = clr.id;
+          renderColors();
+          updatePriceUI();
+          if (clr.previewImg) {
+            document.getElementById('main-product-img').src = clr.previewImg;
+            document.getElementById('floating-bar-img').src = clr.previewImg;
+          }
+          showToast(`Đã chọn màu: ${clr.name}`);
+        };
+
+        btn.className = `option-card relative rounded-2xl p-2.5 sm:p-3 border-2 transition select-none cursor-pointer flex items-center gap-2.5 ${
+          isSelected 
+            ? 'border-blue-600 bg-blue-50/70 text-blue-950 shadow-2xs ring-2 ring-blue-500/20' 
+            : 'border-slate-200 bg-white hover:border-blue-300 text-slate-800'
+        }`;
+
+        btn.innerHTML = `
+          <span class="flex h-6 w-6 rounded-full border border-slate-300 shrink-0 shadow-2xs" style="background-color: ${clr.hex};"></span>
+          <div class="text-left flex-1 min-w-0">
+            <span class="text-xs font-bold block truncate ${isSelected ? 'text-blue-900' : 'text-slate-900'}">
+              ${clr.name.split('(')[0].trim()}
+            </span>
+            <span class="text-[10px] block ${clr.priceDiff > 0 ? 'text-rose-600 font-bold' : 'text-slate-500 font-medium'}">
+              ${clr.priceDiff > 0 ? `+${formatVND(clr.priceDiff)}` : 'Giá chuẩn (+0₫)'}
+            </span>
+          </div>
+          ${isSelected ? `
+            <span class="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-black shrink-0">
+              ✓
+            </span>
+          ` : ''}
+        `;
+        container.appendChild(btn);
+      });
+    }
+
+    // Render danh sách Gói bảo hành (Có giá điều chỉnh)
+    function renderWarranties() {
+      const prod = PRODUCTS[currentProdKey];
+      const container = document.getElementById('warranty-options-container');
+      container.innerHTML = '';
+
+      prod.warranties.forEach(war => {
+        const isSelected = war.id === currentWarrantyId;
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.onclick = () => {
+          currentWarrantyId = war.id;
+          renderWarranties();
+          updatePriceUI();
+          showToast(`Đã chọn gói: ${war.name}`);
+        };
+
+        card.className = `option-card relative rounded-2xl p-3 border-2 transition select-none cursor-pointer flex flex-col justify-between text-left ${
+          isSelected 
+            ? 'border-emerald-600 bg-emerald-50/70 text-emerald-950 shadow-2xs ring-2 ring-emerald-500/20' 
+            : 'border-slate-200 bg-white hover:border-emerald-400 text-slate-800'
+        }`;
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-start justify-between gap-1 mb-1">
+              <span class="text-xs font-black ${isSelected ? 'text-emerald-950' : 'text-slate-900'}">
+                ${war.name}
+              </span>
+              ${isSelected ? `
+                <span class="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white text-[9px] font-black shrink-0">
+                  ✓
+                </span>
+              ` : ''}
+            </div>
+            <p class="text-[10.5px] text-slate-500 line-clamp-2 leading-tight">
+              ${war.desc}
+            </p>
+          </div>
+
+          <div class="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between">
+            <span class="text-xs font-bold ${war.priceDiff === 0 ? 'text-emerald-700' : 'text-slate-900'}">
+              ${war.priceDiff === 0 ? 'Đã bao gồm' : `+${formatVND(war.priceDiff)}`}
+            </span>
+            ${war.tag ? `
+              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                ${war.tag}
+              </span>
+            ` : ''}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // Render Thumbnails
+    function renderThumbnails() {
+      const prod = PRODUCTS[currentProdKey];
+      const container = document.getElementById('thumbnail-gallery');
+      container.innerHTML = '';
+
+      prod.images.forEach((img, idx) => {
+        const thumb = document.createElement('button');
+        thumb.type = 'button';
+        thumb.onclick = () => {
+          document.getElementById('main-product-img').src = img.url;
+          currentLightboxIdx = idx;
+          Array.from(container.children).forEach(c => c.className = "flex-shrink-0 w-16 h-16 rounded-xl border-2 border-slate-200 bg-slate-50 p-1 hover:border-blue-500 transition cursor-pointer");
+          thumb.className = "flex-shrink-0 w-16 h-16 rounded-xl border-2 border-blue-600 bg-white p-1 shadow-xs cursor-pointer";
+        };
+
+        thumb.className = idx === 0 
+          ? "flex-shrink-0 w-16 h-16 rounded-xl border-2 border-blue-600 bg-white p-1 shadow-xs cursor-pointer" 
+          : "flex-shrink-0 w-16 h-16 rounded-xl border-2 border-slate-200 bg-slate-50 p-1 hover:border-blue-500 transition cursor-pointer";
+
+        thumb.innerHTML = `
+          <img src="${img.url}" alt="${img.label}" class="w-full h-full object-contain" />
+        `;
+        container.appendChild(thumb);
+      });
+
+      // Reset main image & floating thumb
+      document.getElementById('main-product-img').src = prod.images[0].url;
+      document.getElementById('floating-bar-img').src = prod.images[0].url;
+    }
+
+    // Render Bảng Thông Số Kỹ Thuật
+    function renderSpecs() {
+      const prod = PRODUCTS[currentProdKey];
+      const tbody = document.getElementById('specs-table-body');
+      tbody.innerHTML = '';
+
+      prod.specs.forEach(([key, val], idx) => {
+        const tr = document.createElement('tr');
+        tr.className = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60';
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-semibold text-slate-600 w-1/3 border-b border-slate-100">${key}</td>
+          <td class="py-2.5 px-3 text-slate-900 font-medium border-b border-slate-100">${val}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Render Combo Mua Kèm (Gắn checkbox tính tiền thật)
+    function renderAccessories() {
+      const prod = PRODUCTS[currentProdKey];
+      const container = document.getElementById('combo-accessories');
+      container.innerHTML = '';
+
+      if (!prod.accessories || prod.accessories.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400">Không có phụ kiện mua kèm cho sản phẩm này.</p>';
+        return;
+      }
+
+      prod.accessories.forEach(item => {
+        const isChecked = selectedAddonIds.has(item.id);
+        const div = document.createElement('label');
+        div.className = `flex items-center justify-between p-2 rounded-xl border transition cursor-pointer ${
+          isChecked ? 'bg-blue-50/80 border-blue-400' : 'bg-white border-slate-200/80 hover:border-blue-300'
+        }`;
+        div.innerHTML = `
+          <div class="flex items-center gap-2 min-w-0">
+            <input 
+              type="checkbox" 
+              ${isChecked ? 'checked' : ''} 
+              onchange="toggleAccessory('${item.id}', this.checked)" 
+              class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 accent-blue-600" 
+            />
+            <img src="${item.img}" alt="${item.name}" class="h-8 w-8 object-cover rounded shrink-0 border border-slate-100" />
+            <span class="text-xs text-slate-800 font-medium truncate">${item.name}</span>
+          </div>
+          <div class="text-right shrink-0 ml-2">
+            <span class="text-xs font-bold text-rose-600">+${formatVND(item.sale)}</span>
+            <span class="text-[10px] text-slate-400 line-through block">${formatVND(item.original)}</span>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // Toggle Accessory selection
+    function toggleAccessory(id, checked) {
+      if (checked) {
+        selectedAddonIds.add(id);
+        showToast("Đã thêm phụ kiện ưu đãi vào tổng đơn hàng!");
+      } else {
+        selectedAddonIds.delete(id);
+        showToast("Đã bỏ chọn phụ kiện!");
+      }
+      renderAccessories();
+      updatePriceUI();
+    }
+
+    // Render Bài Đánh Giá & FAQ & Review khách hàng
+    function renderArticleAndFAQ() {
+      const prod = PRODUCTS[currentProdKey];
+      
+      // Review content
+      const reviewBox = document.getElementById('review-content');
+      reviewBox.innerHTML = prod.reviewHtml;
+      
+      // FAQ Accordion
+      const faqBox = document.getElementById('faq-container');
+      faqBox.innerHTML = '';
+      prod.faqs.forEach((faq, idx) => {
+        const div = document.createElement('div');
+        div.className = "rounded-2xl border border-slate-200 bg-slate-50/60 overflow-hidden";
+        div.innerHTML = `
+          <button 
+            type="button" 
+            onclick="toggleFaq(${idx})" 
+            class="w-full p-3.5 text-left flex items-center justify-between gap-3 font-bold text-xs sm:text-sm text-slate-900 hover:text-blue-600 transition"
+          >
+            <span>${faq.q}</span>
+            <span id="faq-icon-${idx}" class="text-slate-400 text-base shrink-0 transition-transform duration-200">+</span>
+          </button>
+          <div id="faq-ans-${idx}" class="hidden p-3.5 pt-0 text-xs text-slate-600 leading-relaxed border-t border-slate-100/80 bg-white">
+            ${faq.a}
+          </div>
+        `;
+        faqBox.appendChild(div);
+      });
+
+      // Reviews
+      const reviewList = document.getElementById('customer-reviews-list');
+      reviewList.innerHTML = `
+        <div class="pt-3 space-y-1">
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-900">Hoàng Tuấn Minh</span>
+              <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">✓ Đã mua tại CitiLap</span>
+            </div>
+            <span class="text-slate-400 text-[11px]">3 ngày trước</span>
+          </div>
+          <div class="text-amber-500 text-xs">★★★★★ <span class="text-slate-500 font-medium text-[11px]">Đã mua bản ${prod.configs[1]?.name || prod.configs[0].name}</span></div>
+          <p class="text-xs text-slate-700 leading-relaxed mt-1">
+            Máy nguyên seal mới 100%, mình qua trực tiếp showroom 79 Lê Thanh Nghị bóc hộp và nhờ kỹ thuật viên cài giúp Win với Photoshop. Máy tản nhiệt siêu êm, render video 4K rất mượt. Tư vấn nhiệt tình, 5 sao cho CitiLap!
+          </p>
+        </div>
+        <div class="pt-3 space-y-1">
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-900">Lê Quỳnh Nga</span>
+              <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">✓ Đã mua tại CitiLap</span>
+            </div>
+            <span class="text-slate-400 text-[11px]">1 tuần trước</span>
+          </div>
+          <div class="text-amber-500 text-xs">★★★★★ <span class="text-slate-500 font-medium text-[11px]">Đã mua bản ${prod.configs[0]?.name}</span></div>
+          <p class="text-xs text-slate-700 leading-relaxed mt-1">
+            Mình ở Đà Nẵng đặt ship COD, 2 ngày nhận được máy. Shipper cho mở hộp kiểm tra đúng seal, đúng mã model mới thanh toán. Màn hình 165Hz chuẩn màu siêu đẹp. Quà tặng kèm balo với chuột rất xịn!
+          </p>
+        </div>
+      `;
+    }
+
+    // Toggle Review Article Expand/Collapse
+    function toggleReviewArticle() {
+      isReviewExpanded = !isReviewExpanded;
+      const content = document.getElementById('review-content');
+      const overlay = document.getElementById('review-fade-overlay');
+      const btnText = document.getElementById('review-toggle-text');
+      const btnIcon = document.getElementById('review-toggle-icon');
+
+      if (isReviewExpanded) {
+        content.classList.remove('max-h-[380px]');
+        content.classList.add('max-h-[2000px]');
+        overlay.classList.add('hidden');
+        btnText.innerText = "Thu gọn bài đánh giá";
+        btnIcon.classList.add('rotate-180');
+      } else {
+        content.classList.remove('max-h-[2000px]');
+        content.classList.add('max-h-[380px]');
+        overlay.classList.remove('hidden');
+        btnText.innerText = "Đọc tiếp bài đánh giá chi tiết";
+        btnIcon.classList.remove('rotate-180');
+      }
+    }
+
+    // Toggle FAQ
+    function toggleFaq(idx) {
+      const ans = document.getElementById(`faq-ans-${idx}`);
+      const icon = document.getElementById(`faq-icon-${idx}`);
+      if (ans.classList.contains('hidden')) {
+        ans.classList.remove('hidden');
+        icon.innerText = '−';
+        icon.classList.add('text-blue-600');
+      } else {
+        ans.classList.add('hidden');
+        icon.innerText = '+';
+        icon.classList.remove('text-blue-600');
+      }
+    }
+
+    // Render toàn bộ trang
+    function renderAll() {
+      const prod = PRODUCTS[currentProdKey];
+
+      // Breadcrumb & Info
+      document.getElementById('bc-category').innerText = prod.category;
+      document.getElementById('bc-series').innerText = prod.series;
+      document.getElementById('bc-product-name').innerText = prod.name;
+
+      document.getElementById('product-title').innerText = prod.fullTitle;
+      document.getElementById('product-model-code').innerText = prod.modelCode;
+      document.getElementById('product-brand').innerText = prod.brand;
+      document.getElementById('badge-condition').innerText = prod.condition;
+
+      // Floating bar
+      document.getElementById('floating-bar-title').innerText = prod.name;
+
+      renderThumbnails();
+      renderConfigs();
+      renderColors();
+      renderWarranties();
+      renderSpecs();
+      renderAccessories();
+      renderArticleAndFAQ();
+      updatePriceUI();
+    }
+
+    // ==========================================
+    // FLOATING STICKY BAR CONTROLLER ON SCROLL
+    // ==========================================
+    window.addEventListener('scroll', () => {
+      const hero = document.getElementById('product-hero-container');
+      const bar = document.getElementById('floating-purchase-bar');
+      if (!hero || !bar) return;
+
+      const rect = hero.getBoundingClientRect();
+      // Khi cuộn qua nửa khối sản phẩm thì bật thanh nổi
+      if (rect.bottom < 200) {
+        bar.classList.remove('floating-bar-hidden');
+        bar.classList.add('floating-bar-visible');
+      } else {
+        bar.classList.remove('floating-bar-visible');
+        bar.classList.add('floating-bar-hidden');
+      }
+    });
+
+    // ==========================================
+    // MODAL 1: ĐẶT HÀNG NHANH 1 PHÚT
+    // ==========================================
+    function openQuickCheckoutModal() {
+      const total = calculateTotal();
+      const prod = PRODUCTS[currentProdKey];
+
+      document.getElementById('checkout-summary-title').innerText = prod.name;
+      document.getElementById('checkout-summary-spec').innerText = `${total.cfg.name} | Màu ${total.clr.name.split('(')[0].trim()} | ${total.war.name}`;
+      document.getElementById('checkout-summary-price').innerText = formatVND(total.finalPrice);
+      document.getElementById('checkout-summary-img').src = document.getElementById('main-product-img').src;
+
+      // Reset views
+      document.getElementById('checkout-form-container').classList.remove('hidden');
+      document.getElementById('checkout-success-container').classList.add('hidden');
+      document.getElementById('modal-quick-checkout').classList.remove('hidden');
+    }
+
+    function closeQuickCheckoutModal() {
+      document.getElementById('modal-quick-checkout').classList.add('hidden');
+    }
+
+    function toggleDeliveryMode(mode) {
+      if (mode === 'home') {
+        document.getElementById('field-address').classList.remove('hidden');
+        document.getElementById('field-store').classList.add('hidden');
+      } else {
+        document.getElementById('field-address').classList.add('hidden');
+        document.getElementById('field-store').classList.remove('hidden');
+      }
+    }
+
+    function submitQuickOrder() {
+      const name = document.getElementById('checkout-name').value.trim() || "Quý khách";
+      const phone = document.getElementById('checkout-phone').value.trim() || "09xx.xxx.xxx";
+      
+      const randomCode = '#CTL-' + Math.floor(10000 + Math.random() * 90000);
+      document.getElementById('success-customer-name').innerText = name;
+      document.getElementById('success-customer-phone').innerText = phone;
+      document.getElementById('success-order-code').innerText = randomCode;
+
+      document.getElementById('checkout-form-container').classList.add('hidden');
+      document.getElementById('checkout-success-container').classList.remove('hidden');
+    }
+
+    // ==========================================
+    // MODAL 2: BẢNG TÍNH TRẢ GÓP 0%
+    // ==========================================
+    function openInstallmentModal() {
+      updateInstallmentModalCalc();
+      document.getElementById('modal-installment').classList.remove('hidden');
+    }
+
+    function closeInstallmentModal() {
+      document.getElementById('modal-installment').classList.add('hidden');
+    }
+
+    function setPrepayPercent(pct) {
+      prepayPercent = pct;
+      [0, 20, 30, 50].forEach(p => {
+        const btn = document.getElementById(`btn-prepay-${p}`);
+        if (p === pct) {
+          btn.className = "py-2 rounded-xl border border-blue-600 bg-blue-50 text-blue-900 font-bold";
+        } else {
+          btn.className = "py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold";
+        }
+      });
+      updateInstallmentModalCalc();
+    }
+
+    function setInstallmentMonths(months) {
+      installmentMonths = months;
+      [3, 6, 9, 12].forEach(m => {
+        const btn = document.getElementById(`btn-month-${m}`);
+        if (m === months) {
+          btn.className = "py-2 rounded-xl border border-blue-600 bg-blue-50 text-blue-900 font-bold";
+        } else {
+          btn.className = "py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-blue-400 font-semibold";
+        }
+      });
+      updateInstallmentModalCalc();
+    }
+
+    function updateInstallmentModalCalc() {
+      const { finalPrice } = calculateTotal();
+      const prepayAmount = Math.round((finalPrice * prepayPercent) / 100);
+      const loanAmount = finalPrice - prepayAmount;
+      const monthlyPay = Math.round(loanAmount / installmentMonths);
+
+      const priceElem = document.getElementById('installment-calc-price');
+      if (priceElem) priceElem.innerText = formatVND(finalPrice);
+      const prepayElem = document.getElementById('calc-prepay-amount');
+      if (prepayElem) prepayElem.innerText = `${formatVND(prepayAmount)} (${prepayPercent}%)`;
+      const loanElem = document.getElementById('calc-loan-amount');
+      if (loanElem) loanElem.innerText = formatVND(loanAmount);
+      const monthlyElem = document.getElementById('calc-monthly-pay');
+      if (monthlyElem) monthlyElem.innerText = `${formatVND(monthlyPay)} / tháng (${installmentMonths} tháng)`;
+    }
+
+    // ==========================================
+    // MODAL 3: LIGHTBOX ẢNH
+    // ==========================================
+    function openLightbox(idx) {
+      currentLightboxIdx = idx;
+      updateLightboxView();
+      document.getElementById('modal-lightbox').classList.remove('hidden');
+    }
+
+    function closeLightbox() {
+      document.getElementById('modal-lightbox').classList.add('hidden');
+    }
+
+    function prevLightboxImage() {
+      const prod = PRODUCTS[currentProdKey];
+      currentLightboxIdx = (currentLightboxIdx - 1 + prod.images.length) % prod.images.length;
+      updateLightboxView();
+    }
+
+    function nextLightboxImage() {
+      const prod = PRODUCTS[currentProdKey];
+      currentLightboxIdx = (currentLightboxIdx + 1) % prod.images.length;
+      updateLightboxView();
+    }
+
+    function updateLightboxView() {
+      const prod = PRODUCTS[currentProdKey];
+      const img = prod.images[currentLightboxIdx];
+      document.getElementById('lightbox-img').src = img.url;
+      document.getElementById('lightbox-label').innerText = img.label;
+      document.getElementById('lightbox-counter').innerText = `${currentLightboxIdx + 1} / ${prod.images.length}`;
+    }
+
+    // ==========================================
+    // MODAL 4: FULL SPECS SHEET
+    // ==========================================
+    function openFullSpecsModal() {
+      const prod = PRODUCTS[currentProdKey];
+      document.getElementById('fullspecs-product-name').innerText = prod.fullTitle;
+      const tbody = document.getElementById('full-specs-table-body');
+      tbody.innerHTML = '';
+
+      prod.specs.forEach(([key, val], idx) => {
+        const tr = document.createElement('tr');
+        tr.className = idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/70';
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-bold text-slate-700 w-1/3 border-b border-slate-100">${key}</td>
+          <td class="py-3 px-4 text-slate-900 border-b border-slate-100">${val}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('modal-full-specs').classList.remove('hidden');
+    }
+
+    function closeFullSpecsModal() {
+      document.getElementById('modal-full-specs').classList.add('hidden');
+    }
+
+    // Keyboard ESC to close modals
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeQuickCheckoutModal();
+        closeInstallmentModal();
+        closeLightbox();
+        closeFullSpecsModal();
+      }
+    });
+
+    // Handle Add to cart
+    function handleAddToCart() {
+      const total = calculateTotal();
+      showToast(`Đã thêm vào giỏ hàng: ${total.cfg.name} (${formatVND(total.finalPrice)})`);
+    }
+
+    function openFeedbackModal() {
+      showToast("Cảm ơn bạn! Tính năng gửi đánh giá sẽ được cập nhật trong phiên bản tiếp theo.");
+    }
+
+    // Toast notification
+    let toastTimeout;
+    function showToast(message) {
+      clearTimeout(toastTimeout);
+      const toast = document.getElementById('toast-modal');
+      document.getElementById('toast-desc').innerText = message;
+      toast.classList.remove('opacity-0', 'translate-y-[-100px]', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-[-100px]', 'pointer-events-none');
+      }, 2500);
+    }
+
+    // Khởi tạo lần đầu
+    renderAll();
+  </script>
+</body>
+</html>

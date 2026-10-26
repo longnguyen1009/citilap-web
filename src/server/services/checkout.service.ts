@@ -6,6 +6,7 @@ import { adminSettingsDocumentSchema } from '@/contracts/cms/settings';
 import { checkoutSelectionSchema, type CheckoutQuote } from '@/contracts/checkout';
 import type { ResolvedOrderItem, PriceChangedError } from './order.service';
 import { computeShippingFee } from './checkout-shipping-policy';
+import { resolveProductWarranty } from '@/lib/product-warranty';
 
 export class CheckoutError extends Error {
   constructor(public code: string, message: string, public status = 400, public details?: unknown) { super(message); }
@@ -36,6 +37,7 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
   const changedItems: PriceChangedError['details']['changedItems'] = [];
   let subtotalAmount = 0;
   let expectedSubtotal = 0;
+  const warranties: NonNullable<CheckoutQuote['snapshot']['warranties']> = [];
 
   for (const item of payload.items) {
     if (!item || typeof item !== 'object') {
@@ -106,7 +108,9 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
       }
     );
 
-    const price = resolvedPricing.effectivePrice;
+    const warranty = resolveProductWarranty(product.studio?.published, item.warrantyName);
+    if (warranty) warranties.push({ productId, variantId, ...warranty });
+    const price = resolvedPricing.effectivePrice + (warranty?.adjustment || 0);
 
     // Strict 0đ tolerance verification against client expectation if provided
     let expectedItemPrice: number | null = null;
@@ -145,15 +149,16 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
     resolvedItems.push({
       productId,
       variantId,
+      warrantyName: warranty?.name || null,
       productName: product.name,
       sku,
       productNameSnapshot: product.name,
       skuSnapshot: sku,
-      variantNameSnapshot: variantName,
+      variantNameSnapshot: [variantName, warranty?.name].filter(Boolean).join(' | ') || null,
       price,
       priceSnapshot: price,
-      regularPriceSnapshot: resolvedPricing.regularPrice,
-      compareAtPriceSnapshot: resolvedPricing.compareAtPrice,
+      regularPriceSnapshot: resolvedPricing.regularPrice + (warranty?.adjustment || 0),
+      compareAtPriceSnapshot: resolvedPricing.compareAtPrice === null ? null : resolvedPricing.compareAtPrice + (warranty?.adjustment || 0),
       campaignSnapshot: resolvedPricing.campaign ? JSON.stringify(resolvedPricing.campaign) : null,
       pricingEvaluatedAt: evaluatedAtStr,
       quantity,
@@ -174,10 +179,10 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
   if (payload.shippingMethod === 'pickup' && !showroom) throw new CheckoutError('SHOWROOM_UNAVAILABLE', 'Điểm nhận hàng không còn khả dụng. Vui lòng chọn lại.');
   const shippingFee = computeShippingFee({shippingMethod:payload.shippingMethod, subtotal:subtotalAmount, shippingFee:config.shippingFee, freeShippingThreshold:config.freeShippingThreshold});
   if (!Number.isSafeInteger(subtotalAmount + shippingFee)) throw new CheckoutError('INVALID_CHECKOUT', 'Tổng tiền vượt giới hạn.');
-  const snapshot = {settingsRevision:settings.revision, showroom:showroom || null, bankAccountInfo:payload.paymentMethod === 'BANK_TRANSFER' ? config.bankAccountInfo.trim() : null};
-  const terms = JSON.stringify({shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,showroom:snapshot.showroom,bankAccountInfo:snapshot.bankAccountInfo});
+  const snapshot = {settingsRevision:settings.revision, showroom:showroom || null, bankAccountInfo:payload.paymentMethod === 'BANK_TRANSFER' ? config.bankAccountInfo.trim() : null, ...(warranties.length ? {warranties} : {})};
+  const terms = JSON.stringify({shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,showroom:snapshot.showroom,bankAccountInfo:snapshot.bankAccountInfo, ...(warranties.length ? {warranties} : {})});
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(terms));
   const termsVersion = Array.from(new Uint8Array(digest), b=>b.toString(16).padStart(2,'0')).join('');
-  const quote: CheckoutQuote = {evaluatedAt:at.toISOString(),lines:resolvedItems.map(i=>({productId:i.productId,variantId:i.variantId,productName:i.variantNameSnapshot ? i.productName+' - '+i.variantNameSnapshot : i.productName,quantity:i.quantity,price:i.price,lineTotal:i.lineTotal})),subtotal:subtotalAmount,shippingFee,totalAmount:subtotalAmount+shippingFee,shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,allowedPaymentMethods,showrooms,snapshot,termsVersion};
+  const quote: CheckoutQuote = {evaluatedAt:at.toISOString(),lines:resolvedItems.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName,productName:i.variantNameSnapshot ? i.productName+' - '+i.variantNameSnapshot : i.productName,quantity:i.quantity,price:i.price,lineTotal:i.lineTotal})),subtotal:subtotalAmount,shippingFee,totalAmount:subtotalAmount+shippingFee,shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,allowedPaymentMethods,showrooms,snapshot,termsVersion};
   return {quote,resolvedItems,campaignNotes,changedItems,expectedSubtotal};
 }

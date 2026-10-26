@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     return Response.json({success:true,data:quote}, {headers});
   } catch (error) {
     if (error instanceof CheckoutError) return Response.json({success:false,error:{code:error.code,message:error.message}}, {status:error.status,headers});
-    const unavailable = error instanceof Error && /^(PRODUCT_UNAVAILABLE|VARIANT_UNAVAILABLE|PRODUCT_NOT_AVAILABLE|PRODUCT_NOT_FOUND|VARIANT_NOT_FOUND)$/.test(error.message);
+    const unavailable = error instanceof Error && /^(PRODUCT_UNAVAILABLE|VARIANT_UNAVAILABLE|WARRANTY_UNAVAILABLE|PRODUCT_NOT_AVAILABLE|PRODUCT_NOT_FOUND|VARIANT_NOT_FOUND)$/.test(error.message);
     return Response.json({success:false,error:{code:unavailable?'PRODUCT_UNAVAILABLE':'CHECKOUT_UNAVAILABLE',message:unavailable?'Sản phẩm không còn khả dụng.':'Chưa thể xác thực giá và phí giao hàng. Vui lòng thử lại.'}}, {status:unavailable?409:503,headers});
   }
 }

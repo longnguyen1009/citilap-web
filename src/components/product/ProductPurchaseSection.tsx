@@ -1,16 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Minus, Plus, ShoppingCart, ArrowRight } from 'lucide-react';
+import { ShoppingCart, ArrowRight, ShieldCheck, Gift, Phone, CreditCard } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
-import { PriceTag } from '@/components/ui/PriceTag';
-import { StockBadge } from '@/components/ui/StockBadge';
 import { conditionLabels } from '@/contracts/cms/product-studio';
 import type { ProductDetailVariant } from '@/server/services/catalog.service';
 import { businessProfile } from '@/config/business-profile';
 import ProductVariantSelector from './ProductVariantSelector';
+import InstallmentCalculatorModal from './InstallmentCalculatorModal';
 
 interface ProductPurchaseSectionProps {
   productId: string;
@@ -42,11 +41,12 @@ export default function ProductPurchaseSection({
   phone = businessProfile.displayPhone,
 }: ProductPurchaseSectionProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { addToCart } = useCart();
-  const [quantity, setQuantity] = useState(1);
   const [message, setMessage] = useState('');
   const [userSelectedVariantId, setUserSelectedVariantId] = useState<string | null>(null);
   const [prevPropVariantId, setPrevPropVariantId] = useState(selectedVariantId);
+  const [isInstallmentModalOpen, setIsInstallmentModalOpen] = useState(false);
 
   if (prevPropVariantId !== selectedVariantId) {
     setPrevPropVariantId(selectedVariantId);
@@ -59,11 +59,16 @@ export default function ProductPurchaseSection({
   const originalPrice = variant ? variant.originalPrice : baseOriginalPrice;
   const stock = variant?.stock ?? baseStock;
   const canOrder = stock > 0 && (!variants.length || !!variant);
-  const actualQuantity = Math.min(quantity, Math.max(1, stock));
 
-  const add = () => {
+  const saving = originalPrice && originalPrice > price ? originalPrice - price : null;
+  const installmentMonthly = Math.round(price / 12);
+  const effectiveWarranty = initialWarranty || "Bảo hành 3 tháng tiêu chuẩn tại CitiLap";
+
+  const add = (redirectCart = false) => {
     if (!canOrder) return;
     addToCart({
+      slug: productSlug,
+      template: pathname.startsWith('/phu-kien/') ? 'ACCESSORY' : 'LAPTOP',
       id: `${productId}-${variant?.id || 'base'}`,
       productId,
       variantId: variant?.id,
@@ -72,18 +77,78 @@ export default function ProductPurchaseSection({
       price,
       displayPrice: price.toLocaleString('vi-VN') + 'đ',
       variantLabel: variant?.name,
-      quantity: actualQuantity,
+      quantity: 1,
       maxQuantity: stock,
     });
-    setMessage('Đã thêm vào giỏ. Giá và khả dụng được kiểm tra lại trước khi đặt hàng.');
+    if (redirectCart) {
+      router.push('/cart');
+    } else {
+      setMessage('Đã thêm sản phẩm vào giỏ hàng thành công!');
+    }
   };
 
   return (
-    <section className="space-y-5">
-      <p className="text-sm font-semibold text-gray-700">
-        Tình trạng: <span className="text-gray-900 font-bold">{conditionLabels[initialCondition as keyof typeof conditionLabels] || initialCondition}</span>
-      </p>
+    <section className="space-y-4">
+      {/* 1. KHỐI GIÁ NẰM NGAY TRÊN ĐẦU, DỄ THEO DÕI NHẤT */}
+      <div className="rounded-2xl border-2 border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 shadow-xs relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider">
+                🔥 GIÁ KHUYẾN MÃI HÔM NAY
+              </span>
+              <span className="text-[11px] text-gray-500 font-medium">(Đã bao gồm VAT)</span>
+            </div>
+            <div className="flex items-baseline gap-2.5">
+              <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
+                {price.toLocaleString('vi-VN')}₫
+              </span>
+              {originalPrice && originalPrice > price && (
+                <span className="text-sm sm:text-base text-gray-400 line-through">
+                  {originalPrice.toLocaleString('vi-VN')}₫
+                </span>
+              )}
+              {saving && saving > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-xs">
+                  Tiết kiệm {saving.toLocaleString('vi-VN')}₫
+                </span>
+              )}
+            </div>
+          </div>
 
+          <div className="sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-200">
+            <span className="text-xs font-semibold text-gray-700 block">
+              Trả góp 0% chỉ từ:
+            </span>
+            <span className="text-sm font-black text-blue-600 block">
+              {installmentMonthly.toLocaleString('vi-VN')}₫ / tháng
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsInstallmentModalOpen(true)}
+              className="text-[11px] text-blue-600 hover:underline font-bold mt-0.5 inline-block cursor-pointer"
+            >
+              Bảng tính góp chi tiết →
+            </button>
+          </div>
+        </div>
+
+        {/* Tóm tắt cấu hình đang chọn */}
+        <div className="mt-3 pt-3 border-t border-rose-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 text-gray-700">
+            <span className="font-bold text-gray-900">Đang chọn:</span>
+            <span className="font-semibold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-gray-200">
+              {variant?.name || conditionLabels[initialCondition as keyof typeof conditionLabels] || initialCondition}
+            </span>
+          </div>
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            {effectiveWarranty}
+          </span>
+        </div>
+      </div>
+
+      {/* 2. CHỌN CẤU HÌNH (DẠNG CARD 365, TỰ ĐỘNG ẨN NẾU <= 1 OPTION) */}
       <ProductVariantSelector
         variants={variants}
         selectedVariantId={currentVariantId}
@@ -91,105 +156,98 @@ export default function ProductPurchaseSection({
         productSlug={productSlug}
       />
 
-      <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 space-y-3">
-        <PriceTag price={price} originalPrice={originalPrice} size="xl" />
-        <StockBadge stock={stock} />
-        {initialWarranty && (
-          <p className="text-sm text-gray-600">
-            Bảo hành: <span className="font-semibold text-gray-900">{initialWarranty}</span>
-          </p>
-        )}
-        <div>
-          <Link href="/chinh-sach-bao-hanh" className="text-sm text-blue-600 hover:text-blue-700 underline">
-            Chính sách bảo hành
-          </Link>
+      {/* 3. KHỐI QUÀ TẶNG & KHUYẾN MÃI ĐI KÈM */}
+      <div className="rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50/70 to-orange-50/30 p-4 space-y-2 relative">
+        <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wide">
+          <Gift className="w-4 h-4 text-rose-600" />
+          <span>QUÀ TẶNG KÈM THEO MÁY (TRỊ GIÁ ĐẾN 1.250.000₫):</span>
         </div>
+        <ul className="space-y-1.5 text-xs text-gray-700">
+          <li className="flex items-start gap-2">
+            <span className="text-rose-600 font-bold shrink-0">●</span>
+            <span>Tặng <strong>Balo Gaming / Công sở cao cấp</strong> chống sốc chống nước (trị giá 450.000₫).</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-rose-600 font-bold shrink-0">●</span>
+            <span>Tặng <strong>Chuột quang không dây Silent</strong> + Bàn di chuột Speed CitiLap (trị giá 250.000₫).</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-rose-600 font-bold shrink-0">●</span>
+            <span>Tặng gói <strong>Cài đặt hệ điều hành, Office và vệ sinh, tra keo tản nhiệt</strong> trọn đời máy.</span>
+          </li>
+          <li className="flex items-start gap-2">
+            <span className="text-rose-600 font-bold shrink-0">●</span>
+            <span className="text-rose-700 font-semibold">Giảm thêm 300.000₫ cho Học sinh - Sinh viên khi xuất trình thẻ HSSV tại cửa hàng.</span>
+          </li>
+        </ul>
       </div>
 
-      {/* Quantity Selector with Stepper Buttons */}
-      <div className="flex items-center gap-4">
-        <span className="text-sm font-semibold text-gray-700">Số lượng:</span>
-        <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-white shadow-2xs">
+      {/* 4. CỤM NÚT HÀNH ĐỘNG MUA HÀNG */}
+      <div className="space-y-2.5 pt-1">
+        {/* Nút Hero Mua Ngay */}
+        <button
+          type="button"
+          disabled={!canOrder}
+          onClick={() => add(true)}
+          className="w-full flex flex-col items-center justify-center py-3.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black shadow-lg shadow-rose-600/25 transition cursor-pointer active:scale-[0.99] disabled:opacity-50"
+        >
+          <div className="flex items-center gap-2 text-base sm:text-lg">
+            <ShoppingCart className="w-5 h-5" />
+            <span>MUA NGAY - GIAO TẬN NƠI HOẶC NHẬN TẠI SHOP</span>
+          </div>
+          <span className="text-[11px] font-normal text-rose-100 mt-0.5">
+            Kiểm tra máy chuẩn 100%, hài lòng mới thanh toán
+          </span>
+        </button>
+
+        {/* 2 Nút phụ: Trả góp & Thêm vào giỏ */}
+        <div className="grid grid-cols-2 gap-2.5">
           <button
             type="button"
-            aria-label="Giảm số lượng"
-            disabled={!canOrder || actualQuantity <= 1}
-            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-            className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            onClick={() => setIsInstallmentModalOpen(true)}
+            className="flex flex-col items-center justify-center py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 hover:bg-blue-100/70 text-blue-800 transition cursor-pointer"
           >
-            <Minus className="w-4 h-4" />
+            <span className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
+              <CreditCard className="w-4 h-4 text-blue-600" /> TRẢ GÓP 0% QUA THẺ
+            </span>
+            <span className="text-[10px] text-blue-600">Thủ tục chỉ mất 3 phút</span>
           </button>
-          <input
-            aria-label="Số lượng"
-            type="number"
-            min={1}
-            max={Math.max(1, stock)}
-            value={actualQuantity}
+
+          <button
+            type="button"
             disabled={!canOrder}
-            onChange={(e) => setQuantity(Math.max(1, Math.min(Math.max(1, stock), Math.floor(Number(e.target.value) || 1))))}
-            className="w-12 h-9 text-center font-bold text-gray-900 border-x border-gray-200 focus:outline-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none"
-          />
-          <button
-            type="button"
-            aria-label="Tăng số lượng"
-            disabled={!canOrder || actualQuantity >= stock}
-            onClick={() => setQuantity((q) => Math.min(stock, q + 1))}
-            className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            onClick={() => add(false)}
+            className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 border-gray-300 hover:border-gray-400 bg-white hover:bg-gray-50 text-gray-800 transition cursor-pointer font-bold text-xs sm:text-sm disabled:opacity-50"
           >
-            <Plus className="w-4 h-4" />
+            <ShoppingCart className="w-4 h-4 text-gray-600" />
+            <span>THÊM VÀO GIỎ</span>
           </button>
         </div>
-        {stock > 0 && stock <= 5 && (
-          <span className="text-xs text-amber-600 font-medium">Chỉ còn {stock} máy</span>
+
+        {/* Thông báo thêm giỏ hàng thành công */}
+        {message && (
+          <div role="status" aria-live="polite" className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between gap-2">
+            <span>{message}</span>
+            <Link href="/cart" className="font-bold underline shrink-0 hover:text-emerald-900 inline-flex items-center gap-0.5">
+              Xem giỏ hàng <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
         )}
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <button
-          type="button"
-          disabled={!canOrder}
-          onClick={add}
-          className="rounded-xl border-2 border-blue-600 p-3 font-bold text-blue-700 hover:bg-blue-50/50 disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2"
-        >
-          <ShoppingCart className="w-5 h-5" />
-          Thêm vào giỏ
-        </button>
-        <button
-          type="button"
-          disabled={!canOrder}
-          onClick={() => {
-            if (canOrder) {
-              add();
-              router.push('/cart');
-            }
-          }}
-          className="rounded-xl bg-blue-600 hover:bg-blue-700 p-3 font-bold text-white shadow-md disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2"
-        >
-          Mua ngay
-        </button>
-      </div>
-
-      {!canOrder && (
-        <p role="status" className="text-sm text-red-600 font-medium">
-          Cấu hình này hiện chưa nhận đặt hàng. Liên hệ cửa hàng để được hỗ trợ.
-        </p>
-      )}
-
-      {message && (
-        <div role="status" aria-live="polite" className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-800 flex items-center justify-between gap-2">
-          <span>{message}</span>
-          <Link href="/cart" className="font-bold underline shrink-0 hover:text-emerald-900 inline-flex items-center gap-0.5">
-            Xem giỏ hàng <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+        {/* Hotline tư vấn */}
+        <div className="flex items-center justify-center gap-2 pt-1 text-xs text-gray-500">
+          <Phone className="w-4 h-4 text-emerald-600" />
+          <span>Tư vấn kỹ thuật & cấu hình riêng: <a href={'tel:' + phone.replace(/\s+/g, '')} className="text-blue-600 font-bold hover:underline">{phone}</a> (Zalo / Miễn phí)</span>
         </div>
-      )}
+      </div>
 
-      <a
-        href={'tel:' + phone.replace(/\s+/g, '')}
-        className="block rounded-xl border border-blue-200 bg-blue-50/30 hover:bg-blue-50 p-3 text-center font-semibold text-blue-700 transition"
-      >
-        Hotline tư vấn: {phone}
-      </a>
+      {/* Modal Trả Góp 0% */}
+      <InstallmentCalculatorModal
+        isOpen={isInstallmentModalOpen}
+        onClose={() => setIsInstallmentModalOpen(false)}
+        productName={productName}
+        price={price}
+      />
     </section>
   );
 }

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+  <defs>
+    <linearGradient id="dh-screen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181B"/>
+      <stop offset="100%" stop-color="#09090B"/>
+    </linearGradient>
+    <linearGradient id="dh-art" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#EC4899"/>
+      <stop offset="33%" stop-color="#8B5CF6"/>
+      <stop offset="66%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <filter id="dh-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Shadow -->
+  <ellipse cx="80" cy="108" rx="58" ry="7" fill="#CBD5E1" opacity="0.6"/>
+
+  <!-- Screen Lid -->
+  <g filter="url(#dh-shadow)">
+    <rect x="36" y="24" width="88" height="56" rx="4" fill="#18181B"/>
+    <rect x="40" y="28" width="80" height="48" rx="2" fill="url(#dh-screen)"/>
+    <!-- Color Wave on Canvas -->
+    <path d="M42,62 Q60,40 80,54 T118,48 L118,74 L42,74 Z" fill="url(#dh-art)" opacity="0.85"/>
+  </g>
+
+  <!-- Floating Adobe Creative Badges -->
+  <!-- Ps -->
+  <g transform="translate(48, 16)" filter="url(#dh-shadow)">
+    <rect width="16" height="16" rx="3" fill="#001E36" stroke="#31A8FF" stroke-width="1.2"/>
+    <text x="8" y="12" fill="#31A8FF" font-family="system-ui" font-weight="900" font-size="9" text-anchor="middle">Ps</text>
+  </g>
+  <!-- Ai -->
+  <g transform="translate(68, 14)" filter="url(#dh-shadow)">
+    <rect width="16" height="16" rx="3" fill="#330000" stroke="#FF9A00" stroke-width="1.2"/>
+    <text x="8" y="12" fill="#FF9A00" font-family="system-ui" font-weight="900" font-size="9" text-anchor="middle">Ai</text>
+  </g>
+  <!-- Pr -->
+  <g transform="translate(88, 15)" filter="url(#dh-shadow)">
+    <rect width="16" height="16" rx="3" fill="#00005B" stroke="#EA77FF" stroke-width="1.2"/>
+    <text x="8" y="12" fill="#EA77FF" font-family="system-ui" font-weight="900" font-size="9" text-anchor="middle">Pr</text>
+  </g>
+  <!-- Ae -->
+  <g transform="translate(108, 18)" filter="url(#dh-shadow)">
+    <rect width="16" height="16" rx="3" fill="#00005B" stroke="#9999FF" stroke-width="1.2"/>
+    <text x="8" y="12" fill="#9999FF" font-family="system-ui" font-weight="900" font-size="9" text-anchor="middle">Ae</text>
+  </g>
+
+  <!-- Base / Precision Keyboard -->
+  <polygon points="18,102 142,102 130,80 30,80" fill="#27272A"/>
+  <polygon points="34,83 126,83 122,96 38,96" fill="#18181B"/>
+  <rect x="68" y="98" width="24" height="2.5" rx="1" fill="#3F3F46"/>
+</svg>

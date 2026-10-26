@@ -7,6 +7,7 @@ import { useCart } from "@/context/CartContext";
 import { useState } from "react";
 import CartValidationStatus from '@/components/cart/CartValidationStatus';
 import Breadcrumb from "@/components/layout/Breadcrumb";
+import { productHref } from '@/lib/product-paths';
 
 export default function CartPage() {
   const { cart, removeFromCart, updateQuantity, cartTotal, cartCount, checkoutReady } = useCart();
@@ -77,11 +78,11 @@ export default function CartPage() {
                   <div key={item.id} className="p-4 flex flex-col md:grid md:grid-cols-12 gap-4 items-center">
                     {/* Product Info */}
                     <div className="col-span-6 flex gap-4 w-full">
-                      <Link href={`/product/${item.productId}`} className="w-20 h-20 md:w-24 md:h-24 flex-shrink-0 bg-gray-50 rounded-lg border border-gray-100 p-2 flex items-center justify-center hover:shadow-md transition">
+                      <Link href={productHref({ ...item, id: item.productId })} className="w-20 h-20 md:w-24 md:h-24 flex-shrink-0 bg-gray-50 rounded-lg border border-gray-100 p-2 flex items-center justify-center hover:shadow-md transition">
                         <div className="relative w-full h-full"><Image src={item.image} alt={item.name} fill sizes="96px" className="object-contain" /></div>
                       </Link>
                       <div className="flex flex-col flex-grow justify-center min-w-0">
-                        <Link href={`/product/${item.productId}`} className="font-bold text-gray-800 hover:text-blue-600 line-clamp-2 leading-tight text-sm md:text-base">
+                        <Link href={productHref({ ...item, id: item.productId })} className="font-bold text-gray-800 hover:text-blue-600 line-clamp-2 leading-tight text-sm md:text-base">
                           {item.name}
                         </Link>
                         {item.variantLabel && (

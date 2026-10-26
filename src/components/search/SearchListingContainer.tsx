@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { trackStorefront } from '@/lib/storefront-metrics';
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Filter, Inbox, Sparkles } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import EmptyState from "@/components/ui/EmptyState";
@@ -40,6 +40,7 @@ export default function SearchListingContainer({
   initialData,
 }: SearchListingContainerProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
@@ -61,6 +62,8 @@ export default function SearchListingContainer({
   const activeGpus = searchParams.getAll("gpu");
 
   const totalActiveFilters =
+    searchParams.getAll("tag").length +
+    (!activePricePreset && (searchParams.has("minPrice") || searchParams.has("maxPrice")) ? 1 : 0) +
     activeCategories.length +
     activeBrands.length +
     (activePricePreset ? 1 : 0) +
@@ -116,10 +119,10 @@ export default function SearchListingContainer({
         </aside>
 
         {/* Right Content Area (3 cols) */}
-        <section className="lg:col-span-3">
+        <section aria-label="Kết quả sản phẩm" className="min-w-0 lg:col-span-3">
           {/* Top Bar: Results Count + Mobile Filter Trigger + Sort Select */}
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-border-subtle">
-            <div className="text-body-sm text-text-secondary">
+            <div role="status" className="text-body-sm text-text-secondary">
               {query ? (
                 <>
                   Tìm thấy{" "}
@@ -175,14 +178,14 @@ export default function SearchListingContainer({
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4">
                     {totalActiveFilters > 0 && (
                       <Link
-                        href={`/search${query ? `?q=${encodeURIComponent(query)}` : ""}`}
+                        href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
                         className="px-5 py-2.5 rounded-control bg-brand-primary text-text-inverse font-bold text-body-sm hover:bg-brand-primary-hover transition"
                       >
                         Xóa tất cả bộ lọc
                       </Link>
                     )}
                     <Link
-                      href="/category"
+                      href="/phan-loai"
                       className="px-5 py-2.5 rounded-control border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
                     >
                       Khám phá tất cả danh mục

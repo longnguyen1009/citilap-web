@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -12,19 +12,12 @@ import {
   Trash2,
   Home,
   Layers,
-  Calendar,
-  AlertTriangle,
-  RefreshCw,
   X,
   Sparkles,
 } from 'lucide-react';
 import {
   PageHeader,
-  AdminCard,
   AdminButton,
-  StatusBadge,
-  AdminLoadingState,
-  AdminErrorState,
 } from '@/components/admin/ui';
 import { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import type { LandingPageListItem } from '@/contracts/cms/site-builder';
@@ -51,27 +44,86 @@ export default function AdminBuilderListPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const fetchList = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (query.trim()) params.set('q', query.trim());
-      params.set('page', String(page));
-      params.set('limit', '20');
+  const createModalRef = useRef<HTMLDivElement>(null);
+  const createTriggerRef = useRef<HTMLElement | null>(null);
 
-      const res = await mediaRequest<LandingPageListResponse>(`/api/admin/builder?${params.toString()}`);
-      setData(res);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Không thể tải danh sách trang.');
-    } finally {
-      setLoading(false);
-    }
-  }, [query, page]);
+  const openCreateModal = () => {
+    createTriggerRef.current = document.activeElement as HTMLElement;
+    setShowCreateModal(true);
+  };
 
+  const closeCreateModal = () => {
+    setShowCreateModal(false);
+    createTriggerRef.current?.focus();
+  };
+
+  // Focus trap and Escape key listener for Create Modal
   useEffect(() => {
-    void fetchList();
-  }, [fetchList]);
+    if (!showCreateModal) return;
+
+    // Auto-focus first required input
+    const input = createModalRef.current?.querySelector<HTMLInputElement>('input[required]');
+    input?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeCreateModal();
+        return;
+      }
+      if (e.key === 'Tab' && createModalRef.current) {
+        const focusables = createModalRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCreateModal]);
+
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Asynchronous data fetching without synchronous setState in effect body
+  useEffect(() => {
+    let ignore = false;
+    const fetchPages = async () => {
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set('q', query.trim());
+        params.set('page', String(page));
+        params.set('limit', '20');
+
+        const res = await mediaRequest<LandingPageListResponse>(`/api/admin/builder?${params.toString()}`);
+        if (!ignore) {
+          setData(res);
+          setError(null);
+        }
+      } catch (err: unknown) {
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : 'Không thể tải danh sách trang.');
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void fetchPages();
+    return () => {
+      ignore = true;
+    };
+  }, [query, page, reloadKey]);
 
   // Separate homepage from landing pages
   const homepage = data?.items.find((p) => p.id === 'home');
@@ -97,7 +149,7 @@ export default function AdminBuilderListPage() {
         }),
       });
 
-      setShowCreateModal(false);
+      closeCreateModal();
       router.push(`/admin/builder/${res.id}`);
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : 'Không thể tạo trang đích.');
@@ -109,7 +161,7 @@ export default function AdminBuilderListPage() {
     if (!confirm(`Bạn có chắc muốn xoá trang "${name}"?`)) return;
     try {
       await mediaRequest(`/api/admin/builder/${id}`, { method: 'DELETE' });
-      void fetchList();
+      setReloadKey((k) => k + 1);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Không thể xoá trang.');
     }
@@ -122,6 +174,7 @@ export default function AdminBuilderListPage() {
         description="Quản lý bố cục trang chủ và các trang đích (Landing Pages). Thay đổi nội dung banner, danh mục, khối sản phẩm theo thời gian thực mà không cần sửa mã nguồn."
         actions={
           <AdminButton
+            id="btn-create-landing"
             variant="primary"
             size="sm"
             icon={<Plus size={16} />}
@@ -130,7 +183,7 @@ export default function AdminBuilderListPage() {
               setCreateTitle('');
               setCreateSlug('');
               setCreateError(null);
-              setShowCreateModal(true);
+              openCreateModal();
             }}
           >
             Tạo Landing Page mới
@@ -340,15 +393,27 @@ export default function AdminBuilderListPage() {
         <div
           role="dialog"
           aria-modal="true"
+          aria-labelledby="create-landing-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeCreateModal();
+            }
+          }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
         >
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+          <div
+            ref={createModalRef}
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95"
+          >
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900">Tạo Landing Page mới</h3>
+              <h3 id="create-landing-modal-title" className="text-sm font-bold text-slate-900">
+                Tạo Landing Page mới
+              </h3>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded"
+                onClick={closeCreateModal}
+                className="p-1 text-slate-400 hover:text-slate-700 rounded cursor-pointer"
+                aria-label="Đóng hộp thoại"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -419,7 +484,7 @@ export default function AdminBuilderListPage() {
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={closeCreateModal}
                   className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition cursor-pointer"
                 >
                   Hủy

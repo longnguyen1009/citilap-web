@@ -3,7 +3,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { unstable_splitSqlQuery } from 'wrangler';
-await build({stdin:{contents:`export * from './src/server/services/navigation.service'; export * from './src/server/services/media-library.service'; export * from './src/contracts/cms/navigation';`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile:'scripts/.navigation-bundle.mjs',external:['cloudflare:workers','node:*'],plugins:[{name:'fixture',setup(b){b.onResolve({filter:/\.wasm/},a=>({path:a.path,external:true}));b.onResolve({filter:/^server-only$/},a=>({path:a.path,namespace:'empty'}));b.onLoad({filter:/.*/,namespace:'empty'},()=>({contents:''}));}}]});
+await build({stdin:{contents:`export * from './src/server/services/navigation.service'; export * from './src/server/services/media-library.service'; export * from './src/contracts/cms/navigation'; export {getCategoryFilteredProducts,getCategoryProducts,resolveProductsByCriteria} from './src/server/services/catalog.service'; export {getPrismaClient} from './src/lib/prisma'; export {publicRedirect} from './src/server/services/redirect.service';`,resolveDir:process.cwd()},bundle:true,platform:'node',format:'esm',outfile:'scripts/.navigation-bundle.mjs',external:['cloudflare:workers','node:*'],plugins:[{name:'fixture',setup(b){b.onResolve({filter:/\.wasm/},a=>({path:a.path,external:true}));b.onResolve({filter:/^server-only$/},a=>({path:a.path,namespace:'empty'}));b.onLoad({filter:/.*/,namespace:'empty'},()=>({contents:''}));}}]});
 const api=await import('./.navigation-bundle.mjs');
 const mf=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default {fetch(){return new Response("qa")}}',compatibilityDate:'2026-10-01',compatibilityFlags:['nodejs_compat'],d1Databases:['DB'],r2Buckets:['PRODUCT_MEDIA']}));
 let passed=0;
@@ -11,7 +11,7 @@ const check=async(name,fn)=>{await fn();passed++;console.log('PASS '+name);};
 try {
  const DB=await mf.getD1Database('DB'),PRODUCT_MEDIA=await mf.getR2Bucket('PRODUCT_MEDIA'),env={DB,PRODUCT_MEDIA};
  for(const f of (await readdir('d1-migrations')).filter(f=>f.endsWith('.sql')).sort()) await DB.batch(unstable_splitSqlQuery(await readFile('d1-migrations/'+f,'utf8')).map(s=>DB.prepare(s)));
- await DB.prepare("INSERT INTO Category(id,name,slug,updatedAt) VALUES('laptop','Laptop','laptop',CURRENT_TIMESTAMP)").run();
+ await DB.prepare("INSERT INTO Category(id,name,slug,updatedAt) VALUES('laptop','Laptop','laptop-catalog',CURRENT_TIMESTAMP)").run();
  await DB.prepare("UPDATE Category SET image='categories/gaming.webp' WHERE id='laptop'").run();
  for(const [id,status] of [['p1','ACTIVE'],['p2','ACTIVE'],['p3','DRAFT']]) await DB.prepare("INSERT INTO Product(id,name,slug,description,price,categoryId,status,updatedAt) VALUES(?,?,?,'',100,'laptop',?,CURRENT_TIMESTAMP)").bind(id,'Product '+id,id,status).run();
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
@@ -24,7 +24,7 @@ try {
  d.menus.main=[{id:'accessories-menu',label:'Phụ kiện',target:{kind:'category',id:'accessories'},children:[{id:'setup-menu',label:'Góc làm việc',target:{kind:'collection',id:'setup'}}]}];
  const write=(document=d,action='save',expectedRevision=detail.revision)=>api.writeNavigation(env,{document,action,expectedRevision});
  await check('legacy categories imported with stable IDs; draft invisible to public and Category projection',async()=>{detail=await write();await assert.rejects(()=>api.publicNavigation(DB),e=>e.status===404);assert.equal((await api.publicCategories(DB)).length,1);assert.equal((await api.navigationDetail(DB)).document.categories[0].id,'accessories');});
- await check('publish category order, main menu and collection atomically with resolved media',async()=>{detail=await write(d,'publish');const pub=await api.publicNavigation(DB);assert.equal(pub.categories[0].name,'Phụ kiện');assert.equal(pub.categories[0].image,asset.url);assert.equal(pub.menus.main[0].children[0].href,'/collection/goc-lam-viec');assert.equal(JSON.stringify(pub).includes('storageKey'),false);assert.equal((await api.publicCategories(DB))[0].id,'accessories');assert.deepEqual((await api.publicCollection(DB,'goc-lam-viec')).products.map(p=>p.id),['p2','p1']);});
+ await check('publish category order, main menu and collection atomically with resolved media',async()=>{detail=await write(d,'publish');const pub=await api.publicNavigation(DB);assert.equal(pub.categories[0].name,'Phụ kiện');assert.equal(pub.categories[0].image,asset.url);assert.deepEqual(pub.menus.main[0].children,[{id:'setup-menu',label:d.menus.main[0].children[0].label,href:'/collection/goc-lam-viec'}]);assert.equal(pub.categories[0].href,'/phu-kien');assert.equal(JSON.stringify(pub).includes('storageKey'),false);assert.equal((await api.publicCategories(DB))[0].id,'accessories');assert.deepEqual((await api.publicCollection(DB,'goc-lam-viec')).products.map(p=>p.id),['p2','p1']);});
  await check('draft edits leave public labels and collection order unchanged',async()=>{const draft=structuredClone(d);draft.menus.main[0].label='Draft';draft.collections[0].productIds.reverse();detail=await write(draft);assert.equal((await api.publicNavigation(DB)).menus.main[0].label,'Phụ kiện');assert.deepEqual((await api.publicCollection(DB,'goc-lam-viec')).products.map(p=>p.id),['p2','p1']);assert.equal((await api.navigationDetail(DB)).productNames.p1,'Product p1');});
  await check('stale writes rejected without revision or history changes',async()=>{const before=await DB.prepare('SELECT count(*) AS n FROM NavigationRevision').first();await assert.rejects(()=>write(d,'publish',1),e=>e.status===409);assert.equal((await DB.prepare('SELECT count(*) AS n FROM NavigationRevision').first()).n,before.n);});
  await check('two concurrent edits have exactly one winner',async()=>{const results=await Promise.allSettled([write(),write()]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.find(r=>r.status==='rejected').reason.status,409);detail=await api.navigationDetail(DB);});
@@ -37,6 +37,58 @@ try {
  await check('missing R2 fails publication without partial category changes',async()=>{await PRODUCT_MEDIA.delete((await api.getAsset(DB,asset.id)).storageKey);await assert.rejects(()=>write(d,'publish'),e=>e.status===400);assert.equal((await api.navigationDetail(DB)).revision,detail.revision);});
  await check('SQL projection failure rolls back snapshot, revision history and categories',async()=>{const next=structuredClone(d);next.categories[0].assetId='';[next.categories[0].name,next.categories[1].name]=[next.categories[1].name,next.categories[0].name];const before=(await DB.prepare('SELECT count(*) AS n FROM NavigationRevision').first()).n;await assert.rejects(()=>write(next,'publish'),e=>e.status===409);assert.equal((await api.navigationDetail(DB)).revision,detail.revision);assert.equal((await DB.prepare('SELECT count(*) AS n FROM NavigationRevision').first()).n,before);assert.equal((await api.publicNavigation(DB)).categories[0].name,'Phụ kiện');});
  await check('product selector is paginated and searchable beyond first 25',async()=>{for(let i=0;i<26;i++)await DB.prepare("INSERT INTO Product(id,name,slug,description,price,categoryId,status,updatedAt) VALUES(?,?,?,'',100,'laptop','ACTIVE',CURRENT_TIMESTAMP)").bind('page-'+i,'Page '+String(i).padStart(2,'0'),'page-'+i).run();const first=await api.navigationProducts(DB,'Page ',1),second=await api.navigationProducts(DB,'Page ',2);assert.equal(first.items.length,25);assert.equal(first.hasMore,true);assert.equal(second.items.length,1);assert.equal(second.hasMore,false);assert.equal(new Set([...first.items,...second.items].map(p=>p.id)).size,26);assert.equal((await api.navigationProducts(DB,'Product p1')).items[0].id,'p1');});
+
+ await check('category tree links, descendants, facets, reserved slugs and redirect history',async()=>{
+   const tree=structuredClone(detail.document);
+   for(const c of tree.categories)c.assetId='';
+   tree.categories.push(
+     {...category,id:'gaming',name:'Gaming',slug:'gaming',parentId:'laptop',assetId:''},
+     {...category,id:'legion',name:'Legion',slug:'legion',parentId:'gaming',assetId:''},
+     {...category,id:'new',name:'New laptops',slug:'laptop-moi',parentId:null,assetId:''}
+   );
+   tree.menus.main=[{id:'laptop-menu',label:'Laptop',target:{kind:'category',id:'laptop'},children:[]}];
+   detail=await write(tree,'publish');
+   const pub=await api.publicNavigation(DB);
+   assert.equal(pub.categories.find(c=>c.id==='legion').href,'/laptop-catalog/gaming/legion');
+   assert.equal(pub.menus.main.length,1);
+   assert.deepEqual(pub.menus.main[0].children,[], 'Adding categories must preserve authored menu children');
+   await DB.prepare("UPDATE Product SET categoryId='legion',condition='NEW' WHERE id='p1'").run();
+   await DB.prepare("UPDATE Product SET categoryId='gaming',condition='LIKE_NEW' WHERE id='p2'").run();
+   await DB.prepare("INSERT INTO Product(id,name,slug,description,price,categoryId,status,condition,updatedAt) VALUES('accessory','Accessory','accessory','',100,'accessories','ACTIVE','NEW',CURRENT_TIMESTAMP)").run();
+   const context={flashSaleEnabled:false,flashSaleTitle:'',flashSaleStartAt:'',flashSaleEndAt:''};
+   const client=api.getPrismaClient(DB);
+   const root=await api.getCategoryFilteredProducts({categorySlug:'laptop-catalog',limit:50},client,context);
+   assert(root.products.some(p=>p.id==='p1'));assert(root.products.some(p=>p.id==='p2'));
+   assert(root.facets.conditions.some(c=>c.value==='LIKE_NEW'));
+   const leaf=await api.getCategoryFilteredProducts({categorySlug:'legion'},client,context);
+   assert.deepEqual(leaf.products.map(p=>p.id),['p1']);
+   assert.equal(leaf.category.href,'/laptop-catalog/gaming/legion');
+   const fresh=await api.getCategoryFilteredProducts({categorySlug:'laptop-moi',limit:50},client,context);
+   assert(fresh.products.some(p=>p.id==='p1'));assert(!fresh.products.some(p=>p.id==='p2'));assert(!fresh.products.some(p=>p.id==='accessory'));
+   assert((await api.getCategoryProducts('laptop-catalog',48,client,context)).some(p=>p.id==='p1'));
+   assert((await api.resolveProductsByCriteria({categoryId:'laptop',limit:48},client,context)).some(p=>p.id==='p1'));
+   assert.deepEqual((await api.resolveProductsByCriteria({productType:'accessory'},client,context)).map(p=>p.id),['accessory']);
+   const bad=structuredClone(tree);bad.categories.find(c=>c.id==='laptop').slug='san-pham';
+   await assert.rejects(()=>write(bad,'publish'));
+   tree.categories.find(c=>c.id==='laptop').slug='laptop-renamed';
+   detail=await write(tree,'publish');
+   assert.equal(await api.publicRedirect(DB,'/laptop-catalog/gaming/legion'),'/laptop-renamed/gaming/legion');
+   assert.equal(await api.publicRedirect(DB,'/phan-loai/laptop-catalog/gaming/legion'),'/laptop-renamed/gaming/legion');
+   assert.equal(await api.publicRedirect(DB,'/category/legion'),'/laptop-renamed/gaming/legion');
+   tree.categories.find(c=>c.id==='gaming').parentId='accessories';
+   detail=await write(tree,'publish');
+   assert.equal(await api.publicRedirect(DB,'/laptop-catalog/gaming/legion'),'/phu-kien/gaming/legion');
+   assert.equal(await api.publicRedirect(DB,'/laptop-renamed/gaming/legion'),'/phu-kien/gaming/legion');
+   assert.equal(await api.publicRedirect(DB,'/category/legion'),'/phu-kien/gaming/legion');
+   tree.categories.find(c=>c.id==='laptop').slug='laptop-catalog';
+   detail=await write(tree,'publish');
+   assert.equal(await api.publicRedirect(DB,'/laptop-catalog'),null);
+   assert.equal(await api.publicRedirect(DB,'/laptop-renamed'),'/laptop-catalog');
+ });
+ await check('accessory categories cannot shadow published product URLs',async()=>{
+   const collision=structuredClone(detail.document);collision.categories.push({...category,id:'collision-category',name:'Collision category',slug:'accessory',parentId:'accessories',assetId:''});
+   await assert.rejects(()=>write(collision,'publish'),e=>e.status===409);
+ });
  await check('foreign keys remain valid after all writes',async()=>{assert.equal((await DB.prepare('PRAGMA foreign_key_check').all()).results.length,0);});
  console.log(`Navigation: ${passed}/${passed} PASS`);
 } finally { await mf.dispose(); }

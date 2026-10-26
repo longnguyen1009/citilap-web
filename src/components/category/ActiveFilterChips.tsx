@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X, RotateCcw } from "lucide-react";
 import type { FacetOption } from "@/server/services/catalog.service";
 import { getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
+import { NEED_LABELS, catalogNeedTag } from "@/lib/catalog-needs";
 
 interface ActiveFilterChipsProps {
   facets: {
@@ -35,6 +36,13 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
   const activeGpus = searchParams.getAll("gpu");
 
   const chips: { key: string; value: string; label: string }[] = [];
+  searchParams.getAll("tag").forEach(tag => chips.push({ key: "tag", value: tag, label: `Nhu cầu: ${NEED_LABELS[catalogNeedTag(tag)] || tag.replaceAll("-", " ")}` }));
+  if (!activePricePreset) {
+    for (const [key, label] of [["minPrice", "Giá từ"], ["maxPrice", "Giá đến"]]) {
+      const value = searchParams.get(key);
+      if (value !== null) chips.push({ key, value, label: `${label}: ${Number(value).toLocaleString("vi-VN")} ₫` });
+    }
+  }
 
   if (activeType) {
     const accType = getAccessoryTypeBySlug(activeType);

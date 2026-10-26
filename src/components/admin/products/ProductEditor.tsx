@@ -4,11 +4,25 @@ import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
 import DraftRecovery from '@/components/admin/DraftRecovery';
 import SchedulePanel from '@/components/admin/SchedulePanel';
 import InspectionEditor from './InspectionEditor';
+import ProductStorefrontFields from './ProductStorefrontFields';
+import { productHref } from '@/lib/product-paths';
 
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { catalogNeedTag } from '@/lib/catalog-needs';
+
+const NEED_PRESETS = [
+  { key: 'gaming', label: 'Gaming', icon: '🎮' },
+  { key: 'van-phong', label: 'Văn phòng', icon: '💼' },
+  { key: 'mong-nhe', label: 'Mỏng nhẹ', icon: '🪶' },
+  { key: 'do-hoa', label: 'Đồ họa – kỹ thuật', icon: '🎨' },
+  { key: 'sinh-vien', label: 'Sinh viên', icon: '🎓' },
+  { key: 'cam-ung', label: 'Cảm ứng', icon: '👆' },
+  { key: 'laptop-ai', label: 'Laptop AI', icon: '⚡' },
+  { key: 'doanh-nhan', label: 'Doanh nhân', icon: '👔' },
+];
 import {
   Save,
   Globe,
@@ -428,7 +442,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         <div className="flex items-center gap-2">
           {id && isPublished && (
             <a
-              href={`/product/${doc.slug}`}
+              href={productHref(doc)}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-medium px-2 py-1 rounded border border-slate-200 bg-white"
@@ -448,7 +462,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         title={id ? doc.name || 'Biên tập sản phẩm' : 'Thêm sản phẩm mới'}
         description={
           id
-            ? `Định danh ID: ${id} · Mã URL: /product/${doc.slug || '...'}`
+            ? `Định danh ID: ${id} · Mã URL: ${doc.template === 'LAPTOP' ? '/laptop/' : '/phu-kien/'}${doc.slug || '...'}`
             : 'Tạo sản phẩm Laptop hoặc Phụ kiện với đầy đủ thông số, biến thể và hình ảnh.'
         }
         badge={
@@ -572,7 +586,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                 </label>
                 <div className="flex">
                   <span className="inline-flex items-center px-3 text-xs bg-slate-100 text-slate-500 border border-r-0 border-slate-300 rounded-l-lg">
-                    /product/
+                    {doc.template === 'LAPTOP' ? '/laptop/' : '/phu-kien/'}
                   </span>
                   <input
                     type="text"
@@ -583,6 +597,99 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <label htmlFor="product-tags" className="block text-xs font-bold text-slate-800">
+                  Thẻ tag & Nhu cầu sử dụng
+                </label>
+                <span className="text-[11px] text-slate-500">
+                  Chọn nhanh nhu cầu chuẩn để khách hàng lọc chính xác ở trang phân loại
+                </span>
+              </div>
+
+              {/* Gợi ý chọn nhanh nhu cầu chuẩn */}
+              <div>
+                <span className="block text-[11px] font-semibold text-slate-600 mb-1.5">
+                  Gợi ý chọn nhanh nhu cầu chuẩn:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {NEED_PRESETS.map((preset) => {
+                    const normalizedTags = (doc.tags || []).map(catalogNeedTag);
+                    const isSelected = normalizedTags.includes(preset.key);
+                    return (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        onClick={() => {
+                          const currentTags = doc.tags || [];
+                          let newTags: string[];
+                          if (isSelected) {
+                            newTags = currentTags.filter(t => catalogNeedTag(t) !== preset.key);
+                          } else {
+                            newTags = [...currentTags, preset.key];
+                          }
+                          updateDoc('tags', [...new Set(newTags.map(t => t.trim().toLocaleLowerCase('vi-VN')).filter(Boolean))]);
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'
+                        }`}
+                      >
+                        <span>{preset.icon}</span>
+                        <span>{preset.label}</span>
+                        {isSelected && <span className="ml-0.5 text-[10px] font-black">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tag Input tự do */}
+              <div>
+                <input
+                  id="product-tags"
+                  type="text"
+                  value={(doc.tags || []).join(', ')}
+                  maxLength={1858}
+                  onChange={e => updateDoc('tags', e.target.value.split(',').map(tag => tag.trimStart()))}
+                  onBlur={() => updateDoc('tags', [...new Set((doc.tags || []).map(tag => tag.trim().toLocaleLowerCase('vi-VN')).filter(Boolean))])}
+                  placeholder="gaming, sinh-vien, van-phong, do-hoa, mong-nhe..."
+                  aria-describedby="product-tags-help"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                />
+                <p id="product-tags-help" className="mt-1 text-[11px] text-slate-500">
+                  Tối đa 30 tag, mỗi tag 60 ký tự. Ngăn cách bằng dấu phẩy.
+                </p>
+              </div>
+
+              {/* Danh sách tag đã gắn kèm nút xóa */}
+              {(doc.tags || []).length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-500">Đã gắn ({doc.tags.length}):</span>
+                  {doc.tags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTags = (doc.tags || []).filter((_, idx) => idx !== i);
+                          updateDoc('tags', newTags);
+                        }}
+                        className="text-blue-400 hover:text-blue-700 font-bold ml-0.5"
+                        aria-label={`Xóa tag ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -718,8 +825,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     onChange={e => updateDoc('isFlashSale', e.target.checked)}
                     className="w-4 h-4 rounded text-red-600 focus:ring-red-500"
                   />
-                  <span>🔥 Giá sốc giờ vàng (Hot Sale)</span>
+                  <span>Flash Sale cũ</span>
                 </label>
+                <Link href="/admin/campaigns" className="text-xs font-bold text-red-700 underline">Chọn sản phẩm cho chiến dịch HOT SALE</Link>
               </div>
             </div>
 
@@ -916,6 +1024,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
             </div>
 
             <div className="pt-2">
+              {!doc.specs.some(spec => spec.key === 'Năm ra mắt') && <AdminButton variant="secondary" size="sm" onClick={() => updateDoc('specs',[...doc.specs,{key:'Năm ra mắt',value:''}])}>Thêm năm ra mắt cho bộ lọc</AdminButton>}
               <AdminButton
                 variant="secondary"
                 size="sm"
@@ -1607,6 +1716,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               onChange={html => updateDoc('contentHtml', html)}
               onInsertMediaClick={() => setContentMediaPickerOpen(true)}
             />
+            <ProductStorefrontFields document={doc} onChange={updateDoc} productId={id} />
           </div>
         </AdminCard>
       )}
@@ -1659,7 +1769,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                 {doc.seoTitle || doc.name || 'Tiêu đề sản phẩm'}
               </div>
               <div className="text-emerald-700 text-xs truncate">
-                https://citilap.vn/product/{doc.slug || 'duong-dan-san-pham'}
+                https://citilap.vn{doc.template === 'LAPTOP' ? '/laptop/' : '/phu-kien/'}{doc.slug || 'duong-dan-san-pham'}
               </div>
               <div className="text-slate-600 text-xs line-clamp-2">
                 {doc.seoDescription || doc.description || 'Mô tả tóm tắt sản phẩm sẽ hiển thị tại đây khi khách hàng tìm kiếm...'}

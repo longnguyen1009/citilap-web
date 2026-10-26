@@ -287,7 +287,7 @@ export async function getCampaignById(id: string, d1?: D1Database) {
     where: { id },
     include: {
       items: {
-        select: { id: true, productId: true, variantId: true, salePrice: true, regularPrice: true },
+        select: { id: true, productId: true, variantId: true, salePrice: true, regularPrice: true, product: { select: { name: true } }, variant: { select: { name: true } } },
       },
     },
   });

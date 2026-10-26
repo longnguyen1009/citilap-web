@@ -330,9 +330,16 @@ export async function studioList(db: D1Database, q = '') {
  * Adopts legacy products into standard ProductDocument on-read without mutating DB.
  */
 export async function studioDetail(db: D1Database, id: string) {
-  const row = await db.prepare('SELECT * FROM ProductStudio WHERE productId=?').bind(id).first<Studio>();
+  const row = await db.prepare('SELECT s.*,p.tags legacyTags FROM ProductStudio s JOIN Product p ON p.id=s.productId WHERE productId=?').bind(id).first<Studio & { legacyTags: string | null }>();
   if (row) {
     const document = JSON.parse(row.draft) as ProductDocument;
+    document.faqs ??= [];
+    document.gifts ??= [];
+    document.accessoryProductIds ??= [];
+    if (!document.tags) {
+      try { document.tags = row.legacyTags?.startsWith('[') ? JSON.parse(row.legacyTags) : (row.legacyTags || '').split(',').map(tag => tag.trim()).filter(Boolean); }
+      catch { document.tags = []; }
+    }
     if (document.isFlashSale === undefined) {
       document.isFlashSale = false;
     }
@@ -348,6 +355,7 @@ export async function studioDetail(db: D1Database, id: string) {
   }
   d.price = Number(p.price);
   d.originalPrice = p.originalPrice == null ? null : Number(p.originalPrice);
+  try { d.tags = String(p.tags || '').startsWith('[') ? JSON.parse(String(p.tags)) : String(p.tags || '').split(',').map(tag => tag.trim()).filter(Boolean); } catch { d.tags = []; }
 
   // Determine template from category or specs
   if (p.categoryId === 'cat-phu-kien') {
@@ -439,6 +447,10 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
   d.contentHtml = sanitizeHtml(d.contentHtml);
   const db = env.DB;
 
+  if (action === 'publish' && d.template !== 'LAPTOP' && await db.prepare("SELECT c.id FROM Category c JOIN Category parent ON parent.id=c.parentId WHERE c.slug=? AND parent.slug='phu-kien'").bind(d.slug).first()) {
+    throw new MediaError('Slug sản phẩm trùng đường dẫn danh mục phụ kiện. Chọn slug khác.');
+  }
+
   if (!await db.prepare("SELECT id FROM Category WHERE id=? AND status='ACTIVE'").bind(d.categoryId).first()) {
     throw new MediaError('Danh mục không tồn tại hoặc đã ẩn.');
   }
@@ -454,6 +466,11 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     : null;
 
   const productId = id || crypto.randomUUID();
+  for (const accessoryId of d.accessoryProductIds) {
+    if (accessoryId === productId || !await db.prepare('SELECT id FROM Product WHERE id=? AND deletedAt IS NULL').bind(accessoryId).first()) {
+      throw new MediaError('Phụ kiện mua kèm không tồn tại hoặc trùng sản phẩm chính.');
+    }
+  }
   const assets = [];
   for (const m of d.media) {
     const a = await getAsset(db, m.assetId);
@@ -533,6 +550,7 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         isBestSeller = ?,
         isFeatured = ?,
         isFlashSale = ?,
+        tags = ?,
         categoryId = ?,
         price = ?,
         originalPrice = ?,
@@ -555,6 +573,7 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     `).bind(
       d.name, d.slug, d.description, d.contentHtml, d.brand, d.brandId || null,
       d.condition || 'NEW', d.isNewArrival ? 1 : 0, d.isBestSeller ? 1 : 0, d.isFeatured ? 1 : 0, d.isFlashSale ? 1 : 0,
+      JSON.stringify(d.tags),
       d.categoryId,
       d.price, d.originalPrice, d.seoTitle, d.seoDescription,
       JSON.stringify(assets.filter(a => a.kind === 'IMAGE').map(a => a.url)), JSON.stringify(specs),
@@ -762,5 +781,5 @@ export async function publicStudio(db: D1Database, slug: string) {
     const { asset } = await mediaDetail(db, m.assetId);
     media.push({ url: asset.url, kind: asset.kind, alt: m.alt, variantId: m.variantId });
   }
-  return { ...d, media, canOrder: ['AVAILABLE', 'PREORDER'].includes(d.availability) };
+  return { ...d, faqs: d.faqs || [], gifts: d.gifts || [], accessoryProductIds: d.accessoryProductIds || [], tags: d.tags || [], media, canOrder: ['AVAILABLE', 'PREORDER'].includes(d.availability) };
 }

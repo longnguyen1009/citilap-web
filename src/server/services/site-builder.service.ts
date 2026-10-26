@@ -22,6 +22,7 @@ import { publicCollection } from './navigation.service';
 import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
 import { getStorefrontPricingContext } from './pricing.service';
 import { getPrismaClient } from '../../lib/prisma';
+import { canonicalCategoryPath } from '../../lib/category-paths';
 
 export interface LandingPageListItem {
   id: string;
@@ -497,7 +498,21 @@ export async function resolveSectionsForStorefront(
   db: D1Database,
   sections: SectionItem[]
 ): Promise<ResolvedSectionItem[]> {
-  const enabledSections = sections.filter((s) => s.enabled);
+  const client = getPrismaClient(db);
+  const [allCategories, redirects] = await Promise.all([
+    getActiveCategories(client),
+    db.prepare('SELECT source,target FROM CmsRedirect WHERE enabled=1').all<{source:string;target:string}>(),
+  ]);
+  const aliases = new Map(redirects.results.map(r => [r.source,r.target]));
+  const categoryPaths = allCategories.map(c => ({ ...c, href: c.href! }));
+  // Normalize published link fields only; retain authored snapshots and unrelated content.
+  const publicSections: SectionItem[] = JSON.parse(JSON.stringify(sections,(key,value) => {
+    if (typeof value !== 'string' || !/^(href|.*[Ll]ink)$/.test(key) || !value.startsWith('/') || value.startsWith('//')) return value;
+    const index = value.search(/[?#]/), path = index < 0 ? value : value.slice(0,index), suffix = index < 0 ? '' : value.slice(index);
+    const target = canonicalCategoryPath(path, categoryPaths) || aliases.get(path) || path;
+    return (canonicalCategoryPath(target, categoryPaths) || target.replace(/^\/product\//,'/san-pham/')) + suffix;
+  }));
+  const enabledSections = publicSections.filter((s) => s.enabled);
   const resolvedList: ResolvedSectionItem[] = [];
 
   // Fail-closed: evaluate pricing context with active campaigns, surfacing infrastructure errors
@@ -536,18 +551,17 @@ export async function resolveSectionsForStorefront(
       }
     } else if (data.type === 'featured_categories') {
       try {
-        const allCategories = await getActiveCategories();
         if (data.categoryIds.length > 0) {
           resolvedSec.resolvedCategories = allCategories.filter((c) => data.categoryIds.includes(c.id));
         } else {
-          resolvedSec.resolvedCategories = allCategories.slice(0, 8);
+          resolvedSec.resolvedCategories = allCategories.filter(c => !c.parentId).slice(0, 8);
         }
       } catch {
         resolvedSec.resolvedCategories = [];
       }
     } else if (data.type === 'featured_brands') {
       try {
-        const allBrands = await getActiveBrands();
+        const allBrands = await getActiveBrands(client);
         if (data.brandIds.length > 0) {
           resolvedSec.resolvedBrands = allBrands.filter((b) => data.brandIds.includes(b.id));
         } else {

@@ -5,6 +5,7 @@ import { calculateCheckout, CheckoutError } from './checkout.service';
 import { checkoutSelectionSchema, checkoutAcknowledgmentSchema, type CheckoutAcknowledgment, type CheckoutSnapshot } from '@/contracts/checkout';
 
 export interface OrderItemInput {
+  warrantyName?: string | null;
   productId: string;
   variantId?: string | null;
   sku?: string | null;
@@ -26,6 +27,7 @@ export interface CreateOrderInput {
 }
 
 export interface ResolvedOrderItem {
+  warrantyName?: string | null;
   productId: string;
   variantId: string | null;
   productName: string;
@@ -352,6 +354,7 @@ export async function computeOrderPayloadHash(payload: CreateOrderInput): Promis
       .map((item) => ({
         productId: item.productId,
         variantId: item.variantId || null,
+        ...(item.warrantyName ? { warrantyName: item.warrantyName } : {}),
         sku: item.sku || null,
         quantity: item.quantity,
       }))

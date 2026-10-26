@@ -1,4 +1,5 @@
 "use client";
+import { productHref } from '@/lib/product-paths';
 
 import { useState, useRef, useEffect, useCallback, FormEvent, KeyboardEvent } from "react";
 import Image from "next/image";
@@ -39,7 +40,7 @@ export default function SearchAutocomplete({
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestionItem[]>([]);
   const [brandSuggestions, setBrandSuggestions] = useState<Array<{ id: string; name: string; slug: string }>>([]);
-  const [categorySuggestions, setCategorySuggestions] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [categorySuggestions, setCategorySuggestions] = useState<Array<{ id: string; name: string; slug: string; href?: string }>>([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [activeIndex, setActiveIndex] = useState(-1);
 
@@ -218,7 +219,7 @@ export default function SearchAutocomplete({
         if (activeIndex < suggestions.length) {
           const product = suggestions[activeIndex];
           if (onSelectSuggestion) onSelectSuggestion(product);
-          const href = `/product/${product.slug}${product.sku ? `?sku=${product.sku}` : ""}`;
+          const href = `${productHref(product)}${product.sku ? `?sku=${product.sku}` : ""}`;
           setIsOpen(false);
           router.push(href);
           return;
@@ -238,7 +239,7 @@ export default function SearchAutocomplete({
         if (activeIndex < curr + categorySuggestions.length) {
           const category = categorySuggestions[activeIndex - curr];
           setIsOpen(false);
-          router.push(`/category/${category.slug}`);
+          router.push(category.href || `/${category.slug}`);
           return;
         }
         curr += categorySuggestions.length;
@@ -358,7 +359,7 @@ export default function SearchAutocomplete({
                 <div className="space-y-1 mt-1">
                   {suggestions.map((p, idx) => {
                     const isSelected = activeIndex === idx;
-                    const href = `/product/${p.slug}${p.sku ? `?sku=${p.sku}` : ""}`;
+                    const href = `${productHref(p)}${p.sku ? `?sku=${p.sku}` : ""}`;
 
                     return (
                       <Link
@@ -470,7 +471,7 @@ export default function SearchAutocomplete({
                         id={`suggestion-item-${itemIndex}`}
                         role="option"
                         aria-selected={isSelected}
-                        href={`/category/${c.slug}`}
+                        href={c.href || `/${c.slug}`}
                         onClick={() => setIsOpen(false)}
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition ${
                           isSelected

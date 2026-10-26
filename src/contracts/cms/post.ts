@@ -8,7 +8,7 @@ const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(1).max(220
 export const RESERVED_SLUGS = [
   'news', 'product', 'category', 'brand', 'collection', 'search', 'cart', 'checkout',
   'contact', 'lien-he', 'wishlist', 'profile', 'order-tracking', 'hot-sale', 'admin',
-  'api', 'login', 'chon-laptop',
+  'api', 'login', 'chon-laptop', 'san-pham', 'laptop', 'phu-kien', 'phan-loai',
 ] as const;
 
 const notReserved = (val: string) => !(RESERVED_SLUGS as readonly string[]).includes(val);

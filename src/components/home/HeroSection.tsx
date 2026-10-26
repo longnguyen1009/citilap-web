@@ -40,13 +40,13 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                 <div className="flex flex-wrap gap-3 sm:gap-4">
                   <Link
                     href={settings.heroCtaPrimaryLink}
-                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm md:text-base shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-300 transform hover:-translate-y-0.5"
+                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm md:text-base shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {settings.heroCtaPrimaryText}
                   </Link>
                   <Link
                     href={settings.heroCtaSecondaryLink}
-                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm md:text-base transition duration-300"
+                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm md:text-base transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {settings.heroCtaSecondaryText}
                   </Link>
@@ -67,7 +67,7 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                 src={settings.subBanner1Image}
                 alt={settings.subBanner1Title}
                 fill
-                className="object-cover group-hover:scale-105 transition duration-700 ease-in-out"
+                className="object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/60 to-transparent flex items-center p-5 sm:p-7 md:p-8">
@@ -80,7 +80,7 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                   </p>
                   <Link
                     href={settings.subBanner1Link}
-                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold py-1.5 sm:py-2 px-5 sm:px-6 rounded-full uppercase text-[11px] sm:text-xs md:text-sm shadow-md transition"
+                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-1.5 sm:py-2 px-5 sm:px-6 rounded-full uppercase text-[11px] sm:text-xs md:text-sm shadow-md transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden after:absolute after:inset-0"
                     aria-label={`Xem ngay ${settings.subBanner1Title}`}
                   >
                     Xem ngay
@@ -95,7 +95,7 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                 src={settings.subBanner2Image}
                 alt={settings.subBanner2Title}
                 fill
-                className="object-cover group-hover:scale-105 transition duration-700 ease-in-out"
+                className="object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-red-950/90 via-red-900/60 to-transparent flex items-center p-5 sm:p-7 md:p-8">
@@ -108,7 +108,7 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                   </p>
                   <Link
                     href={settings.subBanner2Link}
-                    className="inline-flex items-center justify-center bg-red-600 hover:bg-red-500 text-white font-bold py-1.5 sm:py-2 px-5 sm:px-6 rounded-full uppercase text-[11px] sm:text-xs md:text-sm shadow-md transition"
+                    className="inline-flex items-center justify-center bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold py-1.5 sm:py-2 px-5 sm:px-6 rounded-full uppercase text-[11px] sm:text-xs md:text-sm shadow-md transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden after:absolute after:inset-0"
                     aria-label={`Mua ngay ${settings.subBanner2Title}`}
                   >
                     Mua ngay

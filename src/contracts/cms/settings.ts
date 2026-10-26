@@ -24,7 +24,15 @@ const safeUrlOrPath = z
     message: "Giao thức URL không được phép.",
   });
 
+const productBannerSchema = z.object({
+  title: safeText(120).min(1), description: safeText(500),
+  href: z.string().max(1000).refine(value => /^\/(?!\/)[^\\\s]*$/.test(value) || /^https:\/\/[^\s\\]+$/.test(value), 'Dùng đường dẫn nội bộ hoặc HTTPS.'),
+});
+
 export const adminSettingsDocumentSchema = z.object({
+  productTrustItems: z.array(safeText(300).min(1)).max(8).default([]),
+  productShippingItems: z.array(safeText(500).min(1)).max(8).default([]),
+  productBanners: z.array(productBannerSchema).max(2).default([]),
   // Store info
   storeName: safeText(120).min(1, "Tên cửa hàng không được để trống"),
   storeEmail: z.string().email("Email không hợp lệ").max(120),
@@ -49,6 +57,8 @@ export const adminSettingsDocumentSchema = z.object({
   defaultSeoDescription: safeText(500).default("CitiLap chuyên cung cấp Laptop Gaming, Ultrabook, Máy Trạm và Like New chính hãng."),
 
   // Flash sale
+  hotSaleBannerImage: safeUrlOrPath.default(""),
+  hotSaleBannerLink: safeUrlOrPath.default("/hot-sale"),
   flashSaleEnabled: z.union([z.boolean(), z.number().transform((n) => n !== 0)]).default(false),
   flashSaleTitle: safeText(120),
   flashSaleStartAt: safeText(64).default(""), // Chuỗi ISO UTC cố định hoặc rỗng
@@ -119,6 +129,9 @@ const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh");
 
 // Default settings based on confirmed businessProfile.
 export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
+  productTrustItems: [],
+  productShippingItems: [],
+  productBanners: [],
   storeName: businessProfile.brandName,
   storeEmail: businessProfile.email,
   storePhone: businessProfile.displayPhone,
@@ -140,6 +153,8 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   defaultSeoDescription: "CitiLap chuyên cung cấp các dòng Laptop Gaming, Ultrabook, Máy Trạm (Workstation) và Laptop Like New chính hãng.",
 
   flashSaleEnabled: true,
+  hotSaleBannerImage: "",
+  hotSaleBannerLink: "/hot-sale",
   flashSaleTitle: "Giá Sốc Giờ Vàng",
   flashSaleStartAt: "",
   flashSaleEndAt: "2026-12-31T23:59:59Z",
@@ -150,13 +165,13 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   heroSlogan: "✩ HIỆU NĂNG MẠNH MẼ - CHIẾN GAME CỰC ĐỈNH ✩",
   heroBgImage: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop",
   heroCtaPrimaryText: "Khám Phá Ngay",
-  heroCtaPrimaryLink: "/category/laptop-gaming",
+  heroCtaPrimaryLink: "/laptop-gaming",
   heroCtaSecondaryText: "Xem Ưu Đãi",
   heroCtaSecondaryLink: "/hot-sale",
 
   subBanner1Title: "Ultrabook Cao Cấp",
   subBanner1Subtitle: "Sang trọng & Mỏng nhẹ",
-  subBanner1Link: "/category/laptop-van-phong",
+  subBanner1Link: "/laptop-van-phong",
   subBanner1Image: "https://images.unsplash.com/photo-1598550476439-6847785fcea6?q=80&w=1200&auto=format&fit=crop",
 
   subBanner2Title: "Ưu đãi cực khủng",
@@ -186,6 +201,11 @@ export const DEFAULT_SETTINGS = DEFAULT_ADMIN_SETTINGS;
 
 // Public DTO: Whitelist fields needed by Storefront UI (No admin secrets or billing accounts)
 export const publicStorefrontSettingsSchema = z.object({
+  productTrustItems: z.array(z.string()).default([]),
+  productShippingItems: z.array(z.string()).default([]),
+  productBanners: z.array(productBannerSchema).default([]),
+  hotSaleBannerImage: z.string().default(""),
+  hotSaleBannerLink: z.string().default("/hot-sale"),
   storeName: z.string(),
   storeEmail: z.string(),
   storePhone: z.string(),

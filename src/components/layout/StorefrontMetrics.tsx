@@ -11,7 +11,7 @@ export default function StorefrontMetrics() {
     if (previous.current === pathname) return;
     previous.current = pathname;
     trackStorefront('page_view');
-    if (pathname.startsWith('/product/')) trackStorefront('view_item');
+    if (/^\/(?:laptop|phu-kien|san-pham)\/[^/]+$/.test(pathname)) trackStorefront('view_item');
     if (pathname === '/checkout') trackStorefront('begin_checkout');
   }, [pathname]);
   useEffect(() => {

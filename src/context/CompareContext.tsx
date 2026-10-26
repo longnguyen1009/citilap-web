@@ -132,3 +132,7 @@ export function useCompare() {
   }
   return context;
 }
+
+export function useOptionalCompare() {
+  return useContext(CompareContext);
+}

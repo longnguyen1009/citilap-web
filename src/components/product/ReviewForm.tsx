@@ -23,7 +23,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!turnstile.ready) return;
-    if (rating === 0 || !comment.trim() || !name.trim()) {
+    if (rating === 0 || !comment.trim() || !name.trim() || !phone.trim()) {
       setError("Vui lòng chọn số sao và nhập đầy đủ thông tin.");
       return;
     }
@@ -32,8 +32,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
     setError(null);
 
     try {
-      // If phone is provided, post to contact/feedback system
-      if (phone.trim()) {
+      {
         const response = await fetch("/api/contact", {
           method: "POST",
           headers: { "Content-Type": "application/json", "cf-turnstile-response": turnstile.token },
@@ -43,7 +42,8 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
             message: `[Đánh giá ${rating}⭐ sản phẩm: ${productName}]: ${comment.trim()}`,
           }),
         });
-        if (!response.ok) throw new Error("Contact submission failed");
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error("Contact submission failed");
       }
 
       onSubmit?.({ rating, comment: comment.trim(), name: name.trim(), phone: phone.trim() });
@@ -62,7 +62,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
         <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
         <h3 className="text-lg font-bold text-emerald-900 mb-1">Cảm ơn bạn đã đánh giá!</h3>
         <p className="text-sm text-emerald-700">
-          Đánh giá {rating} sao cho &quot;{productName}&quot; đã được gửi thành công. Đội ngũ CitiLap chân thành cảm ơn đóng góp của bạn!
+          Phản hồi {rating} sao cho &quot;{productName}&quot; đã được gửi đến CitiLap để kiểm tra. Phản hồi chưa được công khai trên trang sản phẩm.
         </p>
         <button
           type="button"
@@ -96,27 +96,29 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
       {/* Star Rating */}
       <div className="mb-5">
         <label className="block text-xs font-bold text-slate-700 uppercase mb-2">Đánh giá số sao *</label>
-        <div className="flex items-center gap-1">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => setRating(star)}
-              onMouseEnter={() => setHoveredStar(star)}
-              onMouseLeave={() => setHoveredStar(0)}
-              className="p-1 transition-transform hover:scale-110 cursor-pointer"
-            >
-              <Star
-                className={`w-7 h-7 transition-colors ${
-                  star <= (hoveredStar || rating)
-                    ? "text-amber-400 fill-amber-400"
-                    : "text-slate-300"
-                }`}
-              />
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setRating(star)}
+                onMouseEnter={() => setHoveredStar(star)}
+                onMouseLeave={() => setHoveredStar(0)}
+                className="p-1 transition-transform hover:scale-110 cursor-pointer"
+              >
+                <Star
+                  className={`w-7 h-7 transition-colors ${
+                    star <= (hoveredStar || rating)
+                      ? "text-amber-400 fill-amber-400"
+                      : "text-slate-300"
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
           {rating > 0 && (
-            <span className="ml-3 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md">
+            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-md whitespace-nowrap">
               {rating === 1 && "1/5 - Rất tệ"}
               {rating === 2 && "2/5 - Chưa ưng ý"}
               {rating === 3 && "3/5 - Bình thường"}
@@ -144,10 +146,12 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
         {/* Phone */}
         <div>
           <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
-            Số điện thoại (để nhận quà tri ân)
+            Số điện thoại để xác minh phản hồi *
           </label>
           <input
             type="tel"
+            required
+            maxLength={20}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="Ví dụ: 0912 345 678"
@@ -161,6 +165,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
         <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">Nội dung đánh giá chi tiết *</label>
         <textarea
           value={comment}
+          maxLength={1500}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Bạn cảm nhận thế nào về thiết kế, tốc độ, màn hình và thời lượng pin của máy?"
           required
@@ -173,7 +178,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
       {turnstile.widget}
       <button
         type="submit"
-        disabled={!turnstile.ready || rating === 0 || !comment.trim() || !name.trim() || submitting}
+        disabled={!turnstile.ready || rating === 0 || !comment.trim() || !name.trim() || !phone.trim() || submitting}
         className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-2.5 px-6 rounded-xl transition flex items-center gap-2 cursor-pointer text-sm"
       >
         {submitting ? (

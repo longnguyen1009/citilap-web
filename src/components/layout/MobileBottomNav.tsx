@@ -76,8 +76,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [drawerOpen]);
 
-  const isCategoryActive = pathname.startsWith("/category");
-  const isProductPage = pathname.startsWith("/product/");
+  const isCategoryActive = pathname.startsWith("/phan-loai") || !!navigation?.categories.some(c => c.href === pathname);
+  const isProductPage = /^\/(?:laptop|phu-kien|san-pham)\/[^/]+$/.test(pathname);
   const isCheckoutPage = pathname.startsWith("/checkout");
 
   // On product detail and checkout pages, allow dedicated action bars to own the bottom space
@@ -197,7 +197,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {/* Direct link to All Categories */}
               <Link
-                href="/category"
+                href="/phan-loai"
                 onClick={() => setDrawerOpen(false)}
                 className="flex items-center justify-between p-3 rounded-control bg-brand-primary-subtle text-brand-primary font-bold text-body-sm mb-3 border border-brand-primary/20"
               >
@@ -224,12 +224,12 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
               ) : (
                 categories.map((cat) => {
                   const IconComponent = categoryIconMap[cat.slug] || Laptop;
-                  const isSelected = pathname === `/category/${cat.slug}`;
+                  const isSelected = pathname === (cat.href || `/${cat.slug}`);
 
                   return (
                     <Link
                       key={cat.id}
-                      href={`/category/${cat.slug}`}
+                      href={cat.href || `/${cat.slug}`}
                       onClick={() => setDrawerOpen(false)}
                       className={`flex items-center justify-between p-3 rounded-control transition border ${
                         isSelected
@@ -274,42 +274,42 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
                 </span>
                 <div className="grid grid-cols-2 gap-2">
                   <Link
-                    href="/category/linh-kien?type=mouse-keyboard"
+                    href="/phu-kien?type=mouse-keyboard"
                     onClick={() => setDrawerOpen(false)}
                     className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
                   >
                     <span>⌨️ Chuột & Phím</span>
                   </Link>
                   <Link
-                    href="/category/linh-kien?type=bag"
+                    href="/phu-kien?type=bag"
                     onClick={() => setDrawerOpen(false)}
                     className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
                   >
                     <span>🎒 Balo & Túi sốc</span>
                   </Link>
                   <Link
-                    href="/category/linh-kien?type=charger"
+                    href="/phu-kien?type=charger"
                     onClick={() => setDrawerOpen(false)}
                     className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
                   >
                     <span>⚡ Sạc GaN & Cáp</span>
                   </Link>
                   <Link
-                    href="/category/linh-kien?type=hub"
+                    href="/phu-kien?type=hub"
                     onClick={() => setDrawerOpen(false)}
                     className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
                   >
                     <span>🔌 Hub Type-C</span>
                   </Link>
                   <Link
-                    href="/category/linh-kien?type=screenbar"
+                    href="/phu-kien?type=screenbar"
                     onClick={() => setDrawerOpen(false)}
                     className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
                   >
                     <span>💡 Đèn màn hình</span>
                   </Link>
                   <Link
-                    href="/category/linh-kien?type=audio"
+                    href="/phu-kien?type=audio"
                     onClick={() => setDrawerOpen(false)}
                     className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
                   >

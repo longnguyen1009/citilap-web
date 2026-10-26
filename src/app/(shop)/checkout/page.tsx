@@ -50,7 +50,7 @@ export default function CheckoutPage() {
   const [quoteRetry, setQuoteRetry] = useState(0);
   const [pending, setPending] = useState<{key:string;body:string} | null>(null);
   const sending = useRef(false);
-  const quoteRequest = JSON.stringify({items:cart.map(i=>({productId:i.productId,variantId:i.variantId || null,quantity:i.quantity})),shippingMethod:deliveryType === 'pickup' ? 'pickup' : 'standard',showroomId:deliveryType === 'pickup' ? selectedShowroom : null,...(paymentMethod?{paymentMethod}:{})});
+  const quoteRequest = JSON.stringify({items:cart.map(i=>({productId:i.productId,variantId:i.variantId || null,warrantyName:i.warrantyName || null,quantity:i.quantity})),shippingMethod:deliveryType === 'pickup' ? 'pickup' : 'standard',showroomId:deliveryType === 'pickup' ? selectedShowroom : null,...(paymentMethod?{paymentMethod}:{})});
   const quote = quoteState.data;
   const quoteKey = quoteRequest + ':' + quoteRetry;
   const quoteReady = loaded && quoteState.key === quoteKey && !!quote && !quoteState.error && !!paymentMethod && checkoutReady;
@@ -107,7 +107,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     if(pending){await sendAttempt(pending);return;}
     if(!quoteReady || !quote || priceChangeDetails || sending.current)return;
-    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.district.trim(),form.province].join(', ') : null,note:form.note,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
+    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName || null,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.district.trim(),form.province].join(', ') : null,note:form.note,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
     const attempt={key:crypto.randomUUID(),body};
     try{sessionStorage.setItem('citilap-checkout-attempt-v1',JSON.stringify(attempt));}catch{setFormError('Không thể lưu yêu cầu để thử lại an toàn. Vui lòng bật lưu trữ trình duyệt.');return;}
     setPending(attempt);await sendAttempt(attempt);
@@ -116,7 +116,7 @@ export default function CheckoutPage() {
     if(!priceChangeDetails)return;
     const next=priceChangeDetails.quote;
     setQuoteState({key:quoteKey,data:next,error:''});
-    for(const line of next.lines)updateItemPrice(line.productId,line.variantId,line.price);
+    for(const line of next.lines)updateItemPrice(line.productId,line.variantId,line.price,line.warrantyName || null);
     setPriceChangeDetails(null);setFormError('Đã xác nhận thông tin mới. Kiểm tra và bấm gửi đơn.');
   };
   const handleReviewCart = () => {setPriceChangeDetails(null);router.push('/cart');};

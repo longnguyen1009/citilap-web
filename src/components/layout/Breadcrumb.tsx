@@ -8,6 +8,7 @@ import { Container } from "@/components/ui/Container";
 const labelMap: Record<string, string> = {
   "": "Trang chủ",
   category: "Danh mục",
+  "phan-loai": "Phân loại",
   product: "Sản phẩm",
   cart: "Giỏ hàng",
   checkout: "Thanh toán",

@@ -84,3 +84,7 @@ export function useWishlist() {
   if (!ctx) throw new Error("useWishlist must be used within WishlistProvider");
   return ctx;
 }
+
+export function useOptionalWishlist() {
+  return useContext(WishlistContext);
+}

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RESERVED_CATEGORY_ROOTS } from '../../lib/category-paths';
 import { internalPathSchema } from './v1';
 import { productRuleCriteriaSchema } from './site-builder';
 
@@ -71,6 +72,7 @@ export const navigationDocumentSchema = z.object({
 
   const categories = new Map(d.categories.map(c => [c.id, c]));
   for (const c of d.categories) {
+    if (!c.parentId && RESERVED_CATEGORY_ROOTS.has(c.slug)) issue('Slug gốc trùng đường dẫn hệ thống.');
     const seen = new Set([c.id]);
     let parent = c.parentId;
     while (parent) {
@@ -117,6 +119,7 @@ export type NavigationDetail = {
   categoryIds: string[];
 };
 
+export type ResolvedMenuItem = { id: string; label: string; href: string; children?: ResolvedMenuItem[] };
 export type ResolvedNavigation = {
   schemaVersion: 1;
   revision: number;
@@ -143,6 +146,6 @@ export type ResolvedNavigation = {
     id: string;
     label: string;
     href: string;
-    children: { id: string; label: string; href: string }[];
+    children: ResolvedMenuItem[];
   }[]>;
 };

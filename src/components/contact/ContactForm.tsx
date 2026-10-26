@@ -6,12 +6,12 @@ import { Send, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { businessProfile } from '@/config/business-profile';
 import { trackStorefront } from '@/lib/storefront-metrics';
 
-export default function ContactForm({ appointment = false, productId = '', unitCode = '' }: { appointment?: boolean; productId?: string; unitCode?: string }) {
+export default function ContactForm({ appointment = false, productId = '', unitCode = '', initialMessage = '', context = '' }: { appointment?: boolean; productId?: string; unitCode?: string; initialMessage?: string; context?: string }) {
   const turnstile = useTurnstile("contact");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(initialMessage);
   const [website, setWebsite] = useState(""); // Honeypot field for bot trap
   const [locationId, setLocationId] = useState('hanoi');
   const [requestedAt, setRequestedAt] = useState('');
@@ -35,7 +35,7 @@ export default function ContactForm({ appointment = false, productId = '', unitC
           name,
           phone,
           email: email || undefined,
-          message: message || undefined,
+          message: [context,message].filter(Boolean).join('\n') || undefined,
           website: website || undefined,
           ...(appointment ? { appointment: { productId: productId || undefined, unitCode: unitCode || undefined, locationId, requestedAt: `${requestedAt}:00+07:00` } } : {}),
         }),

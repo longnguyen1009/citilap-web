@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+  <defs>
+    <linearGradient id="dn-screen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18181B"/>
+      <stop offset="100%" stop-color="#27272A"/>
+    </linearGradient>
+    <linearGradient id="dn-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <filter id="dn-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <ellipse cx="80" cy="108" rx="58" ry="7" fill="#CBD5E1" opacity="0.6"/>
+
+  <!-- Screen Lid -->
+  <g filter="url(#dn-shadow)">
+    <rect x="36" y="24" width="88" height="56" rx="4" fill="#09090B"/>
+    <rect x="40" y="28" width="80" height="48" rx="2" fill="url(#dn-screen)"/>
+    <!-- Minimalist Business Golden Line Chart -->
+    <path d="M50,64 L65,54 L80,58 L98,40 L110,42" fill="none" stroke="url(#dn-gold)" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="110" cy="42" r="3" fill="#F59E0B"/>
+  </g>
+
+  <!-- Floating Executive Briefcase / Shield Icon -->
+  <g transform="translate(118, 16)" filter="url(#dn-shadow)">
+    <rect x="2" y="6" width="20" height="14" rx="2.5" fill="#18181B" stroke="#D97706" stroke-width="1.2"/>
+    <path d="M8,6 L8,3 C8,2 9,1 10,1 L14,1 C15,1 16,2 16,3 L16,6" fill="none" stroke="#D97706" stroke-width="1.2"/>
+    <rect x="10.5" y="11" width="3" height="3" rx="0.5" fill="#F59E0B"/>
+  </g>
+
+  <!-- Laptop Base with TrackPoint -->
+  <polygon points="18,102 142,102 130,80 30,80" fill="#18181B"/>
+  <polygon points="34,83 126,83 122,96 38,96" fill="#09090B"/>
+  <!-- Iconic TrackPoint Red Dot -->
+  <circle cx="80" cy="89" r="1.8" fill="#EF4444"/>
+  <rect x="68" y="98" width="24" height="2.5" rx="1" fill="#27272A"/>
+</svg>

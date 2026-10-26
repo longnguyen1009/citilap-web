@@ -54,7 +54,7 @@ async function GETHandler(request: Request) {
 
     const {resolveProductsByIds}=await import('@/server/services/catalog.service');
     const publicCards=new Map((await resolveProductsByIds(products.map(p=>p.id),prisma)).map(p=>[p.id,p]));
-    const data = products.filter(p=>publicCards.has(p.id)).map(({ id, name, slug, description, brand, model, series, warranty, condition, origin, images, stock, specs, tags, category }) => ({ id, name, slug, description, brand, model, series, warranty, condition, origin, price:publicCards.get(id)!.price, originalPrice:publicCards.get(id)!.originalPrice,variantId:publicCards.get(id)!.variantId,availability:publicCards.get(id)!.availability, images, stock, specs, tags, category: category ? { id: category.id, name: category.name, slug: category.slug } : null }));
+    const data = products.filter(p=>publicCards.has(p.id)).map(({ id, name, slug, description, brand, model, series, warranty, condition, origin, images, stock, specs, tags, category }) => ({ id, name, slug, description, brand, model, series, warranty, condition, origin, href:publicCards.get(id)!.href, price:publicCards.get(id)!.price, originalPrice:publicCards.get(id)!.originalPrice,variantId:publicCards.get(id)!.variantId,availability:publicCards.get(id)!.availability, images, stock, specs, tags, category: category ? { id: category.id, name: category.name, slug: category.slug } : null }));
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error('Failed to fetch products:', error);

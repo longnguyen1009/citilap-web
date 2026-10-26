@@ -74,6 +74,8 @@ export async function pageDetail(db: D1Database, id: string) {
 }
 
 async function assertSlugAvailable(db: D1Database, slug: string, excludePageId: string | null) {
+  const category = await db.prepare("SELECT id FROM Category WHERE parentId IS NULL AND slug=? UNION SELECT json_extract(c.value,'$.id') FROM NavigationStudio n,json_each(n.draft,'$.categories') c WHERE json_extract(c.value,'$.parentId') IS NULL AND json_extract(c.value,'$.slug')=?").bind(slug,slug).first();
+  if (category) throw new MediaError('Slug đã thuộc phân loại sản phẩm.',409);
   if ((RESERVED_SLUGS as readonly string[]).includes(slug)) {
     throw new MediaError('Đường dẫn này được hệ thống dành riêng, vui lòng chọn đường dẫn khác.', 400);
   }

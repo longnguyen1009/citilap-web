@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import CampaignProductPicker from '@/components/admin/products/CampaignProductPicker';
 import {
   Zap,
   Plus,
@@ -9,7 +10,6 @@ import {
   CheckCircle,
   Archive,
   AlertCircle,
-  Calendar,
   Layers,
   X,
   Trash2,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 interface CampaignItemForm {
+  displayName?: string;
   id?: string;
   productId: string;
   variantId?: string | null;
@@ -34,6 +35,8 @@ interface CampaignData {
   endAt: string;
   itemCount: number;
   items?: Array<{
+    product?: { name: string };
+    variant?: { name: string } | null;
     id: string;
     productId: string;
     variantId: string | null;
@@ -91,6 +94,7 @@ function datetimeLocalGmt7ToIso(localStr: string): string {
 export default function AdminCampaignsPage() {
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [nowMs, setNowMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -99,12 +103,32 @@ export default function AdminCampaignsPage() {
   const [editingCampaign, setEditingCampaign] = useState<CampaignData | null>(null);
   const [formName, setFormName] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formEnabled, setFormEnabled] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [formStartLocal, setFormStartLocal] = useState("");
   const [formEndLocal, setFormEndLocal] = useState("");
+  const [durationHours, setDurationHours] = useState('');
   const [formItems, setFormItems] = useState<CampaignItemForm[]>([]);
   const [formRevision, setFormRevision] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isEditorOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = document.getElementById('campaign-editor');
+    dialog?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setIsEditorOpen(false); }
+      if (event.key !== 'Tab' || !dialog) return;
+      const items = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href]')];
+      const first = items[0], last = items.at(-1);
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => { document.removeEventListener('keydown', handleKey); previous?.focus(); };
+  }, [isEditorOpen]);
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
@@ -124,15 +148,19 @@ export default function AdminCampaignsPage() {
   }, []);
 
   useEffect(() => {
-    fetchCampaigns();
+    const timer = setTimeout(() => { setNowMs(Date.now()); void fetchCampaigns(); }, 0);
+    const clock = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => { clearTimeout(timer); clearInterval(clock); };
   }, [fetchCampaigns]);
 
   const openNewEditor = () => {
+    setFormEnabled(true);
+    setDurationHours('');
     setEditingCampaign(null);
     setFormName("");
     setFormDescription("");
     const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     setFormStartLocal(isoToDatetimeLocalGmt7(now.toISOString()));
     setFormEndLocal(isoToDatetimeLocalGmt7(tomorrow.toISOString()));
     setFormItems([]);
@@ -142,6 +170,8 @@ export default function AdminCampaignsPage() {
   };
 
   const openEditEditor = async (c: CampaignData) => {
+    setFormEnabled(c.status === 'PUBLISHED' && new Date(c.endAt).getTime() > Date.now());
+    setDurationHours('');
     setEditingCampaign(c);
     setFormName(c.name);
     setFormDescription(c.description || "");
@@ -157,6 +187,7 @@ export default function AdminCampaignsPage() {
       if (res.ok && json.data?.items) {
         setFormItems(
           json.data.items.map((it) => ({
+            displayName: [it.product?.name, it.variant?.name].filter(Boolean).join(' · '),
             id: it.id,
             productId: it.productId,
             variantId: it.variantId || "",
@@ -166,13 +197,25 @@ export default function AdminCampaignsPage() {
         );
         setFormRevision(json.data.revision);
       } else {
-        setFormItems([]);
+        throw new Error('Không tải được sản phẩm chiến dịch. Thử lại để tránh mất danh sách.');
       }
-    } catch {
-      setFormItems([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không tải được chiến dịch');
+      return false;
     }
 
     setIsEditorOpen(true);
+    return true;
+  };
+
+  const addTimeSlot = async (campaign: CampaignData) => {
+    if (!await openEditEditor(campaign)) return;
+    setEditingCampaign(null);
+    setFormRevision(0);
+    setFormEnabled(true);
+    setFormItems(items => items.map(item => ({ ...item, id: undefined })));
+    setFormStartLocal(isoToDatetimeLocalGmt7(campaign.endAt));
+    setFormEndLocal(isoToDatetimeLocalGmt7(new Date(Date.parse(campaign.endAt) + 2 * 3600000).toISOString()));
   };
 
   const handleAddItem = () => {
@@ -192,7 +235,7 @@ export default function AdminCampaignsPage() {
     );
   };
 
-  const handleSave = async (publishImmediate = false) => {
+  const handleSave = async (enabled = formEnabled) => {
     setFormError(null);
     setSaving(true);
 
@@ -202,6 +245,9 @@ export default function AdminCampaignsPage() {
       }
       if (!formStartLocal || !formEndLocal) {
         throw new Error("Vui lòng nhập thời gian bắt đầu và kết thúc");
+      }
+      if (durationHours && (!Number.isFinite(Number(durationHours)) || Number(durationHours) < 0.25 || Number(durationHours) > 8760)) {
+        throw new Error('Thời lượng phải từ 0,25 đến 8760 giờ.');
       }
 
       const startUtc = datetimeLocalGmt7ToIso(formStartLocal);
@@ -238,7 +284,7 @@ export default function AdminCampaignsPage() {
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || null,
-        status: publishImmediate ? "PUBLISHED" : editingCampaign?.status || "DRAFT",
+        status: enabled && new Date(endUtc).getTime() > Date.now() ? "PUBLISHED" : "DRAFT",
         startAt: startUtc,
         endAt: endUtc,
         items: parsedItems,
@@ -288,23 +334,27 @@ export default function AdminCampaignsPage() {
     }
   };
 
-  const handlePublish = async (c: CampaignData) => {
-    if (!confirm(`Bạn có chắc chắn muốn xuất bản chiến dịch "${c.name}"?`)) return;
+  const handleToggle = async (c: CampaignData, enabled: boolean) => {
+    setTogglingId(c.id);
+    setError(null);
     try {
-      const res = await fetch(`/api/admin/campaigns/${c.id}/publish`, {
-        method: "POST",
+      const detail = await fetch(`/api/admin/campaigns/${c.id}`);
+      const current = await detail.json();
+      if (!detail.ok || !current.success) throw new Error(current.error || 'Không tải được chiến dịch.');
+      const res = await fetch(`/api/admin/campaigns/${c.id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expectedRevision: c.revision }),
+        body: JSON.stringify({ ...current.data, status: enabled ? 'PUBLISHED' : 'DRAFT', expectedRevision: c.revision }),
       });
       const json = (await res.json()) as { success: boolean; error?: string };
       if (!res.ok || !json.success) {
         throw new Error(json.error || "Không thể xuất bản chiến dịch.");
       }
-      setSuccessMsg(`Đã xuất bản chiến dịch "${c.name}" thành công.`);
-      fetchCampaigns();
+      setSuccessMsg(`Đã ${enabled ? 'bật' : 'tắt'} chiến dịch "${c.name}".`);
+      await fetchCampaigns();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Lỗi khi xuất bản");
-    }
+      setError(e instanceof Error ? e.message : 'Không đổi được trạng thái chiến dịch.');
+    } finally { setTogglingId(null); }
   };
 
   const handleArchive = async (c: CampaignData) => {
@@ -336,7 +386,7 @@ export default function AdminCampaignsPage() {
             <h1 className="text-xl font-bold text-gray-900">Chiến dịch Khuyến mại & Giá</h1>
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Quản lý chiến dịch giá cho sản phẩm và biến thể với chu kỳ [startAt, endAt) theo giờ GMT+7 và CAS concurrency guard.
+            HOT SALE tập hợp nhiều chiến dịch: FLASH SALE, SALE 10/10, Sale mừng nhập học… Đặt lịch GMT+7 và chọn sản phẩm cho từng chiến dịch.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -409,6 +459,7 @@ export default function AdminCampaignsPage() {
                   <th className="py-3 px-4">Tên chiến dịch</th>
                   <th className="py-3 px-4">Trạng thái</th>
                   <th className="py-3 px-4">Thời gian hiệu lực (GMT+7)</th>
+                  <th className="py-3 px-4">Hiển thị homepage</th>
                   <th className="py-3 px-4 text-center">Sản phẩm</th>
                   <th className="py-3 px-4 text-center">Revision</th>
                   <th className="py-3 px-4 text-right">Thao tác</th>
@@ -416,7 +467,6 @@ export default function AdminCampaignsPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {campaigns.map((c) => {
-                  const nowMs = Date.now();
                   const startMs = new Date(c.startAt).getTime();
                   const endMs = new Date(c.endAt).getTime();
                   const isCurrentlyActive = c.status === "PUBLISHED" && nowMs >= startMs && nowMs < endMs;
@@ -449,7 +499,7 @@ export default function AdminCampaignsPage() {
                           )
                         ) : c.status === "DRAFT" ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                            Bản nháp
+                            Đã tắt
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
@@ -461,6 +511,16 @@ export default function AdminCampaignsPage() {
                         <div>{formatGmt7(c.startAt)}</div>
                         <div className="text-gray-400 mt-0.5">đến {formatGmt7(c.endAt)}</div>
                       </td>
+                      <td className="py-3 px-4">
+                        <button type="button" role="switch" aria-label={`Hiển thị ${c.name} trên homepage`} aria-checked={c.status === 'PUBLISHED' && nowMs < endMs}
+                          disabled={togglingId !== null || nowMs >= endMs || c.status === 'ARCHIVED'}
+                          onClick={() => handleToggle(c, c.status !== 'PUBLISHED')}
+                          title={nowMs >= endMs ? 'Đã kết thúc. Sửa thời gian để bật lại.' : 'Bật để hiển thị, tắt để ẩn và dừng giá ưu đãi.'}
+                          className="inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50">
+                          <span aria-hidden="true" className={`flex h-6 w-11 rounded-full p-0.5 ${c.status === 'PUBLISHED' && nowMs < endMs ? 'justify-end bg-blue-600' : 'justify-start bg-slate-300'}`}><span className="h-5 w-5 rounded-full bg-white shadow" /></span>
+                          {c.status === 'PUBLISHED' && nowMs < endMs ? 'Bật' : 'Tắt'}
+                        </button>
+                      </td>
                       <td className="py-3 px-4 text-center">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 font-medium text-xs">
                           <Layers className="w-3 h-3 text-gray-400" />
@@ -471,6 +531,7 @@ export default function AdminCampaignsPage() {
                         rev #{c.revision}
                       </td>
                       <td className="py-3 px-4 text-right space-x-1">
+                        <button type="button" onClick={() => addTimeSlot(c)} aria-label={`Thêm khung giờ ${c.name}`} title="Thêm khung giờ, giữ tên và danh sách sản phẩm" className="rounded-md p-1.5 text-blue-700 hover:bg-blue-50"><Plus className="h-4 w-4" /></button>
                         <button
                           onClick={() => openEditEditor(c)}
                           className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition"
@@ -478,15 +539,6 @@ export default function AdminCampaignsPage() {
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
-                        {c.status === "DRAFT" && (
-                          <button
-                            onClick={() => handlePublish(c)}
-                            className="p-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-md transition"
-                            title="Xuất bản chiến dịch"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                          </button>
-                        )}
                         {c.status !== "ARCHIVED" && (
                           <button
                             onClick={() => handleArchive(c)}
@@ -509,12 +561,12 @@ export default function AdminCampaignsPage() {
       {/* Editor Modal */}
       {isEditorOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
+          <div id="campaign-editor" role="dialog" aria-modal="true" aria-labelledby="campaign-editor-title" tabIndex={-1} className="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
             {/* Modal Header */}
             <div className="p-5 border-b border-gray-100 flex items-center justify-between bg-gray-50">
               <div className="flex items-center gap-2">
                 <Zap className="w-5 h-5 text-amber-500" />
-                <h2 className="font-bold text-gray-900 text-base">
+                <h2 id="campaign-editor-title" className="font-bold text-gray-900 text-base">
                   {editingCampaign ? `Sửa chiến dịch: ${editingCampaign.name}` : "Tạo chiến dịch khuyến mại mới"}
                 </h2>
                 {editingCampaign && (
@@ -524,6 +576,7 @@ export default function AdminCampaignsPage() {
                 )}
               </div>
               <button
+                aria-label="Đóng trình sửa chiến dịch"
                 onClick={() => setIsEditorOpen(false)}
                 className="text-gray-400 hover:text-gray-600 p-1 rounded-md"
               >
@@ -541,6 +594,17 @@ export default function AdminCampaignsPage() {
               )}
 
               {/* Basic Fields */}
+              <label className="flex items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm font-semibold text-blue-900">
+                <input type="checkbox" checked={formEnabled} onChange={e => setFormEnabled(e.target.checked)} className="h-5 w-5" />
+                <span>Bật chiến dịch trên homepage<span className="mt-1 block text-xs font-normal">Chiến dịch sắp chạy vẫn hiển thị khi bật. Hết thời hạn tự tắt; giá sale chỉ áp dụng trong lịch chạy.</span></span>
+              </label>
+              <p className="text-xs text-slate-600">Các lịch cùng tên được gom thành một chương trình trên homepage. Mỗi lịch có ngày, khung giờ và sản phẩm riêng; giá không chồng lấn cho cùng cấu hình.</p>
+              <fieldset className="grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-3">
+                <legend className="px-1 text-xs font-bold text-slate-700">Lịch sale theo ngày (GMT+7)</legend>
+                <label className="text-xs font-semibold">Ngày sale<input type="date" value={formStartLocal.slice(0, 10)} onChange={e => { if (e.target.value) { setFormStartLocal(`${e.target.value}T${formStartLocal.slice(11) || '10:00'}`); setFormEndLocal(`${e.target.value}T${formEndLocal.slice(11) || '12:00'}`); setDurationHours(''); } }} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" /></label>
+                <label className="text-xs font-semibold">Bắt đầu<input type="time" value={formStartLocal.slice(11)} onChange={e => { setFormStartLocal(`${formStartLocal.slice(0, 10)}T${e.target.value}`); setDurationHours(''); }} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" /></label>
+                <label className="text-xs font-semibold">Kết thúc<input type="time" value={formEndLocal.slice(11)} onChange={e => { setFormEndLocal(`${formStartLocal.slice(0, 10)}T${e.target.value}`); setDurationHours(''); }} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" /></label>
+              </fieldset>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-semibold text-gray-700 mb-1">
@@ -575,7 +639,11 @@ export default function AdminCampaignsPage() {
                   <input
                     type="datetime-local"
                     value={formStartLocal}
-                    onChange={(e) => setFormStartLocal(e.target.value)}
+                    onChange={(e) => {
+                      setFormStartLocal(e.target.value);
+                      const hours = Number(durationHours);
+                      if (e.target.value && durationHours && Number.isFinite(hours) && hours >= 0.25 && hours <= 8760) setFormEndLocal(isoToDatetimeLocalGmt7(new Date(new Date(datetimeLocalGmt7ToIso(e.target.value)).getTime() + hours * 3600000).toISOString()));
+                    }}
                     className="w-full px-3.5 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
                   <p className="text-[10px] text-gray-400 mt-1">Giờ chuẩn Việt Nam (Asia/Ho_Chi_Minh)</p>
@@ -588,11 +656,18 @@ export default function AdminCampaignsPage() {
                   <input
                     type="datetime-local"
                     value={formEndLocal}
-                    onChange={(e) => setFormEndLocal(e.target.value)}
+                    onChange={(e) => { setDurationHours(''); setFormEndLocal(e.target.value); }}
                     className="w-full px-3.5 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Khoảng nửa mở [startAt, endAt)</p>
+                  <p className="text-[10px] text-gray-400 mt-1">Giá ưu đãi ngừng áp dụng đúng thời điểm kết thúc.</p>
                 </div>
+                <label className="sm:col-span-2 block text-xs font-semibold text-gray-700">Hoặc chạy trong số giờ kể từ lúc bắt đầu
+                  <input type="number" min="0.25" max="8760" step="0.25" value={durationHours} placeholder="Ví dụ: 2, 6, 24" onChange={e => {
+                    const value = e.target.value; setDurationHours(value);
+                    const hours = Number(value);
+                    if (formStartLocal && Number.isFinite(hours) && hours > 0 && hours <= 8760) setFormEndLocal(isoToDatetimeLocalGmt7(new Date(new Date(datetimeLocalGmt7ToIso(formStartLocal)).getTime() + hours * 3600000).toISOString()));
+                  }} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-normal" />
+                </label>
               </div>
 
               {/* Items Section */}
@@ -613,6 +688,7 @@ export default function AdminCampaignsPage() {
                   </button>
                 </div>
 
+                <CampaignProductPicker onAdd={items => setFormItems(prev => [...prev, ...items.filter(item => !prev.some(p => p.productId === item.productId && (p.variantId || null) === item.variantId))])} />
                 {formItems.length === 0 ? (
                   <div className="p-6 border border-dashed border-gray-200 rounded-xl text-center text-xs text-gray-400">
                     Chưa có sản phẩm nào. Bấm &quot;Thêm mục&quot; để gán giá khuyến mại.
@@ -625,6 +701,7 @@ export default function AdminCampaignsPage() {
                         className="p-3.5 bg-gray-50 border border-gray-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-3 items-center"
                       >
                         <div className="sm:col-span-4">
+                          {it.displayName && <p className="mb-1 text-xs font-semibold text-slate-800">{it.displayName}</p>}
                           <label className="block text-[11px] font-semibold text-gray-600 mb-0.5">Product ID</label>
                           <input
                             type="text"
@@ -703,15 +780,15 @@ export default function AdminCampaignsPage() {
                   onClick={() => handleSave(false)}
                   className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-sm font-medium transition"
                 >
-                  {saving ? "Đang lưu..." : "Lưu bản nháp"}
+                  {saving ? "Đang lưu..." : "Lưu & Tắt"}
                 </button>
                 <button
                   type="button"
                   disabled={saving}
-                  onClick={() => handleSave(true)}
+                  onClick={() => handleSave()}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-xs transition"
                 >
-                  {saving ? "Đang xử lý..." : "Lưu & Xuất bản"}
+                  {saving ? "Đang xử lý..." : "Lưu chiến dịch"}
                 </button>
               </div>
             </div>

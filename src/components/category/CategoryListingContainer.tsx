@@ -103,9 +103,9 @@ export default function CategoryListingContainer({
                     href={
                       totalActiveFilters > 0
                         ? initialData.category
-                          ? `/category/${initialData.category.slug}`
-                          : "/category"
-                        : "/category"
+                          ? initialData.category.href || `/${initialData.category.slug}`
+                          : "/phan-loai"
+                        : "/phan-loai"
                     }
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-text-inverse font-medium rounded-control hover:bg-brand-primary-hover transition text-sm"
                   >

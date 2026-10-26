@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+  <defs>
+    <linearGradient id="gm-screen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="40%" stop-color="#311042"/>
+      <stop offset="70%" stop-color="#701A75"/>
+      <stop offset="100%" stop-color="#F43F5E"/>
+    </linearGradient>
+    <linearGradient id="gm-rgb" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#EC4899"/>
+      <stop offset="25%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#3B82F6"/>
+      <stop offset="75%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#F59E0B"/>
+    </linearGradient>
+    <filter id="gm-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#EC4899" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Ambient Floor Glow -->
+  <ellipse cx="80" cy="108" rx="64" ry="8" fill="#EC4899" opacity="0.25"/>
+
+  <!-- Laptop Screen Lid -->
+  <g>
+    <!-- Aggressive Bezel -->
+    <polygon points="34,20 126,20 124,80 36,80" fill="#090D16"/>
+    <!-- Screen Display with Cyber Warrior -->
+    <rect x="38" y="24" width="84" height="52" rx="2" fill="url(#gm-screen)"/>
+    
+    <!-- Gaming Character Silhouette & Game HUD -->
+    <path d="M74,38 L86,38 L90,48 L88,68 L72,68 L70,48 Z" fill="#0F172A" opacity="0.85"/>
+    <circle cx="80" cy="35" r="5" fill="#38BDF8"/>
+    <!-- Glowing Visor -->
+    <line x1="77" y1="35" x2="83" y2="35" stroke="#F43F5E" stroke-width="2" filter="url(#gm-glow)"/>
+    <!-- Crosshairs & HUD -->
+    <circle cx="80" cy="46" r="14" fill="none" stroke="#22D3EE" stroke-width="1" stroke-dasharray="2,2"/>
+    <path d="M44,32 L56,32 M44,32 L44,44" fill="none" stroke="#F43F5E" stroke-width="1.5"/>
+    <path d="M116,32 L104,32 M116,32 L116,44" fill="none" stroke="#F43F5E" stroke-width="1.5"/>
+    <!-- FPS counter -->
+    <text x="44" y="70" fill="#4ADE80" font-family="monospace" font-size="6" font-weight="bold">165 FPS</text>
+  </g>
+
+  <!-- Gaming Keyboard Base with RGB -->
+  <polygon points="16,104 144,104 130,80 30,80" fill="#0F172A"/>
+  <!-- RGB Underglow -->
+  <polygon points="32,83 128,83 124,97 36,97" fill="url(#gm-rgb)" opacity="0.85"/>
+  <!-- Keycaps lattice -->
+  <polygon points="33,84 127,84 123,96 37,96" fill="#182234" opacity="0.7"/>
+  <!-- WASD Highlight -->
+  <rect x="42" y="86" width="6" height="5" rx="1" fill="#F43F5E"/>
+  <!-- Front Edge RGB Strip -->
+  <polygon points="20,103 140,103 142,105 18,105" fill="url(#gm-rgb)"/>
+</svg>

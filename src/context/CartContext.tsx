@@ -4,9 +4,12 @@ import { createContext, useContext, useEffect, useState, useMemo, useCallback, u
 import { trackStorefront } from '@/lib/storefront-metrics';
 
 export interface CartItem {
+  slug?: string;
+  template?: string;
   id: string; // product id + variant id
   productId: string;
   variantId?: string;
+  warrantyName?: string;
   name: string;
   price: number; // numeric price for calculation
   displayPrice: string;
@@ -23,7 +26,7 @@ interface CartContextType {
   addToCart: (item: CartItem) => void;
   removeFromCart: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
-  updateItemPrice: (productId: string, variantId: string | null | undefined, newPrice: number) => void;
+  updateItemPrice: (productId: string, variantId: string | null | undefined, newPrice: number, warrantyName?: string | null) => void;
   revalidateCart: () => Promise<void>;
   clearCart: () => void;
   cartCount: number;
@@ -39,7 +42,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [validation, setValidation] = useState({key:'',status:'pending',error:''});
   const requestNumber = useRef(0);
-  const cartKey = JSON.stringify(cart.map(i=>[i.id,i.productId,i.variantId || null,i.quantity,i.price]));
+  const cartKey = JSON.stringify(cart.map(i=>[i.id,i.productId,i.variantId || null,i.warrantyName || null,i.quantity,i.price]));
 
   // Load from local storage after mount (useEffect keeps SSR hydration safe:
   // server and client both start with [] before the saved cart is applied)
@@ -107,12 +110,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
   };
 
-  const updateItemPrice = (productId: string, variantId: string | null | undefined, newPrice: number) => {
+  const updateItemPrice = (productId: string, variantId: string | null | undefined, newPrice: number, warrantyName?: string | null) => {
     setCart((prev) =>
       prev.map((item) => {
         const matches =
           item.productId === productId &&
-          (item.variantId || null) === (variantId || null);
+          (item.variantId || null) === (variantId || null) && (warrantyName === undefined || (item.warrantyName || null) === warrantyName);
         if (matches) {
           return {
             ...item,
@@ -142,6 +145,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             id: i.id,
             productId: i.productId,
             variantId: i.variantId || null,
+            warrantyName: i.warrantyName || null,
             expectedPrice: i.price,
           })),
         }),

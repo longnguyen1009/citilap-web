@@ -5,13 +5,18 @@ import { mediaEnvironment } from "@/server/media-http";
 import { publicPageBySlug } from "@/server/services/page.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { businessProfile } from "@/config/business-profile";
+import { getPublishedNavigation } from '@/server/services/storefront-cms.service';
+import CategoryPage, { generateMetadata as categoryMetadata } from '@/components/category/CategoryPage';
 
 interface CustomPageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export async function generateMetadata({ params }: CustomPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: CustomPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const navigation = await getPublishedNavigation();
+  if (navigation?.categories.some(c => c.href === '/' + slug)) return categoryMetadata({params: Promise.resolve({category:[slug]}),searchParams});
   try {
     const env = await mediaEnvironment();
     const page = await publicPageBySlug(env.DB, slug);
@@ -40,8 +45,10 @@ export async function generateMetadata({ params }: CustomPageProps): Promise<Met
   }
 }
 
-export default async function CustomCmsPage({ params }: CustomPageProps) {
+export default async function CustomCmsPage({ params, searchParams }: CustomPageProps) {
   const { slug } = await params;
+  const navigation = await getPublishedNavigation();
+  if (navigation?.categories.some(c => c.href === '/' + slug)) return CategoryPage({params: Promise.resolve({category:[slug]}),searchParams});
 
   let env;
   try {

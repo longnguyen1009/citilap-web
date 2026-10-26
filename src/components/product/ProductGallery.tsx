@@ -104,27 +104,30 @@ export default function ProductGallery({
   return (
     <div className="w-full select-none">
       {/* 1. Main Display Viewport */}
-      <div className="relative aspect-[4/3] sm:aspect-square w-full rounded-xl bg-white border border-gray-200 p-4 overflow-hidden group flex items-center justify-center shadow-xs">
-        {/* Discount Badge */}
-        {discount && (
-          <span className="absolute top-3 left-3 z-10 bg-red-600 text-white font-black text-xs px-2.5 py-1 rounded-md shadow-sm tracking-wide">
-            {discount}
+      <div className="relative aspect-[4/3] sm:aspect-square w-full rounded-2xl bg-slate-50/70 border border-slate-200/90 p-4 overflow-hidden group flex items-center justify-center shadow-xs">
+        {/* Badges góc trên bên trái */}
+        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
+          {discount && (
+            <span className="bg-rose-600 text-white font-black text-xs px-2.5 py-1 rounded-lg shadow-xs tracking-wide">
+              {discount}
+            </span>
+          )}
+          <span className="bg-blue-600 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-lg shadow-xs">
+            Mới 100% Fullbox
           </span>
-        )}
+        </div>
 
-        {/* Zoom Button */}
-        <button
-          type="button"
-          onClick={() => setIsLightboxOpen(true)}
-          className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-gray-700 shadow-sm border border-gray-200 flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
-          aria-label="Phóng to ảnh sản phẩm"
-        >
-          <Maximize2 className="w-4 h-4" />
-        </button>
+        {/* Tình trạng kho góc trên bên phải */}
+        <div className="absolute top-3 right-3 z-10 pointer-events-none">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold shadow-xs">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+            <span>Sẵn hàng tại HN & Bắc Ninh</span>
+          </span>
+        </div>
 
-        {/* Main Image */}
+        {/* Main Image with Zoom Trigger */}
         <div
-          className="relative w-full h-full cursor-zoom-in"
+          className="relative w-full h-full cursor-zoom-in flex items-center justify-center"
           onClick={() => setIsLightboxOpen(true)}
           role="button"
           tabIndex={0}
@@ -143,9 +146,23 @@ export default function ProductGallery({
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
             priority={activeIndex === 0}
             onError={() => setFailedImages((prev) => ({ ...prev, [activeIndex]: true }))}
-            className="object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+            className="object-contain transition-transform duration-300 ease-out group-hover:scale-105"
           />
         </div>
+
+        {/* Nút Xem ảnh to góc dưới phải */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsLightboxOpen(true);
+          }}
+          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-xs border border-slate-200 text-slate-700 hover:text-blue-600 text-xs font-semibold shadow-xs transition cursor-pointer"
+          aria-label="Phóng to ảnh sản phẩm"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+          <span>Xem ảnh to</span>
+        </button>
 
         {/* Previous / Next Arrows (visible on hover if > 1 images) */}
         {total > 1 && (

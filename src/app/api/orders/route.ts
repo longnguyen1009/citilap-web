@@ -115,6 +115,7 @@ async function POSTHandler(request: Request) {
     const items = selection.data.items.map((it) => ({
       productId: typeof it.productId === 'string' ? it.productId.trim() : '',
       variantId: typeof it.variantId === 'string' && it.variantId.trim() ? it.variantId.trim() : null,
+      warrantyName: it.warrantyName || null,
       sku: typeof it.sku === 'string' ? it.sku.trim() : null,
       quantity: Number(it.quantity),
       expectedPrice: typeof it.expectedPrice === 'number'
@@ -204,6 +205,7 @@ async function POSTHandler(request: Request) {
     if (code === 'VARIANT_UNAVAILABLE') {
       return errorResponse('Cấu hình sản phẩm đã chọn hiện không khả dụng.', 409, 'VARIANT_UNAVAILABLE');
     }
+    if (code === 'WARRANTY_UNAVAILABLE') return errorResponse('Gói bảo hành đã thay đổi. Vui lòng chọn lại.', 409, code);
     if (code === 'INVALID_ITEM') {
       return errorResponse('Thông tin sản phẩm trong giỏ hàng không hợp lệ.', 400, 'INVALID_ITEM');
     }

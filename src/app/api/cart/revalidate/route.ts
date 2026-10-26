@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { mediaEnvironment } from '@/server/media-http';
 import { getStorefrontPricingContext, resolvePrice, PricingTargetError } from '@/server/services/pricing.service';
+import { resolveProductWarranty } from '@/lib/product-warranty';
 
 export const runtime = 'edge';
 
@@ -8,6 +9,7 @@ interface RevalidateCartItem {
   id: string;
   productId: string;
   variantId?: string | null;
+  warrantyName?: string | null;
   expectedPrice?: number;
 }
 
@@ -45,6 +47,7 @@ export async function POST(request: Request) {
       const it = body.items[i];
       if (!it || typeof it !== 'object' || !validId(it.id) || !validId(it.productId) || ids.has(it.id.trim()) ||
           (it.variantId !== undefined && it.variantId !== null && !validId(it.variantId)) ||
+          (it.warrantyName != null && (typeof it.warrantyName !== 'string' || !it.warrantyName.trim() || it.warrantyName.length > 240)) ||
           (it.expectedPrice !== undefined && (!Number.isSafeInteger(it.expectedPrice) || it.expectedPrice < 0))) {
         return NextResponse.json(
           { success: false, code: 'INVALID_CART_ITEM', error: `Mục thứ ${i + 1} không hợp lệ (cần productId).` },
@@ -69,32 +72,36 @@ export async function POST(request: Request) {
             explicitDb: env.DB,
           });
 
+          const studio = item.warrantyName ? await env.DB.prepare('SELECT published FROM ProductStudio WHERE productId=?').bind(item.productId.trim()).first<{published:string | null}>() : null;
+          const warranty = resolveProductWarranty(studio?.published, item.warrantyName);
+          const price = resolved.effectivePrice + (warranty?.adjustment || 0);
+          if (!Number.isSafeInteger(price) || price < 0) throw new Error('WARRANTY_UNAVAILABLE');
           const expected = typeof item.expectedPrice === 'number' ? item.expectedPrice : null;
-          const priceChanged = expected !== null && expected !== resolved.effectivePrice;
+          const priceChanged = expected !== null && expected !== price;
 
           return {
             id: item.id,
             productId: item.productId.trim(),
             variantId: item.variantId || null,
-            price: resolved.effectivePrice,
+            price,
             regularPrice: resolved.regularPrice,
             compareAtPrice: resolved.compareAtPrice,
             isOnSale: resolved.isOnSale,
             discountPercent: resolved.discountPercent,
             priceChanged,
             oldPrice: expected,
-            newPrice: resolved.effectivePrice,
+            newPrice: price,
             available: true,
           };
         } catch (err: unknown) {
           // If it is a known business pricing target error (missing product/variant or not active/orderable)
-          if (err instanceof PricingTargetError) {
+          if (err instanceof PricingTargetError || (err instanceof Error && err.message === 'WARRANTY_UNAVAILABLE')) {
             return {
               id: item.id,
               productId: item.productId.trim(),
               variantId: item.variantId || null,
               available: false,
-              unavailableReason: err.code,
+              unavailableReason: err instanceof PricingTargetError ? err.code : err.message,
               priceChanged: false,
             };
           }

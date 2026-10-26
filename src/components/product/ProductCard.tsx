@@ -4,15 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Heart, ShieldCheck, Laptop, Cpu, Scale } from "lucide-react";
-import { useWishlist } from "@/context/WishlistContext";
-import { useCompare } from "@/context/CompareContext";
+import { useOptionalWishlist } from "@/context/WishlistContext";
+import { useOptionalCompare } from "@/context/CompareContext";
 import { Badge } from "@/components/ui/Badge";
 import { PriceTag } from "@/components/ui/PriceTag";
 import { SpecChip } from "@/components/ui/SpecChip";
 import { ConditionBadge } from "@/components/ui/ConditionBadge";
 import { StockBadge } from "@/components/ui/StockBadge";
+import { productHref as getProductHref } from '@/lib/product-paths';
 
 export type ProductCardProduct = {
+  href?: string;
+  template?: string;
   id: string;
   name: string;
   slug?: string;
@@ -56,14 +59,18 @@ export interface ProductCardProps {
  */
 function formatCpuSpec(val?: string): string {
   if (!val) return "";
-  return val
+  let s = val.split(/[\/,;]/)[0].trim();
+  s = s
     .replace(/^Intel\s+/i, "")
     .replace(/^AMD\s+/i, "")
     .replace(/^Core\s+/i, "")
-    .replace(/Ryzen\s*(\d)\s*/i, "R$1-")
-    .replace(/Ultra\s*(\d)\s*/i, "U$1-")
-    .replace(/i(\d)\s+(\d)/i, "i$1-$2")
+    .replace(/Ryzen\s*(?:AI\s*)?(\d)\s*[-–—]?\s*/i, "R$1-")
+    .replace(/Ultra\s*(\d)\s*[-–—]?\s*/i, "U$1-")
+    .replace(/i(\d)\s*[-–—]?\s*(\d)/i, "i$1-$2")
+    .replace(/--+/g, "-")
+    .replace(/-+$/, "")
     .trim();
+  return s;
 }
 
 function formatGpuSpec(val?: string): string {
@@ -95,7 +102,7 @@ function formatStorageSpec(val?: string): string {
 
 function formatDisplaySpec(val?: string): string {
   if (!val) return "";
-  const sizeMatch = val.match(/(\d+(?:\.\d+)?)\s*(?:inch|")/i);
+  const sizeMatch = val.match(/^(\d+(?:\.\d+)?)\s*(?:inch|"|\s)/i) || val.match(/(\d+(?:\.\d+)?)\s*(?:inch|")/i);
   const size = sizeMatch ? `${sizeMatch[1].replace(/\.0$/, "")}"` : "";
 
   let res = "";
@@ -116,7 +123,8 @@ function formatWarranty(val?: string, fallback = "BH 12T"): string {
   return val
     .replace(/^Bảo hành\s*/i, "BH ")
     .replace(/\s*tháng/i, "T")
-    .replace(/\s*(1\s*đổi\s*1|tại|chính|hãng|toàn\s*diện).*$/i, "")
+    .replace(/\s*chính\s*hãng/i, " hãng")
+    .replace(/\s*(1\s*đổi\s*1|tại|toàn\s*diện).*$/i, "")
     .trim();
 }
 
@@ -128,19 +136,20 @@ export default function ProductCard({
   showSpecs = true,
   className = "",
 }: ProductCardProps) {
-  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
-  const { isInCompare, addToCompare, removeFromCompare } = useCompare();
-  const liked = isInWishlist(product.id);
-  const inCompare = isInCompare(product.id);
+  const wishlistCtx = useOptionalWishlist();
+  const compareCtx = useOptionalCompare();
+  const liked = wishlistCtx?.isInWishlist(product.id) ?? false;
+  const inCompare = compareCtx?.isInCompare(product.id) ?? false;
   const [imageError, setImageError] = useState(false);
 
   const toggleWishlist = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!wishlistCtx) return;
     if (liked) {
-      removeFromWishlist(product.id);
+      wishlistCtx.removeFromWishlist(product.id);
     } else {
-      addToWishlist({
+      wishlistCtx.addToWishlist({
         productId: product.id,
       });
     }
@@ -149,15 +158,17 @@ export default function ProductCard({
   const toggleCompare = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!compareCtx) return;
     if (inCompare) {
-      removeFromCompare(product.id);
+      compareCtx.removeFromCompare(product.id);
     } else {
-      const res = addToCompare({
+      const res = compareCtx.addToCompare({
         id: product.id,
         name: product.name,
         slug: product.slug || product.id,
         price: Number(product.price) || 0,
         image: product.image,
+        template: product.template,
       });
       if (!res.success && res.message) {
         alert(res.message);
@@ -166,11 +177,11 @@ export default function ProductCard({
   };
 
   const variantQuery = product.sku ? `?sku=${encodeURIComponent(product.sku)}` : (product.variantId ? `?variant=${encodeURIComponent(product.variantId)}` : "");
-  const productHref = product.slug ? `/product/${product.slug}${variantQuery}` : `/product/${product.id}${variantQuery}`;
+  const productHref = getProductHref(product) + variantQuery;
   const isOutOfStock = product.availability ? product.availability === 'UNAVAILABLE' : product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const warrantyText = formatWarranty(
     product.warranty,
-    "BH chính hãng"
+    "BH hãng"
   );
 
   // Format key specs for density & clarity
@@ -183,7 +194,7 @@ export default function ProductCard({
 
   return (
     <article
-      className={`group relative flex flex-col h-full bg-white rounded-card border border-border-default hover:border-border-strong hover:shadow-card-hover transition-all duration-200 overflow-hidden ${className}`}
+      className={`group/product relative flex flex-col h-full bg-white rounded-2xl border border-slate-300 shadow-xs hover:border-blue-500 hover:shadow-[0_6px_18px_-8px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
     >
       {/* Top Badges Bar: Rank, Condition, Discount & Wishlist */}
       <div className="absolute top-2 left-2 right-2 z-20 flex items-center justify-between pointer-events-none">
@@ -222,7 +233,7 @@ export default function ProductCard({
               inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
             }
             title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
-            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-colors shadow-xs cursor-pointer ${
+            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-[background-color,border-color,transform] duration-150 shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
               inCompare
                 ? "bg-blue-600 text-white border border-blue-600"
                 : "bg-white/90 backdrop-blur-xs text-text-muted hover:text-blue-600 hover:bg-blue-50/80 border border-border-default"
@@ -239,7 +250,7 @@ export default function ProductCard({
             aria-label={
               liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
             }
-            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-colors shadow-xs cursor-pointer ${
+            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-[background-color,border-color,transform] duration-150 shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden ${
               liked
                 ? "bg-red-50 text-error border border-red-200"
                 : "bg-white/90 backdrop-blur-xs text-text-muted hover:text-error hover:bg-red-50/80 border border-border-default"
@@ -251,13 +262,8 @@ export default function ProductCard({
       </div>
 
       {/* Product Image Container */}
-      <div className="relative aspect-[4/3] w-full bg-surface-subtle p-4 pt-8 flex items-center justify-center overflow-hidden">
-        <Link
-          href={productHref}
-          className="relative block w-full h-full"
-          tabIndex={-1}
-          aria-hidden="true"
-        >
+      <div className="relative aspect-[4/3] w-full border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white p-3 pt-11 sm:p-4 sm:pt-10 flex items-center justify-center overflow-hidden">
+        <div className="relative block w-full h-full">
           {product.image && !imageError ? (
             <Image
               src={product.image}
@@ -265,7 +271,7 @@ export default function ProductCard({
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
               onError={() => setImageError(true)}
-              className={`object-contain transition-transform duration-300 group-hover:scale-105 ${
+              className={`object-contain transition-transform duration-300 group-hover/product:scale-105 motion-reduce:transform-none ${
                 isOutOfStock ? "grayscale opacity-60" : ""
               }`}
             />
@@ -278,27 +284,31 @@ export default function ProductCard({
 
           {/* Out of stock overlay */}
           {isOutOfStock && (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[1px] rounded-control">
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[1px] rounded-control z-10">
               <span className="bg-slate-900/90 text-white text-xs font-bold px-3 py-1 rounded-control shadow-xs">
                 Tạm hết hàng
               </span>
             </div>
           )}
-        </Link>
+        </div>
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-col flex-1 p-3">
+      <div className="flex flex-col flex-1 p-2.5 sm:p-3.5">
         {/* Brand or Series line if present */}
         {(product.brand || product.series) && (
-          <p className="text-caption font-semibold text-text-muted uppercase tracking-wider mb-0.5 truncate">
+          <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 truncate">
             {[product.brand, product.series].filter(Boolean).join(" • ")}
           </p>
         )}
 
         {/* Title */}
-        <h3 className="text-body-sm font-medium text-text-primary leading-snug line-clamp-2 min-h-[38px] group-hover:text-brand-primary transition-colors">
-          <Link href={productHref} title={product.name}>
+        <h3 className="text-[13px] sm:text-sm font-semibold text-slate-900 leading-5 line-clamp-2 min-h-10 group-hover/product:text-blue-700 transition-colors">
+          <Link
+            href={productHref}
+            title={product.name}
+            className="after:absolute after:inset-0 after:z-10 focus:outline-hidden focus-visible:underline"
+          >
             {product.name}
           </Link>
         </h3>
@@ -308,7 +318,8 @@ export default function ProductCard({
           price={product.availability === 'CONTACT' ? 'Liên hệ' : product.price}
           originalPrice={product.originalPrice ?? product.oldPrice}
           size="md"
-          className="mt-2"
+          className="mt-2 mb-3"
+          priceClassName="tabular-nums"
         />
 
         {/* Specs Matrix - High Density & Easy to Scan */}
@@ -350,7 +361,7 @@ export default function ProductCard({
         )}
 
         {/* Footer Meta: Warranty & Stock Status */}
-        <div className="mt-auto pt-2.5 border-t border-border-default flex items-center justify-between gap-1.5 text-caption">
+        <div className="mt-auto pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1 text-caption">
           {/* Warranty tag */}
           <div
             className="flex items-center gap-1 text-text-secondary font-medium truncate min-w-0"
@@ -362,7 +373,7 @@ export default function ProductCard({
 
           {/* Standardized Stock Indicator */}
           {product.availability ? (
-            <span className="shrink-0 text-right whitespace-nowrap text-[11px] font-medium text-text-secondary">
+            <span className="text-[10px] sm:text-[11px] font-medium text-text-secondary">
               {({AVAILABLE:'Nhận yêu cầu mua',PREORDER:'Nhận đặt trước',CONTACT:'Liên hệ tư vấn',UNAVAILABLE:'Tạm ngừng nhận đơn'} as Record<string,string>)[product.availability] || 'Chưa cập nhật'}
             </span>
           ) : (
@@ -372,7 +383,7 @@ export default function ProductCard({
 
         {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}
         {footerAction && (
-          <div className="mt-2.5 pt-2 border-t border-border-default">
+          <div className="mt-2.5 pt-2 border-t border-border-default relative z-20">
             {footerAction}
           </div>
         )}
