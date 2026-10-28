@@ -95,7 +95,7 @@ export default async function StoresPage() {
     <div className="bg-[#f8fafc] min-h-screen pb-16">
       {/* 1. Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 max-w-[1240px]">
+        <div className="container mx-auto px-4 max-w-[1370px]">
           <nav className="flex text-sm text-gray-500 py-3.5 font-medium items-center">
             <Link href="/" className="hover:text-blue-600 transition">
               Trang chủ
@@ -106,7 +106,7 @@ export default async function StoresPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-[1240px] mt-8">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-8">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold mb-2">
             <Store className="w-3.5 h-3.5" /> Điểm trải nghiệm sản phẩm thực tế

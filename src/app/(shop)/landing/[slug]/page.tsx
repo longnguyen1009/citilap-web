@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronRight, Eye } from 'lucide-react';
-import { getPublishedLandingPage } from '@/server/services/storefront-cms.service';
+import { getPublishedLandingPage, getStorefrontSettings } from '@/server/services/storefront-cms.service';
 import BlockRenderer from '@/components/builder/BlockRenderer';
 import FlashSaleSection from '@/components/home/FlashSaleSection';
 import { businessProfile } from '@/config/business-profile';
@@ -47,7 +47,11 @@ export default async function StorefrontLandingPage({ params, searchParams }: La
   const sp = searchParams ? await searchParams : {};
   const isPreview = sp.preview === 'true';
 
-  let page = await getPublishedLandingPage(slug);
+  const [initialPage, settings] = await Promise.all([
+    getPublishedLandingPage(slug),
+    getStorefrontSettings().catch(() => null),
+  ]);
+  let page = initialPage;
 
   // If in preview mode and not published, try resolving preview
   if (!page && isPreview) {
@@ -89,7 +93,7 @@ export default async function StorefrontLandingPage({ params, searchParams }: La
       </div>
 
       {/* Dynamic Sections */}
-      <BlockRenderer sections={page.sections} flashSale={<FlashSaleSection />} />
+      <BlockRenderer sections={page.sections} settings={settings} flashSale={<FlashSaleSection settings={settings} />} />
     </div>
   );
 }

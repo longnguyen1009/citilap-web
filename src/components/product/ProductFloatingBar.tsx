@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, X } from "lucide-react";
 
 interface ProductFloatingBarProps {
   productName: string;
@@ -24,6 +24,7 @@ export default function ProductFloatingBar({
   onBuyNow,
 }: ProductFloatingBarProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -39,6 +40,10 @@ export default function ProductFloatingBar({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  if (isDismissed) {
+    return null;
+  }
+
   const specSummary = [variantLabel, colorLabel].filter(Boolean).join(" • ");
 
   return (
@@ -49,7 +54,7 @@ export default function ProductFloatingBar({
           : "translate-y-full opacity-0 pointer-events-none"
       }`}
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <div className="max-w-[1370px] mx-auto flex items-center justify-between gap-3 sm:gap-4">
         {/* Left: Thumbnail & Selected Specs */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative h-11 w-11 rounded-lg border border-slate-200 bg-slate-50 shrink-0 p-0.5 overflow-hidden">
@@ -62,19 +67,19 @@ export default function ProductFloatingBar({
             />
           </div>
           <div className="min-w-0">
-            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[200px] sm:max-w-md">
+            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate max-w-[160px] sm:max-w-md">
               {productName}
             </p>
             {specSummary && (
-              <p className="text-[11px] text-blue-700 font-semibold truncate max-w-[180px] sm:max-w-sm mt-0.5">
+              <p className="text-[11px] text-blue-700 font-semibold truncate max-w-[150px] sm:max-w-sm mt-0.5">
                 {specSummary}
               </p>
             )}
           </div>
         </div>
 
-        {/* Right: Live Price & Actions */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Right: Live Price & Actions + Close button */}
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           <div className="text-right">
             <span className="text-[10px] text-slate-400 block font-medium">Giá thanh toán:</span>
             <span className="text-base sm:text-xl font-black text-rose-600">
@@ -96,9 +101,19 @@ export default function ProductFloatingBar({
             <button
               type="button"
               onClick={onBuyNow}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer"
+              className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer"
             >
               MUA NGAY
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsDismissed(true)}
+              aria-label="Đóng thanh mua nhanh"
+              title="Đóng thanh mua nhanh"
+              className="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-100/80 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 text-xs font-semibold transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+              <span className="hidden md:inline">Đóng</span>
             </button>
           </div>
         </div>

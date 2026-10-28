@@ -89,7 +89,7 @@ export interface BusinessProfile {
 
 export const businessProfile: BusinessProfile = {
   brandName: "CitiLap",
-  legalEntityNotice: "Đơn vị vận hành: Hộ kinh doanh CitiLap.",
+  legalEntityNotice: "Đơn vị vận hành: HỘ KINH DOANH CITI LAP - Mã số đăng ký hộ kinh doanh: 01D8053589.",
   alternateNames: ["CitiLapVN", "CitiLap.VN"],
   canonicalSiteUrl: "https://citilap.vn",
   logoAsset: "/brand/citilap-mark.png",

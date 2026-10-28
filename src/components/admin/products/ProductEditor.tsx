@@ -14,14 +14,14 @@ import { useRouter } from 'next/navigation';
 import { catalogNeedTag } from '@/lib/catalog-needs';
 
 const NEED_PRESETS = [
-  { key: 'gaming', label: 'Gaming', icon: '🎮' },
-  { key: 'van-phong', label: 'Văn phòng', icon: '💼' },
-  { key: 'mong-nhe', label: 'Mỏng nhẹ', icon: '🪶' },
-  { key: 'do-hoa', label: 'Đồ họa – kỹ thuật', icon: '🎨' },
-  { key: 'sinh-vien', label: 'Sinh viên', icon: '🎓' },
-  { key: 'cam-ung', label: 'Cảm ứng', icon: '👆' },
-  { key: 'laptop-ai', label: 'Laptop AI', icon: '⚡' },
-  { key: 'doanh-nhan', label: 'Doanh nhân', icon: '👔' },
+  { key: 'gaming', label: 'Gaming' },
+  { key: 'van-phong', label: 'Văn phòng' },
+  { key: 'mong-nhe', label: 'Mỏng nhẹ' },
+  { key: 'do-hoa', label: 'Đồ họa – kỹ thuật' },
+  { key: 'sinh-vien', label: 'Sinh viên' },
+  { key: 'cam-ung', label: 'Cảm ứng' },
+  { key: 'laptop-ai', label: 'Laptop AI' },
+  { key: 'doanh-nhan', label: 'Doanh nhân' },
 ];
 import {
   Save,
@@ -42,9 +42,11 @@ import {
   History,
   ArrowUp,
   ArrowDown,
+  Check,
+  Copy,
+  Sparkles,
 } from 'lucide-react';
 import {
-  PageHeader,
   AdminCard,
   AdminButton,
   StatusBadge,
@@ -58,6 +60,7 @@ import {
   availabilityLabels,
   conditionLabels,
   blankProduct,
+  productDocumentSchema,
   type ProductDocument,
   type ProductTemplate,
 } from '@/contracts/cms/product-studio';
@@ -66,12 +69,15 @@ import MediaDialog from '../media/MediaDialog';
 import MediaUpload from '../media/MediaUpload';
 import StudioAsset from './StudioAsset';
 import RichContentEditor from './RichContentEditor';
+import './editor.css';
 
 interface DetailResponse {
   id: string;
   revision: number;
   document: ProductDocument;
   published: boolean;
+  publishedSummary: Pick<ProductDocument, 'name' | 'slug' | 'template' | 'price' | 'availability'> | null;
+  hasUnpublishedDraft: boolean;
 }
 
 interface CategoryOption {
@@ -90,7 +96,7 @@ interface ProductEditorProps {
   id?: string | null;
 }
 
-type TabKey = 'info' | 'specs' | 'pricing' | 'media' | 'content' | 'seo' | 'history';
+type TabKey = 'info' | 'specs' | 'pricing' | 'media' | 'content' | 'extras' | 'inspection' | 'seo' | 'history';
 
 interface RevisionItem {
   revision: number;
@@ -119,8 +125,11 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [doc, setDoc] = useState<ProductDocument | null>(null);
   const [revision, setRevision] = useState<number>(0);
   const latestDoc=useRef(doc), saveLock=useRef(false);
+  const createdId = useRef<string | null>(null);
   useEffect(()=>{latestDoc.current=doc;},[doc]);
   const [isPublished, setIsPublished] = useState<boolean>(false);
+  const [publishedSummary, setPublishedSummary] = useState<DetailResponse['publishedSummary']>(null);
+  const [hasUnpublishedDraft, setHasUnpublishedDraft] = useState(false);
   const [baseline, setBaseline] = useState<string>('');
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [brands, setBrands] = useState<BrandOption[]>([]);
@@ -147,6 +156,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [relatedSearch, setRelatedSearch] = useState<string>('');
   const [relatedCandidates, setRelatedCandidates] = useState<{ id: string; name: string; sku?: string; image?: string; price: number }[]>([]);
   const [loadingRelated, setLoadingRelated] = useState<boolean>(false);
+  const relatedRequest = useRef(0);
 
   const isDirty = !!doc && JSON.stringify(doc) !== baseline;
 
@@ -155,33 +165,29 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     setLoading(true);
     setLoadError(null);
     try {
-      // 1. Fetch categories
-      const catRes = await fetch('/api/categories').then(r => r.json()).catch(() => ({ success: false }));
-      if (catRes.success && Array.isArray(catRes.data)) {
-        setCategories(catRes.data);
-      } else {
-        const studioRes = await mediaRequest<{ categories: CategoryOption[] }>('/api/admin/product-studio').catch(() => null);
-        if (studioRes?.categories) setCategories(studioRes.categories);
-      }
-
-      // 2. Fetch canonical brands
-      const brandRes = await mediaRequest<{ items: BrandOption[] }>('/api/admin/brands').catch(() => null);
-      if (brandRes?.items && Array.isArray(brandRes.items)) {
-        setBrands(brandRes.items);
-      }
+      const [catalog, brandRes, detail] = await Promise.all([
+        mediaRequest<{ categories: CategoryOption[] }>('/api/admin/products?limit=1'),
+        mediaRequest<{ items: BrandOption[] }>('/api/admin/brands'),
+        id ? mediaRequest<DetailResponse>(`/api/admin/products/${id}`) : Promise.resolve(null),
+      ]);
+      setCategories(catalog.categories);
+      setBrands(brandRes.items);
 
       // 3. Fetch product if editing
-      if (id) {
-        const detail = await mediaRequest<DetailResponse>(`/api/admin/products/${id}`);
+      if (detail) {
         setDoc(detail.document);
         setRevision(detail.revision);
         setIsPublished(detail.published);
+        setPublishedSummary(detail.publishedSummary);
+        setHasUnpublishedDraft(detail.hasUnpublishedDraft);
         setBaseline(JSON.stringify(detail.document));
       } else {
         const initial = blankProduct();
         setDoc(initial);
         setRevision(0);
         setIsPublished(false);
+        setPublishedSummary(null);
+        setHasUnpublishedDraft(false);
         setBaseline(JSON.stringify(initial));
       }
     } catch (err) {
@@ -195,6 +201,121 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     setDoc(prev => (prev ? { ...prev, [key]: value } : prev));
   };
 
+  // Matrix Generator & Quick Add states
+  const [showMatrixGen, setShowMatrixGen] = useState<boolean>(false);
+  const [matrixRAMs, setMatrixRAMs] = useState<string[]>(['16GB DDR5', '32GB DDR5']);
+  const [matrixSSDs, setMatrixSSDs] = useState<string[]>(['512GB NVMe', '1TB NVMe']);
+  const [matrixGPU, setMatrixGPU] = useState<string>('RTX 4060 8GB');
+  const [matrixBasePrice, setMatrixBasePrice] = useState<number>(25000000);
+  const [matrixStepPrice, setMatrixStepPrice] = useState<number>(2000000);
+
+  const [quickAddName, setQuickAddName] = useState<string>('');
+  const [quickAddRam, setQuickAddRam] = useState<string>('');
+  const [quickAddStorage, setQuickAddStorage] = useState<string>('');
+  const [quickAddGpu, setQuickAddGpu] = useState<string>('');
+  const [quickAddCondition, setQuickAddCondition] = useState<'NEW' | 'LIKE_NEW' | 'USED' | 'REFURBISHED'>('NEW');
+  const [quickAddSku, setQuickAddSku] = useState<string>('');
+  const [quickAddPrice, setQuickAddPrice] = useState<string>('');
+  const [quickAddOriginalPrice, setQuickAddOriginalPrice] = useState<string>('');
+  const [quickAddAvail, setQuickAddAvail] = useState<'' | 'AVAILABLE' | 'PREORDER' | 'CONTACT' | 'UNAVAILABLE'>('');
+
+  const handleAddQuickVariant = () => {
+    if (!doc) return;
+    const name = quickAddName.trim();
+    const priceNum = parseInt(quickAddPrice, 10);
+    const price = !isNaN(priceNum) && priceNum >= 0 ? priceNum : doc.price;
+    const sku = (quickAddSku.trim() || `${doc.slug || 'SP'}-${doc.variants.length + 1}`).toUpperCase();
+    const origPriceNum = parseInt(quickAddOriginalPrice, 10);
+    const originalPrice = !isNaN(origPriceNum) && origPriceNum >= 0 ? origPriceNum : null;
+
+    const autoName = name || (doc.template === 'LAPTOP' 
+      ? [quickAddRam, quickAddStorage, quickAddGpu].filter(Boolean).join(' / ') || `Cấu hình ${doc.variants.length + 1}`
+      : `Cấu hình ${doc.variants.length + 1}`);
+
+    const newVariant = {
+      id: crypto.randomUUID(),
+      name: autoName,
+      sku,
+      condition: quickAddCondition,
+      price,
+      originalPrice,
+      availability: quickAddAvail || undefined,
+      ram: quickAddRam.trim() || undefined,
+      storage: quickAddStorage.trim() || undefined,
+      gpu: quickAddGpu.trim() || undefined,
+      options: {},
+      image: '',
+    };
+
+    updateDoc('variants', [...doc.variants, newVariant]);
+    setQuickAddName('');
+    setQuickAddRam('');
+    setQuickAddStorage('');
+    setQuickAddGpu('');
+    setQuickAddSku('');
+    setQuickAddPrice('');
+    setQuickAddOriginalPrice('');
+    setQuickAddAvail('');
+  };
+
+  const handleCloneVariant = (idx: number) => {
+    if (!doc) return;
+    const source = doc.variants[idx];
+    if (!source) return;
+    const newSku = `${source.sku || doc.slug || 'SP'}-COPY-${doc.variants.length + 1}`.toUpperCase();
+    const cloned = {
+      ...source,
+      id: crypto.randomUUID(),
+      sku: newSku,
+      name: source.name ? `${source.name} (Bản sao)` : `Cấu hình ${doc.variants.length + 1}`,
+    };
+    const nextVariants = [...doc.variants];
+    nextVariants.splice(idx + 1, 0, cloned);
+    updateDoc('variants', nextVariants);
+  };
+
+  const handleDeleteVariant = (variantId: string) => {
+    setDoc(current => current && ({
+      ...current,
+      variants: current.variants.filter(v => v.id !== variantId),
+      media: current.media.map(item => item.variantId === variantId ? { ...item, variantId: '' } : item),
+    }));
+  };
+
+  const handleGenerateMatrix = () => {
+    if (!doc) return;
+    const rams = matrixRAMs.length > 0 ? matrixRAMs : ['16GB DDR5'];
+    const ssds = matrixSSDs.length > 0 ? matrixSSDs : ['512GB NVMe'];
+    const newVariants = [];
+    let stepIndex = 0;
+
+    for (const r of rams) {
+      for (const s of ssds) {
+        const variantPrice = (matrixBasePrice || doc.price) + (stepIndex * matrixStepPrice);
+        stepIndex++;
+        const ramShort = r.split(' ')[0] || r;
+        const ssdShort = s.split(' ')[0] || s;
+        newVariants.push({
+          id: crypto.randomUUID(),
+          name: `${ramShort} · ${ssdShort}${matrixGPU ? ' · ' + matrixGPU.split(' ')[0] : ''}`,
+          sku: `${doc.slug || 'SP'}-${ramShort}-${ssdShort}`.toUpperCase(),
+          condition: 'NEW' as const,
+          price: variantPrice,
+          originalPrice: null,
+          availability: 'AVAILABLE' as const,
+          ram: r,
+          storage: s,
+          gpu: matrixGPU || undefined,
+          options: {},
+          image: '',
+        });
+      }
+    }
+
+    updateDoc('variants', [...doc.variants, ...newVariants]);
+    setShowMatrixGen(false);
+  };
+
   const handleSlugify = (name: string) => {
     return name
       .toLowerCase()
@@ -206,17 +327,18 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   };
 
   const fetchRelatedCandidates = async (query: string) => {
+    const request = ++relatedRequest.current;
     setLoadingRelated(true);
     try {
       const params = new URLSearchParams();
       params.set('limit', '12');
       if (query.trim()) params.set('q', query.trim());
       const res = await mediaRequest<{ items: { id: string; name: string; sku?: string; image?: string; price: number }[] }>(`/api/admin/products?${params.toString()}`);
-      setRelatedCandidates((res.items || []).filter(item => item.id !== id));
+      if (request === relatedRequest.current) setRelatedCandidates((res.items || []).filter(item => item.id !== id));
     } catch {
-      setRelatedCandidates([]);
+      if (request === relatedRequest.current) setRelatedCandidates([]);
     } finally {
-      setLoadingRelated(false);
+      if (request === relatedRequest.current) setLoadingRelated(false);
     }
   };
 
@@ -254,14 +376,24 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
   const handleSave = useCallback(async (action: 'save' | 'publish' | 'unpublish') => {
     if (!doc || saveLock.current) return false;
+    const validation = productDocumentSchema.safeParse(doc);
+    if (!validation.success) {
+      const issue = validation.error.issues[0];
+      const field = String(issue.path[0] || '');
+      const labels: Record<string, string> = { name: 'Tên sản phẩm', slug: 'Đường dẫn', categoryId: 'Danh mục', price: 'Giá bán', originalPrice: 'Giá gốc', variants: 'Cấu hình', specs: 'Thông số', media: 'Ảnh', warranties: 'Bảo hành', tags: 'Thẻ tag', faqs: 'Câu hỏi', gifts: 'Quà tặng' };
+      setActiveTab(['price', 'originalPrice', 'variants', 'warranties'].includes(field) ? 'pricing' : field === 'media' ? 'media' : field === 'specs' ? 'specs' : ['faqs', 'gifts', 'accessoryProductIds'].includes(field) ? 'extras' : 'info');
+      setStatusMessage({ type: 'error', text: field ? `${labels[field] || field}: ${issue.code === 'custom' ? issue.message : 'kiểm tra giá trị, độ dài và trường bắt buộc.'}` : issue.message });
+      return false;
+    }
     saveLock.current=true;
     const submitted=JSON.stringify(doc);
     setSaving(true);
     setStatusMessage(null);
 
     try {
-      const endpoint = id ? `/api/admin/products/${id}` : '/api/admin/products';
-      const method = id ? 'PUT' : 'POST';
+      const targetId = id || createdId.current;
+      const endpoint = targetId ? `/api/admin/products/${targetId}` : '/api/admin/products';
+      const method = targetId ? 'PUT' : 'POST';
 
       const result = await mediaRequest<DetailResponse>(endpoint, {
         method,
@@ -276,6 +408,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       if(JSON.stringify(latestDoc.current)===submitted)setDoc(result.document);
       setRevision(result.revision);
       setIsPublished(result.published);
+      setPublishedSummary(result.publishedSummary);
+      setHasUnpublishedDraft(result.hasUnpublishedDraft);
       setBaseline(JSON.stringify(result.document));
 
 
@@ -288,6 +422,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       }
 
       if (!id && result.id) {
+        createdId.current = result.id;
         router.replace(`/admin/products/${result.id}`);
       }
       return true;
@@ -304,24 +439,12 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     }
   }, [doc, id, revision, router]);
 
-  const autosaveStatus=useDraftAutosave(doc,revision,!!id && !loading,isDirty,saving,()=>handleSave('save'));
+  const autosaveStatus=useDraftAutosave(doc,revision,!!id && !loading && productDocumentSchema.safeParse(doc).success,isDirty,saving,()=>handleSave('save'));
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data hydration from API
     void loadData();
   }, [loadData]);
-
-  // Prevent accidental navigation when unsaved
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isDirty]);
 
   // Keyboard shortcut Ctrl+S / Cmd+S
   useEffect(() => {
@@ -378,6 +501,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       if (JSON.stringify(latestDoc.current) === beforeRestore) setDoc(res.document);
       setRevision(res.newRevision);
       setBaseline(JSON.stringify(res.document));
+      setHasUnpublishedDraft(isPublished);
       setRestoreConfirmRev(null);
       setSelectedRevisionSnapshot(null);
       setStatusMessage({
@@ -418,110 +542,44 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     );
   }
 
-  const tabs: { key: TabKey; label: string; icon: typeof Layers }[] = [
-    { key: 'info', label: 'Thông tin chung', icon: Layers },
-    { key: 'specs', label: 'Thông số kỹ thuật', icon: Cpu },
-    { key: 'pricing', label: 'Cấu hình & Giá', icon: DollarSign },
-    { key: 'media', label: 'Hình ảnh & Video', icon: ImageIcon },
-    { key: 'content', label: 'Bài giới thiệu', icon: FileText },
-    { key: 'seo', label: 'SEO & Hiển thị', icon: Globe },
-    ...(id ? [{ key: 'history' as TabKey, label: 'Lịch sử & Khôi phục', icon: History }] : []),
+  const tabs: { key: TabKey; label: string; icon: typeof Layers; count?: number }[] = [
+    { key: 'info', label: 'Thông tin', icon: Layers },
+    { key: 'specs', label: 'Thông số', icon: Cpu, count: doc.specs.filter(s => s.value?.trim()).length },
+    { key: 'pricing', label: 'Giá & Cấu hình', icon: DollarSign, count: doc.variants.length },
+    { key: 'media', label: 'Ảnh', icon: ImageIcon, count: doc.media.length },
+    { key: 'content', label: 'Mô tả', icon: FileText },
+    { key: 'extras', label: 'Quà & FAQ', icon: Plus, count: doc.warranties.length + (doc.gifts?.length || 0) },
+    { key: 'inspection', label: 'Kiểm định', icon: Cpu },
+    { key: 'seo', label: 'SEO', icon: Globe },
+    ...(id ? [{ key: 'history' as TabKey, label: 'Lịch sử', icon: History }] : []),
   ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-24">
-      {/* Top Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between">
-        <Link
-          href="/admin/products"
-          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 transition"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Quay lại danh sách sản phẩm</span>
+    <div className="product-editor space-y-4 pb-12">
+      {/* Compact header: back · title · status | view on web */}
+      <header className="product-editor-header">
+        <Link href="/admin/products" className="product-editor-back" aria-label="Về danh sách sản phẩm" title="Về danh sách sản phẩm">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
         </Link>
-        <div className="flex items-center gap-2">
-          {id && isPublished && (
-            <a
-              href={productHref(doc)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-medium px-2 py-1 rounded border border-slate-200 bg-white"
-            >
-              <ExternalLink className="w-3 h-3" />
-              <span>Xem trên Web</span>
-            </a>
-          )}
-        </div>
-      </div>
-
-      {/* Page Header */}
-      <p role="status" aria-live="polite">{autosaveStatus}</p>
-      {isDirty && id && <DraftRecovery draft={doc} endpoint={`/api/admin/products/${id}`}/>}
-      <SchedulePanel entityType="product" entityId={id} revision={revision} dirty={isDirty || saving}/>
-      <PageHeader
-        title={id ? doc.name || 'Biên tập sản phẩm' : 'Thêm sản phẩm mới'}
-        description={
-          id
-            ? `Định danh ID: ${id} · Mã URL: ${doc.template === 'LAPTOP' ? '/laptop/' : '/phu-kien/'}${doc.slug || '...'}`
-            : 'Tạo sản phẩm Laptop hoặc Phụ kiện với đầy đủ thông số, biến thể và hình ảnh.'
-        }
-        badge={
-          <div className="flex items-center gap-2">
-            <StatusBadge
-              status={isPublished ? 'PUBLISHED' : 'DRAFT'}
-              customLabel={isPublished ? 'Đã xuất bản' : 'Bản nháp'}
-            />
-            {revision > 0 && (
-              <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 font-mono rounded">
-                rev #{revision}
-              </span>
-            )}
-            {isDirty && (
-              <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 font-medium border border-amber-200 rounded animate-pulse">
-                Chưa lưu
-              </span>
-            )}
-          </div>
-        }
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <AdminButton
-              variant="secondary"
-              icon={<Eye className="w-4 h-4" />}
-              onClick={() => setPreviewOpen(true)}
-              disabled={saving}
-            >
-              Xem trước
-            </AdminButton>
-            <AdminButton
-              variant="secondary"
-              icon={<Save className="w-4 h-4" />}
-              onClick={() => void handleSave('save')}
-              loading={saving}
-            >
-              Lưu nháp
-            </AdminButton>
-            <AdminButton
-              variant="primary"
-              icon={<Globe className="w-4 h-4" />}
-              onClick={() => void handleSave('publish')}
-              loading={saving}
-            >
-              {isPublished ? 'Cập nhật website' : 'Xuất bản website'}
-            </AdminButton>
-            {isPublished && (
-              <AdminButton
-                variant="destructive"
-                icon={<EyeOff className="w-4 h-4" />}
-                onClick={() => void handleSave('unpublish')}
-                disabled={saving}
-              >
-                Ẩn khỏi web
-              </AdminButton>
-            )}
-          </div>
-        }
-      />
+        <h1>{id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}</h1>
+        <StatusBadge
+          status={isPublished ? 'PUBLISHED' : 'DRAFT'}
+          customLabel={isPublished ? 'Đã xuất bản' : 'Bản nháp'}
+        />
+        {isDirty && <span className="product-editor-dirty">Chưa lưu</span>}
+        {revision > 0 && <span className="product-editor-rev" title="Phiên bản">#{revision}</span>}
+        {id && isPublished && (
+          <a
+            href={productHref(publishedSummary || doc)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="product-editor-viewlink"
+          >
+            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Xem trên web</span>
+          </a>
+        )}
+      </header>
 
       {/* Alert banner if any */}
       {statusMessage && (
@@ -533,45 +591,22 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         </InlineAlert>
       )}
 
-      {/* Tab Navigation */}
-      <div className="flex overflow-x-auto border-b border-slate-200 bg-white rounded-t-xl px-2 gap-1">
-        {tabs.map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 py-3 px-4 text-xs font-medium border-b-2 transition whitespace-nowrap cursor-pointer ${
-                isActive
-                  ? 'border-blue-600 text-blue-600 bg-blue-50/40'
-                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* TAB 1: THÔNG TIN CHUNG */}
-      {activeTab === 'info' && (
-        <AdminCard title="Thông tin cơ bản" subtitle="Tên hiển thị, định danh URL, thương hiệu và danh mục của sản phẩm.">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="product-editor-layout">
+      <fieldset disabled={saving} className="product-editor-main min-w-0 space-y-4" aria-label="Biên tập sản phẩm">
+      <AdminCard>
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label htmlFor="product-name" className="block text-xs font-semibold text-slate-700 mb-1">
                   Tên sản phẩm <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="product-name"
                   value={doc.name}
                   onChange={e => {
                     const newName = e.target.value;
                     updateDoc('name', newName);
-                    if (!id && !doc.slug) {
+                    if (!id && (!doc.slug || doc.slug === handleSlugify(doc.name))) {
                       updateDoc('slug', handleSlugify(newName));
                     }
                   }}
@@ -581,16 +616,17 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Đường dẫn (Slug URL) <span className="text-rose-500">*</span>
+                <label htmlFor="product-slug" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Đường dẫn <span className="text-rose-500">*</span>
                 </label>
                 <div className="flex">
                   <span className="inline-flex items-center px-3 text-xs bg-slate-100 text-slate-500 border border-r-0 border-slate-300 rounded-l-lg">
-                    {doc.template === 'LAPTOP' ? '/laptop/' : '/phu-kien/'}
+                    {productHref({ template: doc.template })}
                   </span>
                   <input
                     type="text"
-                    value={doc.slug}
+                    id="product-slug"
+                  value={doc.slug}
                     onChange={e => updateDoc('slug', e.target.value.toLowerCase().trim())}
                     placeholder="lenovo-legion-5-pro-16arx8"
                     className="flex-1 text-sm border border-slate-300 rounded-r-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
@@ -599,105 +635,56 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               </div>
             </div>
 
-            <div className="space-y-2.5 rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <label htmlFor="product-tags" className="block text-xs font-bold text-slate-800">
-                  Thẻ tag & Nhu cầu sử dụng
-                </label>
-                <span className="text-[11px] text-slate-500">
-                  Chọn nhanh nhu cầu chuẩn để khách hàng lọc chính xác ở trang phân loại
+      </AdminCard>
+      {/* Tab Navigation */}
+      <div className="product-editor-tabs" role="tablist" aria-label="Nội dung sản phẩm">
+        {tabs.map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              id={'product-tab-' + tab.key}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={'product-panel-' + tab.key}
+              tabIndex={isActive ? 0 : -1}
+              onKeyDown={event => {
+                const current = tabs.findIndex(item => item.key === activeTab);
+                const next = event.key === 'ArrowRight' ? (current + 1) % tabs.length : event.key === 'ArrowLeft' ? (current - 1 + tabs.length) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+                if (next < 0) return;
+                event.preventDefault();
+                setActiveTab(tabs[next].key);
+                document.getElementById('product-tab-' + tabs[next].key)?.focus();
+              }}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className="product-editor-tab"
+            >
+              <Icon className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>{tab.label}</span>
+              {typeof tab.count !== 'undefined' && tab.count > 0 && (
+                <span className="product-editor-tab-count">
+                  {tab.count}
                 </span>
-              </div>
-
-              {/* Gợi ý chọn nhanh nhu cầu chuẩn */}
-              <div>
-                <span className="block text-[11px] font-semibold text-slate-600 mb-1.5">
-                  Gợi ý chọn nhanh nhu cầu chuẩn:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {NEED_PRESETS.map((preset) => {
-                    const normalizedTags = (doc.tags || []).map(catalogNeedTag);
-                    const isSelected = normalizedTags.includes(preset.key);
-                    return (
-                      <button
-                        key={preset.key}
-                        type="button"
-                        onClick={() => {
-                          const currentTags = doc.tags || [];
-                          let newTags: string[];
-                          if (isSelected) {
-                            newTags = currentTags.filter(t => catalogNeedTag(t) !== preset.key);
-                          } else {
-                            newTags = [...currentTags, preset.key];
-                          }
-                          updateDoc('tags', [...new Set(newTags.map(t => t.trim().toLocaleLowerCase('vi-VN')).filter(Boolean))]);
-                        }}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border ${
-                          isSelected
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                            : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'
-                        }`}
-                      >
-                        <span>{preset.icon}</span>
-                        <span>{preset.label}</span>
-                        {isSelected && <span className="ml-0.5 text-[10px] font-black">✓</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tag Input tự do */}
-              <div>
-                <input
-                  id="product-tags"
-                  type="text"
-                  value={(doc.tags || []).join(', ')}
-                  maxLength={1858}
-                  onChange={e => updateDoc('tags', e.target.value.split(',').map(tag => tag.trimStart()))}
-                  onBlur={() => updateDoc('tags', [...new Set((doc.tags || []).map(tag => tag.trim().toLocaleLowerCase('vi-VN')).filter(Boolean))])}
-                  placeholder="gaming, sinh-vien, van-phong, do-hoa, mong-nhe..."
-                  aria-describedby="product-tags-help"
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                />
-                <p id="product-tags-help" className="mt-1 text-[11px] text-slate-500">
-                  Tối đa 30 tag, mỗi tag 60 ký tự. Ngăn cách bằng dấu phẩy.
-                </p>
-              </div>
-
-              {/* Danh sách tag đã gắn kèm nút xóa */}
-              {(doc.tags || []).length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[11px] font-semibold text-slate-500">Đã gắn ({doc.tags.length}):</span>
-                  {doc.tags.map((tag, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200"
-                    >
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newTags = (doc.tags || []).filter((_, idx) => idx !== i);
-                          updateDoc('tags', newTags);
-                        }}
-                        className="text-blue-400 hover:text-blue-700 font-bold ml-0.5"
-                        aria-label={`Xóa tag ${tag}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
               )}
-            </div>
+            </button>
+          );
+        })}
+      </div>
 
+      <div id={'product-panel-' + activeTab} role="tabpanel" aria-labelledby={'product-tab-' + activeTab} tabIndex={0} className="product-editor-panel">
+      {/* TAB 1: THÔNG TIN CHUNG */}
+      {activeTab === 'info' && (
+        <AdminCard title="Phân loại">
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Danh mục sản phẩm <span className="text-rose-500">*</span>
+                <label htmlFor="product-category" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Danh mục <span className="text-rose-500">*</span>
                 </label>
                 <select
+                  id="product-category"
                   value={doc.categoryId}
                   onChange={e => updateDoc('categoryId', e.target.value)}
                   className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white cursor-pointer"
@@ -712,11 +699,12 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Thương hiệu / Hãng sản xuất
+                <label htmlFor="product-brand" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Thương hiệu
                 </label>
                 <div className="space-y-1.5">
                   <select
+                    id="product-brand"
                     value={doc.brandId || (brands.find(b => b.name.toLowerCase() === (doc.brand || '').toLowerCase())?.id ?? '')}
                     onChange={e => {
                       const selectedId = e.target.value;
@@ -743,6 +731,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   {(!doc.brandId || !brands.some(b => b.id === doc.brandId)) && (
                     <input
                       type="text"
+                      aria-label="Tên thương hiệu tùy chỉnh"
                       value={doc.brand}
                       onChange={e => updateDoc('brand', e.target.value)}
                       placeholder="Nhập tên thương hiệu (ví dụ: Lenovo, Dell...)"
@@ -754,8 +743,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tình trạng máy (Condition)
-                </label>
+                  Tình trạng
+
                 <select
                   value={doc.condition || 'NEW'}
                   onChange={e => updateDoc('condition', e.target.value as ProductDocument['condition'])}
@@ -766,21 +755,22 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                       {label}
                     </option>
                   ))}
-                </select>
+                </select></label>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Trạng thái nhận đơn trên Website
+                <label htmlFor="product-availability" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Nhận đơn
                 </label>
                 <select
+                  id="product-availability"
                   value={doc.availability}
                   onChange={e => updateDoc('availability', e.target.value as ProductDocument['availability'])}
                   className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white cursor-pointer"
                 >
                   {Object.entries(availabilityLabels).map(([key, label]) => (
                     <option key={key} value={key}>
-                      {label} ({key})
+                      {label}
                     </option>
                   ))}
                 </select>
@@ -788,9 +778,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
             </div>
 
             {/* Marketing Labels */}
-            <div className="pt-2 pb-1 border-t border-slate-100">
-              <span className="block text-xs font-bold text-slate-700 mb-2">Nhãn tiếp thị & Nổi bật trên Website:</span>
-              <div className="flex flex-wrap items-center gap-6">
+            <details className="product-editor-disclosure"><summary>Nhãn nổi bật</summary>
+              <div className="flex flex-wrap items-center gap-5 pt-2">
                 <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
                   <input
                     type="checkbox"
@@ -798,7 +787,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     onChange={e => updateDoc('isNewArrival', e.target.checked)}
                     className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   />
-                  <span>Hàng mới về (New Arrival)</span>
+                  <span>Hàng mới</span>
                 </label>
                 <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
                   <input
@@ -807,7 +796,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     onChange={e => updateDoc('isBestSeller', e.target.checked)}
                     className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   />
-                  <span>Bán chạy (Best Seller)</span>
+                  <span>Bán chạy</span>
                 </label>
                 <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
                   <input
@@ -816,7 +805,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     onChange={e => updateDoc('isFeatured', e.target.checked)}
                     className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   />
-                  <span>Sản phẩm nổi bật (Featured)</span>
+                  <span>Nổi bật</span>
                 </label>
                 <label className="inline-flex items-center gap-2 cursor-pointer text-xs font-bold text-red-600 bg-red-50/70 border border-red-200/60 px-2.5 py-1 rounded-lg hover:bg-red-100/70 transition">
                   <input
@@ -825,32 +814,105 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     onChange={e => updateDoc('isFlashSale', e.target.checked)}
                     className="w-4 h-4 rounded text-red-600 focus:ring-red-500"
                   />
-                  <span>Flash Sale cũ</span>
+                  <span>Flash Sale</span>
                 </label>
-                <Link href="/admin/campaigns" className="text-xs font-bold text-red-700 underline">Chọn sản phẩm cho chiến dịch HOT SALE</Link>
+                <Link href="/admin/campaigns" className="text-xs font-semibold text-red-700 hover:underline">Quản lý Flash Sale →</Link>
               </div>
-            </div>
+            </details>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Mô tả ngắn (Hiển thị đầu trang sản phẩm)
+              <label htmlFor="product-description" className="block text-xs font-semibold text-slate-700 mb-1">
+                Mô tả ngắn
               </label>
               <textarea
                 rows={3}
+                id="product-description"
                 value={doc.description}
                 onChange={e => updateDoc('description', e.target.value)}
-                placeholder="Tóm tắt điểm nhấn nổi bật về cấu hình, đối tượng sử dụng..."
+                placeholder="Tóm tắt điểm nhấn cấu hình, đối tượng sử dụng..."
                 className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
               />
             </div>
 
-            {/* Related Products Section */}
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="block text-xs font-bold text-slate-700">Sản phẩm liên quan / Đề xuất:</span>
-                  <span className="block text-[11px] text-slate-500">Chọn tối đa 10 sản phẩm đề xuất cùng phân khúc hoặc phụ kiện tương thích</span>
+            <details className="product-editor-disclosure"><summary>Thẻ & nhu cầu <span>{doc.tags.length}</span></summary><div className="space-y-3 pt-3">
+              {/* Gợi ý chọn nhanh nhu cầu chuẩn */}
+              <div className="flex flex-wrap gap-1.5">
+                {NEED_PRESETS.map((preset) => {
+                  const normalizedTags = (doc.tags || []).map(catalogNeedTag);
+                  const isSelected = normalizedTags.includes(preset.key);
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => {
+                        const currentTags = doc.tags || [];
+                        let newTags: string[];
+                        if (isSelected) {
+                          newTags = currentTags.filter(t => catalogNeedTag(t) !== preset.key);
+                        } else {
+                          newTags = [...currentTags, preset.key];
+                        }
+                        updateDoc('tags', [...new Set(newTags.map(t => t.trim().toLocaleLowerCase('vi-VN')).filter(Boolean))]);
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'
+                      }`}
+                    >
+                      <span>{preset.label}</span>
+                      {isSelected && <Check size={12} aria-hidden="true" />}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Tag Input tự do */}
+              <div>
+                <input
+                  id="product-tags"
+                  type="text"
+                  aria-label="Nhập thẻ cách nhau bằng dấu phẩy"
+                  value={(doc.tags || []).join(', ')}
+                  maxLength={1858}
+                  onChange={e => updateDoc('tags', e.target.value.split(',').map(tag => tag.trimStart()))}
+                  onBlur={() => updateDoc('tags', [...new Set((doc.tags || []).map(tag => tag.trim().toLocaleLowerCase('vi-VN')).filter(Boolean))])}
+                  placeholder="Nhập thẻ, ngăn cách bằng dấu phẩy (gaming, sinh-vien, van-phong...)"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* Danh sách tag đã gắn kèm nút xóa */}
+              {(doc.tags || []).length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {doc.tags.map((tag, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200"
+                    >
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newTags = (doc.tags || []).filter((_, idx) => idx !== i);
+                          updateDoc('tags', newTags);
+                        }}
+                        className="text-blue-400 hover:text-blue-700 font-bold ml-0.5"
+                        aria-label={`Xóa tag ${tag}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
                 </div>
+              )}
+            </div></details>
+
+            {/* Related Products Section */}
+            <details className="product-editor-disclosure"><summary>Sản phẩm liên quan <span>{doc.relatedProductIds?.length || 0}</span></summary><div className="space-y-3 pt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-500">Tối đa 10 sản phẩm (để trống sẽ tự gợi ý cùng danh mục)</span>
                 <AdminButton
                   variant="secondary"
                   size="sm"
@@ -860,15 +922,11 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     void fetchRelatedCandidates('');
                   }}
                 >
-                  Chọn sản phẩm
+                  + Chọn
                 </AdminButton>
               </div>
 
-              {(doc.relatedProductIds || []).length === 0 ? (
-                <div className="p-3 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-500">
-                  Chưa chọn sản phẩm liên quan thủ công. Hệ thống sẽ tự động đề xuất các sản phẩm cùng danh mục/thương hiệu.
-                </div>
-              ) : (
+              {(doc.relatedProductIds || []).length > 0 && (
                 <div className="space-y-1.5">
                   {(doc.relatedProductIds || []).map((relId, rIdx) => (
                     <div key={relId} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
@@ -890,7 +948,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                             updateDoc('relatedProductIds', arr);
                           }}
                           className="p-1 text-slate-500 hover:text-slate-800 disabled:opacity-30 cursor-pointer"
-                          title="Di chuyển lên"
+                          title="Lên"
                         >
                           <ArrowUp className="w-3.5 h-3.5" />
                         </button>
@@ -905,7 +963,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                             updateDoc('relatedProductIds', arr);
                           }}
                           className="p-1 text-slate-500 hover:text-slate-800 disabled:opacity-30 cursor-pointer"
-                          title="Di chuyển xuống"
+                          title="Xuống"
                         >
                           <ArrowDown className="w-3.5 h-3.5" />
                         </button>
@@ -915,7 +973,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                             updateDoc('relatedProductIds', (doc.relatedProductIds || []).filter(item => item !== relId));
                           }}
                           className="p-1 text-rose-500 hover:text-rose-700 cursor-pointer"
-                          title="Xóa liên kết"
+                          title="Xóa"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -924,7 +982,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   ))}
                 </div>
               )}
-            </div>
+            </div></details>
           </div>
         </AdminCard>
       )}
@@ -932,22 +990,16 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       {/* TAB 2: THÔNG SỐ KỸ THUẬT */}
       {activeTab === 'specs' && (
         <AdminCard
-          title="Thông số kỹ thuật"
-          subtitle="Thiết lập mẫu thông số cho Laptop, Chuột, Bàn phím hoặc Phụ kiện. Các trường này đồng bộ với bộ lọc tìm kiếm và bảng so sánh trên website."
-        >
-          <div className="space-y-4">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Mẫu thông số kỹ thuật (Template):</span>
-                <span className="text-[11px] text-slate-500">Đổi mẫu tự động điền danh mục trường chuẩn và giữ lại các trường cũ</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
+          title="Thông số"
+          action={
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex flex-wrap gap-1">
                 {ALL_TEMPLATES.map(t => (
                   <button
                     key={t.key}
                     type="button"
                     onClick={() => handleSwitchTemplate(t.key)}
-                    className={`px-2.5 py-1 text-xs font-medium rounded-md border transition cursor-pointer ${
+                    className={`px-2 py-1 text-xs font-medium rounded-md border transition cursor-pointer ${
                       doc.template === t.key
                         ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -957,74 +1009,11 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {doc.specs.map((spec, idx) => {
-                const def = attributeTemplateDefinitions[doc.template]?.find(d => d.key === spec.key);
-                const isCustom = !(attributeTemplates[doc.template] as readonly string[])?.includes(spec.key);
-                return (
-                  <div key={spec.key || idx} className="p-3 bg-white border border-slate-200 rounded-lg space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-700">{spec.key}</span>
-                        {def?.unit && <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">{def.unit}</span>}
-                        {isCustom && <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">Tùy chỉnh</span>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => updateDoc('specs', doc.specs.filter((_, i) => i !== idx))}
-                        className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer"
-                        title="Xóa thông số này"
-                      >
-                        Xóa
-                      </button>
-                    </div>
-
-                    <input
-                      type="text"
-                      value={spec.value}
-                      onChange={e =>
-                        updateDoc(
-                          'specs',
-                          doc.specs.map((s, i) => (i === idx ? { ...s, value: e.target.value } : s))
-                        )
-                      }
-                      placeholder={def ? `Nhập ${def.label}...` : 'Nhập giá trị...'}
-                      className="w-full text-sm border border-slate-300 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                    />
-
-                    {def?.options && def.options.length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        <span className="text-[10px] text-slate-400 self-center mr-0.5">Gợi ý:</span>
-                        {def.options.map(opt => (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() =>
-                              updateDoc(
-                                'specs',
-                                doc.specs.map((s, i) => (i === idx ? { ...s, value: opt } : s))
-                              )
-                            }
-                            className={`text-[10px] px-2 py-0.5 rounded border transition cursor-pointer ${
-                              spec.value === opt
-                                ? 'bg-blue-50 text-blue-700 border-blue-300 font-medium'
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            {opt}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pt-2">
-              {!doc.specs.some(spec => spec.key === 'Năm ra mắt') && <AdminButton variant="secondary" size="sm" onClick={() => updateDoc('specs',[...doc.specs,{key:'Năm ra mắt',value:''}])}>Thêm năm ra mắt cho bộ lọc</AdminButton>}
+              {!doc.specs.some(spec => spec.key === 'Năm ra mắt') && (
+                <AdminButton variant="secondary" size="sm" onClick={() => updateDoc('specs', [...doc.specs, { key: 'Năm ra mắt', value: '' }])}>
+                  + Năm ra mắt
+                </AdminButton>
+              )}
               <AdminButton
                 variant="secondary"
                 size="sm"
@@ -1036,9 +1025,91 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   }
                 }}
               >
-                Thêm thông số tùy chỉnh
+                + Thông số
               </AdminButton>
             </div>
+          }
+        >
+          <div className="variant-matrix-wrapper">
+            <table className="compact-matrix-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '36px', textAlign: 'center' }}>#</th>
+                  <th style={{ width: '200px' }}>Thông số</th>
+                  <th>Giá trị & Gợi ý</th>
+                  <th style={{ width: '44px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {doc.specs.map((spec, idx) => {
+                  const def = attributeTemplateDefinitions[doc.template]?.find(d => d.key === spec.key);
+                  const isCustom = !(attributeTemplates[doc.template] as readonly string[])?.includes(spec.key);
+                  return (
+                    <tr key={spec.key || idx}>
+                      <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
+                      <td>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-semibold text-slate-800">{spec.key}</span>
+                          {def?.unit && <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">{def.unit}</span>}
+                          {isCustom && <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">Tùy chỉnh</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            aria-label={spec.key}
+                            value={spec.value}
+                            onChange={e =>
+                              updateDoc(
+                                'specs',
+                                doc.specs.map((s, i) => (i === idx ? { ...s, value: e.target.value } : s))
+                              )
+                            }
+                            placeholder={def ? `${def.label}...` : 'Nhập giá trị...'}
+                            className="matrix-input-cell"
+                          />
+                          {def?.options && def.options.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {def.options.map(opt => (
+                                <button
+                                  key={opt}
+                                  type="button"
+                                  onClick={() =>
+                                    updateDoc(
+                                      'specs',
+                                      doc.specs.map((s, i) => (i === idx ? { ...s, value: opt } : s))
+                                    )
+                                  }
+                                  className={`text-[10px] px-1.5 py-0.5 rounded border transition cursor-pointer ${
+                                    spec.value === opt
+                                      ? 'bg-blue-50 text-blue-700 border-blue-300 font-medium'
+                                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => updateDoc('specs', doc.specs.filter((_, i) => i !== idx))}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                          title="Xóa thông số"
+                          aria-label={`Xóa ${spec.key}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </AdminCard>
       )}
@@ -1046,16 +1117,1117 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       {/* TAB 3: CẤU HÌNH & GIÁ */}
       {activeTab === 'pricing' && (
         <div className="space-y-6">
-          <AdminCard title="Giá bán chung" subtitle="Giá bán tham chiếu của sản phẩm khi chưa chọn biến thể.">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+
+          {(() => {
+            const variantPrices = doc.variants.map(v => v.price).filter(p => p > 0);
+            const minVariantPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : doc.price;
+            const maxVariantPrice = variantPrices.length > 0 ? Math.max(...variantPrices) : doc.price;
+
+            return (
+              <AdminCard
+                title={
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm font-bold text-slate-900">Cấu hình</span>
+                    <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-semibold">
+                      {doc.variants.length}
+                    </span>
+                    {doc.variants.length > 0 && (
+                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                        {minVariantPrice === maxVariantPrice
+                          ? money(minVariantPrice)
+                          : `${money(minVariantPrice)} – ${money(maxVariantPrice)}`}
+                      </span>
+                    )}
+                  </div>
+                }
+                action={
+                  <div className="flex items-center gap-2">
+                    <AdminButton
+                      variant="secondary"
+                      size="sm"
+                      icon={<Sparkles className="w-3.5 h-3.5 text-blue-600" />}
+                      onClick={() => setShowMatrixGen(!showMatrixGen)}
+                    >
+                      Sinh nhanh
+                    </AdminButton>
+                    <AdminButton
+                      variant="secondary"
+                      size="sm"
+                      icon={<Plus className="w-3.5 h-3.5" />}
+                      onClick={() => {
+                        const newSku = `${doc.slug || 'SP'}-${doc.variants.length + 1}`.toUpperCase();
+                        updateDoc('variants', [
+                          ...doc.variants,
+                          {
+                            id: crypto.randomUUID(),
+                            name: '',
+                            sku: newSku,
+                            condition: 'NEW',
+                            price: doc.price,
+                            ram: '',
+                            storage: '',
+                            gpu: '',
+                            options: {},
+                            image: '',
+                          },
+                        ]);
+                      }}
+                      disabled={doc.variants.length >= 40}
+                    >
+                      + Dòng
+                    </AdminButton>
+                  </div>
+                }
+              >
+                {/* Collapsible Matrix Generator */}
+                {showMatrixGen && (
+                  <div className="matrix-generator-panel mb-4">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <strong className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                        Sinh nhanh (RAM × SSD)
+                      </strong>
+                      <button
+                        type="button"
+                        onClick={() => setShowMatrixGen(false)}
+                        className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-100">
+                        <span className="text-[11px] font-bold text-blue-900 block mb-1.5">RAM</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['8GB DDR5', '16GB DDR5', '32GB DDR5', '64GB DDR5'].map(r => (
+                            <label key={r} className="generator-chip-label">
+                              <input
+                                type="checkbox"
+                                checked={matrixRAMs.includes(r)}
+                                onChange={e => {
+                                  setMatrixRAMs(prev => (e.target.checked ? [...prev, r] : prev.filter(x => x !== r)));
+                                }}
+                              />
+                              <span>{r}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-100">
+                        <span className="text-[11px] font-bold text-blue-900 block mb-1.5">SSD</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['512GB NVMe', '1TB NVMe', '2TB NVMe'].map(s => (
+                            <label key={s} className="generator-chip-label">
+                              <input
+                                type="checkbox"
+                                checked={matrixSSDs.includes(s)}
+                                onChange={e => {
+                                  setMatrixSSDs(prev => (e.target.checked ? [...prev, s] : prev.filter(x => x !== s)));
+                                }}
+                              />
+                              <span>{s}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-100 space-y-2">
+                        <div>
+                          <span className="text-[11px] font-bold text-blue-900 block mb-0.5">GPU & Giá</span>
+                          <input
+                            type="text"
+                            value={matrixGPU}
+                            onChange={e => setMatrixGPU(e.target.value)}
+                            placeholder="GPU mặc định"
+                            className="w-full text-xs border border-slate-300 rounded px-2 py-1 mb-1.5"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label className="text-[10px] text-slate-500 block">Giá từ</label>
+                            <input
+                              type="number"
+                              value={matrixBasePrice}
+                              onChange={e => setMatrixBasePrice(Number(e.target.value) || 0)}
+                              className="w-full text-xs font-bold text-blue-700 border border-slate-300 rounded px-2 py-1"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="text-[10px] text-slate-500 block">Bước giá (+)</label>
+                            <input
+                              type="number"
+                              value={matrixStepPrice}
+                              onChange={e => setMatrixStepPrice(Number(e.target.value) || 0)}
+                              className="w-full text-xs border border-slate-300 rounded px-2 py-1"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <AdminButton variant="secondary" size="sm" onClick={() => setShowMatrixGen(false)}>
+                        Hủy
+                      </AdminButton>
+                      <AdminButton
+                        variant="primary"
+                        size="sm"
+                        icon={<Sparkles className="w-3.5 h-3.5" />}
+                        onClick={handleGenerateMatrix}
+                      >
+                        Tạo {Math.max(1, matrixRAMs.length) * Math.max(1, matrixSSDs.length)} dòng
+                      </AdminButton>
+                    </div>
+                  </div>
+                )}
+
+                {/* Compact Spreadsheet Table */}
+                <div className="variant-matrix-wrapper">
+                  <table className="compact-matrix-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '32px', textAlign: 'center' }}>#</th>
+                        <th style={{ minWidth: '150px' }}>Tên cấu hình</th>
+                        <th style={{ minWidth: '190px' }}>Thông số</th>
+                        <th style={{ width: '110px' }}>SKU</th>
+                        <th style={{ width: '105px', textAlign: 'right' }}>Giá bán</th>
+                        <th style={{ width: '100px', textAlign: 'right' }}>Giá gốc</th>
+                        <th style={{ width: '115px' }}>Nhận đơn</th>
+                        <th style={{ width: '60px', textAlign: 'center' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {doc.variants.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-8 text-center text-slate-500">
+                            <p className="text-xs mb-2">Chưa có biến thể hoặc cấu hình nào.</p>
+                            <AdminButton
+                              variant="secondary"
+                              size="sm"
+                              icon={<Plus className="w-3.5 h-3.5" />}
+                              onClick={() => {
+                                const newSku = `${doc.slug || 'SP'}-1`.toUpperCase();
+                                updateDoc('variants', [
+                                  {
+                                    id: crypto.randomUUID(),
+                                    name: 'Bản Tiêu chuẩn',
+                                    sku: newSku,
+                                    condition: 'NEW',
+                                    price: doc.price,
+                                    ram: '',
+                                    storage: '',
+                                    gpu: '',
+                                    options: {},
+                                    image: '',
+                                  },
+                                ]);
+                              }}
+                            >
+                              + Thêm cấu hình đầu tiên
+                            </AdminButton>
+                          </td>
+                        </tr>
+                      ) : (
+                        doc.variants.map((variant, idx) => (
+                          <tr key={variant.id}>
+                            <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
+                              {idx + 1}
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                aria-label={`Tên cấu hình ${idx + 1}`}
+                                value={variant.name}
+                                onChange={e =>
+                                  updateDoc(
+                                    'variants',
+                                    doc.variants.map((v, i) => (i === idx ? { ...v, name: e.target.value } : v))
+                                  )
+                                }
+                                placeholder={
+                                  doc.template === 'LAPTOP'
+                                    ? '16GB / 512GB / RTX 4060'
+                                    : doc.template === 'KEYBOARD'
+                                    ? 'Red Switch - Màu Trắng'
+                                    : doc.template === 'CHARGER'
+                                    ? '65W GaN - Đen'
+                                    : 'Màu Đen / Bản Tiêu chuẩn'
+                                }
+                                className="matrix-input-cell font-semibold"
+                              />
+                            </td>
+                            <td>
+                              {doc.template === 'LAPTOP' ? (
+                                <div className="matrix-specs-grid">
+                                  <input
+                                    type="text"
+                                    value={variant.ram || ''}
+                                    onChange={e =>
+                                      updateDoc(
+                                        'variants',
+                                        doc.variants.map((v, i) => (i === idx ? { ...v, ram: e.target.value } : v))
+                                      )
+                                    }
+                                    placeholder="RAM (16GB)"
+                                    title="Dung lượng RAM"
+                                    className="matrix-mini-input"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={variant.storage || ''}
+                                    onChange={e =>
+                                      updateDoc(
+                                        'variants',
+                                        doc.variants.map((v, i) => (i === idx ? { ...v, storage: e.target.value } : v))
+                                      )
+                                    }
+                                    placeholder="SSD (512GB)"
+                                    title="Ổ cứng SSD"
+                                    className="matrix-mini-input"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={variant.gpu || ''}
+                                    onChange={e =>
+                                      updateDoc(
+                                        'variants',
+                                        doc.variants.map((v, i) => (i === idx ? { ...v, gpu: e.target.value } : v))
+                                      )
+                                    }
+                                    placeholder="GPU (RTX 4060)"
+                                    title="Card đồ họa GPU"
+                                    className="matrix-mini-input"
+                                  />
+                                  <select
+                                    value={variant.condition}
+                                    onChange={e =>
+                                      updateDoc(
+                                        'variants',
+                                        doc.variants.map((v, i) =>
+                                          i === idx ? { ...v, condition: e.target.value as typeof v.condition } : v
+                                        )
+                                      )
+                                    }
+                                    title="Tình trạng máy"
+                                    className="matrix-mini-select"
+                                  >
+                                    <option value="NEW">Mới 100%</option>
+                                    <option value="LIKE_NEW">Like New 99%</option>
+                                    <option value="USED">Đã qua sử dụng</option>
+                                    <option value="REFURBISHED">Tân trang</option>
+                                  </select>
+                                </div>
+                              ) : (
+                                <div className="matrix-specs-grid">
+                                  <input
+                                    type="text"
+                                    value={variant.options?.color || ''}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      updateDoc(
+                                        'variants',
+                                        doc.variants.map((v, i) => {
+                                          if (i !== idx) return v;
+                                          const nextOpts = { ...(v.options || {}) };
+                                          if (val) nextOpts.color = val;
+                                          else delete nextOpts.color;
+                                          return { ...v, options: nextOpts };
+                                        })
+                                      );
+                                    }}
+                                    placeholder="Màu sắc"
+                                    className="matrix-mini-input"
+                                  />
+                                  <select
+                                    value={variant.condition}
+                                    onChange={e =>
+                                      updateDoc(
+                                        'variants',
+                                        doc.variants.map((v, i) =>
+                                          i === idx ? { ...v, condition: e.target.value as typeof v.condition } : v
+                                        )
+                                      )
+                                    }
+                                    title="Tình trạng"
+                                    className="matrix-mini-select"
+                                  >
+                                    <option value="NEW">Mới 100%</option>
+                                    <option value="LIKE_NEW">Like New 99%</option>
+                                    <option value="USED">Đã dùng</option>
+                                    <option value="REFURBISHED">Tân trang</option>
+                                  </select>
+                                </div>
+                              )}
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                aria-label={`SKU cấu hình ${idx + 1}`}
+                                value={variant.sku}
+                                onChange={e =>
+                                  updateDoc(
+                                    'variants',
+                                    doc.variants.map((v, i) =>
+                                      i === idx ? { ...v, sku: e.target.value.toUpperCase().trim() } : v
+                                    )
+                                  )
+                                }
+                                placeholder="SKU-001"
+                                className="matrix-input-cell matrix-input-mono"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                max="2000000000"
+                                aria-label={`Giá bán cấu hình ${idx + 1}`}
+                                value={variant.price}
+                                onChange={e =>
+                                  updateDoc(
+                                    'variants',
+                                    doc.variants.map((v, i) =>
+                                      i === idx ? { ...v, price: parseInt(e.target.value, 10) || 0 } : v
+                                    )
+                                  )
+                                }
+                                className="matrix-input-cell matrix-input-price"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min="0"
+                                max="2000000000"
+                                step="1"
+                                value={variant.originalPrice ?? ''}
+                                placeholder="Không giảm"
+                                onChange={e =>
+                                  updateDoc(
+                                    'variants',
+                                    doc.variants.map((v, i) =>
+                                      i === idx ? { ...v, originalPrice: e.target.value === '' ? null : Number(e.target.value) } : v
+                                    )
+                                  )
+                                }
+                                className="matrix-input-cell text-slate-500 text-right"
+                              />
+                            </td>
+                            <td>
+                              <select
+                                aria-label={`Nhận đơn cấu hình ${idx + 1}`}
+                                value={variant.availability || ''}
+                                data-val={variant.availability || 'DEFAULT'}
+                                onChange={e =>
+                                  updateDoc(
+                                    'variants',
+                                    doc.variants.map((v, i) =>
+                                      i === idx ? { ...v, availability: (e.target.value || undefined) as typeof v.availability } : v
+                                    )
+                                  )
+                                }
+                                className="matrix-select-availability"
+                              >
+                                <option value="">Theo sản phẩm</option>
+                                {Object.entries(availabilityLabels).map(([value, label]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  type="button"
+                                  title="Nhân bản cấu hình này"
+                                  onClick={() => handleCloneVariant(idx)}
+                                  className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Xóa biến thể"
+                                  onClick={() => handleDeleteVariant(variant.id)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+
+                    {/* INLINE QUICK ADD ROW */}
+                    <tfoot>
+                      <tr className="matrix-quick-add-tr">
+                        <td style={{ textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>+</td>
+                        <td>
+                          <input
+                            type="text"
+                            value={quickAddName}
+                            onChange={e => setQuickAddName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddQuickVariant();
+                            }}
+                            placeholder="Tên cấu hình mới..."
+                            className="matrix-input-cell"
+                          />
+                        </td>
+                        <td>
+                          {doc.template === 'LAPTOP' ? (
+                            <div className="matrix-specs-grid">
+                              <input
+                                type="text"
+                                value={quickAddRam}
+                                onChange={e => setQuickAddRam(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleAddQuickVariant();
+                                }}
+                                placeholder="RAM (16GB)"
+                                className="matrix-mini-input"
+                              />
+                              <input
+                                type="text"
+                                value={quickAddStorage}
+                                onChange={e => setQuickAddStorage(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleAddQuickVariant();
+                                }}
+                                placeholder="SSD (512GB)"
+                                className="matrix-mini-input"
+                              />
+                              <input
+                                type="text"
+                                value={quickAddGpu}
+                                onChange={e => setQuickAddGpu(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleAddQuickVariant();
+                                }}
+                                placeholder="GPU"
+                                className="matrix-mini-input"
+                              />
+                              <select
+                                value={quickAddCondition}
+                                onChange={e => setQuickAddCondition(e.target.value as typeof quickAddCondition)}
+                                className="matrix-mini-select"
+                              >
+                                <option value="NEW">Mới 100%</option>
+                                <option value="LIKE_NEW">Like New</option>
+                                <option value="USED">Đã dùng</option>
+                                <option value="REFURBISHED">Tân trang</option>
+                              </select>
+                            </div>
+                          ) : (
+                            <div className="matrix-specs-grid">
+                              <input
+                                type="text"
+                                value={quickAddRam}
+                                onChange={e => setQuickAddRam(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleAddQuickVariant();
+                                }}
+                                placeholder="Màu sắc..."
+                                className="matrix-mini-input"
+                              />
+                              <select
+                                value={quickAddCondition}
+                                onChange={e => setQuickAddCondition(e.target.value as typeof quickAddCondition)}
+                                className="matrix-mini-select"
+                              >
+                                <option value="NEW">Mới 100%</option>
+                                <option value="LIKE_NEW">Like New</option>
+                                <option value="USED">Đã dùng</option>
+                                <option value="REFURBISHED">Tân trang</option>
+                              </select>
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={quickAddSku}
+                            onChange={e => setQuickAddSku(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddQuickVariant();
+                            }}
+                            placeholder={`SKU-${doc.variants.length + 1}`}
+                            className="matrix-input-cell matrix-input-mono"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            value={quickAddPrice}
+                            onChange={e => setQuickAddPrice(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddQuickVariant();
+                            }}
+                            placeholder="Giá bán"
+                            className="matrix-input-cell matrix-input-price"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            value={quickAddOriginalPrice}
+                            onChange={e => setQuickAddOriginalPrice(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddQuickVariant();
+                            }}
+                            placeholder="Giá gốc"
+                            className="matrix-input-cell text-slate-500 text-right"
+                          />
+                        </td>
+                        <td>
+                          <select
+                            value={quickAddAvail}
+                            onChange={e => setQuickAddAvail(e.target.value as typeof quickAddAvail)}
+                            className="matrix-select-availability"
+                          >
+                            <option value="">Theo sản phẩm</option>
+                            <option value="AVAILABLE">Sẵn hàng</option>
+                            <option value="PREORDER">Đặt trước</option>
+                            <option value="CONTACT">Liên hệ</option>
+                            <option value="UNAVAILABLE">Tạm ngưng</option>
+                          </select>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <AdminButton variant="primary" size="sm" onClick={handleAddQuickVariant}>
+                            + Thêm
+                          </AdminButton>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </AdminCard>
+            );
+          })()}
+
+          <AdminCard
+            title={
+              <div className="flex items-center gap-2">
+                <span>Gói bảo hành</span>
+                {doc.warranties.length > 0 && (
+                  <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-semibold">
+                    {doc.warranties.length}
+                  </span>
+                )}
+              </div>
+            }
+            action={
+              <AdminButton
+                variant="secondary"
+                size="sm"
+                icon={<Plus className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  updateDoc('warranties', [
+                    ...doc.warranties,
+                    {
+                      name: 'Bảo hành tiêu chuẩn 12 tháng',
+                      description: 'Bảo hành phần cứng 12 tháng, hỗ trợ phần mềm trọn đời.',
+                      adjustment: 0,
+                      recommended: doc.warranties.length === 0,
+                    },
+                  ]);
+                }}
+              >
+                + Thêm gói
+              </AdminButton>
+            }
+          >
+            {doc.warranties.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-4">Chưa có gói bảo hành.</p>
+            ) : (
+              <div className="variant-matrix-wrapper">
+                <table className="compact-matrix-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '32px', textAlign: 'center' }}>#</th>
+                      <th style={{ minWidth: '180px' }}>Tên gói</th>
+                      <th style={{ minWidth: '240px' }}>Quyền lợi</th>
+                      <th style={{ width: '130px', textAlign: 'right' }}>Phụ thu (đ)</th>
+                      <th style={{ width: '90px', textAlign: 'center' }}>Khuyên dùng</th>
+                      <th style={{ width: '44px' }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doc.warranties.map((w, idx) => (
+                      <tr key={idx}>
+                        <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
+                        <td>
+                          <input
+                            type="text"
+                            aria-label={`Tên gói bảo hành ${idx + 1}`}
+                            value={w.name}
+                            onChange={e =>
+                              updateDoc(
+                                'warranties',
+                                doc.warranties.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item))
+                              )
+                            }
+                            placeholder="Bảo hành 12 tháng"
+                            className="matrix-input-cell font-semibold"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            aria-label={`Quyền lợi gói ${idx + 1}`}
+                            value={w.description}
+                            onChange={e =>
+                              updateDoc(
+                                'warranties',
+                                doc.warranties.map((item, i) => (i === idx ? { ...item, description: e.target.value } : item))
+                              )
+                            }
+                            placeholder="1 đổi 1 15 ngày, phần cứng 12 tháng..."
+                            className="matrix-input-cell"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            step="1"
+                            min="-2000000000"
+                            max="2000000000"
+                            aria-label={`Phụ thu gói ${idx + 1}`}
+                            value={w.adjustment}
+                            onChange={e =>
+                              updateDoc(
+                                'warranties',
+                                doc.warranties.map((item, i) =>
+                                  i === idx ? { ...item, adjustment: parseInt(e.target.value, 10) || 0 } : item
+                                )
+                              )
+                            }
+                            placeholder="0 = Đã kèm"
+                            className="matrix-input-cell matrix-input-price"
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Khuyên dùng gói ${idx + 1}`}
+                            checked={w.recommended}
+                            onChange={e =>
+                              updateDoc(
+                                'warranties',
+                                doc.warranties.map((item, i) => ({
+                                  ...item,
+                                  recommended: i === idx ? e.target.checked : false,
+                                }))
+                              )
+                            }
+                            className="w-4 h-4 rounded text-blue-600 cursor-pointer"
+                          />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            title="Xóa gói"
+                            aria-label={`Xóa gói bảo hành ${idx + 1}`}
+                            onClick={() =>
+                              updateDoc('warranties', doc.warranties.filter((_, i) => i !== idx))
+                            }
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </AdminCard>
+        </div>
+      )}
+
+      {/* TAB 4: HÌNH ẢNH & VIDEO */}
+      {activeTab === 'media' && (
+        <AdminCard
+          title={
+            <div className="flex items-center gap-2">
+              <span>Ảnh & Video</span>
+              <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-semibold">
+                {doc.media.length}/30
+              </span>
+            </div>
+          }
+          action={
+            <AdminButton
+              variant="primary"
+              size="sm"
+              icon={<ImageIcon className="w-3.5 h-3.5" />}
+              onClick={() => setPickerOpen(true)}
+              disabled={doc.media.length >= 30}
+            >
+              + Chọn ảnh/video
+            </AdminButton>
+          }
+        >
+          {doc.media.length === 0 ? (
+            <div className="text-center py-8 border border-dashed border-slate-200 rounded-lg">
+              <p className="text-xs text-slate-500">Chưa có ảnh/video.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {doc.media.map((item, idx) => (
+                <div
+                  key={item.assetId}
+                  className="p-2.5 bg-white border border-slate-200 rounded-lg flex gap-3 items-center"
+                >
+                  <div className="w-20 h-20 relative bg-slate-100 rounded-md overflow-hidden shrink-0 border border-slate-200">
+                    <StudioAsset id={item.assetId} />
+                    <span className="absolute bottom-1 left-1 text-[10px] font-bold px-1.5 py-0.5 bg-black/70 text-white rounded">
+                      {idx === 0 ? 'Bìa' : `#${idx + 1}`}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 space-y-1.5 min-w-0">
+                    <input
+                      type="text"
+                      aria-label={`ALT ảnh ${idx + 1}`}
+                      value={item.alt}
+                      onChange={e =>
+                        updateDoc(
+                          'media',
+                          doc.media.map((m, i) => (i === idx ? { ...m, alt: e.target.value } : m))
+                        )
+                      }
+                      placeholder="Mô tả ảnh (ALT) *"
+                      className="matrix-input-cell"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        aria-label={`Cấu hình ảnh ${idx + 1}`}
+                        value={item.variantId}
+                        onChange={e =>
+                          updateDoc(
+                            'media',
+                            doc.media.map((m, i) => (i === idx ? { ...m, variantId: e.target.value } : m))
+                          )
+                        }
+                        className="matrix-input-cell flex-1 cursor-pointer"
+                      >
+                        <option value="">Mọi cấu hình</option>
+                        {doc.variants.map(v => (
+                          <option key={v.id} value={v.id}>
+                            {v.name || v.sku}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        title="Lên"
+                        aria-label="Di chuyển ảnh lên"
+                        onClick={() => {
+                          const newMedia = [...doc.media];
+                          [newMedia[idx - 1], newMedia[idx]] = [newMedia[idx], newMedia[idx - 1]];
+                          updateDoc('media', newMedia);
+                        }}
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30 cursor-pointer"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === doc.media.length - 1}
+                        title="Xuống"
+                        aria-label="Di chuyển ảnh xuống"
+                        onClick={() => {
+                          const newMedia = [...doc.media];
+                          [newMedia[idx + 1], newMedia[idx]] = [newMedia[idx], newMedia[idx + 1]];
+                          updateDoc('media', newMedia);
+                        }}
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded disabled:opacity-30 cursor-pointer"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Gỡ ảnh"
+                        aria-label="Gỡ ảnh này"
+                        onClick={() =>
+                          updateDoc(
+                            'media',
+                            doc.media.filter((_, i) => i !== idx)
+                          )
+                        }
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </AdminCard>
+      )}
+
+      {/* TAB 5: MÔ TẢ CHI TIẾT */}
+      {activeTab === 'content' && (
+        <AdminCard title="Mô tả chi tiết">
+          <RichContentEditor
+            value={doc.contentHtml || ''}
+            onChange={html => updateDoc('contentHtml', html)}
+            onInsertMediaClick={() => setContentMediaPickerOpen(true)}
+          />
+        </AdminCard>
+      )}
+
+      {/* TAB 6: SEO & HIỂN THỊ */}
+      {activeTab === 'seo' && (
+        <AdminCard title="SEO">
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="product-seo-title" className="text-xs font-semibold text-slate-700">
+                  Tiêu đề SEO
+                </label>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {doc.seoTitle.length}/70
+                </span>
+              </div>
+              <input
+                type="text"
+                id="product-seo-title"
+                value={doc.seoTitle}
+                onChange={e => updateDoc('seoTitle', e.target.value)}
+                placeholder={`${doc.name || 'Tên sản phẩm'} | CitiLap`}
+                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label htmlFor="product-seo-description" className="text-xs font-semibold text-slate-700">
+                  Mô tả SEO
+                </label>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {doc.seoDescription.length}/160
+                </span>
+              </div>
+              <textarea
+                rows={3}
+                id="product-seo-description"
+                value={doc.seoDescription}
+                onChange={e => updateDoc('seoDescription', e.target.value)}
+                placeholder="Tóm tắt ưu đãi, bảo hành, trả góp..."
+                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
+
+            {/* Google SERP Snippet Preview */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-0.5">
+              <div className="text-blue-700 text-sm font-medium truncate">
+                {doc.seoTitle || doc.name || 'Tiêu đề sản phẩm'}
+              </div>
+              <div className="text-emerald-700 text-xs truncate">
+                https://citilap.vn{productHref({ ...doc, slug: doc.slug || 'duong-dan-san-pham' })}
+              </div>
+              <div className="text-slate-600 text-xs line-clamp-2">
+                {doc.seoDescription || doc.description || 'Mô tả hiển thị trên Google...'}
+              </div>
+            </div>
+          </div>
+        </AdminCard>
+      )}
+
+      {/* TAB 7: LỊCH SỬ PHIÊN BẢN & KHÔI PHỤC */}
+      {activeTab === 'history' && (
+        <AdminCard title="Lịch sử phiên bản">
+          {loadingRevisions ? (
+            <div className="py-12">
+              <AdminLoadingState message="Đang tải..." />
+            </div>
+          ) : revisions.length === 0 ? (
+            <div className="py-8 text-center text-slate-500 text-xs">
+              Chưa có lịch sử.
+            </div>
+          ) : (
+            <div className="overflow-x-auto -mx-4 sm:-mx-5">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-500 font-semibold">
+                    <th className="py-2.5 px-4">Bản</th>
+                    <th className="py-2.5 px-4">Trạng thái</th>
+                    <th className="py-2.5 px-4">Thời gian</th>
+                    <th className="py-2.5 px-4">Người sửa</th>
+                    <th className="py-2.5 px-4">Tóm tắt</th>
+                    <th className="py-2.5 px-4 text-right"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {revisions.map(r => (
+                    <tr
+                      key={r.revision}
+                      className={`hover:bg-slate-50/50 transition ${
+                        r.isCurrent ? 'bg-blue-50/20 font-medium' : ''
+                      }`}
+                    >
+                      <td className="py-2.5 px-4 font-mono font-bold">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span>#{r.revision}</span>
+                          {r.isCurrent && (
+                            <span className="text-[10px] px-1.5 py-0.2 bg-blue-600 text-white rounded font-normal">
+                              Hiện tại
+                            </span>
+                          )}
+                          {r.isPublished && (
+                            <span className="text-[10px] px-1.5 py-0.2 bg-emerald-600 text-white rounded font-normal">
+                              Web
+                            </span>
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="py-2.5 px-4">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                            r.action === 'publish'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : r.action === 'unpublish'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {r.action === 'publish'
+                            ? 'Xuất bản'
+                            : r.action === 'unpublish'
+                            ? 'Ẩn'
+                            : r.action === 'restore'
+                            ? 'Khôi phục'
+                            : 'Lưu nháp'}
+                        </span>
+                      </td>
+
+                      <td className="py-2.5 px-4 text-slate-600 whitespace-nowrap">
+                        {new Date(r.createdAt).toLocaleString('vi-VN')}
+                      </td>
+
+                      <td className="py-2.5 px-4 text-slate-700">
+                        <span className="font-mono text-slate-600">{r.actorName || 'admin'}</span>
+                      </td>
+
+                      <td className="py-2.5 px-4 text-slate-600 max-w-xs truncate">
+                        {r.summary}
+                      </td>
+
+                      <td className="py-2.5 px-4 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                const snap = await mediaRequest<SnapshotDetail>(
+                                  `/api/admin/products/${id}/revisions/${r.revision}`
+                                );
+                                setSelectedRevisionSnapshot(snap);
+                              } catch (e) {
+                                alert((e as Error).message);
+                              }
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                          >
+                            Chi tiết
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRestoreConfirmRev(r)}
+                            disabled={saving || restoring}
+                            className="text-xs text-amber-700 hover:text-amber-900 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 cursor-pointer disabled:opacity-50"
+                          >
+                            Khôi phục
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </AdminCard>
+      )}
+
+      {activeTab === 'extras' && <AdminCard title="Quà tặng, Mua kèm & FAQ"><ProductStorefrontFields document={doc} onChange={updateDoc} productId={id} /></AdminCard>}
+      {activeTab === 'inspection' && (id ? <InspectionEditor productId={id} /> : <AdminCard title="Kiểm định"><p className="text-xs text-slate-500">Lưu sản phẩm trước để nhập hồ sơ kiểm định.</p></AdminCard>)}
+      </div>
+      </fieldset>
+      <aside className="product-editor-sidebar space-y-4" aria-label="Xuất bản sản phẩm">
+        <AdminCard>
+          {/* Primary action first, secondary actions below, destructive as quiet link */}
+          <div className="product-editor-actions">
+            <AdminButton
+              variant="primary"
+              icon={<Globe className="w-4 h-4" />}
+              onClick={() => void handleSave('publish')}
+              loading={saving}
+              className="product-editor-publish"
+            >
+              {isPublished ? 'Cập nhật website' : 'Xuất bản'}
+            </AdminButton>
+            <div className="product-editor-actions-row">
+              <AdminButton
+                variant="secondary"
+                icon={<Save className="w-4 h-4" />}
+                onClick={() => void handleSave('save')}
+                loading={saving}
+              >
+                Lưu nháp
+              </AdminButton>
+              <AdminButton
+                variant="secondary"
+                icon={<Eye className="w-4 h-4" />}
+                onClick={() => setPreviewOpen(true)}
+                disabled={saving}
+              >
+                Xem trước
+              </AdminButton>
+            </div>
+          </div>
+          <div className="product-editor-status">
+            <p
+              className="product-publish-note"
+              title="Lưu nháp tự động sau khi ngừng nhập; sản phẩm mới cần lưu lần đầu. Xuất bản áp dụng toàn bộ nội dung nháp."
+            >
+              {isPublished ? hasUnpublishedDraft || isDirty ? 'Có thay đổi chưa xuất bản' : 'Đã khớp với website' : 'Chưa hiển thị cho khách'}
+            </p>
+            <p role="status" aria-live="polite" className="text-xs text-slate-500">{autosaveStatus}</p>
+            {isPublished && (
+              <button type="button" className="product-editor-unpublish" onClick={() => void handleSave('unpublish')} disabled={saving}>
+                <EyeOff className="w-3.5 h-3.5" aria-hidden="true" /> Ẩn khỏi web
+              </button>
+            )}
+          </div>
+        </AdminCard>
+        <fieldset disabled={saving} className="m-0 min-w-0 border-0 p-0">
+          <AdminCard title="Giá">
+            <div className="grid gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Giá bán niêm yết (VNĐ) <span className="text-rose-500">*</span>
+                <label htmlFor="product-price" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Giá bán <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
                   min="0"
-                  step="10000"
+                  step="1" max="2000000000"
+                  id="product-price"
                   value={doc.price}
                   onChange={e => updateDoc('price', Math.max(0, parseInt(e.target.value, 10) || 0))}
                   className="w-full text-sm font-semibold text-blue-600 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
@@ -1064,13 +2236,14 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Giá gốc / Giá hãng (VNĐ - Để trống nếu không giảm giá)
+                <label htmlFor="product-original-price" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Giá gốc <span className="font-normal text-slate-500">(nếu giảm)</span>
                 </label>
                 <input
                   type="number"
                   min="0"
-                  step="10000"
+                  step="1" max="2000000000"
+                  id="product-original-price"
                   value={doc.originalPrice ?? ''}
                   onChange={e =>
                     updateDoc(
@@ -1089,843 +2262,35 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               </div>
             </div>
           </AdminCard>
-
-          <AdminCard
-            title="Danh sách biến thể / Cấu hình"
-            subtitle={
-              doc.template === 'LAPTOP'
-                ? 'Các tùy chọn RAM, SSD, Card đồ họa hoặc màu sắc. Khách hàng sẽ chọn biến thể này khi đặt mua.'
-                : 'Các tùy chọn màu sắc, switch, kết nối, công suất hoặc phân loại tương ứng với phụ kiện.'
-            }
-          >
-            <div className="space-y-4">
-              {doc.variants.map((variant, idx) => (
-                <div key={variant.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">
-                      Biến thể {idx + 1}: {variant.name || variant.sku || 'Chưa đặt tên'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateDoc('variants', doc.variants.filter((_, i) => i !== idx))
-                      }
-                      className="text-xs text-rose-500 hover:text-rose-700 font-medium cursor-pointer"
-                    >
-                      Xóa biến thể
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                    <div className="md:col-span-2">
-                      <label className="block text-xs text-slate-500 mb-0.5">Tên hiển thị biến thể</label>
-                      <input
-                        type="text"
-                        value={variant.name}
-                        onChange={e =>
-                          updateDoc(
-                            'variants',
-                            doc.variants.map((v, i) => (i === idx ? { ...v, name: e.target.value } : v))
-                          )
-                        }
-                        placeholder={
-                          doc.template === 'LAPTOP'
-                            ? '16GB / 512GB / RTX 4060'
-                            : doc.template === 'KEYBOARD'
-                            ? 'Red Switch - Màu Trắng'
-                            : doc.template === 'CHARGER'
-                            ? '65W GaN - Đen'
-                            : 'Màu Đen / Bản Tiêu chuẩn'
-                        }
-                        className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-0.5">Mã SKU</label>
-                      <input
-                        type="text"
-                        value={variant.sku}
-                        onChange={e =>
-                          updateDoc(
-                            'variants',
-                            doc.variants.map((v, i) =>
-                              i === idx ? { ...v, sku: e.target.value.toUpperCase().trim() } : v
-                            )
-                          )
-                        }
-                        placeholder="SKU-001"
-                        className="w-full text-xs font-mono border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-0.5">Giá bán (VNĐ)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="10000"
-                        value={variant.price}
-                        onChange={e =>
-                          updateDoc(
-                            'variants',
-                            doc.variants.map((v, i) =>
-                              i === idx ? { ...v, price: parseInt(e.target.value, 10) || 0 } : v
-                            )
-                          )
-                        }
-                        className="w-full text-xs font-semibold text-blue-600 border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-0.5">Trạng thái kho</label>
-                      <select
-                        value={variant.availability || 'AVAILABLE'}
-                        onChange={e =>
-                          updateDoc(
-                            'variants',
-                            doc.variants.map((v, i) =>
-                              i === idx ? { ...v, availability: e.target.value as typeof v.availability } : v
-                            )
-                          )
-                        }
-                        className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white cursor-pointer"
-                      >
-                        <option value="AVAILABLE">Còn hàng</option>
-                        <option value="OUT_OF_STOCK">Hết hàng</option>
-                        <option value="PREORDER">Đặt trước</option>
-                        <option value="CONTACT">Liên hệ</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Template specific fields */}
-                  {doc.template === 'LAPTOP' ? (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1 border-t border-slate-200">
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-0.5">RAM</label>
-                        <input
-                          type="text"
-                          value={variant.ram || ''}
-                          onChange={e =>
-                            updateDoc(
-                              'variants',
-                              doc.variants.map((v, i) => (i === idx ? { ...v, ram: e.target.value } : v))
-                            )
-                          }
-                          placeholder="16GB DDR5"
-                          className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-0.5">Ổ cứng SSD</label>
-                        <input
-                          type="text"
-                          value={variant.storage || ''}
-                          onChange={e =>
-                            updateDoc(
-                              'variants',
-                              doc.variants.map((v, i) => (i === idx ? { ...v, storage: e.target.value } : v))
-                            )
-                          }
-                          placeholder="512GB NVMe"
-                          className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-0.5">Card GPU</label>
-                        <input
-                          type="text"
-                          value={variant.gpu || ''}
-                          onChange={e =>
-                            updateDoc(
-                              'variants',
-                              doc.variants.map((v, i) => (i === idx ? { ...v, gpu: e.target.value } : v))
-                            )
-                          }
-                          placeholder="RTX 4060 8GB"
-                          className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-0.5">Tình trạng</label>
-                        <select
-                          value={variant.condition}
-                          onChange={e =>
-                            updateDoc(
-                              'variants',
-                              doc.variants.map((v, i) =>
-                                i === idx ? { ...v, condition: e.target.value as typeof v.condition } : v
-                              )
-                            )
-                          }
-                          className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white cursor-pointer"
-                        >
-                          <option value="NEW">Mới 100%</option>
-                          <option value="LIKE_NEW">Like New 99%</option>
-                          <option value="USED">Đã qua sử dụng</option>
-                          <option value="REFURBISHED">Tân trang</option>
-                        </select>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1 border-t border-slate-200">
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-0.5">Màu sắc</label>
-                        <input
-                          type="text"
-                          value={variant.options?.color || ''}
-                          onChange={e => {
-                            const val = e.target.value;
-                            updateDoc(
-                              'variants',
-                              doc.variants.map((v, i) => {
-                                if (i !== idx) return v;
-                                const nextOpts = { ...(v.options || {}) };
-                                if (val) nextOpts.color = val;
-                                else delete nextOpts.color;
-                                return { ...v, options: nextOpts };
-                              })
-                            );
-                          }}
-                          placeholder="Ví dụ: Đen, Trắng, Xám..."
-                          className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                        />
-                      </div>
-
-                      {doc.template === 'KEYBOARD' && (
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-0.5">Loại Switch</label>
-                          <input
-                            type="text"
-                            value={variant.options?.switch || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              updateDoc(
-                                'variants',
-                                doc.variants.map((v, i) => {
-                                  if (i !== idx) return v;
-                                  const nextOpts = { ...(v.options || {}) };
-                                  if (val) nextOpts.switch = val;
-                                  else delete nextOpts.switch;
-                                  return { ...v, options: nextOpts };
-                                })
-                              );
-                            }}
-                            placeholder="Ví dụ: Red, Blue, Brown..."
-                            className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                          />
-                        </div>
-                      )}
-
-                      {(doc.template === 'MOUSE' || doc.template === 'HEADPHONE') && (
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-0.5">Kiểu kết nối</label>
-                          <input
-                            type="text"
-                            value={variant.options?.connection || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              updateDoc(
-                                'variants',
-                                doc.variants.map((v, i) => {
-                                  if (i !== idx) return v;
-                                  const nextOpts = { ...(v.options || {}) };
-                                  if (val) nextOpts.connection = val;
-                                  else delete nextOpts.connection;
-                                  return { ...v, options: nextOpts };
-                                })
-                              );
-                            }}
-                            placeholder="Ví dụ: Wireless 2.4G, Bluetooth..."
-                            className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                          />
-                        </div>
-                      )}
-
-                      {doc.template === 'CHARGER' && (
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-0.5">Công suất</label>
-                          <input
-                            type="text"
-                            value={variant.options?.power || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              updateDoc(
-                                'variants',
-                                doc.variants.map((v, i) => {
-                                  if (i !== idx) return v;
-                                  const nextOpts = { ...(v.options || {}) };
-                                  if (val) nextOpts.power = val;
-                                  else delete nextOpts.power;
-                                  return { ...v, options: nextOpts };
-                                })
-                              );
-                            }}
-                            placeholder="Ví dụ: 65W, 100W, 140W..."
-                            className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                          />
-                        </div>
-                      )}
-
-                      {doc.template === 'BAG' && (
-                        <div>
-                          <label className="block text-xs text-slate-500 mb-0.5">Kích cỡ / Tương thích</label>
-                          <input
-                            type="text"
-                            value={variant.options?.size || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              updateDoc(
-                                'variants',
-                                doc.variants.map((v, i) => {
-                                  if (i !== idx) return v;
-                                  const nextOpts = { ...(v.options || {}) };
-                                  if (val) nextOpts.size = val;
-                                  else delete nextOpts.size;
-                                  return { ...v, options: nextOpts };
-                                })
-                              );
-                            }}
-                            placeholder="Ví dụ: 14 inch, 15.6 inch..."
-                            className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                          />
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-0.5">Tình trạng</label>
-                        <select
-                          value={variant.condition}
-                          onChange={e =>
-                            updateDoc(
-                              'variants',
-                              doc.variants.map((v, i) =>
-                                i === idx ? { ...v, condition: e.target.value as typeof v.condition } : v
-                              )
-                            )
-                          }
-                          className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white cursor-pointer"
-                        >
-                          <option value="NEW">Mới 100%</option>
-                          <option value="LIKE_NEW">Like New 99%</option>
-                          <option value="USED">Đã qua sử dụng</option>
-                          <option value="REFURBISHED">Tân trang</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              <AdminButton
-                variant="secondary"
-                size="sm"
-                icon={<Plus className="w-3.5 h-3.5" />}
-                onClick={() => {
-                  const newSku = `${doc.slug || 'SP'}-${doc.variants.length + 1}`.toUpperCase();
-                  updateDoc('variants', [
-                    ...doc.variants,
-                    {
-                      id: crypto.randomUUID(),
-                      name: '',
-                      sku: newSku,
-                      condition: 'NEW',
-                      price: doc.price,
-                      ram: '',
-                      storage: '',
-                      gpu: '',
-                      options: {},
-                      image: '',
-                      availability: 'AVAILABLE',
-                    },
-                  ]);
-                }}
-              >
-                Thêm cấu hình mới
-              </AdminButton>
-            </div>
-          </AdminCard>
-
-          <AdminCard
-            title="Gói bảo hành tùy chọn"
-            subtitle="Các gói bảo hành mở rộng đi kèm sản phẩm (ví dụ: Bảo hành vàng 12 tháng, Đổi mới 30 ngày)."
-          >
-            <div className="space-y-4">
-              {doc.warranties.map((w, idx) => (
-                <div key={idx} className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">
-                      Gói {idx + 1}: {w.name || 'Chưa đặt tên'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateDoc('warranties', doc.warranties.filter((_, i) => i !== idx))
-                      }
-                      className="text-xs text-rose-500 hover:text-rose-700 cursor-pointer"
-                    >
-                      Xóa gói
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-0.5">Tên gói bảo hành</label>
-                      <input
-                        type="text"
-                        value={w.name}
-                        onChange={e =>
-                          updateDoc(
-                            'warranties',
-                            doc.warranties.map((item, i) => (i === idx ? { ...item, name: e.target.value } : item))
-                          )
-                        }
-                        placeholder="Bảo hành tiêu chuẩn 12 tháng"
-                        className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-0.5">Điều chỉnh giá (VNĐ, 0 = Đã kèm)</label>
-                      <input
-                        type="number"
-                        step="10000"
-                        value={w.adjustment}
-                        onChange={e =>
-                          updateDoc(
-                            'warranties',
-                            doc.warranties.map((item, i) =>
-                              i === idx ? { ...item, adjustment: parseInt(e.target.value, 10) || 0 } : item
-                            )
-                          )
-                        }
-                        className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-4">
-                      <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={w.recommended}
-                          onChange={e =>
-                            updateDoc(
-                              'warranties',
-                              doc.warranties.map((item, i) => ({
-                                ...item,
-                                recommended: i === idx ? e.target.checked : false,
-                              }))
-                            )
-                          }
-                          className="rounded text-blue-600 cursor-pointer"
-                        />
-                        <span>Đánh dấu &quot;Khuyên dùng&quot;</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-0.5">Mô tả quyền lợi bảo hành</label>
-                    <input
-                      type="text"
-                      value={w.description}
-                      onChange={e =>
-                        updateDoc(
-                          'warranties',
-                          doc.warranties.map((item, i) =>
-                            i === idx ? { ...item, description: e.target.value } : item
-                          )
-                        )
-                      }
-                      placeholder="Bao test 1 đổi 1 trong 15 ngày, bảo hành phần cứng 12 tháng..."
-                      className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                    />
-                  </div>
-                </div>
-              ))}
-
-              <AdminButton
-                variant="secondary"
-                size="sm"
-                icon={<Plus className="w-3.5 h-3.5" />}
-                onClick={() => {
-                  updateDoc('warranties', [
-                    ...doc.warranties,
-                    {
-                      name: 'Bảo hành tiêu chuẩn CitiLap',
-                      description: 'Bảo hành phần cứng 12 tháng, hỗ trợ trọn đời phần mềm.',
-                      adjustment: 0,
-                      recommended: doc.warranties.length === 0,
-                    },
-                  ]);
-                }}
-              >
-                Thêm gói bảo hành
-              </AdminButton>
-            </div>
-          </AdminCard>
-        </div>
-      )}
-
-      {/* TAB 4: HÌNH ẢNH & VIDEO */}
-      {activeTab === 'media' && (
-        <AdminCard
-          title="Thư viện hình ảnh & Video"
-          subtitle="Ảnh đầu tiên sẽ là ảnh đại diện (Thumbnail). Tích hợp trực tiếp từ Thư viện Media Cloudflare R2."
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <span className="text-xs text-slate-500">
-                Đã chọn {doc.media.length} ảnh/video cho sản phẩm này.
-              </span>
-              <AdminButton
-                variant="primary"
-                size="sm"
-                icon={<ImageIcon className="w-3.5 h-3.5" />}
-                onClick={() => setPickerOpen(true)}
-              >
-                Chọn ảnh từ Thư viện Media
-              </AdminButton>
-            </div>
-
-            {doc.media.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl">
-                <ImageIcon className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm font-medium text-slate-600">Chưa có ảnh nào được gắn vào sản phẩm</p>
-                <p className="text-xs text-slate-400 mt-1">Bấm nút trên để chọn từ Thư viện Media</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {doc.media.map((item, idx) => (
-                  <div
-                    key={item.assetId}
-                    className="p-3 bg-white border border-slate-200 rounded-xl flex gap-3 items-start shadow-sm"
-                  >
-                    <div className="w-24 h-24 relative bg-slate-100 rounded-lg overflow-hidden shrink-0 border border-slate-200">
-                      <StudioAsset id={item.assetId} />
-                      <span className="absolute bottom-1 left-1 text-[10px] font-bold px-1.5 py-0.5 bg-black/70 text-white rounded">
-                        {idx === 0 ? 'Đại diện' : `#${idx + 1}`}
-                      </span>
-                    </div>
-
-                    <div className="flex-1 space-y-2 min-w-0">
-                      <div>
-                        <label className="block text-[11px] font-medium text-slate-600 mb-0.5">
-                          Mô tả ảnh (ALT) <span className="text-rose-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={item.alt}
-                          onChange={e =>
-                            updateDoc(
-                              'media',
-                              doc.media.map((m, i) => (i === idx ? { ...m, alt: e.target.value } : m))
-                            )
-                          }
-                          placeholder="Mô tả góc chụp, máy..."
-                          className="w-full text-xs border border-slate-300 rounded px-2 py-1"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-medium text-slate-600 mb-0.5">
-                          Gán cho cấu hình
-                        </label>
-                        <select
-                          value={item.variantId}
-                          onChange={e =>
-                            updateDoc(
-                              'media',
-                              doc.media.map((m, i) => (i === idx ? { ...m, variantId: e.target.value } : m))
-                            )
-                          }
-                          className="w-full text-xs border border-slate-300 rounded px-2 py-1 bg-white cursor-pointer"
-                        >
-                          <option value="">Tất cả cấu hình</option>
-                          {doc.variants.map(v => (
-                            <option key={v.id} value={v.id}>
-                              {v.name || v.sku}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          disabled={idx === 0}
-                          onClick={() => {
-                            const newMedia = [...doc.media];
-                            [newMedia[idx - 1], newMedia[idx]] = [newMedia[idx], newMedia[idx - 1]];
-                            updateDoc('media', newMedia);
-                          }}
-                          className="text-[11px] text-slate-600 hover:text-blue-600 disabled:opacity-30 cursor-pointer"
-                        >
-                          Lên trước
-                        </button>
-                        <span className="text-slate-300">·</span>
-                        <button
-                          type="button"
-                          disabled={idx === doc.media.length - 1}
-                          onClick={() => {
-                            const newMedia = [...doc.media];
-                            [newMedia[idx + 1], newMedia[idx]] = [newMedia[idx], newMedia[idx + 1]];
-                            updateDoc('media', newMedia);
-                          }}
-                          className="text-[11px] text-slate-600 hover:text-blue-600 disabled:opacity-30 cursor-pointer"
-                        >
-                          Xuống sau
-                        </button>
-                        <span className="text-slate-300">·</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            updateDoc(
-                              'media',
-                              doc.media.filter((_, i) => i !== idx)
-                            )
-                          }
-                          className="text-[11px] text-rose-500 hover:text-rose-700 cursor-pointer"
-                        >
-                          Bỏ ảnh này
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </AdminCard>
-      )}
-
-      {/* TAB 5: BÀI GIỚI THIỆU & NỘI DUNG */}
-      {activeTab === 'content' && (
-        <AdminCard
-          title="Bài viết giới thiệu & Đánh giá chi tiết"
-          subtitle="Trình biên tập trực quan CMS hỗ trợ tiêu đề, định dạng chữ, chèn ảnh từ Thư viện Media Cloudflare R2 và bảng thông số."
-        >
-          <div className="space-y-4">
-            <RichContentEditor
-              value={doc.contentHtml || ''}
-              onChange={html => updateDoc('contentHtml', html)}
-              onInsertMediaClick={() => setContentMediaPickerOpen(true)}
-            />
-            <ProductStorefrontFields document={doc} onChange={updateDoc} productId={id} />
-          </div>
-        </AdminCard>
-      )}
-
-      {/* TAB 6: SEO & HIỂN THỊ */}
-      {activeTab === 'seo' && (
-        <AdminCard
-          title="Tối ưu SEO Google & Mạng xã hội"
-          subtitle="Thông tin hiển thị khi khách hàng tìm kiếm trên Google hoặc chia sẻ liên kết qua Zalo/Facebook."
-        >
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Tiêu đề SEO (Title Tag)
-              </label>
-              <input
-                type="text"
-                value={doc.seoTitle}
-                onChange={e => updateDoc('seoTitle', e.target.value)}
-                placeholder="Tên sản phẩm | Chính hãng giá tốt tại CitiLap"
-                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-              />
-              <span className="text-xs text-slate-400 mt-1 block">
-                {doc.seoTitle.length} / 70 ký tự khuyến nghị
-              </span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Mô tả SEO (Meta Description)
-              </label>
-              <textarea
-                rows={3}
-                value={doc.seoDescription}
-                onChange={e => updateDoc('seoDescription', e.target.value)}
-                placeholder="Mua ngay laptop giá ưu đãi, trả góp 0%, quà tặng hấp dẫn tại CitiLap..."
-                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-              />
-              <span className="text-xs text-slate-400 mt-1 block">
-                {doc.seoDescription.length} / 160 ký tự khuyến nghị
-              </span>
-            </div>
-
-            {/* Google SERP Snippet Preview */}
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-                Xem trước kết quả tìm kiếm Google
-              </span>
-              <div className="text-blue-700 text-base font-medium truncate hover:underline cursor-pointer">
-                {doc.seoTitle || doc.name || 'Tiêu đề sản phẩm'}
-              </div>
-              <div className="text-emerald-700 text-xs truncate">
-                https://citilap.vn{doc.template === 'LAPTOP' ? '/laptop/' : '/phu-kien/'}{doc.slug || 'duong-dan-san-pham'}
-              </div>
-              <div className="text-slate-600 text-xs line-clamp-2">
-                {doc.seoDescription || doc.description || 'Mô tả tóm tắt sản phẩm sẽ hiển thị tại đây khi khách hàng tìm kiếm...'}
-              </div>
+        </fieldset>
+        <AdminCard title="Tóm tắt">
+          <div className="space-y-3 text-xs">
+            {doc.media[0] ? <button type="button" className="product-editor-cover" onClick={() => setActiveTab('media')} title="Mở tab Ảnh"><StudioAsset key={doc.media[0].assetId} id={doc.media[0].assetId} /></button> : <button type="button" className="product-editor-no-cover" onClick={() => setActiveTab('media')}>+ Thêm ảnh</button>}
+            {publishedSummary && publishedSummary.price !== doc.price && <div className="flex justify-between gap-2"><span>Giá trên web</span><strong>{money(publishedSummary.price)}</strong></div>}
+            <div className="product-editor-shortcuts">
+              <button type="button" onClick={() => setActiveTab('pricing')}><span>Cấu hình</span><strong>{doc.variants.length}</strong></button>
+              <button type="button" onClick={() => setActiveTab('pricing')}><span>Bảo hành</span><strong>{doc.warranties.length}</strong></button>
+              <button type="button" onClick={() => setActiveTab('media')}><span>Ảnh/video</span><strong>{doc.media.length}</strong></button>
             </div>
           </div>
         </AdminCard>
-      )}
 
-      {/* TAB 7: LỊCH SỬ PHIÊN BẢN & KHÔI PHỤC */}
-      {activeTab === 'history' && (
-        <AdminCard
-          title="Lịch sử các phiên bản"
-          subtitle="Danh sách các lần chỉnh sửa và xuất bản. Bạn có thể xem chi tiết hoặc khôi phục phiên bản cũ về bản nháp."
-        >
-          {loadingRevisions ? (
-            <div className="py-12">
-              <AdminLoadingState message="Đang tải lịch sử phiên bản..." />
-            </div>
-          ) : revisions.length === 0 ? (
-            <div className="py-8 text-center text-slate-500 text-xs">
-              Chưa có phiên bản lịch sử nào được ghi nhận.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="block mb-0.5">Quy tắc khôi phục an toàn:</strong>
-                  <span>
-                    Khi bấm <strong>Khôi phục thành bản nháp</strong>, dữ liệu phiên bản cũ sẽ được nạp vào Product Studio dưới dạng một bản nháp mới (revision kế tiếp). <strong>Nội dung trên website vẫn được giữ nguyên</strong> cho đến khi bạn chủ động bấm <strong>Xuất bản website</strong>.
-                  </span>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto -mx-4 sm:-mx-6">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-500 font-semibold">
-                      <th className="py-3 px-4">Phiên bản</th>
-                      <th className="py-3 px-4">Hành động</th>
-                      <th className="py-3 px-4">Thời gian</th>
-                      <th className="py-3 px-4">Người thao tác</th>
-                      <th className="py-3 px-4">Tóm tắt dữ liệu</th>
-                      <th className="py-3 px-4 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {revisions.map(r => (
-                      <tr
-                        key={r.revision}
-                        className={`hover:bg-slate-50/50 transition ${
-                          r.isCurrent ? 'bg-blue-50/20 font-medium' : ''
-                        }`}
-                      >
-                        <td className="py-3 px-4 font-mono font-bold">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span>#{r.revision}</span>
-                            {r.isCurrent && (
-                              <span className="text-[10px] px-1.5 py-0.2 bg-blue-600 text-white rounded font-normal">
-                                Hiện tại
-                              </span>
-                            )}
-                            {r.isPublished && (
-                              <span className="text-[10px] px-1.5 py-0.2 bg-emerald-600 text-white rounded font-normal">
-                                Đang hiển thị
-                              </span>
-                            )}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
-                              r.action === 'publish'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : r.action === 'unpublish'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : r.action === 'restore'
-                                ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                : 'bg-slate-100 text-slate-700 border border-slate-200'
-                            }`}
-                          >
-                            {r.action === 'publish'
-                              ? 'Xuất bản'
-                              : r.action === 'unpublish'
-                              ? 'Ẩn khỏi web'
-                              : r.action === 'restore'
-                              ? 'Khôi phục'
-                              : 'Lưu nháp'}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 text-slate-600 whitespace-nowrap">
-                          {new Date(r.createdAt).toLocaleString('vi-VN')}
-                        </td>
-
-                        <td className="py-3 px-4 text-slate-700">
-                          <span className="font-mono text-slate-600">{r.actorName || 'admin'}</span>
-                        </td>
-
-                        <td className="py-3 px-4 text-slate-600 max-w-xs truncate">
-                          {r.summary}
-                        </td>
-
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  const snap = await mediaRequest<SnapshotDetail>(
-                                    `/api/admin/products/${id}/revisions/${r.revision}`
-                                  );
-                                  setSelectedRevisionSnapshot(snap);
-                                } catch (e) {
-                                  alert((e as Error).message);
-                                }
-                              }}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                            >
-                              Xem chi tiết
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRestoreConfirmRev(r)}
-                              disabled={saving || restoring}
-                              className="text-xs text-amber-700 hover:text-amber-900 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 cursor-pointer disabled:opacity-50"
-                            >
-                              Khôi phục nháp
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </AdminCard>
-      )}
-
-      {id && <InspectionEditor productId={id} />}
+        <SchedulePanel entityType="product" entityId={id} revision={revision} dirty={isDirty || saving}/>
+      </aside>
+      </div>
+      {isDirty && id && <DraftRecovery draft={doc} endpoint={'/api/admin/products/' + id}/>}
 
       {/* MEDIA PICKER MODAL */}
       {pickerOpen && (
-        <MediaDialog title="Chọn hình ảnh từ Thư viện Media" onClose={() => setPickerOpen(false)}>
+        <MediaDialog title="Chọn ảnh / video từ Thư viện Media" onClose={() => setPickerOpen(false)}>
           <div className="space-y-4">
             <MediaUpload onUploaded={() => setMediaRefresh(n => n + 1)} />
             <MediaBrowser
               refresh={mediaRefresh}
               picker
-              allowVideo={false}
+              allowVideo
               onSelect={asset => {
-                if (!doc.media.some(m => m.assetId === asset.id)) {
+                if (doc.media.length < 30 && !doc.media.some(m => m.assetId === asset.id)) {
                   updateDoc('media', [
                     ...doc.media,
                     {
@@ -1952,7 +2317,14 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               picker
               allowVideo={false}
               onSelect={asset => {
-                const imgSnippet = `<figure class="my-4 text-center"><img src="${asset.url}" alt="${asset.alt || asset.name || doc.name}" class="rounded-lg shadow-sm mx-auto max-w-full" /><figcaption class="text-xs text-slate-500 mt-1">${asset.alt || asset.name}</figcaption></figure><p><br></p>`;
+                const figure = document.createElement('figure');
+                const image = document.createElement('img');
+                image.src = asset.url || '';
+                image.alt = asset.alt || asset.name || doc.name;
+                const caption = document.createElement('figcaption');
+                caption.textContent = asset.alt || asset.name;
+                figure.append(image, caption);
+                const imgSnippet = figure.outerHTML + '<p><br></p>';
                 updateDoc('contentHtml', (doc.contentHtml || '') + imgSnippet);
                 setContentMediaPickerOpen(false);
               }}
@@ -2071,10 +2443,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
           <div className="p-4 space-y-6 max-w-4xl mx-auto">
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>
-                Đây là bản xem trước nội dung nháp trong Admin; bố cục và kiểu dáng hiển thị đầy đủ theo Renderer Storefront.
-              </span>
+              <span>Đây là tóm tắt nội dung đang biên tập, chưa tính chương trình ưu đãi trên website.</span>
             </div>
+            {id && <Link href={`/admin/products/${id}/preview`} target="_blank" rel="noopener noreferrer" className="inline-flex text-sm font-semibold text-blue-700 underline">Mở bố cục Storefront với bản nháp đã lưu ↗</Link>}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>

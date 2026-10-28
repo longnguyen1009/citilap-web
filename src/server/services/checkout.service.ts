@@ -179,8 +179,16 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
   if (payload.shippingMethod === 'pickup' && !showroom) throw new CheckoutError('SHOWROOM_UNAVAILABLE', 'Điểm nhận hàng không còn khả dụng. Vui lòng chọn lại.');
   const shippingFee = computeShippingFee({shippingMethod:payload.shippingMethod, subtotal:subtotalAmount, shippingFee:config.shippingFee, freeShippingThreshold:config.freeShippingThreshold});
   if (!Number.isSafeInteger(subtotalAmount + shippingFee)) throw new CheckoutError('INVALID_CHECKOUT', 'Tổng tiền vượt giới hạn.');
-  const snapshot = {settingsRevision:settings.revision, showroom:showroom || null, bankAccountInfo:payload.paymentMethod === 'BANK_TRANSFER' ? config.bankAccountInfo.trim() : null, ...(warranties.length ? {warranties} : {})};
-  const terms = JSON.stringify({shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,showroom:snapshot.showroom,bankAccountInfo:snapshot.bankAccountInfo, ...(warranties.length ? {warranties} : {})});
+  const vietQr =
+    payload.paymentMethod === 'BANK_TRANSFER' && config.bankBin.trim() && config.bankAccountNumber.trim()
+      ? {
+          bankBin: config.bankBin.trim(),
+          accountNumber: config.bankAccountNumber.trim(),
+          accountName: config.bankAccountName.trim(),
+        }
+      : undefined;
+  const snapshot = {settingsRevision:settings.revision, showroom:showroom || null, bankAccountInfo:payload.paymentMethod === 'BANK_TRANSFER' ? config.bankAccountInfo.trim() : null, ...(vietQr ? {vietQr} : {}), ...(warranties.length ? {warranties} : {})};
+  const terms = JSON.stringify({shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,showroom:snapshot.showroom,bankAccountInfo:snapshot.bankAccountInfo, ...(vietQr ? {vietQr} : {}), ...(warranties.length ? {warranties} : {})});
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(terms));
   const termsVersion = Array.from(new Uint8Array(digest), b=>b.toString(16).padStart(2,'0')).join('');
   const quote: CheckoutQuote = {evaluatedAt:at.toISOString(),lines:resolvedItems.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName,productName:i.variantNameSnapshot ? i.productName+' - '+i.variantNameSnapshot : i.productName,quantity:i.quantity,price:i.price,lineTotal:i.lineTotal})),subtotal:subtotalAmount,shippingFee,totalAmount:subtotalAmount+shippingFee,shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,allowedPaymentMethods,showrooms,snapshot,termsVersion};

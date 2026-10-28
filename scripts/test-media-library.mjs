@@ -79,6 +79,42 @@ try {
     assert.equal(one.asset.id, two.asset.id); assert.equal((await api.listMedia(DB, { kind: 'VIDEO' })).total, 1);
     for (const url of ['javascript:alert(1)', 'https://youtube.com.evil.test/watch?v=abcdefghijk', 'https://user:pass@youtube.com/watch?v=abcdefghijk', 'http://youtu.be/abcdefghijk']) assert.equal(api.youtubeId(url), null);
   });
+  await check('SVG, PDF, MP4 video uploads and TikTok/Google Drive embeds work and filter properly', async () => {
+    const svgContent = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60" onclick="alert(1)"><script>alert(1)</script><rect width="120" height="60" fill="blue"/></svg>';
+    const svgRes = await api.uploadLibraryImage(env, new File([svgContent], 'logo.svg', { type: 'image/svg+xml' }));
+    assert.equal(svgRes.asset.assetType, 'SVG');
+    assert.equal(svgRes.asset.width, 120);
+    assert.equal(svgRes.asset.height, 60);
+    const servedSvg = await api.serveLibraryImage(env, svgRes.asset.id, new Request('http://test/'));
+    assert.equal(servedSvg.status, 200);
+    assert.ok(servedSvg.headers.get('Content-Security-Policy')?.includes('sandbox'));
+    const svgText = await servedSvg.text();
+    assert.ok(!svgText.includes('<script'));
+    assert.ok(!svgText.includes('onclick'));
+
+    const pdfBytes = Buffer.from('%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF', 'utf8');
+    const pdfRes = await api.uploadLibraryImage(env, new File([pdfBytes], 'catalogue.pdf', { type: 'application/pdf' }));
+    assert.equal(pdfRes.asset.assetType, 'PDF');
+
+    const mp4Bytes = Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x02, 0x00]);
+    const mp4Res = await api.uploadLibraryImage(env, new File([mp4Bytes], 'intro.mp4', { type: 'video/mp4' }));
+    assert.equal(mp4Res.asset.assetType, 'VIDEO_FILE');
+
+    const tiktokRes = await api.addVideo(DB, { name: 'TikTok Review', url: 'https://www.tiktok.com/@citilap/video/7350000000000000001' });
+    assert.equal(tiktokRes.asset.assetType, 'TIKTOK');
+    assert.ok(tiktokRes.asset.embedUrl?.includes('7350000000000000001'));
+
+    const driveRes = await api.addVideo(DB, { name: 'Drive Media', url: 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz/view?usp=sharing', mediaKind: 'GDRIVE_VIDEO' });
+    assert.equal(driveRes.asset.assetType, 'GDRIVE');
+    assert.ok(driveRes.asset.embedUrl?.includes('1AbCdEfGhIjKlMnOpQrStUvWxYz/preview'));
+
+    assert.equal((await api.listMedia(DB, { kind: 'SVG' })).total, 1);
+    assert.equal((await api.listMedia(DB, { kind: 'PDF' })).total, 1);
+    assert.equal((await api.listMedia(DB, { kind: 'TIKTOK' })).total, 1);
+    assert.equal((await api.listMedia(DB, { kind: 'GDRIVE' })).total, 1);
+    assert.equal((await api.listMedia(DB, { kind: 'YOUTUBE' })).total, 1);
+    assert.equal((await api.listMedia(DB, { kind: 'VIDEO' })).total, 4);
+  });
   await check('missing asset and R2 objects yield 404', async () => {
     await assert.rejects(() => api.getAsset(DB, 'missing'), (e) => e.status === 404);
     const row = await api.getAsset(DB, asset.id); await PRODUCT_MEDIA.delete(row.storageKey);

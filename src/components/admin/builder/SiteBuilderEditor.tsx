@@ -748,7 +748,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   const selectedIndex = sections.findIndex((s) => s.id === selectedSectionId);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] -m-4 sm:-m-6 lg:-m-8 bg-slate-100 overflow-hidden">
+    <div className="admin-builder-editor flex flex-col bg-slate-100 overflow-hidden">
       {/* 1. TOP STATUS & ACTION BAR */}
       <header className="h-16 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-20">
         <div className="flex items-center gap-3 min-w-0">

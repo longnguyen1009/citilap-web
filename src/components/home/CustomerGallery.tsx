@@ -44,12 +44,19 @@ export default function CustomerGallery({ title, images }: { title: string; imag
     triggerRef.current?.focus();
   }
 
+  const scrollByAmount = (direction: -1 | 1) => {
+    const el = rail.current;
+    if (!el) return;
+    const step = Math.max(280, Math.round(el.clientWidth * 0.6));
+    el.scrollBy({ left: direction * step, behavior: 'smooth' });
+  };
+
   return <section className="pb-10" aria-label={title}>
     <div className="container mx-auto max-w-[1370px] px-4">
-      <div className="rounded-2xl bg-white p-3 sm:p-5 shadow-xs border border-slate-200/80">
-        <div className="mb-4 flex items-center gap-4">
+      <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-xs border border-slate-200/80">
+        <div className="mb-4 flex items-center gap-3">
           <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
-          <h2 className="max-w-[85%] text-center text-base font-black uppercase text-slate-900 sm:text-xl">{title}</h2>
+          <h2 className="max-w-[85%] text-center text-base font-black uppercase tracking-tight text-slate-900 sm:text-xl">{title}</h2>
           <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
         </div>
         <div className="relative">
@@ -66,9 +73,9 @@ export default function CustomerGallery({ title, images }: { title: string; imag
                 type="button"
                 onClick={(e) => open(image, e)}
                 aria-label={`Phóng to ảnh ${index + 1}: ${image.alt || title}`}
-                className="group relative aspect-[4/3] w-[85%] shrink-0 snap-start overflow-hidden rounded-xl border border-slate-300 bg-slate-100 cursor-pointer focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 focus-visible:outline-hidden active:scale-[0.98] transition duration-150 sm:w-[calc((100%-12px)/2)] lg:w-[calc((100%-24px)/3)]"
+                className="group relative aspect-[16/10] w-[75%] shrink-0 snap-start overflow-hidden rounded-xl border border-slate-200 bg-slate-100 cursor-pointer focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 focus-visible:outline-hidden active:scale-[0.98] transition duration-150 sm:w-[calc((100%-12px)/2)] md:w-[calc((100%-24px)/3)] lg:w-[calc((100%-48px)/5)]"
               >
-                <Image src={image.url} alt={image.alt} fill sizes="(max-width: 640px) 85vw, (max-width: 1024px) 50vw, 430px" className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
+                <Image src={image.url} alt={image.alt} fill sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 260px" className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
               </button>
             ))}
           </div>
@@ -77,19 +84,19 @@ export default function CustomerGallery({ title, images }: { title: string; imag
               type="button"
               aria-label="Cuộn ảnh về trước"
               disabled={bounds.start}
-              onClick={() => rail.current?.scrollBy({ left: -rail.current.clientWidth, behavior: 'auto' })}
-              className="flex absolute left-1 top-1/2 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-800 shadow-md hover:bg-blue-50 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden cursor-pointer disabled:pointer-events-none disabled:opacity-40"
+              onClick={() => scrollByAmount(-1)}
+              className="flex absolute -left-2 top-1/2 h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-900 shadow-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden cursor-pointer disabled:pointer-events-none disabled:opacity-0"
             >
-              <ChevronLeft className="h-6 w-6" />
+              <ChevronLeft className="h-5 w-5" />
             </button>
             <button
               type="button"
               aria-label="Cuộn ảnh tiếp theo"
               disabled={bounds.end}
-              onClick={() => rail.current?.scrollBy({ left: rail.current.clientWidth, behavior: 'auto' })}
-              className="flex absolute right-1 top-1/2 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-800 shadow-md hover:bg-blue-50 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden cursor-pointer disabled:pointer-events-none disabled:opacity-40"
+              onClick={() => scrollByAmount(1)}
+              className="flex absolute -right-2 top-1/2 h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-900 shadow-lg hover:bg-blue-600 hover:text-white hover:border-blue-600 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden cursor-pointer disabled:pointer-events-none disabled:opacity-0"
             >
-              <ChevronRight className="h-6 w-6" />
+              <ChevronRight className="h-5 w-5" />
             </button>
           </>}
         </div>

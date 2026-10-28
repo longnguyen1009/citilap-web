@@ -199,6 +199,11 @@ export const productDocumentSchema = z.object({
   if (d.originalPrice !== null && d.originalPrice < d.price) {
     issue('Giá gốc phải lớn hơn hoặc bằng giá bán.');
   }
+  d.variants.forEach((variant, index) => {
+    if (variant.originalPrice != null && variant.originalPrice < variant.price) {
+      ctx.addIssue({ code: 'custom', path: ['variants', index, 'originalPrice'], message: 'Giá gốc cấu hình phải lớn hơn hoặc bằng giá bán.' });
+    }
+  });
   for (const values of [d.variants.map(v => v.id), d.variants.map(v => v.sku), d.media.map(m => m.assetId), d.specs.map(s => s.key)]) {
     if (new Set(values).size !== values.length) {
       issue('Không được trùng mã, ảnh hoặc tên thông số.');

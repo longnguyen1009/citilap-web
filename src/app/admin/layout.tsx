@@ -21,16 +21,25 @@ import {
   FileText,
   LayoutTemplate,
   Zap,
+  Search,
+  Plus,
+  BarChart3,
+  ShieldCheck,
+  History,
+  CornerUpRight,
+  Folder,
 } from "lucide-react";
-import AdminBreadcrumbs, { type BreadcrumbItem } from "@/components/admin/ui/AdminBreadcrumbs";
 import AdminNotificationBell from "@/components/admin/notifications/AdminNotificationBell";
+import AdminCommandPalette from "@/components/admin/ui/AdminCommandPalette";
 import { adminCapability, canAdmin, type AdminPrincipal } from '@/lib/admin-permissions';
+import './admin.css';
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ElementType;
-  badge?: string;
+  /** Extra search terms so the sidebar filter finds items by synonyms. */
+  keywords?: string;
 }
 
 interface NavGroup {
@@ -38,120 +47,63 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// Short labels, grouped by daily task. Keywords keep the old long names searchable.
 const navGroups: NavGroup[] = [
   {
-    groupName: "Tổng quan & Bán hàng",
+    groupName: "",
     items: [
-      { name: "Tổng quan", href: "/admin/dashboard", icon: LayoutDashboard },
-      { name: "Hành vi mua hàng", href: "/admin/analytics", icon: LayoutDashboard },
-      { name: "Đơn hàng", href: "/admin/orders", icon: ShoppingCart },
-      { name: "Hộp thư liên hệ", href: "/admin/contacts", icon: Mail },
-      { name: "Khách hàng", href: "/admin/customers", icon: Users },
+      { name: "Tổng quan", href: "/admin/dashboard", icon: LayoutDashboard, keywords: "bảng tin dashboard" },
     ],
   },
   {
-    groupName: "Catalog & Sản phẩm",
+    groupName: "Bán hàng",
     items: [
-      { name: "Sản phẩm", href: "/admin/products", icon: Package },
-      { name: "Chiến dịch giá", href: "/admin/campaigns", icon: Zap },
-      { name: "Thương hiệu", href: "/admin/brands", icon: Tag },
-      { name: "Thư viện Media", href: "/admin/media", icon: Images },
+      { name: "Đơn hàng", href: "/admin/orders", icon: ShoppingCart, keywords: "order" },
+      { name: "Khách hàng", href: "/admin/customers", icon: Users, keywords: "customer" },
+      { name: "Tư vấn", href: "/admin/contacts", icon: Mail, keywords: "hộp thư liên hệ contact" },
     ],
   },
   {
-    groupName: "Giao diện & Nội dung",
+    groupName: "Sản phẩm",
     items: [
-      { name: "Trang chủ & Landing", href: "/admin/builder", icon: LayoutTemplate },
-      { name: "Bài viết / Review", href: "/admin/posts", icon: Newspaper },
-      { name: "Chuyên mục bài viết", href: "/admin/post-categories", icon: FolderTree },
-      { name: "Trang thông tin", href: "/admin/pages", icon: FileText },
+      { name: "Sản phẩm", href: "/admin/products", icon: Package, keywords: "laptop máy tính product" },
+      { name: "Danh mục", href: "/admin/categories", icon: FolderTree, keywords: "category" },
+      { name: "Thương hiệu", href: "/admin/brands", icon: Tag, keywords: "hãng brand" },
+      { name: "Flash Sale", href: "/admin/campaigns", icon: Zap, keywords: "chiến dịch khuyến mãi campaign" },
+    ],
+  },
+  {
+    groupName: "Nội dung",
+    items: [
+      { name: "Bài viết", href: "/admin/posts", icon: Newspaper, keywords: "review tin tức post" },
+      { name: "Chuyên mục", href: "/admin/post-categories", icon: Folder, keywords: "chuyên mục bài viết" },
+      { name: "Trang", href: "/admin/pages", icon: FileText, keywords: "trang thông tin chính sách page" },
+      { name: "Media", href: "/admin/media", icon: Images, keywords: "ảnh hình thư viện" },
+    ],
+  },
+  {
+    groupName: "Giao diện",
+    items: [
+      { name: "Trang chủ", href: "/admin/builder", icon: LayoutTemplate, keywords: "landing builder" },
+      { name: "Menu", href: "/admin/navigation", icon: Menu, keywords: "mega menu điều hướng" },
     ],
   },
   {
     groupName: "Hệ thống",
     items: [
-      { name: "Danh mục sản phẩm", href: "/admin/categories", icon: FolderTree },
-      { name: "Menu & Bộ sưu tập", href: "/admin/navigation", icon: Menu },
-      { name: "Cài đặt hệ thống", href: "/admin/settings", icon: Settings },
-      { name: "Tài khoản và quyền", href: "/admin/users", icon: Users },
-      { name: "Nhật ký quản trị", href: "/admin/audit", icon: FileText },
-      { name: "Chuyển hướng 301", href: "/admin/redirects", icon: ExternalLink },
+      { name: "Thống kê", href: "/admin/analytics", icon: BarChart3, keywords: "hành vi mua hàng analytics" },
+      { name: "Cài đặt", href: "/admin/settings", icon: Settings, keywords: "cấu hình setting" },
+      { name: "Tài khoản", href: "/admin/users", icon: ShieldCheck, keywords: "quyền user" },
+      { name: "Nhật ký", href: "/admin/audit", icon: History, keywords: "audit log" },
+      { name: "Chuyển hướng", href: "/admin/redirects", icon: CornerUpRight, keywords: "301 redirect" },
     ],
   },
 ];
 
-function getBreadcrumbsFromPath(pathname: string): BreadcrumbItem[] {
-  if (pathname === "/admin" || pathname === "/admin/dashboard") {
-    return [{ label: "Tổng quan" }];
-  }
-  if (pathname === "/admin/orders") {
-    return [{ label: "Bán hàng" }, { label: "Đơn hàng" }];
-  }
-  if (pathname.startsWith("/admin/orders/")) {
-    return [{ label: "Đơn hàng", href: "/admin/orders" }, { label: "Chi tiết đơn" }];
-  }
-  if (pathname === "/admin/contacts") {
-    return [{ label: "Bán hàng" }, { label: "Hộp thư liên hệ" }];
-  }
-  if (pathname === "/admin/customers") {
-    return [{ label: "Bán hàng" }, { label: "Khách hàng" }];
-  }
-  if (pathname === "/admin/products") {
-    return [{ label: "Sản phẩm" }, { label: "Danh sách sản phẩm" }];
-  }
-  if (pathname === "/admin/products/new") {
-    return [{ label: "Sản phẩm", href: "/admin/products" }, { label: "Thêm sản phẩm mới" }];
-  }
-  if (pathname.startsWith("/admin/products/")) {
-    return [{ label: "Sản phẩm", href: "/admin/products" }, { label: "Biên tập sản phẩm" }];
-  }
-  if (pathname === "/admin/product-studio") {
-    return [{ label: "Sản phẩm", href: "/admin/products" }, { label: "Biên tập sản phẩm" }];
-  }
-  if (pathname === "/admin/media") {
-    return [{ label: "Catalog" }, { label: "Thư viện Media" }];
-  }
-  if (pathname === "/admin/campaigns") {
-    return [{ label: "Catalog" }, { label: "Chiến dịch giá" }];
-  }
-  if (pathname === "/admin/categories") {
-    return [{ label: "Nội dung" }, { label: "Danh mục sản phẩm" }];
-  }
-  if (pathname === "/admin/navigation") {
-    return [{ label: "Nội dung" }, { label: "Menu & Bộ sưu tập" }];
-  }
-  if (pathname === "/admin/builder") {
-    return [{ label: "Giao diện" }, { label: "Trang chủ & Landing" }];
-  }
-  if (pathname.startsWith("/admin/builder/")) {
-    return [{ label: "Trang chủ & Landing", href: "/admin/builder" }, { label: "Biên tập giao diện" }];
-  }
-  if (pathname === "/admin/posts") {
-    return [{ label: "Tin tức & Review" }, { label: "Danh sách bài viết" }];
-  }
-  if (pathname === "/admin/posts/new") {
-    return [{ label: "Bài viết", href: "/admin/posts" }, { label: "Viết bài mới" }];
-  }
-  if (pathname.startsWith("/admin/posts/")) {
-    return [{ label: "Bài viết", href: "/admin/posts" }, { label: "Biên tập bài viết" }];
-  }
-  if (pathname === "/admin/post-categories") {
-    return [{ label: "Tin tức & Review" }, { label: "Chuyên mục bài viết" }];
-  }
-  if (pathname === "/admin/pages") {
-    return [{ label: "Trang tĩnh" }, { label: "Danh sách trang thông tin" }];
-  }
-  if (pathname === "/admin/pages/new") {
-    return [{ label: "Trang thông tin", href: "/admin/pages" }, { label: "Tạo trang mới" }];
-  }
-  if (pathname.startsWith("/admin/pages/")) {
-    return [{ label: "Trang thông tin", href: "/admin/pages" }, { label: "Biên tập trang" }];
-  }
-  if (pathname === "/admin/settings") {
-    return [{ label: "Hệ thống" }, { label: "Cài đặt hệ thống" }];
-  }
-  return [{ label: "Quản trị" }];
-}
+const allNavItems = navGroups.flatMap(group => group.items);
+
+const normalize = (value: string) =>
+  value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d");
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [principal, setPrincipal] = useState<AdminPrincipal | null>(null);
@@ -168,13 +120,48 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [navFilter, setNavFilter] = useState("");
+  const quickAddRef = useRef<HTMLDivElement | null>(null);
   const openButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (!quickAddOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!quickAddRef.current?.contains(event.target as Node)) setQuickAddOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setQuickAddOpen(false);
+        quickAddRef.current?.querySelector('button')?.focus();
+      }
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [quickAddOpen]);
+
+  // Global Ctrl + K shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const isItemActive = (href: string) => {
     if (pathname === href) return true;
     if (href === "/admin/dashboard" || href === "/admin") return false;
-    return pathname.startsWith(`${href}/`);
+    return pathname.startsWith(`${href}/`) && !allNavItems.some(item => item.href !== href && item.href.length > href.length && pathname.startsWith(item.href));
   };
 
   // Keyboard navigation & focus management for mobile drawer
@@ -215,16 +202,42 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     } catch { setSessionError('Đăng xuất chưa thành công. Thử lại.'); }
   };
 
-  const breadcrumbs = getBreadcrumbsFromPath(pathname);
+  const query = normalize(navFilter.trim());
+  const visibleGroups = navGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item =>
+        principal && canAdmin(principal, adminCapability(item.href)) &&
+        (!query || normalize(`${item.name} ${group.groupName} ${item.keywords ?? ""}`).includes(query))
+      ),
+    }))
+    .filter(group => group.items.length);
 
   const renderNavLinks = () => (
-    <div className="space-y-6">
-      {navGroups.map(group => ({ ...group, items: group.items.filter(item => principal && canAdmin(principal, adminCapability(item.href))) })).filter(group => group.items.length).map((group) => (
-        <div key={group.groupName}>
-          <div className="px-3 mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            {group.groupName}
-          </div>
-          <nav className="space-y-0.5" aria-label={group.groupName}>
+    <div className="admin-nav">
+      <div className="admin-nav-filter">
+        <Search className="size-3.5" aria-hidden="true" />
+        <input
+          type="search"
+          value={navFilter}
+          onChange={event => setNavFilter(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === "Enter" && visibleGroups[0]?.items[0]) {
+              router.push(visibleGroups[0].items[0].href);
+              setNavFilter("");
+              setSidebarOpen(false);
+            }
+            if (event.key === "Escape") setNavFilter("");
+          }}
+          placeholder="Tìm menu…"
+          aria-label="Lọc menu quản trị"
+        />
+      </div>
+      {visibleGroups.length === 0 && <p className="admin-nav-empty">Không thấy mục nào</p>}
+      {visibleGroups.map((group) => (
+        <div key={group.groupName || "home"} className="admin-nav-group">
+          {group.groupName && <div className="admin-nav-title">{group.groupName}</div>}
+          <nav aria-label={group.groupName || "Tổng quan"}>
             {group.items.map((item) => {
               const active = isItemActive(item.href);
               const Icon = item.icon;
@@ -232,29 +245,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setSidebarOpen(false)}
+                  onClick={() => { setSidebarOpen(false); setNavFilter(""); }}
                   aria-current={active ? "page" : undefined}
-                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition ${
-                    active
-                      ? "bg-blue-600 text-white shadow-xs font-semibold"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`}
+                  className="admin-nav-link"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Icon className="w-4 h-4 shrink-0 text-slate-300" aria-hidden="true" />
-                    <span className="truncate">{item.name}</span>
-                  </div>
-                  {item.badge && (
-                    <span
-                      className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                        active
-                          ? "bg-blue-800 text-blue-100"
-                          : "bg-slate-800 text-slate-400 border border-slate-700"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
+                  <Icon className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{item.name}</span>
                 </Link>
               );
             })}
@@ -264,158 +260,125 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     </div>
   );
 
-  const sidebarFooter = (
-    <div className="p-3 border-t border-slate-800 space-y-1">
-      <Link
-        href="/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition"
-      >
-        <span className="flex items-center gap-2.5">
-          <ExternalLink className="w-4 h-4 text-slate-400" aria-hidden="true" />
-          <span>Xem website</span>
-        </span>
-        <span className="text-[10px] text-slate-500 uppercase font-semibold">Mở tab</span>
-      </Link>
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-400 hover:text-red-400 hover:bg-slate-800/80 rounded-lg w-full transition text-left cursor-pointer"
-      >
-        <LogOut className="w-4 h-4 text-slate-400" aria-hidden="true" />
-        <span>Đăng xuất</span>
-      </button>
-    </div>
-  );
-
   if (!principal) return <p role="status" className="p-6">{sessionError || 'Đang kiểm tra phiên…'}</p>;
   if (!canAdmin(principal, adminCapability(pathname))) return <p role="alert" className="p-6">Bạn không có quyền mở màn hình này.</p>;
+
+  const displayName = principal.name || principal.email.split("@")[0];
+  const roleLabel = principal.role === "OWNER" ? "Chủ shop" : principal.role === "EDITOR" ? "Biên tập" : "Bán hàng";
+
+  const quickAddItems = [
+    { href: "/admin/products/new", label: "Sản phẩm", icon: Package, show: true },
+    { href: "/admin/posts/new", label: "Bài viết", icon: Newspaper, show: true },
+    { href: "/admin/pages/new", label: "Trang", icon: FileText, show: true },
+    { href: "/admin/campaigns", label: "Flash Sale", icon: Zap, show: canAdmin(principal, 'commerce') },
+  ].filter(item => item.show);
+
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+    <div className="admin-shell relative flex h-dvh pt-11 bg-slate-50 text-slate-900 overflow-hidden font-sans">
+      <a href="#admin-content" className="sr-only focus:not-sr-only focus:absolute focus:top-12 focus:left-64 focus:z-50 focus:bg-white focus:p-3">Đến nội dung chính</a>
       {sessionError && <p role="alert" className="fixed top-2 right-2 z-50 bg-red-50 text-red-800 p-3 rounded">{sessionError}</p>}
+
       {/* Desktop Sidebar */}
-      <aside
-        className="w-64 bg-slate-900 text-white flex-shrink-0 hidden md:flex flex-col border-r border-slate-800 select-none"
-        aria-label="Thanh điều hướng quản trị"
-      >
-        <div className="h-14 flex items-center px-5 border-b border-slate-800">
-          <Link href="/admin/dashboard" className="flex items-center gap-2 text-lg font-bold text-white tracking-tight">
-            <span className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-black shadow-xs">
-              CL
-            </span>
-            <span>CitiLap Admin</span>
-          </Link>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-4">
-          {renderNavLinks()}
-        </div>
-
-        {sidebarFooter}
+      <aside className="admin-sidebar hidden md:flex flex-col select-none" aria-label="Thanh điều hướng quản trị">
+        <div className="flex-1 overflow-y-auto">{renderNavLinks()}</div>
       </aside>
 
       {/* Mobile Drawer */}
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-50 md:hidden flex"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Thanh điều hướng quản trị"
-        >
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
-            onClick={handleCloseDrawer}
-            aria-hidden="true"
-          />
-
-          {/* Drawer container */}
-          <aside className="relative w-72 max-w-[80vw] bg-slate-900 text-white flex flex-col h-full shadow-2xl z-10">
-            <div className="h-14 flex items-center justify-between px-5 border-b border-slate-800">
-              <Link
-                href="/admin/dashboard"
-                onClick={handleCloseDrawer}
-                className="flex items-center gap-2 text-base font-bold text-white tracking-tight"
-              >
-                <span className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center text-white text-xs font-black">
-                  CL
-                </span>
-                <span>CitiLap Admin</span>
-              </Link>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                onClick={handleCloseDrawer}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
-                aria-label="Đóng thanh điều hướng (Esc)"
-              >
-                <X className="w-5 h-5" aria-hidden="true" />
+        <div className="fixed inset-0 z-50 md:hidden flex" role="dialog" aria-modal="true" aria-label="Thanh điều hướng quản trị">
+          <div className="fixed inset-0 bg-slate-950/60 transition-opacity" onClick={handleCloseDrawer} aria-hidden="true" />
+          <aside className="admin-sidebar relative w-72 max-w-[80vw] flex flex-col h-full shadow-2xl z-10">
+            <div className="h-12 flex items-center justify-between px-4 border-b border-slate-800">
+              <span className="text-sm font-bold text-white">CitiLap Admin</span>
+              <button ref={closeButtonRef} type="button" onClick={handleCloseDrawer} className="p-1.5 text-slate-400 hover:text-white rounded-md hover:bg-slate-800" aria-label="Đóng (Esc)">
+                <X className="size-5" aria-hidden="true" />
               </button>
             </div>
-
-            <div className="flex-1 overflow-y-auto px-3 py-4">
-              {renderNavLinks()}
+            <div className="flex-1 overflow-y-auto">{renderNavLinks()}</div>
+            <div className="p-2 border-t border-slate-800">
+              <button type="button" onClick={handleLogout} className="admin-nav-link w-full">
+                <LogOut className="size-4" aria-hidden="true" /><span>Đăng xuất</span>
+              </button>
             </div>
-
-            {sidebarFooter}
           </aside>
         </div>
       )}
 
       {/* Main Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Topbar */}
-        <header className="h-14 bg-white border-b border-slate-200/90 flex items-center justify-between px-4 sm:px-6 z-10 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              ref={openButtonRef}
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden p-1.5 -ml-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition"
-              aria-label="Mở thanh điều hướng"
-            >
-              <Menu className="w-5 h-5" aria-hidden="true" />
+        {/* Topbar: logo · search · + Mới | bell · website · user */}
+        <header className="admin-topbar absolute top-0 inset-x-0 flex items-center justify-between px-3 z-20 gap-3">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <button ref={openButtonRef} type="button" onClick={() => setSidebarOpen(true)} className="admin-icon-btn md:hidden" aria-label="Mở menu">
+              <Menu className="size-5" aria-hidden="true" />
             </button>
 
-            {/* Unified Breadcrumbs on Topbar */}
-            <div className="min-w-0">
-              <AdminBreadcrumbs items={breadcrumbs} />
-            </div>
-          </div>
-
-          {/* Right actions: Notifications, Quick Storefront link & User info */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            {principal && canAdmin(principal, 'orders') && <AdminNotificationBell />}
-
-            <Link
-              href="/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 bg-slate-50 hover:bg-blue-50/60 border border-slate-200 px-3 py-1.5 rounded-lg transition"
-              title="Mở website cửa hàng trên tab mới"
-            >
-              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="hidden sm:inline">Xem website</span>
+            <Link href="/admin/dashboard" className="admin-brand" title="Về Tổng quan">
+              <span className="admin-brand-mark">CL</span>
+              <span className="hidden sm:inline">CitiLap</span>
             </Link>
 
             <button
               type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 p-1.5 sm:px-2 sm:py-1.5 rounded-lg hover:bg-slate-100 transition"
-              title="Đăng xuất khỏi hệ thống quản trị"
+              onClick={() => setCommandPaletteOpen(true)}
+              className="admin-search-trigger"
+              title="Tìm kiếm (Ctrl + K)"
             >
-              <LogOut className="w-4 h-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Đăng xuất</span>
+              <Search className="size-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">Tìm đơn, sản phẩm, khách…</span>
+              <kbd className="hidden sm:inline ml-auto">Ctrl K</kbd>
+            </button>
+
+            {canAdmin(principal, 'content') && <div ref={quickAddRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setQuickAddOpen(!quickAddOpen)}
+                aria-expanded={quickAddOpen}
+                aria-controls="admin-quick-add"
+                className="admin-new-btn"
+                title="Tạo mới"
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Mới</span>
+              </button>
+              {quickAddOpen && (
+                <div id="admin-quick-add" className="admin-menu" onClick={() => setQuickAddOpen(false)}>
+                  {quickAddItems.map(({ href, label, icon: Icon }) => (
+                    <Link key={href} href={href}>
+                      <Icon className="size-4 text-slate-400" aria-hidden="true" />
+                      <span>{label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>}
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {canAdmin(principal, 'orders') && <AdminNotificationBell />}
+            <Link href="/" target="_blank" rel="noopener noreferrer" className="admin-icon-btn" title="Xem website (tab mới)" aria-label="Xem website">
+              <ExternalLink className="size-4" aria-hidden="true" />
+            </Link>
+            <div className="hidden sm:flex items-center gap-2 pl-2 ml-1 border-l border-slate-700" title={`${displayName} · ${roleLabel}`}>
+              <div className="size-7 rounded-full bg-blue-600 text-white font-bold text-[11px] grid place-items-center">
+                {(principal.name || principal.email || "AD").slice(0, 2).toUpperCase()}
+              </div>
+              <span className="text-xs font-semibold text-slate-200 truncate max-w-[110px]">{displayName}</span>
+            </div>
+            <button type="button" onClick={handleLogout} className="admin-icon-btn hover:!text-red-300" title="Đăng xuất" aria-label="Đăng xuất">
+              <LogOut className="size-4" aria-hidden="true" />
             </button>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-8">
+        <main id="admin-content" tabIndex={-1} className="admin-content flex-1 min-w-0 overflow-y-auto bg-slate-50">
           {children}
         </main>
       </div>
+
+      {/* Global Command Palette Modal */}
+      {commandPaletteOpen && <AdminCommandPalette principal={principal} onClose={() => setCommandPaletteOpen(false)} />}
     </div>
   );
 }

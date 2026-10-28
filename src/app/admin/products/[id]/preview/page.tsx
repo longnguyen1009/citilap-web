@@ -1,11 +1,9 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  Eye,
   Globe,
   Sparkles,
   AlertTriangle,
@@ -17,10 +15,14 @@ import {
 } from "lucide-react";
 import ProductGallery from "@/components/product/ProductGallery";
 import StudioPurchaseSection from "@/components/product/StudioPurchaseSection";
+import { CartProvider } from '@/context/CartContext';
+import { CompareProvider } from '@/context/CompareContext';
 import { SpecChip } from "@/components/ui/SpecChip";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import type { ProductDocument } from "@/contracts/cms/product-studio";
 import { AdminButton, AdminLoadingState, AdminErrorState } from "@/components/admin/ui";
+import { mediaRequest } from '@/components/admin/media/MediaBrowser';
+import type { MediaAssetDto } from '@/contracts/cms/media';
 
 interface PreviewPageProps {
   params: Promise<{ id: string }>;
@@ -35,12 +37,13 @@ interface DetailResponse {
 
 export default function ProductDraftPreviewPage({ params }: PreviewPageProps) {
   const { id } = use(params);
-  const router = useRouter();
   const [data, setData] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishMessage, setPublishMessage] = useState<string | null>(null);
+  const [media, setMedia] = useState<MediaAssetDto[]>([]);
+  const publishLock = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -48,16 +51,9 @@ export default function ProductDraftPreviewPage({ params }: PreviewPageProps) {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`/api/admin/products/${id}`, {
-          cache: "no-store",
-          headers: { Accept: "application/json" },
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || `Lỗi tải sản phẩm (${res.status})`);
-        }
-        const json = await res.json();
-        if (active) setData(json);
+        const detail = await mediaRequest<DetailResponse>(`/api/admin/products/${id}`, { cache: 'no-store' });
+        const assets = await Promise.all(detail.document.media.map(item => mediaRequest<{ asset: MediaAssetDto }>(`/api/admin/media/${encodeURIComponent(item.assetId)}`).then(result => result.asset)));
+        if (active) { setData(detail); setMedia(assets); }
       } catch (err) {
         if (active) setError((err as Error).message || "Không thể tải dữ liệu xem trước.");
       } finally {
@@ -71,11 +67,12 @@ export default function ProductDraftPreviewPage({ params }: PreviewPageProps) {
   }, [id]);
 
   const handlePublish = async () => {
-    if (!data) return;
+    if (!data || publishLock.current) return;
+    publishLock.current = true;
     setPublishing(true);
     setPublishMessage(null);
     try {
-      const res = await fetch(`/api/admin/products/${id}`, {
+      const updated = await mediaRequest<DetailResponse>(`/api/admin/products/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -84,17 +81,13 @@ export default function ProductDraftPreviewPage({ params }: PreviewPageProps) {
           document: data.document,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Không thể xuất bản.");
-      }
-      const updated = await res.json();
       setData(updated);
       setPublishMessage("Đã xuất bản sản phẩm thành công lên website!");
     } catch (err) {
       setPublishMessage(`Lỗi: ${(err as Error).message}`);
     } finally {
       setPublishing(false);
+      publishLock.current = false;
     }
   };
 
@@ -119,9 +112,9 @@ export default function ProductDraftPreviewPage({ params }: PreviewPageProps) {
 
   const { document: doc, revision, published } = data;
   const galleryImages = doc.media
-    .filter((m) => Boolean(m.assetId))
+    .filter((m) => media.find(asset => asset.id === m.assetId)?.kind === 'IMAGE')
     .map((m) => ({
-      url: `/api/media/file/${m.assetId}`,
+      url: media.find(asset => asset.id === m.assetId)?.url || '',
       alt: m.alt || doc.name,
       variantId: m.variantId || null,
     }));
@@ -232,6 +225,8 @@ export default function ProductDraftPreviewPage({ params }: PreviewPageProps) {
                 )}
 
                 {/* Studio Purchase & Variant Section */}
+                <p className="text-xs text-amber-800">Xem bản nháp đã lưu, chưa tính chương trình ưu đãi. Thao tác mua hàng tắt trong bản xem trước.</p>
+                <CartProvider><CompareProvider><div inert>
                 <StudioPurchaseSection
                   studio={{
                     ...doc,
@@ -240,6 +235,7 @@ export default function ProductDraftPreviewPage({ params }: PreviewPageProps) {
                   productId={id}
                   image={primaryCover}
                 />
+                </div></CompareProvider></CartProvider>
 
                 {/* Brand Commitments */}
                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100 text-xs text-gray-600">

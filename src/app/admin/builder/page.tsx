@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import {
   PageHeader,
+  AdminCard,
   AdminButton,
 } from '@/components/admin/ui';
 import { mediaRequest } from '@/components/admin/media/MediaBrowser';
@@ -125,9 +126,16 @@ export default function AdminBuilderListPage() {
     };
   }, [query, page, reloadKey]);
 
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT'>('ALL');
+
   // Separate homepage from landing pages
   const homepage = data?.items.find((p) => p.id === 'home');
   const landingPages = data?.items.filter((p) => p.id !== 'home') || [];
+  const filteredLandingPages = landingPages.filter((lp) => {
+    if (statusFilter === 'PUBLISHED') return lp.status === 'PUBLISHED';
+    if (statusFilter === 'DRAFT') return lp.status !== 'PUBLISHED';
+    return true;
+  });
 
   const handleCreateLandingPage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,16 +176,20 @@ export default function AdminBuilderListPage() {
   };
 
   return (
-    <div className="space-y-6 pb-20 max-w-6xl mx-auto">
+    <div className="space-y-3 pb-16">
       <PageHeader
-        title="Trình dựng trang & Giao diện (Site Builder)"
-        description="Quản lý bố cục trang chủ và các trang đích (Landing Pages). Thay đổi nội dung banner, danh mục, khối sản phẩm theo thời gian thực mà không cần sửa mã nguồn."
+        title="Bố cục trang (Site Builder)"
+        badge={
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+            1 Trang chủ · {landingPages.length} Landing Pages
+          </span>
+        }
         actions={
           <AdminButton
             id="btn-create-landing"
             variant="primary"
             size="sm"
-            icon={<Plus size={16} />}
+            icon={<Plus size={15} />}
             onClick={() => {
               setCreateName('');
               setCreateTitle('');
@@ -186,92 +198,104 @@ export default function AdminBuilderListPage() {
               openCreateModal();
             }}
           >
-            Tạo Landing Page mới
+            Tạo Landing Page
           </AdminButton>
         }
       />
 
-      {/* 1. HOMEPAGE PINNED CARD */}
-      <div className="bg-gradient-to-r from-blue-900 to-indigo-950 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-500/20 via-transparent to-transparent pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2 max-w-xl">
-            <div className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                <Home className="w-5 h-5" />
-              </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-300">
-                Trang chủ cửa hàng (Homepage)
-              </span>
-              <span
-                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                  homepage?.status === 'PUBLISHED'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                }`}
-              >
-                {homepage?.status === 'PUBLISHED' ? 'Đang xuất bản' : 'Bản nháp'}
-              </span>
-            </div>
-
-            <h2 className="text-xl font-black tracking-tight text-white">
-              {homepage?.title || 'CitiLap - Cửa hàng Laptop & Phụ kiện cao cấp'}
-            </h2>
-            <p className="text-xs text-blue-200/80 leading-relaxed">
-              Trang đại diện chính tại đường dẫn &quot;/&quot;. Chứa banner chính, các dải tính năng, lưới sản phẩm nổi bật và khối giới thiệu thương hiệu.
-            </p>
-
-            <div className="flex items-center gap-4 text-xs text-blue-300/70 pt-1">
-              <span className="flex items-center gap-1">
-                <Layers className="w-3.5 h-3.5" />
-                {homepage?.sectionCount || 0} Sections
-              </span>
-              <span>•</span>
-              <span>Bản r{homepage?.revision || 1}</span>
-              {homepage?.publishedRevision && (
-                <>
-                  <span>•</span>
-                  <span>Public r{homepage.publishedRevision}</span>
-                </>
-              )}
+      <AdminCard bodyClassName="p-0 overflow-hidden">
+        {/* 1. HOMEPAGE PINNED STRIP */}
+        <div className="px-4 py-3 bg-gradient-to-r from-blue-50/70 via-indigo-50/30 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Home className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-slate-900 truncate">
+                  {homepage?.title || 'Trang chủ cửa hàng (Homepage)'}
+                </span>
+                <span className="font-mono text-[11px] text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded">
+                  /
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    homepage?.status === 'PUBLISHED'
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}
+                >
+                  {homepage?.status === 'PUBLISHED' ? 'Đang hiển thị' : 'Bản nháp'}
+                </span>
+                <span className="text-[11px] text-slate-500 flex items-center gap-1">
+                  <Layers className="w-3 h-3" />
+                  {homepage?.sectionCount || 0} sections · #v{homepage?.revision || 1}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-blue-200 hover:text-white bg-white/10 hover:bg-white/20 transition backdrop-blur-xs"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 transition"
             >
-              <ExternalLink className="w-4 h-4" />
-              <span>Xem trang chủ</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Xem web</span>
             </Link>
 
             <Link
               href="/admin/builder/home"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-900 bg-white hover:bg-blue-50 shadow-lg shadow-black/20 transition hover:-translate-y-0.5"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition shadow-2xs"
             >
-              <Edit className="w-4 h-4 text-blue-600" />
-              <span>Biên tập trang chủ</span>
+              <Edit className="w-3.5 h-3.5" />
+              <span>Sửa bố cục Trang chủ</span>
             </Link>
           </div>
         </div>
-      </div>
 
-      {/* 2. LANDING PAGES SECTION */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-blue-600" />
-            <h3 className="text-base font-bold text-slate-900">Danh sách Landing Pages</h3>
-            <span className="text-xs text-slate-400 font-medium">({landingPages.length})</span>
+        {/* 2. LANDING PAGES TOOLBAR */}
+        <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                statusFilter === 'ALL'
+                  ? 'bg-blue-600 text-white font-semibold'
+                  : 'text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              Tất cả Landing Page <span className="opacity-75">({landingPages.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('PUBLISHED')}
+              className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                statusFilter === 'PUBLISHED'
+                  ? 'bg-blue-600 text-white font-semibold'
+                  : 'text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              Đang hiển thị <span className="opacity-75">({landingPages.filter((p) => p.status === 'PUBLISHED').length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('DRAFT')}
+              className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
+                statusFilter === 'DRAFT'
+                  ? 'bg-blue-600 text-white font-semibold'
+                  : 'text-slate-600 hover:bg-slate-200/70'
+              }`}
+            >
+              Bản nháp / Ẩn <span className="opacity-75">({landingPages.filter((p) => p.status !== 'PUBLISHED').length})</span>
+            </button>
           </div>
 
-          {/* Search box */}
-          <div className="relative w-full sm:w-72">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <div className="relative w-64">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={query}
@@ -279,114 +303,115 @@ export default function AdminBuilderListPage() {
                 setQuery(e.target.value);
                 setPage(1);
               }}
-              placeholder="Tìm kiếm landing page..."
-              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-hidden focus:border-blue-500"
+              placeholder="Tìm tiêu đề hoặc slug..."
+              className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-md text-xs focus:outline-hidden focus:border-blue-500"
             />
           </div>
         </div>
 
+        {/* 3. LANDING PAGES TABLE */}
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-xs bg-white rounded-2xl border border-slate-200">
+          <div className="p-10 text-center text-slate-400 text-xs">
             Đang tải danh sách trang...
           </div>
         ) : error ? (
-          <div className="p-6 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 text-center">
+          <div className="p-6 text-red-700 text-xs text-center">
             {error}
           </div>
-        ) : landingPages.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
-            <LayoutTemplate className="w-10 h-10 text-slate-300 mx-auto" />
-            <h4 className="text-sm font-bold text-slate-700">Chưa có landing page nào</h4>
-            <p className="text-xs text-slate-500 max-w-md mx-auto">
-              Tạo landing page cho các chiến dịch quảng cáo, sự kiện khuyến mãi hoặc giới thiệu bộ sưu tập chuyên sâu.
+        ) : filteredLandingPages.length === 0 ? (
+          <div className="p-10 text-center space-y-2">
+            <LayoutTemplate className="w-8 h-8 text-slate-300 mx-auto" />
+            <h4 className="text-xs font-bold text-slate-700">Chưa có Landing Page nào</h4>
+            <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+              Tạo trang đích riêng cho chiến dịch khuyến mãi hoặc bộ sưu tập chuyên đề.
             </p>
-            <button
-              onClick={() => {
-                setCreateName('');
-                setCreateTitle('');
-                setCreateSlug('');
-                setShowCreateModal(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Tạo landing page đầu tiên</span>
-            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {landingPages.map((lp) => (
-              <div
-                key={lp.id}
-                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-blue-300 hover:shadow-md transition flex flex-col justify-between space-y-4"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        lp.status === 'PUBLISHED'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : lp.status === 'ARCHIVED'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      {lp.status === 'PUBLISHED' ? 'Đã xuất bản' : lp.status === 'ARCHIVED' ? 'Đã ẩn' : 'Bản nháp'}
-                    </span>
-
-                    <span className="text-[11px] text-slate-400">
-                      {new Date(lp.updatedAt).toLocaleDateString('vi-VN')}
-                    </span>
-                  </div>
-
-                  <h4 className="text-sm font-bold text-slate-900 line-clamp-1">{lp.title}</h4>
-                  <div className="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded-md inline-block max-w-full truncate">
-                    /landing/{lp.slug}
-                  </div>
-                  {lp.internalName !== lp.title && (
-                    <p className="text-[11px] text-slate-500 truncate">Tên nội bộ: {lp.internalName}</p>
-                  )}
-                </div>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">{lp.sectionCount} Sections</span>
-
-                  <div className="flex items-center gap-1">
-                    {lp.status === 'PUBLISHED' && (
+          <div className="overflow-x-auto">
+            <table className="admin-table w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider">
+                  <th className="py-2.5 px-4">Tiêu đề Landing Page</th>
+                  <th className="py-2.5 px-3.5">Đường dẫn (URL)</th>
+                  <th className="py-2.5 px-3.5 text-center">Khối (Sections)</th>
+                  <th className="py-2.5 px-3.5 text-center">Trạng thái</th>
+                  <th className="py-2.5 px-3.5">Cập nhật</th>
+                  <th className="py-2.5 px-4 text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredLandingPages.map((lp) => (
+                  <tr key={lp.id} className="hover:bg-blue-50/30 transition">
+                    <td className="py-2.5 px-4">
                       <Link
-                        href={`/landing/${lp.slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1.5 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-50"
-                        title="Xem trang thực tế"
+                        href={`/admin/builder/${lp.id}`}
+                        className="font-bold text-slate-900 hover:text-blue-600 transition block"
                       >
-                        <ExternalLink className="w-4 h-4" />
+                        {lp.title}
                       </Link>
-                    )}
-
-                    <Link
-                      href={`/admin/builder/${lp.id}`}
-                      className="p-1.5 text-slate-600 hover:text-blue-600 rounded hover:bg-slate-50 font-semibold flex items-center gap-1"
-                    >
-                      <Edit className="w-4 h-4" />
-                      <span>Sửa</span>
-                    </Link>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(lp.id, lp.title)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-slate-50"
-                      title="Xoá trang"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                      {lp.internalName && lp.internalName !== lp.title && (
+                        <span className="text-[11px] text-slate-400">Nội bộ: {lp.internalName}</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3.5 font-mono text-[11px] text-blue-600">
+                      /landing/{lp.slug}
+                    </td>
+                    <td className="py-2.5 px-3.5 text-center font-semibold text-slate-700">
+                      {lp.sectionCount}
+                    </td>
+                    <td className="py-2.5 px-3.5 text-center">
+                      <span
+                        className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                          lp.status === 'PUBLISHED'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : lp.status === 'ARCHIVED'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}
+                      >
+                        {lp.status === 'PUBLISHED' ? 'Đang hiển thị' : lp.status === 'ARCHIVED' ? 'Đã ẩn' : 'Bản nháp'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3.5 text-[11px] text-slate-500 font-mono">
+                      {new Date(lp.updatedAt).toLocaleDateString('vi-VN')}
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        {lp.status === 'PUBLISHED' && (
+                          <Link
+                            href={`/landing/${lp.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100"
+                            title="Xem trang thực tế"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </Link>
+                        )}
+                        <Link
+                          href={`/admin/builder/${lp.id}`}
+                          className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded font-semibold inline-flex items-center gap-1"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                          <span>Sửa</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(lp.id, lp.title)}
+                          className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 cursor-pointer"
+                          title="Xoá trang"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
-      </div>
+      </AdminCard>
 
       {/* CREATE MODAL */}
       {showCreateModal && (

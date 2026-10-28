@@ -15,7 +15,17 @@ const timeLabel = (value: string) => {
   return time.endsWith(':00') ? `${Number(time.slice(0, 2))}` : time;
 };
 
-export default function HotSaleCampaigns({ campaigns }: { campaigns: Campaign[] }) {
+export default function HotSaleCampaigns({
+  campaigns,
+  bannerImage,
+  bannerLink,
+  bannerAlt,
+}: {
+  campaigns: Campaign[];
+  bannerImage?: string;
+  bannerLink?: string;
+  bannerAlt?: string;
+}) {
   const [selected, setSelected] = useState('');
   const prefix = useId();
   const router = useRouter();
@@ -42,6 +52,19 @@ export default function HotSaleCampaigns({ campaigns }: { campaigns: Campaign[] 
   }
   return <section aria-label="HOT SALE" className="pb-10">
     <div className="container mx-auto max-w-[1370px] px-4">
+      {bannerImage && (
+        <div className="mb-4 overflow-hidden rounded-2xl shadow-sm">
+          {bannerLink ? (
+            <a href={bannerLink} className="block hover:opacity-95 transition">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={bannerImage} alt={bannerAlt || 'HOT SALE'} className="w-full h-auto max-h-[180px] object-cover" />
+            </a>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={bannerImage} alt={bannerAlt || 'HOT SALE'} className="w-full h-auto max-h-[180px] object-cover" />
+          )}
+        </div>
+      )}
       {!single && <div className="relative isolate before:absolute before:inset-x-3 before:bottom-0 before:top-5 before:-z-10 before:bg-gradient-to-r before:from-[#ef3b20] before:via-[#f46a49] before:to-[#ef3b20] before:[clip-path:polygon(4%_0,96%_0,100%_100%,0_100%)]">
         <div role="tablist" aria-label="Chiến dịch HOT SALE" className="flex gap-5 overflow-x-auto px-7 pb-2 pt-1 hide-scrollbar sm:gap-8 sm:px-20">
           {groups.map((g, index) => <button key={g.key} id={`${prefix}-tab-${index}`} type="button" role="tab" aria-selected={index === groupIndex} aria-controls={`${prefix}-panel`} tabIndex={index === groupIndex ? 0 : -1}

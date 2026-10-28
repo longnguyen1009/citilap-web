@@ -148,8 +148,8 @@ export const newsReviewsSectionDataSchema = z.object({
   layout: z.enum(['featured', 'grid']).optional(),
   title: text(200).default('Góc CitiLap Media & Đánh Giá'),
   subtitle: text(300).default(''),
-  postIds: z.array(z.string().max(128)).max(8).default([]),
-  limit: z.number().int().min(1).max(10).default(4),
+  postIds: z.array(z.string().max(128)).max(10).default([]),
+  limit: z.number().int().min(1).max(20).default(10),
   categoryId: z.string().max(128).nullable().default(null),
 });
 
@@ -521,7 +521,7 @@ export function defaultHomepageSections(): SectionItem[] {
         title: 'Góc CitiLap Media - Video & Đánh Giá Chuyên Sâu',
         subtitle: 'Cập nhật tin công nghệ, thủ thuật sử dụng và đánh giá chi tiết',
         postIds: [],
-        limit: 4,
+        limit: 10,
         categoryId: null,
       },
     },

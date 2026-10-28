@@ -33,6 +33,7 @@ export default function Footer({
   const copyright = settings?.copyrightText || `© 2024 - ${new Date().getFullYear()} ${brandName}. ${businessProfile.primaryTagline}. Tất cả quyền được bảo lưu.`;
 
   const fb = settings ? settings.facebookUrl : businessProfile.socialProfiles.facebook;
+  const messenger = settings?.messengerUrl;
   const tiktok = settings ? settings.tiktokUrl : businessProfile.socialProfiles.tiktok;
   const zalo = settings ? settings.zaloUrl : businessProfile.socialProfiles.zalo;
   const youtube = settings?.youtubeUrl;
@@ -40,6 +41,21 @@ export default function Footer({
   const hanoiAddr = settings?.addressHanoi || hanoi.address;
   const bacNinhAddr = settings ? settings.addressBacNinh : bacNinh.address;
   const bacNinhPhone = settings?.storePhoneBacNinh || bacNinh.displayPhone;
+
+  const DEFAULT_MOIT_BADGE_IMAGE = "https://bizweb.dktcdn.net/thumb/medium/100/372/934/themes/892516/assets/logo_bct.png";
+  const legalName = settings?.legalBusinessName?.trim() || "HỘ KINH DOANH CITI LAP";
+  const registrationNumber = settings?.businessRegistrationNumber?.trim() || "01D8053589";
+  const registrationIssuer = settings?.businessRegistrationIssuer?.trim() || "";
+  const registrationDate = settings?.businessRegistrationDate?.trim() || "";
+  const legalRepresentative = settings?.legalRepresentative?.trim() || "";
+  const legalAddress = settings?.legalAddress?.trim() || hanoiAddr;
+  const moitEnabled = settings ? settings.moitBadgeEnabled !== false : true;
+  const moitUrl = settings?.moitBadgeUrl?.trim() || "#";
+  const rawMoitImage = settings?.moitBadgeImage?.trim();
+  const moitImage =
+    !rawMoitImage || rawMoitImage === "/brand/bo-cong-thuong.svg"
+      ? DEFAULT_MOIT_BADGE_IMAGE
+      : rawMoitImage;
 
   return (
     <footer className="bg-[#0b1221] text-gray-300">
@@ -156,6 +172,16 @@ export default function Footer({
                     Zalo
                   </a>
                 )}
+                {messenger && (
+                  <a
+                    href={messenger}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white transition"
+                  >
+                    Messenger
+                  </a>
+                )}
                 {youtube && (
                   <a
                     href={youtube}
@@ -242,14 +268,46 @@ export default function Footer({
         </div>
       </div>
 
-      {/* 3. Bottom Copyright & Notice */}
-      <div className="bg-[#050a14] pt-4 pb-20 md:pb-4 text-center text-gray-500 text-xs border-t border-gray-800">
-        <div className="container mx-auto px-4 max-w-[1370px] space-y-1">
-          <p>{copyright}</p>
-          <p>{businessProfile.legalEntityNotice}</p>
-          <p className="text-[11px] text-gray-600">
-            Website phục vụ giới thiệu sản phẩm và tiếp nhận yêu cầu mua hàng. Không thực hiện giao dịch thanh toán trực tuyến trên trang.
-          </p>
+      {/* 3. Bottom Copyright, Legal Entity & MOIT badge */}
+      <div className="bg-[#050a14] pt-5 pb-20 md:pb-6 text-gray-400 text-xs border-t border-gray-800/80">
+        <div className="container mx-auto px-4 max-w-[1370px] flex flex-col items-center text-center gap-2.5">
+          <div className="max-w-4xl space-y-1 leading-relaxed">
+            <p className="text-gray-300">
+              <span className="font-semibold text-gray-200">{legalName}</span>
+              {registrationNumber && (
+                <>
+                  {" "}- Mã số đăng ký hộ kinh doanh: <span className="font-semibold text-gray-200">{registrationNumber}</span>
+                  {registrationIssuer && <> cấp tại {registrationIssuer}</>}
+                  {registrationDate && <> ngày {registrationDate}</>}
+                </>
+              )}
+              {legalRepresentative && <>. Chủ hộ kinh doanh: {legalRepresentative}</>}
+              {legalAddress && <>. Địa chỉ: {legalAddress}</>}
+              {phone && <>. Điện thoại: {phone}.</>}
+            </p>
+            <p className="text-[11px] text-gray-500">{copyright}</p>
+          </div>
+          {moitEnabled && moitImage && (
+            <div className="flex items-center justify-center pt-1">
+              <a
+                href={moitUrl || "#"}
+                target={moitUrl && moitUrl !== "#" ? "_blank" : undefined}
+                rel={moitUrl && moitUrl !== "#" ? "noopener noreferrer nofollow" : undefined}
+                className="inline-flex items-center"
+                title="Đã thông báo Bộ Công Thương"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- admin-configurable badge may be hosted externally */}
+                <img
+                  src={moitImage}
+                  alt="Đã thông báo Bộ Công Thương"
+                  width={130}
+                  height={49}
+                  loading="lazy"
+                  className="h-[44px] w-auto object-contain"
+                />
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </footer>

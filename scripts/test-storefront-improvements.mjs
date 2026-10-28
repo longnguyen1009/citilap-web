@@ -119,7 +119,130 @@ try {
   await assert.rejects(() => api.writeInspection(DB, 'demo-thinkpad-t14', payload), /đã thay đổi/);
   await assert.rejects(() => api.writeInspection(DB, 'demo-elitebook-840', payload), /không thuộc/);
   assert.equal((await api.publicInspections(DB, 'demo-thinkpad-t14', null))[0].isDemo, 1);
-  console.log('PASS inspection: sold visibility, no private fields, ownership, concurrent edit, demo label');
+  const lookedUp = await api.lookupPublicInspectionByCode(DB, 'DEMO-THINKPAD-T14');
+  assert.ok(lookedUp && lookedUp.publicCode === 'DEMO-THINKPAD-T14');
+  assert.match(lookedUp.productHref, /^\/laptop\//);
+  assert(!JSON.stringify(lookedUp).includes('serialNumber'));
+  assert(!JSON.stringify(lookedUp).includes('costPrice'));
+  assert(!('unitStatus' in lookedUp));
+  await DB.prepare("UPDATE SerialUnit SET serialNumber='INTERNAL-SN-99999' WHERE id='demo-thinkpad-t14-unit'").run();
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'INTERNAL-SN-99999'), null);
+  await DB.prepare("UPDATE SerialUnit SET status='SOLD' WHERE id='demo-thinkpad-t14-unit'").run();
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'DEMO-THINKPAD-T14'), null);
+  await DB.prepare("UPDATE SerialUnit SET status='AVAILABLE' WHERE id='demo-thinkpad-t14-unit'").run();
+  await DB.prepare("UPDATE ProductInspection SET published=0 WHERE serialUnitId='demo-thinkpad-t14-unit'").run();
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'DEMO-THINKPAD-T14'), null);
+  await DB.prepare("UPDATE ProductInspection SET published=1 WHERE serialUnitId='demo-thinkpad-t14-unit'").run();
+
+  // Variant scoping, NULL variant semantics, inactive/hidden exclusions, and publicInspections <-> lookupPublicInspectionByCode parity
+  const defaultWarehouse = await DB.prepare('SELECT id FROM Warehouse LIMIT 1').first();
+  await DB.prepare(
+    `INSERT INTO ProductVariant(id,productId,sku,name,options,price,stock,status,updatedAt) VALUES
+      ('var-t14-a','demo-thinkpad-t14','T14-VAR-A','16GB / 512GB','{}',12500000,1,'ACTIVE',CURRENT_TIMESTAMP),
+      ('var-t14-b','demo-thinkpad-t14','T14-VAR-B','32GB / 1TB','{}',14500000,1,'ACTIVE',CURRENT_TIMESTAMP),
+      ('var-t14-inactive','demo-thinkpad-t14','T14-VAR-INACTIVE','8GB / 256GB','{}',10500000,1,'INACTIVE',CURRENT_TIMESTAMP)`
+  ).run();
+  await DB.prepare(
+    `INSERT INTO SerialUnit(id,serialNumber,productId,variantId,warehouseId,status,costPrice,createdAt,updatedAt) VALUES
+      ('unit-t14-a','SN-T14-VAR-A','demo-thinkpad-t14','var-t14-a',?,'AVAILABLE',9000000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+      ('unit-t14-b','SN-T14-VAR-B','demo-thinkpad-t14','var-t14-b',?,'AVAILABLE',10000000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+      ('unit-t14-inactive','SN-T14-VAR-INACTIVE','demo-thinkpad-t14','var-t14-inactive',?,'AVAILABLE',8000000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`
+  ).bind(defaultWarehouse.id, defaultWarehouse.id, defaultWarehouse.id).run();
+  await DB.prepare(
+    `INSERT INTO ProductInspection(serialUnitId,publicCode,checkedAt,batteryHealth,appearance,checks,limitations,warranty,published,isDemo,updatedAt) VALUES
+      ('unit-t14-a','CODE-T14-VAR-A','2026-04-16T08:00:00.000Z',94,'Đẹp 99%','Đạt toàn bộ','','6 tháng',1,0,CURRENT_TIMESTAMP),
+      ('unit-t14-b','CODE-T14-VAR-B','2026-04-16T09:00:00.000Z',96,'Đẹp 99%','Đạt toàn bộ','','12 tháng',1,0,CURRENT_TIMESTAMP),
+      ('unit-t14-inactive','CODE-T14-VAR-INACTIVE','2026-04-16T10:00:00.000Z',91,'Đẹp 98%','Đạt toàn bộ','','6 tháng',1,0,CURRENT_TIMESTAMP)`
+  ).run();
+
+  const listVarA = await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-a');
+  assert.deepEqual(
+    listVarA.map(r => ({ code: r.publicCode, variantId: r.variantId })),
+    [
+      { code: 'CODE-T14-VAR-A', variantId: 'var-t14-a' },
+      { code: 'DEMO-THINKPAD-T14', variantId: null },
+    ],
+    'Variant A includes its own unit + product-level (variantId=NULL) unit, excluding Variant B, inactive variant, and other products'
+  );
+  const listVarB = await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-b');
+  assert.deepEqual(
+    listVarB.map(r => ({ code: r.publicCode, variantId: r.variantId })),
+    [
+      { code: 'CODE-T14-VAR-B', variantId: 'var-t14-b' },
+      { code: 'DEMO-THINKPAD-T14', variantId: null },
+    ],
+    'Variant B includes its own unit + product-level (variantId=NULL) unit, excluding Variant A'
+  );
+  const listNoVariant = await api.publicInspections(DB, 'demo-thinkpad-t14', null);
+  assert.deepEqual(
+    listNoVariant.map(r => r.publicCode),
+    ['DEMO-THINKPAD-T14'],
+    'Null variant query returns only product-level (variantId=NULL) unit'
+  );
+  assert.deepEqual(
+    await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-inactive'),
+    [],
+    'Inactive variant query returns no inspections'
+  );
+  assert.equal(
+    await api.lookupPublicInspectionByCode(DB, 'CODE-T14-VAR-INACTIVE'),
+    null,
+    'Lookup rejects unit bound to inactive variant'
+  );
+
+  // Every certificate returned by publicInspections must resolve via lookupPublicInspectionByCode
+  for (const r of [...listVarA, ...listVarB, ...listNoVariant]) {
+    const resolved = await api.lookupPublicInspectionByCode(DB, r.publicCode);
+    assert.ok(resolved, `lookupPublicInspectionByCode must resolve ${r.publicCode} returned by publicInspections`);
+    assert.equal(resolved.publicCode, r.publicCode);
+    assert.equal(resolved.productId, 'demo-thinkpad-t14');
+  }
+
+  // Hidden/inactive product and ProductStudio exclusions must match between publicInspections and lookupPublicInspectionByCode
+  await DB.prepare("UPDATE Product SET status='INACTIVE' WHERE id='demo-thinkpad-t14'").run();
+  assert.deepEqual(await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-a'), []);
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'CODE-T14-VAR-A'), null);
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'DEMO-THINKPAD-T14'), null);
+  await DB.prepare("UPDATE Product SET status='ACTIVE', deletedAt='2026-04-16T00:00:00.000Z' WHERE id='demo-thinkpad-t14'").run();
+  assert.deepEqual(await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-a'), []);
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'CODE-T14-VAR-A'), null);
+  await DB.prepare("UPDATE Product SET deletedAt=NULL WHERE id='demo-thinkpad-t14'").run();
+
+  // Draft-only ProductStudio (published IS NULL)
+  await DB.prepare("INSERT INTO ProductStudio(productId,draft,published,updatedAt) VALUES('demo-thinkpad-t14','{}',NULL,CURRENT_TIMESTAMP)").run();
+  assert.deepEqual(await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-a'), []);
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'CODE-T14-VAR-A'), null);
+
+  // ProductStudio published with availability=HIDDEN
+  await DB.prepare("UPDATE ProductStudio SET published=? WHERE productId='demo-thinkpad-t14'")
+    .bind(JSON.stringify({ name: 'ThinkPad T14', slug: 'thinkpad-t14-gen-2', availability: 'HIDDEN' }))
+    .run();
+  assert.deepEqual(await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-a'), []);
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'CODE-T14-VAR-A'), null);
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'DEMO-THINKPAD-T14'), null);
+
+  // ProductStudio published with variant-level availability=HIDDEN on var-t14-a while var-t14-b is AVAILABLE
+  await DB.prepare("UPDATE ProductStudio SET published=? WHERE productId='demo-thinkpad-t14'")
+    .bind(JSON.stringify({
+      name: 'ThinkPad T14',
+      slug: 'thinkpad-t14-gen-2',
+      availability: 'AVAILABLE',
+      variants: [
+        { id: 'var-t14-a', availability: 'HIDDEN' },
+        { id: 'var-t14-b', availability: 'AVAILABLE' },
+      ],
+    }))
+    .run();
+  assert.deepEqual(await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-a'), []);
+  assert.equal(await api.lookupPublicInspectionByCode(DB, 'CODE-T14-VAR-A'), null);
+  const visibleVarB = await api.publicInspections(DB, 'demo-thinkpad-t14', 'var-t14-b');
+  assert.deepEqual(visibleVarB.map(r => r.publicCode), ['CODE-T14-VAR-B', 'DEMO-THINKPAD-T14']);
+  for (const r of visibleVarB) {
+    assert.ok(await api.lookupPublicInspectionByCode(DB, r.publicCode));
+  }
+  await DB.prepare("DELETE FROM ProductStudio WHERE productId='demo-thinkpad-t14'").run();
+
+  console.log('PASS inspection: sold visibility, variant scoping, NULL variant semantics, hidden/inactive exclusions, publicInspections<->lookup parity, no private fields, concurrent edit');
 
   const appointment = { productId: 'demo-thinkpad-t14', unitCode: 'DEMO-THINKPAD-T14', locationId: 'hanoi', requestedAt: new Date(Date.now() + 86400000).toISOString() };
   const contact = { name: 'Khách kiểm thử', phone: '0900000000', message: 'Chạy test', appointment };

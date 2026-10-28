@@ -19,7 +19,7 @@ import MediaSection from "@/components/home/MediaSection";
 import TestimonialSection from "@/components/home/TestimonialSection";
 import ContactSection from "@/components/home/ContactSection";
 import BrandSection from "@/components/home/BrandSection";
-import { getPublishedNavigation, getPublishedHomepage } from "@/server/services/storefront-cms.service";
+import { getPublishedNavigation, getPublishedHomepage, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import BlockRenderer from "@/components/builder/BlockRenderer";
 import { ProductGridSkeleton } from "@/components/ui/Skeleton";
 
@@ -49,15 +49,16 @@ function ProductSectionSkeleton() {
 }
 
 export default async function Home() {
-  const [navigation, cmsHomepage] = await Promise.all([
+  const [navigation, cmsHomepage, settings] = await Promise.all([
     getPublishedNavigation(),
     getPublishedHomepage(),
+    getStorefrontSettings(),
   ]);
 
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "CitiLap",
+    name: settings?.storeName || "CitiLap",
     url: "https://citilap.vn",
     potentialAction: {
       "@type": "SearchAction",
@@ -74,7 +75,11 @@ export default async function Home() {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <BlockRenderer sections={cmsHomepage.sections} flashSale={<FlashSaleSection />} />
+        <BlockRenderer
+          sections={cmsHomepage.sections}
+          settings={settings}
+          flashSale={<FlashSaleSection settings={settings} />}
+        />
       </div>
     );
   }
@@ -89,17 +94,17 @@ export default async function Home() {
       />
 
       {/* 1. HERO SECTION & SUB-BANNERS */}
-      <HeroSection />
+      <HeroSection settings={settings ?? undefined} />
 
       {/* 2. FEATURE STRIP */}
-      <FeatureStrip />
+      <FeatureStrip settings={settings} />
 
       {/* 3. KHÁM PHÁ HỆ SINH THÁI DANH MỤC & PHỤ KIỆN TECH */}
       <CategoryGridSection navigation={navigation} />
 
       {/* 4. FLASH SALE */}
       <Suspense fallback={<ProductSectionSkeleton />}>
-        <FlashSaleSection pricingContext={pricingContext} evaluatedAt={evaluatedAt} />
+        <FlashSaleSection pricingContext={pricingContext} evaluatedAt={evaluatedAt} settings={settings} />
       </Suspense>
 
       {/* 4. HÀNG MỚI VỀ */}
@@ -214,7 +219,7 @@ export default async function Home() {
       <MediaSection />
 
       {/* 12. ĐÁNH GIÁ KHÁCH HÀNG */}
-      <TestimonialSection />
+      <TestimonialSection testimonials={settings?.testimonials ?? []} sourceUrl={settings?.testimonialsSourceUrl} />
 
       {/* 13. TƯ VẤN CHỌN MÁY */}
       <ContactSection />

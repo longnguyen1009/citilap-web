@@ -17,6 +17,7 @@ const bundle = await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
+  external: ['node:*', 'cloudflare:workers', '*.wasm?module'],
   plugins: [{
     name: 'mock-server-only',
     setup(b) {

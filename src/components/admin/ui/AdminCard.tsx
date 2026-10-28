@@ -22,14 +22,14 @@ export default function AdminCard({
   footer,
 }: AdminCardProps) {
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden ${className}`}>
+    <div className={`admin-card bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden ${className}`}>
       {(title || action) && (
         <div
-          className={`px-5 py-4 sm:px-6 sm:py-4.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${headerClassName}`}
+          className={`admin-card-header px-4 py-3 border-b border-slate-200 bg-slate-50/60 flex flex-wrap items-center justify-between gap-3 ${headerClassName}`}
         >
           <div>
             {typeof title === "string" ? (
-              <h3 className="text-base font-bold text-slate-900 leading-tight">{title}</h3>
+              <h2 className="text-[13px] font-semibold text-slate-900 leading-tight">{title}</h2>
             ) : (
               title
             )}
@@ -40,9 +40,9 @@ export default function AdminCard({
           {action && <div className="flex items-center gap-2 shrink-0">{action}</div>}
         </div>
       )}
-      <div className={`p-5 sm:p-6 ${bodyClassName}`}>{children}</div>
+      <div className={bodyClassName || "p-4"}>{children}</div>
       {footer && (
-        <div className="px-5 py-3.5 sm:px-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-4 py-3 bg-slate-50/50 border-t border-slate-200 flex flex-wrap gap-3 items-center justify-between text-xs text-slate-500">
           {footer}
         </div>
       )}

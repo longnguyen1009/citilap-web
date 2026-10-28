@@ -91,7 +91,6 @@ export default function AdminBrandsPage() {
   }, [searchQuery, statusFilter]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load initial brand list and on filter/refresh change
     void fetchBrands();
   }, [fetchBrands, refreshTrigger]);
 
@@ -130,10 +129,10 @@ export default function AdminBrandsPage() {
   const handleSaveBrand = async (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
-    if (!formData.name.trim()) errors.name = 'Vui lòng nhập tên thương hiệu.';
-    if (!formData.slug.trim()) errors.slug = 'Vui lòng nhập slug URL.';
+    if (!formData.name.trim()) errors.name = 'Nhập tên thương hiệu.';
+    if (!formData.slug.trim()) errors.slug = 'Nhập slug URL.';
     else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formData.slug.trim())) {
-      errors.slug = 'Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang.';
+      errors.slug = 'Chỉ dùng chữ thường, số và gạch ngang.';
     }
 
     if (Object.keys(errors).length > 0) {
@@ -156,8 +155,8 @@ export default function AdminBrandsPage() {
       setStatusAlert({
         type: 'success',
         message: editingId
-          ? `Đã cập nhật thương hiệu "${formData.name}". Thay đổi có hiệu lực ngay trên website.`
-          : `Đã tạo mới thương hiệu "${formData.name}" thành công.`,
+          ? `Đã cập nhật "${formData.name}".`
+          : `Đã tạo "${formData.name}".`,
       });
 
       setModalOpen(false);
@@ -165,7 +164,7 @@ export default function AdminBrandsPage() {
     } catch (err) {
       setStatusAlert({
         type: 'error',
-        message: (err as Error).message || 'Có lỗi xảy ra khi lưu thương hiệu.',
+        message: (err as Error).message || 'Có lỗi xảy ra khi lưu.',
       });
     } finally {
       setSubmitting(false);
@@ -183,7 +182,7 @@ export default function AdminBrandsPage() {
 
       setStatusAlert({
         type: 'success',
-        message: `Đã lưu trữ / gỡ bỏ thương hiệu "${deletingBrand.name}".`,
+        message: `Đã gỡ "${deletingBrand.name}".`,
       });
       setDeleteModalOpen(false);
       setDeletingBrand(null);
@@ -200,111 +199,120 @@ export default function AdminBrandsPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-24">
-      {/* Page Header */}
+    <div className="space-y-3 pb-12">
+      {/* 1. Compact Header */}
       <PageHeader
-        title="Quản lý Thương hiệu"
-        description="Nguồn dữ liệu thương hiệu chuẩn của hệ thống. Tích hợp trực tiếp logo từ Thư viện Media Cloudflare R2, thông số SEO và liên kết đến các sản phẩm trong Catalog."
+        title="Thương hiệu"
+        badge={
+          <span className="text-xs px-2 py-0.5 bg-slate-200/70 text-slate-700 rounded-full font-semibold tabular-nums">
+            {brands.length}
+          </span>
+        }
         actions={
           <div className="flex items-center gap-2">
-            <AdminButton
-              variant="secondary"
-              icon={<RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />}
-              onClick={() => setRefreshTrigger(n => n + 1)}
+            <button
+              type="button"
               disabled={loading}
+              onClick={() => setRefreshTrigger(n => n + 1)}
+              title="Làm mới"
+              aria-label="Làm mới"
+              className="inline-grid place-items-center size-8 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
             >
-              Làm mới
-            </AdminButton>
+              <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
             <AdminButton
               variant="primary"
-              icon={<Plus className="w-4 h-4" />}
+              size="sm"
+              icon={<Plus className="w-3.5 h-3.5" />}
               onClick={openCreateModal}
             >
-              Thêm thương hiệu mới
+              Thêm thương hiệu
             </AdminButton>
           </div>
         }
       />
 
-      {/* Status banner */}
       {statusAlert && (
-        <InlineAlert
-          variant={statusAlert.type}
-          onClose={() => setStatusAlert(null)}
-        >
+        <InlineAlert variant={statusAlert.type} onClose={() => setStatusAlert(null)}>
           {statusAlert.message}
         </InlineAlert>
       )}
 
-      {/* Search & Filter Toolbar */}
-      <AdminCard>
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* 2. Single-Card Workspace */}
+      <AdminCard bodyClassName="p-0 overflow-hidden">
+        {/* Status Tabs + Search */}
+        <div className="px-4 py-2 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            {[
+              { key: 'ALL', label: 'Tất cả' },
+              { key: 'ACTIVE', label: 'Hiển thị' },
+              { key: 'INACTIVE', label: 'Tạm ẩn' },
+            ].map(t => {
+              const active = statusFilter === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setStatusFilter(t.key)}
+                  className={`px-2.5 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                    active ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-200/60'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative flex-1 max-w-xs min-w-[200px]">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
-              type="text"
+              type="search"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm theo tên thương hiệu hoặc slug URL..."
-              className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              placeholder="Tìm tên hãng, slug..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white focus:outline-none focus:border-blue-500"
             />
           </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-700"
-            >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">Hoạt động (Hiển thị web)</option>
-              <option value="INACTIVE">Tạm ẩn</option>
-            </select>
-          </div>
         </div>
-      </AdminCard>
 
-      {/* Brands List Table */}
-      <AdminCard
-        title="Danh sách Hãng sản xuất"
-        subtitle={`Tổng số: ${brands.length} thương hiệu.`}
-      >
+        {/* Table */}
         {loading ? (
           <div className="py-12">
-            <AdminLoadingState message="Đang tải danh sách thương hiệu..." />
+            <AdminLoadingState message="Đang tải..." />
           </div>
         ) : error ? (
-          <div className="py-6 text-center text-rose-500 text-sm">
-            {error}
-          </div>
+          <div className="py-8 text-center text-rose-500 text-xs">{error}</div>
         ) : brands.length === 0 ? (
-          <AdminEmptyState
-            title="Chưa có thương hiệu nào"
-            description="Hãy bấm 'Thêm thương hiệu mới' để khởi tạo thương hiệu đầu tiên."
-            action={
-              <AdminButton variant="primary" icon={<Plus className="w-4 h-4" />} onClick={openCreateModal}>
-                Tạo thương hiệu
-              </AdminButton>
-            }
-          />
+          <div className="py-12">
+            <AdminEmptyState
+              title="Chưa có thương hiệu"
+              action={
+                <AdminButton variant="primary" size="sm" icon={<Plus className="w-3.5 h-3.5" />} onClick={openCreateModal}>
+                  Thêm thương hiệu
+                </AdminButton>
+              }
+            />
+          </div>
         ) : (
-          <div className="overflow-x-auto -mx-4 sm:-mx-6">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto">
+            <table className="admin-table w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-500 font-semibold">
-                  <th className="py-3 px-4 w-16">Logo</th>
-                  <th className="py-3 px-4">Tên thương hiệu</th>
-                  <th className="py-3 px-4">Đường dẫn Web</th>
-                  <th className="py-3 px-4 text-center">Sản phẩm</th>
-                  <th className="py-3 px-4 text-center">Trạng thái</th>
-                  <th className="py-3 px-4 text-right">Thao tác</th>
+                <tr>
+                  <th className="w-14">Logo</th>
+                  <th>Thương hiệu</th>
+                  <th>Đường dẫn</th>
+                  <th className="text-center">Sản phẩm</th>
+                  <th className="text-center">Trạng thái</th>
+                  <th className="text-right"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {brands.map(b => (
-                  <tr key={b.id} className="hover:bg-slate-50/50 transition">
-                    <td className="py-3 px-4">
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
+                  <tr key={b.id} className="hover:bg-slate-50/70 transition">
+                    <td>
+                      <div className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">
                         {b.logo ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -316,54 +324,58 @@ export default function AdminBrandsPage() {
                             }}
                           />
                         ) : (
-                          <Tag className="w-4 h-4 text-slate-400" />
+                          <Tag className="w-3.5 h-3.5 text-slate-400" />
                         )}
                       </div>
                     </td>
 
-                    <td className="py-3 px-4">
-                      <div className="font-semibold text-slate-900 text-sm">{b.name}</div>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(b)}
+                        className="font-semibold text-slate-900 hover:text-blue-600 text-[13px] text-left cursor-pointer"
+                      >
+                        {b.name}
+                      </button>
                       {b.description && (
-                        <div className="text-slate-500 line-clamp-1 max-w-xs text-[11px] mt-0.5">
-                          {b.description}
-                        </div>
+                        <div className="text-slate-500 line-clamp-1 max-w-xs text-[11px]">{b.description}</div>
                       )}
                     </td>
 
-                    <td className="py-3 px-4 font-mono text-slate-600">
+                    <td className="font-mono text-slate-500">
                       <a
                         href={`/brand/${b.slug}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 hover:text-blue-600 transition"
+                        className="inline-flex items-center gap-1 hover:text-blue-600"
                       >
                         <span>/brand/{b.slug}</span>
                         <ExternalLink className="w-3 h-3 text-slate-400" />
                       </a>
                     </td>
 
-                    <td className="py-3 px-4 text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                        {b.productCount} sản phẩm
+                    <td className="text-center tabular-nums">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                        {b.productCount}
                       </span>
                     </td>
 
-                    <td className="py-3 px-4 text-center">
+                    <td className="text-center">
                       <StatusBadge
                         status={b.status === 'ACTIVE' ? 'PUBLISHED' : 'DRAFT'}
                         customLabel={b.status === 'ACTIVE' ? 'Hiển thị' : 'Tạm ẩn'}
                       />
                     </td>
 
-                    <td className="py-3 px-4 text-right">
-                      <div className="inline-flex items-center gap-1.5">
+                    <td className="text-right">
+                      <div className="inline-flex items-center gap-1">
                         <button
                           type="button"
                           onClick={() => openEditModal(b)}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
-                          title="Chỉnh sửa thương hiệu"
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition cursor-pointer"
+                          title="Sửa"
                         >
-                          <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
@@ -371,10 +383,10 @@ export default function AdminBrandsPage() {
                             setDeletingBrand(b);
                             setDeleteModalOpen(true);
                           }}
-                          className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-md transition cursor-pointer"
-                          title="Lưu trữ / Gỡ bỏ"
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                          title="Gỡ"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
@@ -389,11 +401,11 @@ export default function AdminBrandsPage() {
       {/* MODAL CREATE / EDIT BRAND */}
       {modalOpen && (
         <MediaDialog
-          title={editingId ? 'Chỉnh sửa thương hiệu' : 'Thêm thương hiệu mới'}
+          title={editingId ? 'Sửa thương hiệu' : 'Thêm thương hiệu'}
           onClose={() => setModalOpen(false)}
         >
-          <form onSubmit={handleSaveBrand} className="space-y-4 max-w-xl mx-auto py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form onSubmit={handleSaveBrand} className="space-y-3.5 max-w-xl mx-auto py-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Tên thương hiệu <span className="text-rose-500">*</span>
@@ -409,8 +421,8 @@ export default function AdminBrandsPage() {
                       slug: !editingId ? handleSlugify(name) : prev.slug,
                     }));
                   }}
-                  placeholder="Ví dụ: Lenovo, Dell, Asus..."
-                  className="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  placeholder="Lenovo, Dell, Asus..."
+                  className="w-full text-xs border border-slate-300 rounded-md px-3 py-2"
                 />
                 {formErrors.name && (
                   <span className="text-[11px] text-rose-500 mt-0.5 block">{formErrors.name}</span>
@@ -419,14 +431,14 @@ export default function AdminBrandsPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Đường dẫn (Slug URL) <span className="text-rose-500">*</span>
+                  Slug <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.slug}
                   onChange={e => setFormData(prev => ({ ...prev, slug: e.target.value.toLowerCase().trim() }))}
                   placeholder="lenovo"
-                  className="w-full text-xs font-mono border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  className="w-full text-xs font-mono border border-slate-300 rounded-md px-3 py-2"
                 />
                 {formErrors.slug && (
                   <span className="text-[11px] text-rose-500 mt-0.5 block">{formErrors.slug}</span>
@@ -434,120 +446,108 @@ export default function AdminBrandsPage() {
               </div>
             </div>
 
-            {/* Logo from Media Library */}
+            {/* Logo */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Logo thương hiệu (Cloudflare R2 / URL)
-              </label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Logo</label>
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-12 h-12 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden">
                   {formData.logo ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={formData.logo} alt="Logo preview" className="w-full h-full object-contain p-1" />
+                    <img src={formData.logo} alt="Logo" className="w-full h-full object-contain p-1" />
                   ) : (
-                    <ImageIcon className="w-5 h-5 text-slate-400" />
+                    <ImageIcon className="w-4 h-4 text-slate-400" />
                   )}
                 </div>
-                <div className="flex-1 space-y-1.5">
+                <div className="flex-1 flex items-center gap-2">
                   <input
                     type="text"
                     value={formData.logo}
                     onChange={e => setFormData(prev => ({ ...prev, logo: e.target.value }))}
-                    placeholder="https://... hoặc chọn từ Thư viện Media"
-                    className="w-full text-xs border border-slate-300 rounded-lg px-3 py-1.5 font-mono"
+                    placeholder="URL logo hoặc chọn từ Media"
+                    className="flex-1 text-xs border border-slate-300 rounded-md px-2.5 py-1.5 font-mono"
                   />
-                  <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLogoPickerOpen(true)}
+                    className="text-xs px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-md whitespace-nowrap cursor-pointer"
+                  >
+                    Chọn ảnh
+                  </button>
+                  {formData.logo && (
                     <button
                       type="button"
-                      onClick={() => setLogoPickerOpen(true)}
-                      className="text-xs px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded transition flex items-center gap-1 cursor-pointer"
+                      onClick={() => setFormData(prev => ({ ...prev, logo: '' }))}
+                      className="text-xs px-2 py-1.5 text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
                     >
-                      <ImageIcon className="w-3.5 h-3.5" />
-                      <span>Chọn từ Thư viện Media</span>
+                      Xóa
                     </button>
-                    {formData.logo && (
-                      <button
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, logo: '' }))}
-                        className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                      >
-                        Xóa logo
-                      </button>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Trạng thái */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Trạng thái hiển thị
-              </label>
-              <select
-                value={formData.status}
-                onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as 'ACTIVE' | 'INACTIVE' }))}
-                className="w-full text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white cursor-pointer"
-              >
-                <option value="ACTIVE">Hoạt động (Hiển thị trên website và cho phép chọn trong Catalog)</option>
-                <option value="INACTIVE">Tạm ẩn (Ẩn trang thương hiệu)</option>
-              </select>
-            </div>
-
-            {/* Mô tả */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Mô tả giới thiệu thương hiệu
-              </label>
-              <textarea
-                rows={3}
-                value={formData.description}
-                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Giới thiệu về nguồn gốc xuất xứ, các dòng sản phẩm nổi bật của hãng..."
-                className="w-full text-xs border border-slate-300 rounded-lg px-3 py-2"
-              />
-            </div>
-
-            {/* SEO */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
-              <span className="text-xs font-bold text-slate-700 block">Tối ưu hóa SEO trang thương hiệu</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-0.5">Tiêu đề SEO</label>
-                <input
-                  type="text"
-                  value={formData.seoTitle}
-                  onChange={e => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
-                  placeholder="Laptop Lenovo Chính Hãng - Giá Rẻ Nhất | CitiLap"
-                  className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
-                />
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Trạng thái</label>
+                <select
+                  value={formData.status}
+                  onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as 'ACTIVE' | 'INACTIVE' }))}
+                  className="w-full text-xs border border-slate-300 rounded-md px-3 py-2 bg-white cursor-pointer"
+                >
+                  <option value="ACTIVE">Hiển thị</option>
+                  <option value="INACTIVE">Tạm ẩn</option>
+                </select>
               </div>
               <div>
-                <label className="block text-[11px] font-medium text-slate-600 mb-0.5">Mô tả SEO</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Mô tả ngắn</label>
                 <input
                   type="text"
-                  value={formData.seoDescription}
-                  onChange={e => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
-                  placeholder="Mua ngay laptop Lenovo Legion, ThinkPad, Yoga chính hãng tại CitiLap..."
-                  className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
+                  value={formData.description}
+                  onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Giới thiệu ngắn về hãng..."
+                  className="w-full text-xs border border-slate-300 rounded-md px-3 py-2"
                 />
               </div>
             </div>
+
+            <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+              <summary className="font-semibold text-slate-700 cursor-pointer">Tùy chọn SEO</summary>
+              <div className="space-y-2.5 pt-2.5">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-0.5">Tiêu đề SEO</label>
+                  <input
+                    type="text"
+                    value={formData.seoTitle}
+                    onChange={e => setFormData(prev => ({ ...prev, seoTitle: e.target.value }))}
+                    placeholder={`Laptop ${formData.name || 'Chính Hãng'} | CitiLap`}
+                    className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-0.5">Mô tả SEO</label>
+                  <input
+                    type="text"
+                    value={formData.seoDescription}
+                    onChange={e => setFormData(prev => ({ ...prev, seoDescription: e.target.value }))}
+                    placeholder="Mô tả hiển thị trên Google..."
+                    className="w-full text-xs border border-slate-300 rounded px-2.5 py-1.5 bg-white"
+                  />
+                </div>
+              </div>
+            </details>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
               <AdminButton
                 type="button"
                 variant="secondary"
+                size="sm"
                 onClick={() => setModalOpen(false)}
                 disabled={submitting}
               >
                 Hủy
               </AdminButton>
-              <AdminButton
-                type="submit"
-                variant="primary"
-                loading={submitting}
-              >
-                {editingId ? 'Lưu thay đổi' : 'Tạo thương hiệu'}
+              <AdminButton type="submit" variant="primary" size="sm" loading={submitting}>
+                {editingId ? 'Lưu' : 'Tạo'}
               </AdminButton>
             </div>
           </form>
@@ -556,7 +556,7 @@ export default function AdminBrandsPage() {
 
       {/* LOGO PICKER DIALOG */}
       {logoPickerOpen && (
-        <MediaDialog title="Chọn Logo từ Thư viện Media" onClose={() => setLogoPickerOpen(false)}>
+        <MediaDialog title="Chọn Logo" onClose={() => setLogoPickerOpen(false)}>
           <div className="space-y-4">
             <MediaUpload onUploaded={() => setMediaRefresh(n => n + 1)} />
             <MediaBrowser
@@ -574,31 +574,29 @@ export default function AdminBrandsPage() {
 
       {/* DELETE CONFIRMATION MODAL */}
       {deleteModalOpen && deletingBrand && (
-        <MediaDialog title="Xác nhận lưu trữ thương hiệu" onClose={() => setDeleteModalOpen(false)}>
-          <div className="p-4 space-y-4 max-w-md mx-auto">
+        <MediaDialog title="Gỡ thương hiệu" onClose={() => setDeleteModalOpen(false)}>
+          <div className="p-3 space-y-3 max-w-md mx-auto">
             {deletingBrand.productCount > 0 ? (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-amber-900">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-amber-900">
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span>Cảnh báo bảo vệ dữ liệu sản phẩm</span>
+                  <span>Đang có {deletingBrand.productCount} sản phẩm</span>
                 </div>
                 <p>
-                  Thương hiệu <strong>{deletingBrand.name}</strong> hiện đang được liên kết với <strong>{deletingBrand.productCount}</strong> sản phẩm trong Catalog.
-                </p>
-                <p>
-                  Hệ thống không cho phép xóa hẳn thương hiệu đang có sản phẩm tham chiếu. Nếu muốn ẩn khỏi website, hãy bấm nút <strong>Chỉnh sửa</strong> và chuyển trạng thái sang <strong>Tạm ẩn (INACTIVE)</strong>.
+                  Không thể xóa thương hiệu đang có sản phẩm. Hãy sửa trạng thái sang <strong>Tạm ẩn</strong>.
                 </p>
               </div>
             ) : (
               <p className="text-xs text-slate-600">
-                Bạn có chắc chắn muốn lưu trữ / gỡ bỏ thương hiệu <strong>{deletingBrand.name}</strong> không?
+                Xác nhận gỡ thương hiệu <strong>{deletingBrand.name}</strong>?
               </p>
             )}
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2 pt-1">
               <AdminButton
                 type="button"
                 variant="secondary"
+                size="sm"
                 onClick={() => setDeleteModalOpen(false)}
                 disabled={deleting}
               >
@@ -608,10 +606,11 @@ export default function AdminBrandsPage() {
                 <AdminButton
                   type="button"
                   variant="destructive"
+                  size="sm"
                   onClick={handleDeleteBrand}
                   loading={deleting}
                 >
-                  Xác nhận gỡ bỏ
+                  Xác nhận gỡ
                 </AdminButton>
               )}
             </div>

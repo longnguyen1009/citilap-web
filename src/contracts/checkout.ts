@@ -26,6 +26,7 @@ export interface CheckoutSnapshot {
   warranties?: Array<{ productId: string; variantId: string | null; name: string; description: string; adjustment: number }>;
   settingsRevision: number;
   bankAccountInfo: string | null;
+  vietQr?: { bankBin: string; accountNumber: string; accountName: string };
   showroom: { id: string; name: string; address: string; phone: string } | null;
 }
 export interface CheckoutQuote {

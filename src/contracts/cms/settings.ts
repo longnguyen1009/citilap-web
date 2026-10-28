@@ -24,6 +24,17 @@ const safeUrlOrPath = z
     message: "Giao thức URL không được phép.",
   });
 
+// Allows "#" as a temporary placeholder (e.g. MOIT badge link before registration completes).
+const safeLinkOrHash = z.union([z.literal("#"), safeUrlOrPath]);
+
+const testimonialSchema = z.object({
+  name: safeText(80).min(1),
+  role: safeText(120).default(""),
+  product: safeText(160).default(""),
+  text: safeText(800).min(1),
+  rating: z.number().int().min(1).max(5).default(5),
+});
+
 const productBannerSchema = z.object({
   title: safeText(120).min(1), description: safeText(500),
   href: z.string().max(1000).refine(value => /^\/(?!\/)[^\\\s]*$/.test(value) || /^https:\/\/[^\s\\]+$/.test(value), 'Dùng đường dẫn nội bộ hoặc HTTPS.'),
@@ -39,6 +50,8 @@ export const adminSettingsDocumentSchema = z.object({
   storePhone: safeText(30).min(5, "Số điện thoại không hợp lệ"),
   storePhoneBacNinh: safeText(30),
   zaloUrl: safeUrlOrPath,
+  messengerUrl: safeUrlOrPath.default(""),
+  floatingContactEnabled: z.boolean().default(true),
   addressHanoi: safeText(255),
   addressBacNinh: safeText(255),
   openingHours: safeText(120),
@@ -51,6 +64,21 @@ export const adminSettingsDocumentSchema = z.object({
   facebookUrl: safeUrlOrPath.default("https://facebook.com/citilapvn"),
   tiktokUrl: safeUrlOrPath.default("https://tiktok.com/@citilapvn"),
   youtubeUrl: safeUrlOrPath.default(""),
+
+  // Legal entity (Nghị định 52/2013 & 85/2021) shown in footer
+  legalBusinessName: safeText(200).default(""),
+  businessRegistrationNumber: safeText(50).default(""),
+  businessRegistrationIssuer: safeText(200).default(""),
+  businessRegistrationDate: safeText(50).default(""),
+  legalRepresentative: safeText(120).default(""),
+  legalAddress: safeText(255).default(""),
+  moitBadgeEnabled: z.boolean().default(true),
+  moitBadgeUrl: safeLinkOrHash.default("#"),
+  moitBadgeImage: safeUrlOrPath.default("https://bizweb.dktcdn.net/thumb/medium/100/372/934/themes/892516/assets/logo_bct.png"),
+
+  // Homepage testimonials (only real, admin-entered reviews are shown)
+  testimonials: z.array(testimonialSchema).max(6).default([]),
+  testimonialsSourceUrl: safeUrlOrPath.default(""),
 
   // SEO defaults
   defaultSeoTitle: safeText(200).default("CitiLap - Laptop Gaming, Ultrabook & Like New Chính Hãng"),
@@ -101,6 +129,9 @@ export const adminSettingsDocumentSchema = z.object({
   codEnabled: z.boolean(),
   bankTransferEnabled: z.boolean(),
   bankAccountInfo: safeText(500),
+  bankBin: safeText(30).default(""),
+  bankAccountNumber: safeText(50).default(""),
+  bankAccountName: safeText(120).default(""),
 }).superRefine((data, ctx) => {
   if (data.flashSaleEnabled && data.flashSaleStartAt && data.flashSaleEndAt) {
     const start = new Date(data.flashSaleStartAt).getTime();
@@ -137,6 +168,8 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   storePhone: businessProfile.displayPhone,
   storePhoneBacNinh: bacNinh?.displayPhone || "0988.234.567",
   zaloUrl: businessProfile.socialProfiles.zalo,
+  messengerUrl: "",
+  floatingContactEnabled: true,
   addressHanoi: hanoi?.address || "Số 23/40 Tạ Quang Bửu, P. Bách Khoa, Q. Hai Bà Trưng, Hà Nội",
   addressBacNinh: bacNinh?.address || "Số 40 Trần Hưng Đạo, P. Đại Phúc, TP. Bắc Ninh",
   openingHours: "T2 - T7: 09:00 - 20:00 (CN hẹn trước)",
@@ -148,6 +181,19 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   facebookUrl: businessProfile.socialProfiles.facebook || "https://facebook.com/citilapvn",
   tiktokUrl: businessProfile.socialProfiles.tiktok || "https://tiktok.com/@citilapvn",
   youtubeUrl: "",
+
+  legalBusinessName: "HỘ KINH DOANH CITI LAP",
+  businessRegistrationNumber: "01D8053589",
+  businessRegistrationIssuer: "",
+  businessRegistrationDate: "",
+  legalRepresentative: "",
+  legalAddress: "",
+  moitBadgeEnabled: true,
+  moitBadgeUrl: "#",
+  moitBadgeImage: "https://bizweb.dktcdn.net/thumb/medium/100/372/934/themes/892516/assets/logo_bct.png",
+
+  testimonials: [],
+  testimonialsSourceUrl: "",
 
   defaultSeoTitle: "CitiLap - Laptop Gaming, Ultrabook & Like New Chính Hãng",
   defaultSeoDescription: "CitiLap chuyên cung cấp các dòng Laptop Gaming, Ultrabook, Máy Trạm (Workstation) và Laptop Like New chính hãng.",
@@ -180,19 +226,22 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   subBanner2Image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
 
   feature1Title: "Máy lướt, giá tốt",
-  feature1Desc: "Like-new 99%, tiết kiệm 30 - 50%",
-  feature2Title: "Cam kết nguyên zin",
-  feature2Desc: "100% linh kiện chuẩn, chưa sửa chữa",
+  feature1Desc: "Đối chiếu cấu hình và tình trạng từng máy",
+  feature2Title: "Thông tin rõ ràng",
+  feature2Desc: "Kiểm tra hồ sơ máy và phụ kiện trước khi mua",
   feature3Title: "Dịch vụ vượt trội",
-  feature3Desc: "Bảo hành 12 tháng, 1 đổi 1 trong 7 ngày",
-  feature4Title: "Giao hàng hỏa tốc",
-  feature4Desc: "Đồng kiểm máy trước khi thanh toán",
+  feature3Desc: "Bảo hành theo gói, đổi lỗi 7 ngày theo điều kiện",
+  feature4Title: "Giao hàng toàn quốc",
+  feature4Desc: "Xác nhận phí giao và phương án đồng kiểm",
 
   freeShippingThreshold: 5000000,
   shippingFee: 30000,
   codEnabled: true,
   bankTransferEnabled: true,
   bankAccountInfo: "",
+  bankBin: "",
+  bankAccountNumber: "",
+  bankAccountName: "",
 };
 
 // Backward-compatible alias
@@ -211,6 +260,8 @@ export const publicStorefrontSettingsSchema = z.object({
   storePhone: z.string(),
   storePhoneBacNinh: z.string(),
   zaloUrl: z.string(),
+  messengerUrl: z.string().default(""),
+  floatingContactEnabled: z.boolean().default(true),
   addressHanoi: z.string(),
   addressBacNinh: z.string(),
   openingHours: z.string(),
@@ -222,6 +273,19 @@ export const publicStorefrontSettingsSchema = z.object({
   facebookUrl: z.string(),
   tiktokUrl: z.string(),
   youtubeUrl: z.string(),
+
+  legalBusinessName: z.string().default(""),
+  businessRegistrationNumber: z.string().default(""),
+  businessRegistrationIssuer: z.string().default(""),
+  businessRegistrationDate: z.string().default(""),
+  legalRepresentative: z.string().default(""),
+  legalAddress: z.string().default(""),
+  moitBadgeEnabled: z.boolean().default(true),
+  moitBadgeUrl: z.string().default("#"),
+  moitBadgeImage: z.string().default(""),
+  testimonials: z.array(testimonialSchema).default([]),
+  testimonialsSourceUrl: z.string().default(""),
+
   defaultSeoTitle: z.string(),
   defaultSeoDescription: z.string(),
 
@@ -263,6 +327,9 @@ export const publicStorefrontSettingsSchema = z.object({
   codEnabled: z.boolean(),
   bankTransferEnabled: z.boolean(),
   bankAccountInfo: z.string(),
+  bankBin: z.string().default(""),
+  bankAccountNumber: z.string().default(""),
+  bankAccountName: z.string().default(""),
 });
 
 export type PublicStorefrontSettings = z.infer<typeof publicStorefrontSettingsSchema>;

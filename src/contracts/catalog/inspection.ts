@@ -16,4 +16,12 @@ export type InspectionInput = z.infer<typeof inspectionSchema>;
 export interface PublicInspection {
   publicCode: string; checkedAt: string; batteryHealth: number | null;
   appearance: string; checks: string; limitations: string; warranty: string; isDemo: number;
+  variantId?: string | null;
+}
+
+export interface PublicInspectionLookupResult extends PublicInspection {
+  productId: string;
+  productName: string;
+  productSlug: string;
+  productHref: string;
 }

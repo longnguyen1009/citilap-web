@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from 'next/link';
+import VietQrPaymentCard from '@/components/checkout/VietQrPaymentCard';
 import { X, Check, ShieldCheck, QrCode, Banknote } from "lucide-react";
 import { useTurnstile } from '@/components/Turnstile';
 import type { CheckoutQuote, CheckoutSelection } from '@/contracts/checkout';
@@ -319,7 +320,7 @@ export default function ProductQuickCheckoutModal({
                     autoComplete="street-address"
                     maxLength={500}
                     onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh thành"
+                    placeholder="Số nhà, tên đường, phường/xã, tỉnh/thành phố"
                     className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
                     required
                   />
@@ -394,7 +395,15 @@ export default function ProductQuickCheckoutModal({
                 </button>}
               </div>
             </div>
-            {paymentMethod === 'BANK_TRANSFER' && quote?.snapshot.bankAccountInfo && <p className="whitespace-pre-wrap text-xs rounded-xl bg-blue-50 p-3">{quote.snapshot.bankAccountInfo}</p>}
+            {paymentMethod === 'BANK_TRANSFER' && quote?.snapshot.bankAccountInfo && (
+              <VietQrPaymentCard
+                bankAccountInfo={quote.snapshot.bankAccountInfo}
+                vietQr={quote.snapshot.vietQr}
+                amount={quote.totalAmount}
+                transferNote={phone.trim() ? `CITILAP ${phone.replace(/\s+/g, '')}` : undefined}
+                compact
+              />
+            )}
             </fieldset>
             {quoteState.error && !pending && <div role="alert" className="text-xs text-rose-700">{quoteState.error} <button type="button" onClick={() => setRetry(value => value + 1)} className="underline">Tính lại</button></div>}
             {pending && <p role="status" className="text-xs text-amber-800">Yêu cầu đã lưu. Thử lại dùng cùng mã để tránh tạo đơn trùng.</p>}

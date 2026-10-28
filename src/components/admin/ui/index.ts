@@ -17,3 +17,4 @@ export { default as AdminBreadcrumbs } from "./AdminBreadcrumbs";
 export type { AdminBreadcrumbsProps, BreadcrumbItem } from "./AdminBreadcrumbs";
 
 export { AdminLoadingState, AdminEmptyState, AdminErrorState } from "./AdminState";
+export { default as AdminCommandPalette } from "./AdminCommandPalette";

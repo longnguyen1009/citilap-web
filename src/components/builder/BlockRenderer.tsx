@@ -27,6 +27,7 @@ import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
 import VideoReviews from '@/components/home/VideoReviews';
 import CustomerGallery from '@/components/home/CustomerGallery';
 import { customerGallerySectionDataSchema, videoReviewsSectionDataSchema } from '@/contracts/cms/site-builder';
+import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
 
 const ICON_MAP: Record<string, LucideIcon> = {
   sparkles: Sparkles,
@@ -51,7 +52,15 @@ const THEME_GRADIENT_MAP: Record<string, string> = {
   orange: 'bg-gradient-to-r from-orange-600 via-orange-500 to-orange-700',
 };
 
-export default function BlockRenderer({ sections, flashSale }: { sections: ResolvedSectionItem[]; flashSale?: ReactNode }) {
+export default function BlockRenderer({
+  sections,
+  flashSale,
+  settings,
+}: {
+  sections: ResolvedSectionItem[];
+  flashSale?: ReactNode;
+  settings?: PublicStorefrontSettings | null;
+}) {
   if (!sections || sections.length === 0) {
     return null;
   }
@@ -85,7 +94,7 @@ export default function BlockRenderer({ sections, flashSale }: { sections: Resol
             return <NewsReviewsBlock key={section.id} section={section} />;
 
           case 'intro':
-            return <IntroBlock key={section.id} data={section.data} />;
+            return <IntroBlock key={section.id} data={section.data} settings={settings} />;
 
           case 'cta':
             return <CtaBlock key={section.id} data={section.data} />;
@@ -427,12 +436,12 @@ interface IntroBlockData {
   features?: IntroBlockItem[];
 }
 
-function IntroBlock({ data }: { data: unknown }) {
+function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStorefrontSettings | null }) {
   const d = (data || {}) as IntroBlockData;
   const features = Array.isArray(d.features) && d.features.length > 0 ? d.features : null;
 
   if (!features) {
-    return <FeatureStrip />;
+    return <FeatureStrip settings={settings} />;
   }
 
   return (

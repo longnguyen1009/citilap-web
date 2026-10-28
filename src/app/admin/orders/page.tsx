@@ -7,15 +7,14 @@ import {
   Download,
   Search,
   RefreshCw,
-  Eye,
   Calendar,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 import {
   PageHeader,
   AdminCard,
-  AdminButton,
   StatusBadge,
   InlineAlert,
 } from "@/components/admin/ui";
@@ -48,12 +47,20 @@ type Order = {
   };
 };
 
+const STATUS_TABS = [
+  { key: "ALL", label: "Tất cả" },
+  { key: "NEW", label: "Mới" },
+  { key: "CONTACTED", label: "Đã liên hệ" },
+  { key: "CONFIRMED", label: "Đã xác nhận" },
+  { key: "COMPLETED", label: "Hoàn tất" },
+  { key: "CANCELLED", label: "Đã hủy" },
+];
+
 function OrdersContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Read initial filter values from URL search params
   const initialSearch = searchParams.get("search") || "";
   const initialStatus = searchParams.get("status") || "ALL";
   const initialStartDate = searchParams.get("startDate") || "";
@@ -75,7 +82,6 @@ function OrdersContent() {
     message: string;
   } | null>(null);
 
-  // Sync state changes into URL query params
   const updateUrlParams = useCallback(
     (newSearch: string, newStatus: string, newStart: string, newEnd: string, newPage: number) => {
       const params = new URLSearchParams();
@@ -110,6 +116,7 @@ function OrdersContent() {
       const result = await res.json();
       if (result.success && Array.isArray(result.data)) {
         setOrders(result.data);
+        setFeedback(null);
         if (result.pagination) {
           setTotal(result.pagination.total);
           setTotalPages(result.pagination.totalPages);
@@ -123,7 +130,7 @@ function OrdersContent() {
     } catch {
       setFeedback({
         type: "error",
-        message: "Không thể kết nối đến máy chủ để tải danh sách đơn hàng.",
+        message: "Không thể kết nối đến máy chủ.",
       });
     } finally {
       setLoading(false);
@@ -132,7 +139,7 @@ function OrdersContent() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchOrders();
+      void fetchOrders();
       updateUrlParams(searchTerm, statusFilter, startDate, endDate, page);
     }, 250);
 
@@ -149,24 +156,39 @@ function OrdersContent() {
     window.open(`/api/admin/orders/export?${query.toString()}`, "_blank");
   };
 
+  const hasFilters = Boolean(searchTerm.trim() || statusFilter !== "ALL" || startDate || endDate);
+
   return (
-    <div className="max-w-7xl mx-auto pb-12 space-y-6">
-      {/* 1. Page Header */}
+    <div className="space-y-3 pb-10">
+      {/* 1. Compact Header */}
       <PageHeader
-        title="Quản lý Đơn hàng"
-        description="Tiếp nhận yêu cầu mua hàng, theo dõi tiến độ tư vấn và lịch sử trạng thái theo thời gian thực."
-        breadcrumbs={[{ label: "Bán hàng" }, { label: "Đơn hàng" }]}
+        title="Đơn hàng"
+        badge={
+          <span className="text-xs px-2 py-0.5 bg-slate-200/70 text-slate-700 rounded-full font-semibold tabular-nums">
+            {total}
+          </span>
+        }
         actions={
-          <AdminButton
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleExport}
-            disabled={loading || total === 0}
-            icon={<Download className="w-4 h-4" aria-hidden="true" />}
-          >
-            Xuất danh sách ({total} đơn)
-          </AdminButton>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void fetchOrders()}
+              title="Làm mới"
+              aria-label="Làm mới danh sách"
+              className="inline-grid place-items-center size-8 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer"
+            >
+              <RefreshCw className={`size-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={loading || total === 0}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Xuất CSV</span>
+            </button>
+          </div>
         }
       />
 
@@ -176,167 +198,176 @@ function OrdersContent() {
         </InlineAlert>
       )}
 
-      {/* 2. Main Card with Search, Filter & Table */}
-      <AdminCard bodyClassName="p-0">
-        {/* Filters bar */}
-        <div className="p-4 border-b border-slate-200 flex flex-col lg:flex-row gap-3 justify-between bg-slate-50/60">
-          <div className="flex-1 flex flex-col sm:flex-row gap-2.5">
-            <div className="relative flex-1 max-w-md">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                <Search className="w-4 h-4" aria-hidden="true" />
-              </div>
-              <input
-                type="text"
-                placeholder="Tìm theo mã đơn, tên khách, số điện thoại..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
+      {/* 2. Single-Card Workspace */}
+      <AdminCard bodyClassName="p-0 overflow-hidden">
+        {/* Status Tabs */}
+        <div className="px-4 pt-2 border-b border-slate-200 bg-slate-50/50 flex items-center gap-1 overflow-x-auto">
+          {STATUS_TABS.map((t) => {
+            const active = statusFilter === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={active}
+                onClick={() => {
+                  setStatusFilter(t.key);
                   setPage(1);
                 }}
-                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg bg-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-                aria-label="Lọc theo trạng thái"
-                className="border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm bg-white font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-hidden"
+                className={`px-3 py-2 text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
+                  active
+                    ? "border-blue-600 text-blue-700"
+                    : "border-transparent text-slate-600 hover:text-slate-900"
+                }`}
               >
-                <option value="ALL">Tất cả trạng thái</option>
-                <option value="NEW">Mới (Chờ tiếp nhận)</option>
-                <option value="CONTACTED">Đã liên hệ tư vấn</option>
-                <option value="CONFIRMED">Đã xác nhận</option>
-                <option value="COMPLETED">Hoàn tất xử lý</option>
-                <option value="CANCELLED">Đã hủy</option>
-              </select>
-            </div>
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Inline Filter Bar */}
+        <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center gap-2 bg-white text-xs">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="search"
+              aria-label="Tìm mã đơn, tên khách, SĐT"
+              placeholder="Tìm mã đơn, tên khách, SĐT..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            />
           </div>
 
-          {/* Date range filter & refresh */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 text-xs text-slate-600 bg-white border border-slate-300 rounded-lg px-2 py-1.5">
-              <Calendar className="w-3.5 h-3.5 text-slate-400" />
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  setPage(1);
-                }}
-                className="text-xs outline-hidden text-slate-700 bg-transparent"
-                title="Từ ngày"
-              />
-              <span className="text-slate-300">-</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => {
-                  setEndDate(e.target.value);
-                  setPage(1);
-                }}
-                className="text-xs outline-hidden text-slate-700 bg-transparent"
-                title="Đến ngày"
-              />
-            </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-md px-2.5 py-1">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="date"
+              aria-label="Từ ngày"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs outline-none text-slate-700 bg-transparent"
+              title="Từ ngày"
+            />
+            <span className="text-slate-300">–</span>
+            <input
+              type="date"
+              aria-label="Đến ngày"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setPage(1);
+              }}
+              className="text-xs outline-none text-slate-700 bg-transparent"
+              title="Đến ngày"
+            />
+          </div>
 
+          {hasFilters && (
             <button
               type="button"
-              onClick={() => void fetchOrders()}
-              aria-label="Tải lại danh sách"
-              className="p-2 border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 transition cursor-pointer"
+              onClick={() => {
+                setSearchTerm("");
+                setStatusFilter("ALL");
+                setStartDate("");
+                setEndDate("");
+                setPage(1);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
             >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
+              <X className="w-3.5 h-3.5" />
+              <span>Xóa lọc</span>
             </button>
-          </div>
+          )}
         </div>
 
         {/* Orders Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
-            <thead className="bg-slate-50/90 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200">
+          <table className="admin-table w-full text-left border-collapse text-xs">
+            <thead>
               <tr>
-                <th className="py-3 px-4">Mã đơn hàng</th>
-                <th className="py-3 px-4">Khách hàng</th>
-                <th className="py-3 px-4">Ngày đặt</th>
-                <th className="py-3 px-4 text-center">Sản phẩm</th>
-                <th className="py-3 px-4 text-right">Tổng tiền</th>
-                <th className="py-3 px-4 text-center">Trạng thái</th>
-                <th className="py-3 px-4 text-right">Thao tác</th>
+                <th>Mã đơn</th>
+                <th>Khách hàng</th>
+                <th>Sản phẩm đặt</th>
+                <th className="text-right">Tổng tiền</th>
+                <th className="text-center">Trạng thái</th>
+                <th className="text-right">Ngày đặt</th>
+                <th className="text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" aria-hidden="true" />
-                    <span>Đang tải danh sách đơn hàng...</span>
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" aria-hidden="true" />
+                    <span>Đang tải...</span>
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-500">
-                    Không tìm thấy đơn hàng nào phù hợp với bộ lọc hiện tại.
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                    Không có đơn hàng phù hợp.
                   </td>
                 </tr>
               ) : (
                 orders.map((order) => {
-                  const itemCount =
-                    order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+                  const itemCount = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+                  const firstItem = order.items?.[0]?.productName;
 
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="whitespace-nowrap">
                         <Link
                           href={`/admin/orders/${order.id}`}
-                          className="font-mono font-bold text-blue-600 hover:text-blue-800 transition block"
+                          className="font-mono font-bold text-blue-600 hover:underline"
                         >
-                          {order.orderNumber || order.id.slice(0, 8)}
+                          #{order.orderNumber || order.id.slice(0, 8)}
                         </Link>
-                        <span className="text-[11px] text-slate-400 font-mono">
-                          ID: {order.id.slice(0, 8)}...
-                        </span>
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="font-bold text-slate-900">{order.customerName}</div>
-                        <div className="text-xs text-slate-500 font-mono">{order.customerPhone}</div>
+                      <td className="whitespace-nowrap">
+                        <div className="font-semibold text-slate-900">{order.customerName}</div>
+                        <div className="text-[11px] text-slate-500 font-mono">{order.customerPhone}</div>
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap text-xs text-slate-500">
+                      <td>
+                        <div className="text-slate-800 line-clamp-1 max-w-[260px]">
+                          {firstItem || `${itemCount} sản phẩm`}
+                        </div>
+                        {itemCount > 1 && (
+                          <div className="text-[11px] text-slate-400">Tổng {itemCount} SP</div>
+                        )}
+                      </td>
+
+                      <td className="whitespace-nowrap text-right font-bold text-slate-900 tabular-nums">
+                        {order.totalAmount.toLocaleString("vi-VN")}đ
+                      </td>
+
+                      <td className="whitespace-nowrap text-center">
+                        <StatusBadge status={order.status} />
+                      </td>
+
+                      <td className="whitespace-nowrap text-right text-slate-400 tabular-nums">
                         {new Date(order.createdAt).toLocaleString("vi-VN", {
                           hour: "2-digit",
                           minute: "2-digit",
                           day: "2-digit",
                           month: "2-digit",
-                          year: "numeric",
                         })}
                       </td>
 
-                      <td className="py-3.5 px-4 whitespace-nowrap text-center text-xs font-semibold text-slate-700">
-                        {itemCount} SP
-                      </td>
-
-                      <td className="py-3.5 px-4 whitespace-nowrap text-right font-bold text-slate-900">
-                        {order.totalAmount.toLocaleString("vi-VN")}đ
-                      </td>
-
-                      <td className="py-3.5 px-4 whitespace-nowrap text-center">
-                        <StatusBadge status={order.status} />
-                      </td>
-
-                      <td className="py-3.5 px-4 whitespace-nowrap text-right space-x-2">
+                      <td className="whitespace-nowrap text-right">
                         <Link
                           href={`/admin/orders/${order.id}`}
-                          className="inline-flex items-center gap-1 text-slate-600 hover:text-blue-600 font-medium text-xs py-1 px-2.5 border border-slate-200 rounded hover:bg-slate-100 transition"
-                          title="Xem chi tiết và xử lý đơn hàng"
+                          className="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs"
                         >
-                          <Eye className="w-3.5 h-3.5" aria-hidden="true" />
-                          <span>Chi tiết</span>
+                          Mở
                         </Link>
                       </td>
                     </tr>
@@ -347,31 +378,30 @@ function OrdersContent() {
           </table>
         </div>
 
-        {/* Server Pagination */}
+        {/* Pagination */}
         {!loading && totalPages > 1 && (
-          <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-50/60 text-xs text-slate-600">
-            <div>
-              Trang <span className="font-bold text-slate-900">{page}</span> /{" "}
-              <span className="font-bold text-slate-900">{totalPages}</span> (Tổng {total} đơn)
+          <div className="px-4 py-2.5 border-t border-slate-200 flex items-center justify-between bg-slate-50/60 text-xs text-slate-600">
+            <div className="tabular-nums">
+              Trang <strong>{page}</strong> / {totalPages} ({total} đơn)
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="p-1.5 border border-slate-300 rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="p-1.5 border border-slate-200 bg-white rounded hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
                 aria-label="Trang trước"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="p-1.5 border border-slate-300 rounded hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="p-1.5 border border-slate-200 bg-white rounded hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
                 aria-label="Trang tiếp theo"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -383,7 +413,7 @@ function OrdersContent() {
 
 export default function OrdersPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-400">Đang tải trang đơn hàng...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-slate-400 text-xs">Đang tải đơn hàng...</div>}>
       <OrdersContent />
     </Suspense>
   );

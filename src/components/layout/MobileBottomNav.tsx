@@ -149,15 +149,15 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
             <span className="text-[10px] font-medium leading-tight">Giỏ hàng</span>
           </Link>
 
-          {/* 5. Tài khoản */}
+          {/* 5. Tra cứu & Hỗ trợ */}
           <Link
             href="/profile"
             className={`flex flex-col items-center justify-center gap-0.5 transition ${
-              pathname === "/profile" ? "text-brand-primary" : "text-text-secondary"
+              pathname === "/profile" || pathname.startsWith("/order-tracking") ? "text-brand-primary" : "text-text-secondary"
             }`}
           >
-            <User className="w-5 h-5" strokeWidth={pathname === "/profile" ? 2.5 : 2} />
-            <span className="text-[10px] font-medium leading-tight">Tài khoản</span>
+            <User className="w-5 h-5" strokeWidth={pathname === "/profile" || pathname.startsWith("/order-tracking") ? 2.5 : 2} />
+            <span className="text-[10px] font-medium leading-tight">Hỗ trợ</span>
           </Link>
         </div>
       </nav>

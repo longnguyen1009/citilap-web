@@ -25,9 +25,9 @@ export default function PageHeader({
   className = "",
 }: PageHeaderProps) {
   return (
-    <div className={`mb-6 sm:mb-8 space-y-3 ${className}`}>
+    <div className={`admin-page-header mb-5 space-y-2 ${className}`}>
       {/* Top row: Breadcrumbs & Back link */}
-      <div className="flex items-center justify-between gap-4">
+      {(breadcrumbs?.length || backHref) && <div className="flex items-center justify-between gap-4">
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <AdminBreadcrumbs items={breadcrumbs} />
         ) : backHref ? (
@@ -39,19 +39,20 @@ export default function PageHeader({
             <span>{backLabel}</span>
           </Link>
         ) : null}
-      </div>
+      </div>}
 
       {/* Main row: Title, Badge and Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+            <h1 className="text-xl font-semibold text-slate-900 tracking-tight leading-tight" title={description}>
               {title}
             </h1>
             {badge && <div className="shrink-0">{badge}</div>}
           </div>
+          {/* Minimal: one muted line; full text stays available on hover. */}
           {description && (
-            <p className="text-sm text-slate-500 mt-1 leading-relaxed max-w-3xl">
+            <p className="text-xs text-slate-500 mt-1 truncate max-w-2xl" title={description}>
               {description}
             </p>
           )}

@@ -83,7 +83,7 @@ export default function ReviewForm({ productName, onSubmit }: ReviewFormProps) {
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
       <h3 className="text-lg font-bold text-slate-900 mb-1">Viết đánh giá của bạn</h3>
       <p className="text-xs text-slate-500 mb-5">
-        Chia sẻ cảm nhận thực tế khi sử dụng sản phẩm để giúp cộng đồng có lựa chọn chính xác nhất.
+        Chia sẻ cảm nhận thực tế khi sử dụng sản phẩm. CitiLap xác minh phản hồi qua số điện thoại mua hàng trước khi công khai.
       </p>
 
       {error && (

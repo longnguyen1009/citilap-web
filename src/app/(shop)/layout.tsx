@@ -2,6 +2,7 @@ import Header from "@/components/layout/Header";
 import StorefrontProviders from '@/components/layout/StorefrontProviders';
 import Footer from "@/components/layout/Footer";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import FloatingContactWidget from "@/components/layout/FloatingContactWidget";
 import { getActiveCategories, getActiveBrands } from "@/server/services/catalog.service";
 import { getPublishedNavigation, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import {mediaEnvironment} from '@/server/media-http';
@@ -44,6 +45,7 @@ export default async function ShopLayout({
       <main className="flex-grow pb-16 md:pb-0">{children}</main>
       <Footer navigation={navigation} settings={settings} />
       <StorefrontMetrics />
+      <FloatingContactWidget settings={settings} />
       <MobileBottomNav categories={categories} navigation={navigation} settings={settings} />
     </div></StorefrontProviders>
   );

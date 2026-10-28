@@ -12,7 +12,7 @@ export interface CatalogListOptions {
   kind?: string;
   categoryId?: string;
   brand?: string;
-  publicationStatus?: 'ALL' | 'PUBLISHED' | 'DRAFT' | 'UNPUBLISHED';
+  publicationStatus?: 'ALL' | 'PUBLISHED' | 'DRAFT' | 'UNPUBLISHED' | 'ARCHIVED';
   availability?: 'ALL' | 'AVAILABLE' | 'PREORDER' | 'CONTACT' | 'UNAVAILABLE';
   minPrice?: number | null;
   maxPrice?: number | null;
@@ -36,6 +36,8 @@ export interface CatalogItem {
   isDraftOnly: boolean;
   hasUnpublishedDraft: boolean;
   availability: string;
+  publicAvailability: string | null;
+  publicTemplate?: ProductDocument['template'];
   kind: ProductKind;
   category: { id: string; name: string; slug?: string } | null;
   brand: string;
@@ -60,6 +62,12 @@ export interface CatalogListResult {
 }
 
 type Studio = { productId: string; revision: number; draft: string; published: string | null };
+
+function publicationSummary(document: ProductDocument | null) {
+  if (!document) return null;
+  const { name, slug, template, price, availability } = document;
+  return { name, slug, template, price, availability };
+}
 
 function parseSpecMetrics(specs: Record<string, string>) {
   let ramGb: number | null = null;
@@ -91,9 +99,8 @@ function parseSpecMetrics(specs: Record<string, string>) {
  * Replaces hardcoded LIMIT 100 with scalable, index-friendly pagination and stable tie-breaker.
  */
 export async function catalogList(db: D1Database, opts: CatalogListOptions = {}): Promise<CatalogListResult> {
-  const page = Math.max(1, Math.floor(Number(opts.page) || 1));
-  const limit = Math.min(100, Math.max(1, Math.floor(Number(opts.limit) || 20)));
-  const offset = (page - 1) * limit;
+  let page = Number.isSafeInteger(opts.page) ? Math.max(1, opts.page!) : 1;
+  const limit = Number.isSafeInteger(opts.limit) ? Math.min(100, Math.max(1, opts.limit!)) : 20;
   const q = String(opts.q || '').trim().slice(0, 200);
   const kind = String(opts.kind || 'ALL').toUpperCase();
   const categoryId = String(opts.categoryId || '').trim();
@@ -115,8 +122,9 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       OR instr(lower(COALESCE(p.model, '')), lower(?)) > 0
       OR instr(lower(COALESCE(json_extract(s.draft, '$.name'), '')), lower(?)) > 0
       OR EXISTS (SELECT 1 FROM ProductVariant pv WHERE pv.productId = p.id AND instr(lower(pv.sku), lower(?)) > 0)
+      OR EXISTS (SELECT 1 FROM json_each(s.draft, '$.variants') v WHERE instr(lower(json_extract(v.value, '$.sku')), lower(?)) > 0)
     )`);
-    params.push(q, q, q, q, q, q);
+    params.push(q, q, q, q, q, q, q);
   }
 
   // Kind filter: LAPTOP vs ACCESSORY vs ALL
@@ -131,7 +139,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
     )`);
   } else if (kind === 'ACCESSORY') {
     whereClauses.push(`(
-      json_extract(s.draft, '$.template') IN ('ACCESSORY', 'MOUSE', 'TECH')
+      json_extract(s.draft, '$.template') IN ('ACCESSORY', 'MOUSE', 'KEYBOARD', 'HEADPHONE', 'CHARGER', 'HUB', 'BAG', 'MONITOR', 'TECH')
       OR (s.draft IS NULL AND (
         p.categoryId = 'cat-phu-kien'
         OR c.slug IN ('linh-kien', 'phu-kien', 'chuot-gaming', 'ban-phim-co')
@@ -143,21 +151,21 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
 
   // Category filter
   if (categoryId) {
-    whereClauses.push('p.categoryId = ?');
+    whereClauses.push("COALESCE(json_extract(s.draft, '$.categoryId'), p.categoryId) = ?");
     params.push(categoryId);
   }
 
   // Brand filter
   if (brand) {
-    whereClauses.push('(lower(p.brand) = lower(?) OR lower(COALESCE(json_extract(s.draft, "$.brand"), "")) = lower(?))');
-    params.push(brand, brand);
+    whereClauses.push("lower(COALESCE(json_extract(s.draft, '$.brand'), p.brand)) = lower(?)");
+    params.push(brand);
   }
 
   // Publication status filter
   if (publicationStatus === 'PUBLISHED') {
     whereClauses.push(`((s.published IS NOT NULL AND p.status IN ('ACTIVE', 'active')) OR (s.productId IS NULL AND p.status IN ('ACTIVE', 'active')))`);
   } else if (publicationStatus === 'DRAFT') {
-    whereClauses.push(`((s.draft IS NOT NULL AND s.published IS NULL) OR (s.productId IS NULL AND p.status IN ('DRAFT', 'draft')))`);
+    whereClauses.push(`p.status NOT IN ('ARCHIVED', 'archived') AND ((s.draft IS NOT NULL AND s.published IS NULL) OR (s.productId IS NULL AND p.status IN ('DRAFT', 'draft')))`);
   } else if (publicationStatus === 'UNPUBLISHED') {
     whereClauses.push(`((s.draft IS NOT NULL AND s.published IS NULL AND p.status IN ('DRAFT', 'draft')) OR p.status IN ('ARCHIVED', 'archived', 'INACTIVE', 'inactive'))`);
   } else if (publicationStatus === 'ARCHIVED') {
@@ -167,7 +175,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
   // Availability filter (e.g. AVAILABLE, PREORDER, CONTACT, UNAVAILABLE)
   if (availability && availability !== 'ALL') {
     whereClauses.push(`(
-      COALESCE(json_extract(s.published, '$.availability'), json_extract(s.draft, '$.availability')) = ?
+      COALESCE(json_extract(s.draft, '$.availability'), json_extract(s.published, '$.availability')) = ?
       OR (s.draft IS NULL AND ? = 'AVAILABLE' AND p.status IN ('ACTIVE', 'active'))
     )`);
     params.push(availability, availability);
@@ -186,16 +194,19 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
   const whereSql = whereClauses.join(' AND ');
 
   // Allowlist sort with tie-breaker
-  const sortCol = opts.sort === 'name' ? 'p.name' : opts.sort === 'price' ? 'p.price' : opts.sort === 'status' ? 'p.status' : 'p.updatedAt';
+  const sortCol = opts.sort === 'name' ? "COALESCE(json_extract(s.draft, '$.name'), p.name)" : opts.sort === 'price' ? "COALESCE(json_extract(s.draft, '$.price'), p.price)" : opts.sort === 'status' ? 'p.status' : 'COALESCE(s.updatedAt, p.updatedAt)';
   const sortOrder = opts.order === 'asc' ? 'ASC' : 'DESC';
   const orderSql = `ORDER BY ${sortCol} ${sortOrder}, p.id DESC`;
 
   // 1. Total count query
-  const countSql = `SELECT count(*) AS total FROM Product p LEFT JOIN ProductStudio s ON s.productId = p.id LEFT JOIN Category c ON c.id = p.categoryId WHERE ${whereSql}`;
+  const joins = "FROM Product p LEFT JOIN ProductStudio s ON s.productId = p.id LEFT JOIN Category c ON c.id = COALESCE(json_extract(s.draft, '$.categoryId'), p.categoryId)";
+  const countSql = `SELECT count(*) AS total ${joins} WHERE ${whereSql}`;
   const countStmt = db.prepare(countSql);
   const countRow = await (params.length ? countStmt.bind(...params) : countStmt).first<{ total: number }>();
   const total = countRow?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
+  page = Math.min(page, totalPages);
+  const offset = (page - 1) * limit;
 
   // 2. Rows query
   const itemsSql = `
@@ -215,22 +226,26 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       p.isFeatured,
       p.isFlashSale,
       p.cpu,
-      p.categoryId,
+      c.id AS categoryId,
       c.name AS categoryName,
       c.slug AS categorySlug,
       s.productId AS studioId,
       s.revision,
       s.draft,
       s.published,
-      p.updatedAt,
+      COALESCE(s.updatedAt, p.updatedAt) AS updatedAt,
       json_extract(s.draft, '$.template') AS draftTemplate,
       json_extract(s.draft, '$.name') AS draftName,
       json_extract(s.draft, '$.price') AS draftPrice,
+      json_extract(s.draft, '$.originalPrice') AS draftOriginalPrice,
+      json_extract(s.draft, '$.brand') AS draftBrand,
+      (SELECT json_object('id', a.id, 'storageKey', a.storageKey)
+       FROM json_each(s.draft, '$.media') m JOIN MediaAsset a ON a.id=json_extract(m.value, '$.assetId')
+       WHERE a.kind='IMAGE' AND a.state='READY' ORDER BY CAST(m.key AS INTEGER) LIMIT 1) AS draftImage,
+      json_extract(s.published, '$.template') AS publicTemplate,
       json_extract(s.draft, '$.availability') AS draftAvailability,
       json_extract(s.published, '$.availability') AS publishedAvailability
-    FROM Product p
-    LEFT JOIN ProductStudio s ON s.productId = p.id
-    LEFT JOIN Category c ON c.id = p.categoryId
+    ${joins}
     WHERE ${whereSql}
     ${orderSql}
     LIMIT ? OFFSET ?
@@ -241,7 +256,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
 
   // 3. Populate categories & brands for filter selectors
   const categoriesRes = await db.prepare("SELECT id, name, slug FROM Category WHERE status='ACTIVE' ORDER BY sortOrder, name").all<{ id: string; name: string; slug: string }>();
-  const brandsRes = await db.prepare("SELECT DISTINCT COALESCE(b.name, p.brand) AS name, COALESCE(b.id, p.brand) AS id FROM Product p LEFT JOIN Brand b ON b.id = p.brandId WHERE p.deletedAt IS NULL AND (p.brand IS NOT NULL OR b.name IS NOT NULL) ORDER BY name").all<{ id: string; name: string }>();
+  const brandsRes = await db.prepare("SELECT DISTINCT COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS name, COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS id FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id WHERE p.deletedAt IS NULL AND COALESCE(json_extract(s.draft, '$.brand'), p.brand, '') != '' ORDER BY name").all<{ id: string; name: string }>();
 
   const items: CatalogItem[] = (itemsRows.results || []).map((r: Record<string, unknown>) => {
     const isPublished = (!!r.published && ['ACTIVE', 'active'].includes(String(r.productStatus))) || (r.studioId == null && ['ACTIVE', 'active'].includes(String(r.productStatus)));
@@ -260,12 +275,18 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
     else if (categoryId === 'cat-phu-kien' || ['linh-kien', 'phu-kien'].includes(categorySlug) || (categoryName && /phụ kiện|linh kiện/i.test(categoryName))) resolvedKind = 'ACCESSORY';
     else resolvedKind = 'LAPTOP';
 
-    let image = 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=200';
+    let image = '/images/placeholder-laptop.svg';
     try {
-      const parsed = JSON.parse(String(r.images || '[]'));
-      if (Array.isArray(parsed) && parsed[0]) image = parsed[0];
+      if (r.draft) {
+        const cover = r.draftImage ? JSON.parse(String(r.draftImage)) : null;
+        if (cover?.storageKey?.startsWith('library/')) image = `/api/library/${encodeURIComponent(cover.id)}`;
+        else if (cover?.storageKey && /^(products|brand)\/[a-zA-Z0-9_./-]+\.(png|jpe?g|webp)$/.test(cover.storageKey) && !cover.storageKey.includes('..')) image = `/api/media/${cover.storageKey}`;
+      } else {
+        const parsed = JSON.parse(String(r.images || '[]'));
+        if (Array.isArray(parsed) && parsed[0]) image = parsed[0];
+      }
     } catch {
-      if (typeof r.images === 'string' && r.images.startsWith('http')) image = r.images;
+      if (!r.draft && typeof r.images === 'string' && r.images.startsWith('http')) image = r.images;
     }
 
     return {
@@ -275,16 +296,18 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       slug: String(r.slug),
       price: Number(r.draftPrice ?? r.price),
       publicPrice: Number(r.price),
-      originalPrice: r.originalPrice == null ? null : Number(r.originalPrice),
+      originalPrice: (r.draft ? r.draftOriginalPrice : r.originalPrice) == null ? null : Number(r.draft ? r.draftOriginalPrice : r.originalPrice),
       productStatus: String(r.productStatus),
       revision: Number(r.revision ?? 0),
       isPublished,
       isDraftOnly,
       hasUnpublishedDraft,
-      availability: String(r.publishedAvailability || r.draftAvailability || (isPublished ? 'AVAILABLE' : 'CONTACT')),
+      availability: String(r.draftAvailability || r.publishedAvailability || (isPublished ? 'AVAILABLE' : 'CONTACT')),
+      publicAvailability: isPublished ? String(r.publishedAvailability || 'AVAILABLE') : null,
+      publicTemplate: r.publicTemplate ? r.publicTemplate as ProductDocument['template'] : undefined,
       kind: resolvedKind,
       category: r.categoryName ? { id: String(r.categoryId), name: String(r.categoryName), slug: String(r.categorySlug || '') } : null,
-      brand: String(r.brand || ''),
+      brand: String(r.draftBrand ?? r.brand ?? ''),
       brandId: r.brandId ? String(r.brandId) : null,
       condition: String(r.condition || 'NEW'),
       isNewArrival: !!r.isNewArrival,
@@ -330,7 +353,7 @@ export async function studioList(db: D1Database, q = '') {
  * Adopts legacy products into standard ProductDocument on-read without mutating DB.
  */
 export async function studioDetail(db: D1Database, id: string) {
-  const row = await db.prepare('SELECT s.*,p.tags legacyTags FROM ProductStudio s JOIN Product p ON p.id=s.productId WHERE productId=?').bind(id).first<Studio & { legacyTags: string | null }>();
+  const row = await db.prepare('SELECT s.*,p.tags legacyTags FROM ProductStudio s JOIN Product p ON p.id=s.productId WHERE productId=? AND p.deletedAt IS NULL').bind(id).first<Studio & { legacyTags: string | null }>();
   if (row) {
     const document = JSON.parse(row.draft) as ProductDocument;
     document.faqs ??= [];
@@ -343,7 +366,9 @@ export async function studioDetail(db: D1Database, id: string) {
     if (document.isFlashSale === undefined) {
       document.isFlashSale = false;
     }
-    return { id, revision: row.revision, document, published: !!row.published };
+    return { id, revision: row.revision, document, published: !!row.published,
+      publishedSummary: publicationSummary(row.published ? JSON.parse(row.published) : null),
+      hasUnpublishedDraft: !!row.published && row.draft !== row.published };
   }
 
   const p = await db.prepare('SELECT * FROM Product WHERE id=? AND deletedAt IS NULL').bind(id).first<Record<string, unknown>>();
@@ -398,43 +423,30 @@ export async function studioDetail(db: D1Database, id: string) {
       if (typeof v.options === 'string' && v.options.startsWith('{')) {
         try { optionsObj = JSON.parse(v.options); } catch { optionsObj = {}; }
       }
+      const { condition, ...options } = optionsObj;
       return {
         id: String(v.id),
         sku: String(v.sku),
         name: String(v.name),
         price: Number(v.price),
-        condition: 'NEW',
+        condition: (['NEW', 'LIKE_NEW', 'USED', 'REFURBISHED'].includes(condition) ? condition : 'NEW') as ProductDocument['variants'][number]['condition'],
         originalPrice: v.originalPrice != null ? Number(v.originalPrice) : null,
         availability: 'AVAILABLE',
         ram: String(v.ram || ''),
         storage: String(v.storage || ''),
         gpu: String(v.gpu || ''),
-        options: optionsObj,
+        options,
         image: '',
       };
     });
-  } else {
-    d.variants = [{
-      id: crypto.randomUUID(),
-      name: 'Tiêu chuẩn',
-      sku: String(p.slug || id).toUpperCase().slice(0, 50),
-      condition: 'NEW',
-      price: d.price,
-      originalPrice: null,
-      availability: 'AVAILABLE',
-      ram: '',
-      storage: '',
-      gpu: '',
-      options: {},
-      image: '',
-    }];
   }
 
   // Media
   const media = await db.prepare("SELECT DISTINCT a.id, a.alt FROM MediaUsage u JOIN MediaAsset a ON a.id=u.assetId WHERE u.ownerType='PRODUCT' AND u.ownerId=? AND a.state='READY'").bind(id).all<{ id: string; alt: string }>();
   d.media = media.results.map(a => ({ assetId: a.id, alt: a.alt || '', variantId: '' }));
 
-  return { id, revision: 0, document: d, published: isLegacyActive };
+  return { id, revision: 0, document: d, published: isLegacyActive,
+    publishedSummary: publicationSummary(isLegacyActive ? d : null), hasUnpublishedDraft: false };
 }
 
 /**
@@ -662,7 +674,7 @@ export async function archiveProduct(db: D1Database, id: string) {
  * Lists all revisions for a product (ProductStudioRevision + audit logs).
  */
 export async function listProductRevisions(db: D1Database, productId: string) {
-  const studio = await db.prepare('SELECT revision, published, draft FROM ProductStudio WHERE productId=?').bind(productId).first<{ revision: number; published: string | null; draft: string }>();
+  const studio = await db.prepare('SELECT revision, published, publishedRevision, draft FROM ProductStudio WHERE productId=?').bind(productId).first<{ revision: number; published: string | null; publishedRevision: number | null; draft: string }>();
   
   const studioRevs = await db.prepare(`
     SELECT revision, action, createdAt, document
@@ -697,7 +709,7 @@ export async function listProductRevisions(db: D1Database, productId: string) {
       actorName: matchingLog?.actorName || 'admin',
       summary,
       isCurrent: r.revision === currentRevision,
-      isPublished: isPublished && r.revision === currentRevision,
+      isPublished: isPublished && r.revision === studio?.publishedRevision,
       isLegacy: false,
     };
   });

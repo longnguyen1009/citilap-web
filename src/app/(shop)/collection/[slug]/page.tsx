@@ -32,11 +32,11 @@ export default async function CollectionPage({ params }: PageProps) {
   return (
     <div className="bg-slate-50 min-h-screen pb-16">
       <div className="bg-white border-b border-slate-200">
-        <div className="container mx-auto max-w-7xl px-4 py-3 text-sm text-slate-500">
+        <div className="container mx-auto max-w-[1370px] px-4 py-3 text-sm text-slate-500">
           <Link href="/" className="hover:text-blue-600">Trang chủ</Link> / <span className="text-slate-900">{collection.name}</span>
         </div>
       </div>
-      <div className="container mx-auto max-w-7xl px-4 py-8">
+      <div className="container mx-auto max-w-[1370px] px-4 py-8">
         <h1 className="text-2xl md:text-3xl font-black text-slate-900">{collection.name}</h1>
         {collection.description && <p className="text-slate-600 mt-3 max-w-3xl">{collection.description}</p>}
         {collection.products.length === 0 ? (

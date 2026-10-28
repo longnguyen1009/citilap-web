@@ -1,9 +1,29 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { Check, Copy, ExternalLink, Eye } from 'lucide-react';
 import type { MediaAssetDto, MediaUsageDto } from '@/contracts/cms/media';
 import { mediaEditSchema } from '@/contracts/cms/media';
 import { mediaRequest, MediaThumbnail } from './MediaBrowser';
 import MediaDialog from './MediaDialog';
+
+function getOpenLinkLabel(asset: MediaAssetDto): string {
+  switch (asset.assetType) {
+    case 'YOUTUBE':
+      return 'Mở YouTube';
+    case 'TIKTOK':
+      return 'Mở TikTok';
+    case 'GDRIVE':
+      return 'Mở Google Drive';
+    case 'PDF':
+      return 'Mở PDF';
+    case 'SVG':
+      return 'Mở ảnh SVG';
+    case 'VIDEO_FILE':
+      return 'Mở video';
+    default:
+      return asset.kind === 'VIDEO' ? 'Mở YouTube' : 'Mở ảnh';
+  }
+}
 
 export default function MediaEditor({ asset, onClose, onSaved }: { asset: MediaAssetDto; onClose: () => void; onSaved: () => void }) {
   const [current, setCurrent] = useState(asset);
@@ -15,6 +35,8 @@ export default function MediaEditor({ asset, onClose, onSaved }: { asset: MediaA
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [discard, setDiscard] = useState(false);
+  const [showEmbed, setShowEmbed] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<'url' | 'embed' | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const dirty = name !== current.name || alt !== current.alt || caption !== current.caption;
   useEffect(() => {
@@ -38,11 +60,62 @@ export default function MediaEditor({ asset, onClose, onSaved }: { asset: MediaA
     } catch (e) { setError(e instanceof Error ? e.message : 'Không thể lưu.'); }
     finally { setBusy(false); }
   }
+  async function copyText(value: string, key: 'url' | 'embed') {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey((prev) => (prev === key ? null : prev)), 2000);
+    } catch {
+      // Clipboard API unavailable
+    }
+  }
   return <MediaDialog title="Chi tiết tệp" onClose={() => { if (!busy) { if (dirty) setDiscard(true); else onClose(); } }}>
     {discard ? <div className="space-y-4"><p>Thay đổi chưa được lưu. Bạn muốn tiếp tục chỉnh sửa hay bỏ thay đổi?</p><div className="flex flex-wrap gap-2"><button className="media-button media-button-primary" onClick={() => setDiscard(false)}>Tiếp tục chỉnh sửa</button><button className="media-button" onClick={onClose}>Bỏ thay đổi</button></div></div> :
-      <div className="media-dialog-layout"><div className="space-y-4"><MediaThumbnail asset={current} />
-        <p className="media-muted">{current.width && current.height ? `${current.width} × ${current.height} px · ` : ''}{current.size ? `${Math.ceil(current.size / 1024)} KB` : current.kind === 'VIDEO' ? 'Liên kết video ngoài' : 'Ảnh từ sản phẩm'}</p>
-        {current.url && <a href={current.url} target="_blank" rel="noopener noreferrer" className="media-button">{current.kind === 'VIDEO' ? 'Mở YouTube' : 'Mở ảnh'}</a>}
+      <div className="media-dialog-layout"><div className="space-y-4">
+        {current.assetType === 'VIDEO_FILE' && current.url ? (
+          <video src={current.url} controls preload="metadata" className="w-full rounded-lg border border-slate-200 bg-black aspect-video" />
+        ) : showEmbed && current.embedUrl ? (
+          <iframe
+            src={current.embedUrl}
+            title={current.name}
+            className="w-full rounded-lg border border-slate-200 bg-slate-950 aspect-video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <MediaThumbnail asset={current} />
+        )}
+        <p className="media-muted">
+          {current.width && current.height ? `${current.width} × ${current.height} px · ` : ''}
+          {current.size ? `${Math.ceil(current.size / 1024)} KB` : current.kind === 'VIDEO' ? 'Liên kết video ngoài' : current.assetType === 'GDRIVE' ? 'Liên kết Google Drive' : current.assetType === 'PDF' ? 'Tài liệu PDF' : 'Ảnh từ sản phẩm'}
+          {current.mimeType ? ` · ${current.mimeType}` : ''}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {current.url && (
+            <a href={current.url} target="_blank" rel="noopener noreferrer" className="media-button">
+              <ExternalLink size={13} />
+              {getOpenLinkLabel(current)}
+            </a>
+          )}
+          {current.embedUrl && current.assetType !== 'VIDEO_FILE' && (
+            <button type="button" className="media-button" onClick={() => setShowEmbed((v) => !v)}>
+              <Eye size={13} />
+              {showEmbed ? 'Ẩn khung nhúng' : 'Xem thử nhúng'}
+            </button>
+          )}
+          {current.url && (
+            <button type="button" className="media-button" onClick={() => void copyText(current.url!, 'url')}>
+              {copiedKey === 'url' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+              {copiedKey === 'url' ? 'Đã chép URL' : 'Sao chép URL'}
+            </button>
+          )}
+          {current.embedUrl && current.embedUrl !== current.url && (
+            <button type="button" className="media-button" onClick={() => void copyText(current.embedUrl!, 'embed')}>
+              {copiedKey === 'embed' ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+              {copiedKey === 'embed' ? 'Đã chép Embed' : 'Chép link nhúng'}
+            </button>
+          )}
+        </div>
         <div><h3 className="font-semibold">Đang sử dụng ({current.usageCount})</h3><ul className="mt-2 space-y-2 break-words">{usages.map((usage) => <li key={`${usage.ownerType}-${usage.ownerId}-${usage.slot}`} className="text-sm">{usage.ownerType === 'PRODUCT' ? <a className="text-blue-700 underline" href={`/admin/products/${encodeURIComponent(usage.ownerId)}`}>{usage.ownerId}</a> : `${usage.ownerType}: ${usage.ownerId}`}</li>)}</ul><p className="media-muted mt-2">{!current.usageCount && 'Chưa có liên kết được ghi nhận. '}Ảnh gắn qua URL trong nội dung cũ có thể chưa được thống kê. Không xóa file gốc.</p></div>
       </div><form noValidate className="space-y-4" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <label className="media-field">Tên tệp<input ref={nameRef} value={name} maxLength={180} onChange={(e) => setName(e.target.value)} disabled={busy} /></label>

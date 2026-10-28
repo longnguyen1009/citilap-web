@@ -4,11 +4,16 @@ import Link from "next/link";
 import { CheckCircle2, ArrowRight, Clock, MapPin, Phone, User, Package, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
+import VietQrPaymentCard from "@/components/checkout/VietQrPaymentCard";
 
 interface OrderDetail {
   paymentMethod: string;
   paymentStatus: string;
-  checkoutSnapshot: {bankAccountInfo: string | null; showroom: {name:string;address:string} | null} | null;
+  checkoutSnapshot: {
+    bankAccountInfo: string | null;
+    vietQr?: { bankBin: string; accountNumber: string; accountName: string };
+    showroom: {name:string;address:string} | null;
+  } | null;
   id: string;
   orderNumber: string;
   status: string;
@@ -31,6 +36,15 @@ interface OrderDetail {
   }>;
 }
 
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  NEW: "Mới tiếp nhận (NEW)",
+  PENDING: "Mới tiếp nhận (PENDING)",
+  CONTACTED: "Đã liên hệ (CONTACTED)",
+  CONFIRMED: "Đã xác nhận (CONFIRMED)",
+  COMPLETED: "Hoàn tất xử lý (COMPLETED)",
+  CANCELLED: "Đã hủy (CANCELLED)",
+};
+
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
@@ -40,12 +54,20 @@ function SuccessContent() {
   const [loading, setLoading] = useState(Boolean(orderId && token));
 
   useEffect(() => {
+    try {
+      localStorage.removeItem("citilap-recent-orders");
+    } catch {
+      // Ignore storage access errors
+    }
+
     if (!orderId || !token) {
       return;
     }
 
     let isMounted = true;
-    fetch(`/api/orders/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}`)
+    fetch(`/api/orders/${encodeURIComponent(orderId)}?token=${encodeURIComponent(token)}`, {
+      cache: "no-store",
+    })
       .then((res) => res.json())
       .then((data) => {
         if (isMounted && data.success && data.data) {
@@ -76,6 +98,8 @@ function SuccessContent() {
   if (!order) return <div role="alert" className="rounded border bg-white p-6">Chưa thể xác thực thông tin đơn hàng. Vui lòng kiểm tra đường dẫn xác nhận hoặc tải lại trang.</div>;
 
   const displayOrderNumber = order?.orderNumber || (orderId ? `CTL-${orderId.slice(-6).toUpperCase()}` : "CTL-ORD");
+  const statusKey = (order.status || "NEW").toUpperCase();
+  const statusLabel = ORDER_STATUS_LABELS[statusKey] || order.status || "Mới tiếp nhận";
 
   return (
     <div className="bg-white p-6 md:p-10 rounded-2xl shadow-sm max-w-2xl w-full border border-gray-100">
@@ -92,7 +116,7 @@ function SuccessContent() {
         </p>
 
         <div className="mt-4 inline-flex items-center gap-2 bg-amber-50 text-amber-800 text-xs font-bold px-3.5 py-1.5 rounded-full border border-amber-200">
-          <Clock className="w-3.5 h-3.5" /> Trạng thái: Chờ xác nhận (PENDING)
+          <Clock className="w-3.5 h-3.5" /> Trạng thái: {statusLabel}
         </div>
       </div>
 
@@ -134,7 +158,15 @@ function SuccessContent() {
           </div>
         </div>
 
-        {order.paymentMethod === 'BANK_TRANSFER' && order.checkoutSnapshot?.bankAccountInfo && <div className="rounded border border-blue-200 bg-blue-50 p-4"><h2 className="font-bold">Hướng dẫn chuyển khoản</h2><p className="whitespace-pre-wrap">{order.checkoutSnapshot.bankAccountInfo}</p><p>Trạng thái thanh toán: {order.paymentStatus === 'PENDING' ? 'Chờ xác nhận' : order.paymentStatus}</p></div>}
+        {order.paymentMethod === 'BANK_TRANSFER' && order.checkoutSnapshot?.bankAccountInfo && (
+          <VietQrPaymentCard
+            bankAccountInfo={order.checkoutSnapshot.bankAccountInfo}
+            vietQr={order.checkoutSnapshot.vietQr}
+            amount={order.totalAmount}
+            transferNote={displayOrderNumber}
+            paymentStatus={order.paymentStatus}
+          />
+        )}
         {/* Danh sách sản phẩm nếu có */}
         {order && order.items && order.items.length > 0 && (
           <div className="border border-gray-200 rounded-xl p-4">
@@ -180,6 +212,14 @@ function SuccessContent() {
 
       {/* Action buttons */}
       <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+        {orderId && token && (
+          <Link
+            href={`/order-tracking?orderId=${encodeURIComponent(orderId)}&token=${encodeURIComponent(token)}`}
+            className="w-full sm:w-auto bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold py-3 px-6 rounded-xl transition inline-flex items-center justify-center gap-2 shadow-2xs text-sm"
+          >
+            <Package className="w-4 h-4 text-blue-600" /> Theo dõi tiến độ đơn hàng
+          </Link>
+        )}
         <Link
           href="/"
           className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition inline-flex items-center justify-center gap-2 shadow-sm text-sm"

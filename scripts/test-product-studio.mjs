@@ -19,9 +19,37 @@ try {
  document.tags=[' Gaming ', 'gaming', 'Sinh viên'];
  await check('all migrations; laptop draft creates existing Product identity',async()=>{detail=await api.writeStudio(env,null,{expectedRevision:0,action:'save',document});assert.equal(detail.revision,1);assert.equal((await DB.prepare('SELECT status FROM Product WHERE id=?').bind(detail.id).first()).status,'DRAFT');});
  await check('draft never visible to public resolver',async()=>{await assert.rejects(()=>api.publicStudio(DB,document.slug),e=>e.status===404);});
+ await check('catalog draft thumbnail uses first image before publishing',async()=>{assert.equal((await api.catalogList(DB,{q:document.slug})).items[0].image,asset.url);});
  await check('publish resolves media, variants, warranty and web status',async()=>{detail=await api.writeStudio(env,detail.id,{expectedRevision:1,action:'publish',document});const pub=await api.publicStudio(DB,document.slug);assert.equal(pub.canOrder,true);assert.equal(pub.media[0].url,asset.url);assert.equal(pub.variants[0].ram,'16GB');assert.equal(pub.warranties[0].name,'12 tháng');assert.equal(JSON.stringify(pub).includes('storageKey'),false);});
  await check('tags normalize, deduplicate, reload and publish to search projection',async()=>{assert.deepEqual((await api.studioDetail(DB,detail.id)).document.tags,['gaming','sinh viên']);assert.deepEqual((await api.publicStudio(DB,document.slug)).tags,['gaming','sinh viên']);assert.deepEqual(JSON.parse((await DB.prepare('SELECT tags FROM Product WHERE id=?').bind(detail.id).first()).tags),['gaming','sinh viên']);assert.equal(api.productDocumentSchema.safeParse({...document,tags:['x'.repeat(61)]}).success,false);assert.equal(api.productDocumentSchema.safeParse({...document,tags:Array(31).fill('tag')}).success,false);});
  await check('editing published price does not change public price',async()=>{detail=await api.writeStudio(env,detail.id,{expectedRevision:2,action:'save',document:{...document,price:12000000}});assert.equal((await api.publicStudio(DB,document.slug)).price,10000000);assert.equal((await api.studioDetail(DB,detail.id)).document.price,12000000);});
+ await check('editor publication summary and history retain actual published revision', async()=>{
+   const read=await api.studioDetail(DB,detail.id);
+   assert.equal(read.hasUnpublishedDraft,true);assert.equal(read.publishedSummary.price,10000000);
+   const history=await api.listProductRevisions(DB,detail.id);
+   assert.deepEqual(history.revisions.filter(row=>row.isPublished).map(row=>row.revision),[2]);
+   assert.equal(api.productDocumentSchema.safeParse({...document,variants:[{...document.variants[0],originalPrice:1}]}).success,false);
+ });
+ await check('catalog filters, draft SKUs, sorts and pagination follow displayed draft values',async()=>{
+   await DB.prepare("INSERT INTO Category(id,name,slug,updatedAt) VALUES('draft-category','Draft category','draft-category',CURRENT_TIMESTAMP)").run();
+   const items=[];
+   for(const [index,template] of ['MOUSE','KEYBOARD','HEADPHONE','CHARGER','HUB','BAG','MONITOR','ACCESSORY','TECH'].entries()){
+     items.push(await api.writeStudio(env,null,{expectedRevision:0,action:'save',document:{...api.blankProduct(template),name:'QA catalog '+index,slug:'qa-catalog-'+index,categoryId:'draft-category',brand:'Draft Brand',price:100+index,availability:'PREORDER',variants:[{id:'draft-variant-'+index,name:'Black',sku:'DRAFT-SKU-'+index,condition:'NEW',price:100+index,options:{color:'black'}}]}}));
+   }
+   const query={q:'QA catalog',kind:'ACCESSORY',categoryId:'draft-category',brand:'Draft Brand',sort:'price',order:'desc'};
+   const list=await api.catalogList(DB,query);assert.equal(list.total,9);assert.deepEqual(list.items.map(row=>row.price),[108,107,106,105,104,103,102,101,100]);
+   assert.equal((await api.catalogList(DB,{q:'DRAFT-SKU-3'})).items[0].id,items[3].id);
+   assert.equal((await api.catalogList(DB,{...query,page:999,limit:2})).page,5);
+   assert.equal((await api.catalogList(DB,{...query,availability:'PREORDER'})).total,9);
+   assert(list.brands.some(row=>row.name==='Draft Brand'));
+   await api.archiveProduct(DB,items[0].id);
+   assert.equal((await api.catalogList(DB,{...query,publicationStatus:'DRAFT'})).total,8);
+ });
+ await check('legacy reads preserve absent variants instead of creating unstable configuration IDs',async()=>{
+   await DB.prepare("INSERT INTO Product(id,name,slug,description,price,categoryId,status,updatedAt) VALUES('legacy-empty','Legacy empty','legacy-empty','',100,'studio-category','ACTIVE',CURRENT_TIMESTAMP)").run();
+   assert.deepEqual((await api.studioDetail(DB,'legacy-empty')).document.variants,[]);
+   assert.deepEqual((await api.studioDetail(DB,'legacy-empty')).document.variants,[]);
+ });
  await check('stale revision rejected without audit or data changes',async()=>{await assert.rejects(()=>api.writeStudio(env,detail.id,{expectedRevision:2,action:'publish',document}),e=>e.status===409);assert.equal((await api.studioDetail(DB,detail.id)).revision,3);});
  await check('concurrent editors have exactly one winner',async()=>{const results=await Promise.allSettled([1,2].map(n=>api.writeStudio(env,detail.id,{expectedRevision:3,action:'save',document:{...document,name:'Edit '+n}})));assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.filter(x=>x.status==='rejected')[0].reason.status,409);});
  await check('media archive blocked by retained draft and published revisions',async()=>{await assert.rejects(()=>api.editMedia(DB,asset.id,{revision:1,name:'QA',alt:'QA',caption:'',state:'ARCHIVED'}),e=>e.status===409);});

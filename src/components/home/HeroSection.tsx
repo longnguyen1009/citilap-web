@@ -7,7 +7,17 @@ interface HeroSectionProps {
 }
 
 export default function HeroSection({ settings: customSettings }: HeroSectionProps) {
-  const settings = { ...DEFAULT_SETTINGS, ...customSettings };
+  const raw = { ...DEFAULT_SETTINGS, ...customSettings };
+  const settings = {
+    ...raw,
+    heroBgImage: raw.heroBgImage?.trim() || DEFAULT_SETTINGS.heroBgImage,
+    heroCtaPrimaryLink: raw.heroCtaPrimaryLink?.trim() || DEFAULT_SETTINGS.heroCtaPrimaryLink,
+    heroCtaSecondaryLink: raw.heroCtaSecondaryLink?.trim() || DEFAULT_SETTINGS.heroCtaSecondaryLink,
+    subBanner1Image: raw.subBanner1Image?.trim() || DEFAULT_SETTINGS.subBanner1Image,
+    subBanner1Link: raw.subBanner1Link?.trim() || DEFAULT_SETTINGS.subBanner1Link,
+    subBanner2Image: raw.subBanner2Image?.trim() || DEFAULT_SETTINGS.subBanner2Image,
+    subBanner2Link: raw.subBanner2Link?.trim() || DEFAULT_SETTINGS.subBanner2Link,
+  };
 
   return (
     <>

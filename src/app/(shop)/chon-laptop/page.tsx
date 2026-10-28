@@ -16,7 +16,7 @@ export default async function LaptopAdvisor({ searchParams }: { searchParams: Pr
     catch { error = 'Chưa tải được danh sách máy. Vui lòng thử lại hoặc liên hệ tư vấn.'; }
   }
   const control = 'mt-2 w-full rounded-lg border border-slate-300 bg-white p-3 text-slate-900';
-  return <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+  return <div className="container mx-auto max-w-[1370px] space-y-8 px-4 py-8">
     <div><p className="text-sm font-semibold text-blue-700">CitiLap tư vấn cấu hình</p><h1 className="mt-2 text-3xl font-bold">Chọn laptop theo nhu cầu</h1><p className="mt-3 text-slate-600">Chọn ngân sách và công việc. Xem tối đa 3 máy cùng lý do phù hợp và điểm cần cân nhắc.</p></div>
     <form action="/chon-laptop" className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:grid-cols-2 lg:grid-cols-4">
       <label className="text-sm font-semibold">Ngân sách tối đa (VND)<input className={control} name="budget" type="number" min="5000000" max="200000000" step="100000" defaultValue={input.budget} required /></label>

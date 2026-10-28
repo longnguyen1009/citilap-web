@@ -67,7 +67,7 @@ export default async function AboutPage() {
     <div className="bg-[#f8fafc] min-h-screen pb-16">
       {/* 1. Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 max-w-[1240px]">
+        <div className="container mx-auto px-4 max-w-[1370px]">
           <nav className="flex text-sm text-gray-500 py-3.5 font-medium items-center">
             <Link href="/" className="hover:text-blue-600 transition">
               Trang chủ
@@ -78,7 +78,7 @@ export default async function AboutPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-[1240px] mt-8">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-8">
         {/* 2. Hero Header */}
         <div className="bg-gradient-to-br from-[#0b1221] via-blue-950 to-[#0b1221] text-white rounded-3xl p-8 md:p-14 shadow-xl border border-blue-900/60 relative overflow-hidden mb-12">
           <div className="max-w-2xl relative z-10 space-y-4">

@@ -17,8 +17,15 @@ import ProductSideShowrooms from "@/components/product/ProductSideShowrooms";
 import ProductShippingCommitment from "@/components/product/ProductShippingCommitment";
 import ProductPromoBanners from "@/components/product/ProductPromoBanners";
 import ProductHeroSection from "@/components/product/ProductHeroSection";
+import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 import { DEMO_LENOVO_LOQ } from "@/data/demo-product-loq";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import {
+  generateBreadcrumbJsonLd,
+  generateFaqJsonLd,
+  generateProductJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
 import {
   getProductDetail,
   getRelatedProducts,
@@ -159,13 +166,48 @@ export default async function ProductDetailPage({
       evaluatedAt
     );
     const relatedProducts = applyPricingToHomepageProducts(rawRelated, pricingContext, evaluatedAt);
+    const demoBreadcrumbJsonLd = generateBreadcrumbJsonLd([
+      { name: "Trang chủ", href: "/" },
+      { name: "Laptop Gaming", href: "/laptop" },
+      { name: demo.name, href: `/laptop/${demo.slug}` },
+    ]);
+    const demoFaqJsonLd = generateFaqJsonLd(demo.faqs);
+    const demoProductJsonLd = generateProductJsonLd({
+      id: demo.id,
+      name: demo.name,
+      description: demo.fullTitle,
+      canonicalPath: `/laptop/${demo.slug}`,
+      images: demo.images.map((img) => img.url),
+      sku: currentVariant.sku,
+      modelCode: demo.modelCode,
+      brand: demo.brand,
+      categoryName: "Laptop Gaming",
+      condition: demo.conditionLabel,
+      price: currentVariant.price,
+      canOrder: false,
+      specs: demo.specs.map(([key, value]) => ({ key, value })),
+    });
 
     return (
       <div className="bg-[#f8fafc] min-h-screen pb-20">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoBreadcrumbJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoProductJsonLd) }}
+        />
+        {demoFaqJsonLd && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoFaqJsonLd) }}
+          />
+        )}
 
         {/* Breadcrumb Navigation */}
         <nav aria-label="Đường dẫn trang" className="bg-white border-b border-gray-200">
-          <div className="container mx-auto px-4 max-w-7xl">
+          <div className="container mx-auto px-4 max-w-[1370px]">
             <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-2.5 font-medium flex-wrap gap-y-1">
               <li>
                 <Link href="/" className="hover:text-blue-600 transition">
@@ -193,7 +235,7 @@ export default async function ProductDetailPage({
         </nav>
 
         {/* Main Container */}
-        <main className="container mx-auto px-4 max-w-7xl mt-5 sm:mt-6">
+        <main className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
           {/* 1. TOP HERO SECTION: GALLERY + TRUST + DEAL COMBO + PURCHASING */}
           <ProductHeroSection
             canOrder={false}
@@ -233,14 +275,6 @@ export default async function ProductDetailPage({
                 <h2 className="text-base sm:text-lg font-black text-gray-900 border-b border-gray-100 pb-3 mb-5 uppercase flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-amber-500" /> Đánh giá từ khách hàng
                 </h2>
-                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl mb-5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-500 font-bold text-lg">★★★★★</span>
-                    <span className="font-bold text-slate-900 text-sm">4.9 / 5</span>
-                    <span className="text-slate-500 text-xs">(32 đánh giá thực tế đã mua hàng)</span>
-                  </div>
-                  <span className="text-xs font-semibold text-emerald-800">100% Khách hàng hài lòng</span>
-                </div>
                 <ReviewForm productName={demo.name} />
               </div>
             </div>
@@ -295,6 +329,22 @@ export default async function ProductDetailPage({
               </div>
             </section>
           )}
+
+          <RecentlyViewedSection
+            currentProduct={{
+              id: demo.id,
+              slug: demo.slug,
+              href: `/laptop/${demo.slug}`,
+              name: demo.name,
+              price: currentVariant.price,
+              originalPrice: currentVariant.originalPrice,
+              image: demo.images[0]?.url,
+              brand: demo.brand,
+              condition: demo.conditionLabel,
+              availability: "OUT_OF_STOCK",
+              stock: 0,
+            }}
+          />
         </main>
       </div>
     );
@@ -465,12 +515,101 @@ export default async function ProductDetailPage({
     studio ? (studio.contentHtml || studio.description) : (product.contentHtml || product.description || "")
   );
 
+  const structuredSpecs: Array<{ key: string; value: string }> = studio
+    ? studio.specs.filter((s) => s.value)
+    : product.fullSpecs.flatMap((g) => g.items.map((item) => ({ key: item.label, value: item.value })));
+
+  const findSpecVal = (pattern: RegExp) =>
+    structuredSpecs.find((s) => pattern.test(s.key))?.value;
+
+  const canOrderProduct = studio ? studio.canOrder : true;
+  const isProductInStock = (product.stock ?? 0) > 0;
+  const activeAvailability =
+    studioVariant?.availability ||
+    studio?.availability ||
+    (isProductInStock ? "AVAILABLE" : "OUT_OF_STOCK");
+
+  const seoDescriptionText =
+    studio?.seoDescription ||
+    studio?.description ||
+    product.seoDescription ||
+    product.shortDescription ||
+    `${displayName} chính hãng tại CitiLap. Giá ${displayPrice.toLocaleString("vi-VN")}đ.`;
+
+  const breadcrumbJsonLd = generateBreadcrumbJsonLd([
+    { name: "Trang chủ", href: "/" },
+    ...categoryTrail.map((c) => ({ name: c.name, href: c.href })),
+    { name: displayName, href: canonicalPath },
+  ]);
+  const faqJsonLd = generateFaqJsonLd(studio?.faqs || []);
+  const productJsonLd = generateProductJsonLd({
+    id: product.id,
+    name: displayName,
+    description: seoDescriptionText,
+    canonicalPath,
+    images: galleryImages.map((img) => img.url).filter(Boolean),
+    sku: studioVariant?.sku || selectedVariant?.sku || product.id,
+    modelCode:
+      product.model ||
+      findSpecVal(/model|mã/i) ||
+      undefined,
+    brand: studio?.brand || product.brand || undefined,
+    categoryName: category?.name || product.category || undefined,
+    condition: studioVariant?.condition || studio?.condition || product.condition,
+    price: displayPrice,
+    availability: activeAvailability,
+    canOrder: canOrderProduct,
+    inStock: isProductInStock,
+    specs: structuredSpecs,
+  });
+
+  const recentlyViewedItem = {
+    id: product.id,
+    slug: resolvedSlug,
+    href: canonicalPath,
+    template: studio?.template,
+    name: displayName,
+    price: displayPrice,
+    originalPrice: displayOriginalPrice,
+    image: cover || "/images/placeholder-laptop.svg",
+    brand: studio?.brand || product.brand || undefined,
+    condition: studioVariant?.condition || studio?.condition || product.condition,
+    warranty:
+      heroWarranties.find((w) => w.isDefault)?.name ||
+      heroWarranties[0]?.name ||
+      product.warranty ||
+      undefined,
+    availability: activeAvailability,
+    stock: product.stock ?? 0,
+    specs: {
+      cpu: findSpecVal(/cpu|vi xử lý|processor/i),
+      ram: studioVariant?.ram || selectedVariant?.ram || findSpecVal(/\bram\b/i),
+      ssd: studioVariant?.storage || selectedVariant?.storage || findSpecVal(/ổ cứng|ssd|storage/i),
+      gpu: studioVariant?.gpu || selectedVariant?.gpu || findSpecVal(/gpu|card|đồ họa|vga/i),
+      display: findSpecVal(/màn hình|display/i),
+    },
+  };
+
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(productJsonLd) }}
+      />
+      {faqJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
+        />
+      )}
 
       {/* Breadcrumb Navigation */}
       <nav aria-label="Đường dẫn trang" className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 max-w-7xl">
+        <div className="container mx-auto px-4 max-w-[1370px]">
           <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-2.5 font-medium flex-wrap gap-y-1">
             <li>
               <Link href="/" className="hover:text-blue-600 transition">
@@ -492,7 +631,7 @@ export default async function ProductDetailPage({
       </nav>
 
       {/* Main Content Container */}
-      <main className="container mx-auto px-4 max-w-7xl mt-5 sm:mt-6">
+      <main className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
         {/* 1. TOP HERO SECTION: GALLERY, BADGES, DEAL COMBO, PURCHASING, CARDS 365 */}
         <ProductHeroSection
           key={product.id + (skuParam || '')}
@@ -614,6 +753,9 @@ export default async function ProductDetailPage({
             </div>
           </section>
         )}
+
+        {/* 4. SẢN PHẨM VỪA XEM */}
+        <RecentlyViewedSection currentProduct={recentlyViewedItem} />
       </main>
     </div>
   );

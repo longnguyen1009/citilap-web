@@ -60,7 +60,7 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
     <div className="bg-[#f8fafc] min-h-screen pb-16">
       {/* 1. Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 max-w-[1240px]">
+        <div className="container mx-auto px-4 max-w-[1370px]">
           <nav className="flex text-sm text-gray-500 py-3.5 font-medium items-center">
             <Link href="/" className="hover:text-blue-600 transition">
               Trang chủ
@@ -71,7 +71,7 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-[1240px] mt-8">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-8">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight">
             Liên hệ với {brandName}

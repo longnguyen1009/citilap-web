@@ -10,11 +10,8 @@ import { useEffect, useRef, useState } from "react";
 import type { CheckoutQuote } from "@/contracts/checkout";
 import { useTurnstile } from '@/components/Turnstile';
 import { trackStorefront } from '@/lib/storefront-metrics';
-
-const PROVINCES = [
-  "Hà Nội", "TP. Hồ Chí Minh", "Đà Nẵng", "Hải Phòng", "Cần Thơ",
-  "Bắc Ninh", "Bình Dương", "Đồng Nai", "Khánh Hòa", "Thanh Hóa", "Nghệ An", "Quảng Ninh"
-];
+import { VN_PROVINCES, isVnProvince } from '@/lib/vn-provinces';
+import VietQrPaymentCard from '@/components/checkout/VietQrPaymentCard';
 
 interface PriceChangeDetails {
   quote: CheckoutQuote;
@@ -44,7 +41,7 @@ export default function CheckoutPage() {
   const [selectedShowroom, setSelectedShowroom] = useState('hanoi');
   const [paymentMethod, setPaymentMethod] = useState<'' | 'COD' | 'BANK_TRANSFER'>('');
   const [priceChangeDetails, setPriceChangeDetails] = useState<PriceChangeDetails | null>(null);
-  const [form, setForm] = useState({fullName:'',phone:'',email:'',province:'',district:'',address:'',note:''});
+  const [form, setForm] = useState({fullName:'',phone:'',email:'',province:'',ward:'',address:'',note:''});
   const [loaded, setLoaded] = useState(false);
   const [quoteState, setQuoteState] = useState<{key:string;data:CheckoutQuote | null;error:string}>({key:'',data:null,error:''});
   const [quoteRetry, setQuoteRetry] = useState(0);
@@ -62,7 +59,12 @@ export default function CheckoutPage() {
   useEffect(()=>{
     try {
       const saved = JSON.parse(sessionStorage.getItem('citilap-checkout-v1') || 'null');
-      if (saved?.form && Object.values(saved.form).every(v=>typeof v==='string') && ['delivery','pickup'].includes(saved.deliveryType) && ['', 'COD','BANK_TRANSFER'].includes(saved.paymentMethod) && typeof saved.selectedShowroom==='string') {setForm(prev=>({...prev,...saved.form}));setDeliveryType(saved.deliveryType);setSelectedShowroom(saved.selectedShowroom);setPaymentMethod(saved.paymentMethod);}
+      if (saved?.form && Object.values(saved.form).every(v=>typeof v==='string') && ['delivery','pickup'].includes(saved.deliveryType) && ['', 'COD','BANK_TRANSFER'].includes(saved.paymentMethod) && typeof saved.selectedShowroom==='string') {
+        const f = saved.form as Record<string,string>;
+        // Drafts from before the 2025 address reform may carry a merged province or a district; keep only valid fields.
+        setForm(prev=>({...prev,fullName:f.fullName ?? prev.fullName,phone:f.phone ?? prev.phone,email:f.email ?? prev.email,province:isVnProvince(f.province ?? '') ? f.province : '',ward:f.ward ?? '',address:f.address ?? prev.address,note:f.note ?? prev.note}));
+        setDeliveryType(saved.deliveryType);setSelectedShowroom(saved.selectedShowroom);setPaymentMethod(saved.paymentMethod);
+      }
       const attempt = JSON.parse(sessionStorage.getItem('citilap-checkout-attempt-v1') || 'null');
       if (typeof attempt?.key === 'string' && typeof attempt?.body === 'string') setPending(attempt);
     } catch { /* Invalid local draft is ignored; never used as server authority. */ }
@@ -107,7 +109,7 @@ export default function CheckoutPage() {
     e.preventDefault();
     if(pending){await sendAttempt(pending);return;}
     if(!quoteReady || !quote || priceChangeDetails || sending.current)return;
-    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName || null,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.district.trim(),form.province].join(', ') : null,note:form.note,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
+    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName || null,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.ward.trim(),form.province].join(', ') : null,note:form.note,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
     const attempt={key:crypto.randomUUID(),body};
     try{sessionStorage.setItem('citilap-checkout-attempt-v1',JSON.stringify(attempt));}catch{setFormError('Không thể lưu yêu cầu để thử lại an toàn. Vui lòng bật lưu trữ trình duyệt.');return;}
     setPending(attempt);await sendAttempt(attempt);
@@ -127,7 +129,7 @@ export default function CheckoutPage() {
     <div className="bg-[#f8fafc] min-h-screen pb-16 flex flex-col">
       {/* Top Header / Breadcrumb */}
       <div className="bg-white border-b border-gray-200 shrink-0">
-        <div className="container mx-auto px-4 max-w-[1240px]">
+        <div className="container mx-auto px-4 max-w-[1370px]">
           <nav className="flex text-sm text-gray-500 py-3.5 font-medium items-center justify-between">
             <Link href="/cart" className="hover:text-blue-600 transition flex items-center gap-1.5 text-gray-600 font-semibold">
               <ArrowLeft className="w-4 h-4" /> Quay lại giỏ hàng
@@ -139,7 +141,7 @@ export default function CheckoutPage() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-[1240px] mt-6 flex-1 min-h-[760px]">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-6 flex-1 min-h-[760px]">
         {isCartEmpty ? (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full border border-gray-100">
@@ -359,7 +361,7 @@ export default function CheckoutPage() {
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-white"
                       >
                         <option value="">-- Chọn Tỉnh / Thành phố --</option>
-                        {PROVINCES.map((p) => (
+                        {VN_PROVINCES.map((p) => (
                           <option key={p} value={p}>
                             {p}
                           </option>
@@ -368,17 +370,18 @@ export default function CheckoutPage() {
                     </div>
 
                     <div>
-                      <label htmlFor="district" className="block text-xs font-bold text-gray-700 uppercase mb-1.5">
-                        Quận / Huyện <span className="text-red-500">*</span>
+                      <label htmlFor="ward" className="block text-xs font-bold text-gray-700 uppercase mb-1.5">
+                        Phường / Xã <span className="text-red-500">*</span>
                       </label>
                       <input
-                        id="district"
-                        name="district"
+                        id="ward"
+                        name="ward"
                         type="text"
-                        value={form.district}
-                        onChange={updateField("district")}
+                        value={form.ward}
+                        onChange={updateField("ward")}
                         required
-                        placeholder="Ví dụ: Cầu Giấy"
+                        autoComplete="address-level3"
+                        placeholder="Ví dụ: Phường Bạch Mai"
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                       />
                     </div>
@@ -394,7 +397,8 @@ export default function CheckoutPage() {
                         value={form.address}
                         onChange={updateField("address")}
                         required
-                        placeholder="Số nhà, ngõ/ngách, tên đường, phường/xã..."
+                        autoComplete="street-address"
+                        placeholder="Số nhà, ngõ/ngách, tên đường, thôn/tổ dân phố..."
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                       />
                     </div>
@@ -471,7 +475,15 @@ export default function CheckoutPage() {
 
               <fieldset className="mt-4 space-y-3"><legend className="font-bold">Phương thức thanh toán</legend>
                 {(quote?.allowedPaymentMethods || []).map(method=><label key={method} className="flex items-center gap-2"><input type="radio" name="paymentMethod" checked={paymentMethod===method} onChange={()=>setPaymentMethod(method)}/>{method==='COD'?'Thanh toán khi nhận máy (COD)':'Chuyển khoản ngân hàng'}</label>)}
-                {paymentMethod==='BANK_TRANSFER' && <p className="whitespace-pre-wrap rounded bg-blue-50 p-3 text-sm">{quote?.snapshot.bankAccountInfo || 'Đang tải hướng dẫn chuyển khoản…'}</p>}
+                {paymentMethod==='BANK_TRANSFER' && (
+                  <VietQrPaymentCard
+                    bankAccountInfo={quote?.snapshot.bankAccountInfo}
+                    vietQr={quote?.snapshot.vietQr}
+                    amount={quote?.totalAmount}
+                    transferNote={form.phone.trim() ? `CITILAP ${form.phone.replace(/\s+/g, '')}` : undefined}
+                    compact
+                  />
+                )}
               </fieldset>
               {/* Tổng tiền */}
               <div className="border-t border-gray-200 pt-4 mt-4 space-y-2 text-sm">

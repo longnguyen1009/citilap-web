@@ -135,3 +135,156 @@ export function generateWebSiteJsonLd() {
     },
   };
 }
+
+function toAbsoluteSiteUrl(pathOrUrl: string): string {
+  if (!pathOrUrl) return businessProfile.canonicalSiteUrl;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  return `${businessProfile.canonicalSiteUrl}${pathOrUrl.startsWith("/") ? "" : "/"}${pathOrUrl}`;
+}
+
+function resolveSchemaItemCondition(condition?: string | null): string {
+  const raw = (condition || "").trim().toUpperCase();
+  if (!raw || raw === "NEW" || raw.includes("MỚI") || raw.includes("100%")) {
+    return "https://schema.org/NewCondition";
+  }
+  if (raw === "LIKE_NEW" || raw.includes("LIKE NEW") || raw.includes("99%")) {
+    return "https://schema.org/RefurbishedCondition";
+  }
+  return "https://schema.org/UsedCondition";
+}
+
+function resolveSchemaAvailability(params: {
+  availability?: string | null;
+  canOrder?: boolean;
+  inStock?: boolean;
+}): string {
+  if (params.canOrder === false) {
+    return "https://schema.org/OutOfStock";
+  }
+  const av = (params.availability || "").trim().toUpperCase();
+  if (av === "PREORDER") return "https://schema.org/PreOrder";
+  if (av === "OUT_OF_STOCK" || av === "SOLD" || av === "DISCONTINUED") {
+    return "https://schema.org/OutOfStock";
+  }
+  if (av === "AVAILABLE") return "https://schema.org/InStock";
+  return params.inStock === false
+    ? "https://schema.org/OutOfStock"
+    : "https://schema.org/InStock";
+}
+
+export function generateBreadcrumbJsonLd(
+  items: Array<{ name: string; href: string }>
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      name: item.name,
+      item: toAbsoluteSiteUrl(item.href),
+    })),
+  };
+}
+
+export function generateFaqJsonLd(
+  faqs: Array<{ question?: string; q?: string; answer?: string; a?: string }>
+) {
+  const valid = faqs
+    .map((f) => ({
+      q: (f.question ?? f.q ?? "").trim(),
+      a: (f.answer ?? f.a ?? "").trim(),
+    }))
+    .filter((f) => f.q && f.a);
+
+  if (valid.length === 0) return null;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: valid.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: f.a,
+      },
+    })),
+  };
+}
+
+export interface ProductJsonLdInput {
+  id: string;
+  name: string;
+  description: string;
+  canonicalPath: string;
+  images: string[];
+  sku?: string | null;
+  modelCode?: string | null;
+  brand?: string | null;
+  categoryName?: string | null;
+  condition?: string | null;
+  price: number;
+  availability?: string | null;
+  canOrder?: boolean;
+  inStock?: boolean;
+  specs?: Array<{ key: string; value: string }>;
+}
+
+export function generateProductJsonLd(input: ProductJsonLdInput) {
+  const url = toAbsoluteSiteUrl(input.canonicalPath);
+  const itemCondition = resolveSchemaItemCondition(input.condition);
+  const availability = resolveSchemaAvailability({
+    availability: input.availability,
+    canOrder: input.canOrder,
+    inStock: input.inStock,
+  });
+  const images = input.images
+    .filter(Boolean)
+    .map((img) => toAbsoluteSiteUrl(img));
+
+  const additionalProperty = (input.specs || [])
+    .filter((s) => s.key?.trim() && s.value?.trim())
+    .slice(0, 10)
+    .map((s) => ({
+      "@type": "PropertyValue",
+      name: s.key.trim(),
+      value: s.value.trim(),
+    }));
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "@id": `${url}#product`,
+    name: input.name,
+    description: input.description,
+    url,
+    ...(images.length > 0 ? { image: images } : {}),
+    sku: input.sku || input.id,
+    ...(input.modelCode ? { mpn: input.modelCode } : {}),
+    ...(input.brand
+      ? {
+          brand: {
+            "@type": "Brand",
+            name: input.brand,
+          },
+        }
+      : {}),
+    ...(input.categoryName ? { category: input.categoryName } : {}),
+    itemCondition,
+    ...(additionalProperty.length > 0 ? { additionalProperty } : {}),
+    offers: {
+      "@type": "Offer",
+      url,
+      priceCurrency: "VND",
+      price: input.price,
+      availability,
+      itemCondition,
+      seller: {
+        "@type": "Organization",
+        "@id": `${businessProfile.canonicalSiteUrl}/#organization`,
+        name: businessProfile.brandName,
+      },
+    },
+  };
+}

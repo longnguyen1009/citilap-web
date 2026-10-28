@@ -74,6 +74,12 @@ const tierBadge: Record<string, string> = {
   "Khách vãng lai": "text-purple-700 bg-purple-100 border-purple-200",
 };
 
+const SOURCE_TABS = [
+  { key: "ALL", label: "Tất cả" },
+  { key: "REGISTERED", label: "Thành viên" },
+  { key: "GUEST_ORDER", label: "Vãng lai" },
+] as const;
+
 function CustomersContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [tierFilter, setTierFilter] = useState("");
@@ -174,23 +180,37 @@ function CustomersContent() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-12 space-y-6">
+    <div className="max-w-7xl mx-auto pb-12 space-y-3">
       {/* 1. Header */}
       <PageHeader
-        title="Quản lý Khách hàng"
-        description="Dữ liệu khách hàng trung thực từ D1, phân biệt tài khoản thành viên và đơn đặt vãng lai (không tự động hợp nhất hoặc suy diễn danh tính)."
-        breadcrumbs={[{ label: "Bán hàng" }, { label: "Khách hàng" }]}
+        title="Khách hàng"
+        badge={
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">
+            {total || customers.length}
+          </span>
+        }
         actions={
-          <AdminButton
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handleExport}
-            disabled={loading || customers.length === 0}
-            icon={<Download className="w-4 h-4" aria-hidden="true" />}
-          >
-            Xuất CSV ({total || customers.length} khách)
-          </AdminButton>
+          <div className="flex items-center gap-2">
+            <AdminButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={fetchCustomers}
+              disabled={loading}
+              aria-label="Tải lại danh sách"
+              icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />}
+            />
+            <AdminButton
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleExport}
+              disabled={loading || customers.length === 0}
+              icon={<Download className="w-3.5 h-3.5" aria-hidden="true" />}
+            >
+              Xuất CSV
+            </AdminButton>
+          </div>
         }
       />
 
@@ -200,128 +220,157 @@ function CustomersContent() {
         </InlineAlert>
       )}
 
-      {/* 2. Quick Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-5">
-          <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-            <Users className="w-4 h-4 text-blue-600" /> Tổng hồ sơ hiển thị
+      {/* 2. Compact 4-Stat Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <Users className="w-3.5 h-3.5 text-blue-600" />
+            <span>Hồ sơ</span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{stats.count.toLocaleString("vi-VN")}</div>
+          <div className="text-base font-black text-slate-900 tabular-nums">
+            {stats.count.toLocaleString("vi-VN")}
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-5">
-          <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-            <UserCheck className="w-4 h-4 text-emerald-600" /> Tài khoản đăng ký
+        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Thành viên</span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{stats.registered.toLocaleString("vi-VN")}</div>
+          <div className="text-base font-black text-slate-900 tabular-nums">
+            {stats.registered.toLocaleString("vi-VN")}
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-5">
-          <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-            <ShoppingCart className="w-4 h-4 text-purple-600" /> Khách đặt vãng lai
+        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <ShoppingCart className="w-3.5 h-3.5 text-purple-600" />
+            <span>Vãng lai</span>
           </div>
-          <div className="text-2xl font-black text-slate-900">{stats.guest.toLocaleString("vi-VN")}</div>
+          <div className="text-base font-black text-slate-900 tabular-nums">
+            {stats.guest.toLocaleString("vi-VN")}
+          </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-5">
-          <div className="text-slate-500 text-xs font-semibold uppercase tracking-wider mb-1 flex items-center justify-between">
-            <span>Tổng đơn không hủy</span>
-            <span className="text-[10px] text-slate-400 font-normal">status != CANCELLED</span>
-          </div>
-          <div className="text-2xl font-black text-blue-700">
+        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
+          <div className="text-xs font-medium text-slate-500">Tổng chi</div>
+          <div className="text-base font-black text-blue-700 tabular-nums">
             {stats.totalNonCancelled.toLocaleString("vi-VN")}đ
           </div>
         </div>
       </div>
 
-      {/* 3. Main Card with Search, Filter & Table */}
-      <AdminCard bodyClassName="p-0">
-        {/* Toolbar */}
-        <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-3 justify-between bg-slate-50/60">
-          <div className="relative max-w-md w-full">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-              <Search className="w-4 h-4" />
-            </div>
-            <input
-              type="text"
-              placeholder="Tìm kiếm tên, email, số điện thoại..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg bg-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            />
+      {/* 3. Unified Single-Card Workspace */}
+      <AdminCard bodyClassName="p-0 overflow-hidden">
+        {/* Top Bar: Source Tabs + Inline Search & Tier */}
+        <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+          <div className="flex items-center gap-1" role="tablist" aria-label="Lọc theo nguồn">
+            {SOURCE_TABS.map((tab) => {
+              const active = sourceFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setSourceFilter(tab.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    active
+                      ? "bg-slate-900 text-white shadow-2xs"
+                      : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex gap-2 flex-wrap items-center">
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              aria-label="Lọc theo nguồn"
-              className="border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm bg-white font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 outline-hidden"
-            >
-              <option value="ALL">Tất cả nguồn khách</option>
-              <option value="REGISTERED">Tài khoản đăng ký</option>
-              <option value="GUEST_ORDER">Khách vãng lai (Đơn hàng)</option>
-            </select>
+          <div className="flex items-center gap-2 flex-1 max-w-lg justify-end">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Tìm tên, SĐT, email…"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  aria-label="Xóa tìm kiếm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
             <select
               value={tierFilter}
               onChange={(e) => setTierFilter(e.target.value)}
               aria-label="Lọc theo phân hạng"
-              className="border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm bg-white font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 outline-hidden"
+              className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 outline-hidden"
             >
-              <option value="">Tất cả phân hạng</option>
-              <option value="Vàng">Thành viên Vàng</option>
-              <option value="Bạc">Thành viên Bạc</option>
-              <option value="Mới">Thành viên Mới</option>
+              <option value="">Hạng: Tất cả</option>
+              <option value="Vàng">Vàng</option>
+              <option value="Bạc">Bạc</option>
+              <option value="Mới">Mới</option>
             </select>
 
-            <button
-              type="button"
-              onClick={fetchCustomers}
-              disabled={loading}
-              aria-label="Tải lại danh sách"
-              className="p-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-blue-600" : ""}`} />
-            </button>
+            {(searchTerm || tierFilter || sourceFilter !== "ALL") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setTierFilter("");
+                  setSourceFilter("ALL");
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-slate-200/60 transition cursor-pointer whitespace-nowrap"
+              >
+                ✕ Xóa lọc
+              </button>
+            )}
           </div>
         </div>
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
+          <table className="admin-table w-full text-left border-collapse text-xs">
             <thead className="bg-slate-50/90 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200">
               <tr>
-                <th className="py-3 px-4">Khách hàng</th>
-                <th className="py-3 px-4">Nguồn</th>
-                <th className="py-3 px-4">Phân hạng</th>
-                <th className="py-3 px-4 text-center">Số đơn</th>
-                <th className="py-3 px-4 text-right">Tổng đơn không hủy</th>
-                <th className="py-3 px-4 text-right">Lần đặt cuối</th>
-                <th className="py-3 px-4 text-center">Thao tác</th>
+                <th className="py-2.5 px-4">Khách hàng</th>
+                <th className="py-2.5 px-4">Nguồn</th>
+                <th className="py-2.5 px-4">Hạng</th>
+                <th className="py-2.5 px-4 text-center">Đơn</th>
+                <th className="py-2.5 px-4 text-right">Tổng chi</th>
+                <th className="py-2.5 px-4 text-right">Đơn cuối</th>
+                <th className="py-2.5 px-4 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-500">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
-                    <span>Đang tải danh sách khách hàng...</span>
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" />
+                    <span>Đang tải khách hàng...</span>
                   </td>
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-500">
-                    Không tìm thấy khách hàng phù hợp với bộ lọc hiện tại.
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                    Không có khách hàng phù hợp.
                   </td>
                 </tr>
               ) : (
                 customers.map((customer) => (
                   <tr key={customer.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2.5">
                         <div
-                          className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                          className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
                             customer.source === "REGISTERED"
                               ? "bg-blue-100 text-blue-700"
                               : "bg-purple-100 text-purple-700"
@@ -330,19 +379,19 @@ function CustomersContent() {
                           {(customer.name || customer.email || "K").charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-bold text-slate-900 truncate">
+                          <div className="font-semibold text-slate-900 truncate">
                             {customer.name || "Khách hàng"}
                           </div>
-                          <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5 font-mono">
+                          <div className="text-[11px] text-slate-500 flex items-center gap-2 font-mono">
                             {customer.phone && (
                               <span className="flex items-center gap-1">
-                                <Phone className="w-3 h-3 text-slate-400" />
+                                <Phone className="w-2.5 h-2.5 text-slate-400" />
                                 {customer.phone}
                               </span>
                             )}
                             {customer.email && (
                               <span className="flex items-center gap-1">
-                                <Mail className="w-3 h-3 text-slate-400" />
+                                <Mail className="w-2.5 h-2.5 text-slate-400" />
                                 {customer.email}
                               </span>
                             )}
@@ -351,8 +400,8 @@ function CustomersContent() {
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1 items-start">
+                    <td className="py-2.5 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
                             customer.source === "REGISTERED"
@@ -364,15 +413,15 @@ function CustomersContent() {
                         </span>
                         {customer.orderNumber && (
                           <span className="text-[10px] text-slate-500 font-mono">
-                            Đơn: #{customer.orderNumber}
+                            #{customer.orderNumber}
                           </span>
                         )}
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap">
+                    <td className="py-2.5 px-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
                           tierBadge[customer.tier] || "bg-slate-100 text-slate-600 border-slate-200"
                         }`}
                       >
@@ -380,21 +429,21 @@ function CustomersContent() {
                       </span>
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap text-center font-bold text-slate-900">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-center font-bold text-slate-900 tabular-nums">
                       {customer.totalOrders}
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap text-right font-bold text-blue-700">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-right font-bold text-blue-700 tabular-nums">
                       {(customer.nonCancelledTotal ?? customer.totalSpend ?? 0).toLocaleString("vi-VN")}đ
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap text-right text-xs text-slate-500">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-right text-slate-500 tabular-nums">
                       {customer.lastOrder
                         ? new Date(customer.lastOrder).toLocaleDateString("vi-VN")
                         : "—"}
                     </td>
 
-                    <td className="py-3.5 px-4 whitespace-nowrap text-center">
+                    <td className="py-2.5 px-4 whitespace-nowrap text-right">
                       <button
                         type="button"
                         onClick={() => loadCustomerDetail(customer.id)}
@@ -412,27 +461,25 @@ function CustomersContent() {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-600 flex justify-between items-center">
-          <div>
+        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-500 flex justify-between items-center">
+          <div className="tabular-nums">
             Hiển thị <span className="font-bold text-slate-900">{customers.length}</span> /{" "}
-            <span className="font-bold text-slate-900">{total || customers.length}</span> hồ sơ
+            <span className="font-bold text-slate-900">{total || customers.length}</span>
           </div>
           <div className="text-slate-400 text-[11px]">
-            * Khách vãng lai được ghi nhận theo từng đơn; không tự động gộp hồ sơ dựa trên số điện thoại.
+            Khách vãng lai ghi nhận độc lập theo từng đơn
           </div>
         </div>
       </AdminCard>
 
-      {/* 4. Customer Detail Modal / Drawer */}
+      {/* 4. Customer Detail Modal */}
       {selectedCustomerId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-6">
-            <div className="flex items-start justify-between border-b border-slate-200 pb-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-2xl w-full max-h-[88vh] overflow-y-auto p-5 space-y-4">
+            <div className="flex items-start justify-between border-b border-slate-200 pb-3">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Chi tiết Hồ sơ Khách hàng</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  ID: <span className="font-mono text-slate-700">{selectedCustomerId}</span>
-                </p>
+                <h3 className="text-base font-bold text-slate-900">Hồ sơ khách hàng</h3>
+                <p className="text-[11px] text-slate-400 font-mono">{selectedCustomerId}</p>
               </div>
               <button
                 type="button"
@@ -440,68 +487,69 @@ function CustomersContent() {
                   setSelectedCustomerId(null);
                   setCustomerDetail(null);
                 }}
+                aria-label="Đóng"
                 className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             {loadingDetail ? (
-              <div className="py-16 text-center text-slate-500">
-                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-blue-600" />
-                <span>Đang tải chi tiết hồ sơ...</span>
+              <div className="py-12 text-center text-slate-500 text-xs">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-600" />
+                <span>Đang tải hồ sơ...</span>
               </div>
             ) : customerDetail ? (
-              <div className="space-y-6 text-xs sm:text-sm">
+              <div className="space-y-4 text-xs">
                 {/* Basic Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                   <div>
-                    <span className="text-slate-500 text-xs block">Họ và tên</span>
-                    <strong className="text-slate-900 text-base">{customerDetail.name || "Khách hàng"}</strong>
+                    <span className="text-slate-400 text-[11px] block">Họ tên</span>
+                    <strong className="text-slate-900 text-sm">{customerDetail.name || "Khách hàng"}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-xs block">Nguồn hồ sơ</span>
-                    <span className="font-semibold text-slate-800">{customerDetail.sourceLabel}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs block">Số điện thoại</span>
+                    <span className="text-slate-400 text-[11px] block">Điện thoại</span>
                     <span className="font-mono font-bold text-slate-800">{customerDetail.phone || "—"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-xs block">Email</span>
-                    <span className="font-mono text-slate-800">{customerDetail.email || "—"}</span>
+                    <span className="text-slate-400 text-[11px] block">Email</span>
+                    <span className="font-mono text-slate-800 truncate block">{customerDetail.email || "—"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-xs block">Tổng giá trị đơn không hủy</span>
-                    <span className="font-black text-blue-700 text-base">
+                    <span className="text-slate-400 text-[11px] block">Nguồn</span>
+                    <span className="font-semibold text-slate-800">{customerDetail.sourceLabel}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[11px] block">Hạng</span>
+                    <span className="font-bold text-slate-800">{customerDetail.tier}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 text-[11px] block">Tổng chi (không hủy)</span>
+                    <span className="font-black text-blue-700 text-sm tabular-nums">
                       {customerDetail.nonCancelledTotal.toLocaleString("vi-VN")}đ
                     </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-xs block">Phân hạng</span>
-                    <span className="font-bold text-slate-800">{customerDetail.tier}</span>
                   </div>
                 </div>
 
                 {/* Primary Orders */}
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs sm:text-sm uppercase tracking-wider">
-                    <Package className="w-4 h-4 text-blue-600" />
-                    <span>Đơn hàng chính ({customerDetail.orders.length})</span>
+                <div className="space-y-1.5">
+                  <h4 className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                    <Package className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Đơn hàng ({customerDetail.orders.length})</span>
                   </h4>
                   <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg overflow-hidden">
                     {customerDetail.orders.map((o) => (
-                      <div key={o.id} className="p-3 bg-white flex justify-between items-center text-xs">
+                      <div key={o.id} className="p-2.5 bg-white flex justify-between items-center">
                         <div>
-                          <div className="font-bold text-slate-900">
+                          <div className="font-bold text-slate-900 font-mono">
                             #{o.orderNumber || o.id.slice(0, 8)}
                           </div>
                           <div className="text-slate-500 text-[11px] flex items-center gap-1 mt-0.5">
                             <Clock className="w-3 h-3 text-slate-400" />
-                            {new Date(o.createdAt).toLocaleString("vi-VN")} • {o.itemsCount} sản phẩm
+                            {new Date(o.createdAt).toLocaleString("vi-VN")} • {o.itemsCount} SP
                           </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right tabular-nums">
                           <div className="font-bold text-slate-900">{o.totalAmount.toLocaleString("vi-VN")}đ</div>
                           <span className="text-[11px] font-semibold text-blue-600">{o.status}</span>
                         </div>
@@ -512,26 +560,23 @@ function CustomersContent() {
 
                 {/* Suggested Orders by Phone */}
                 {customerDetail.suggestedOrders && customerDetail.suggestedOrders.length > 0 && (
-                  <div className="space-y-2 bg-amber-50/50 p-4 rounded-xl border border-amber-200">
-                    <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs uppercase tracking-wider">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                      <span>Gợi ý đơn hàng liên quan cùng SĐT (Chưa xác minh cùng danh tính)</span>
+                  <div className="space-y-1.5 bg-amber-50/50 p-3 rounded-xl border border-amber-200">
+                    <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Đơn trùng SĐT ({customerDetail.suggestedOrders.length})</span>
                     </div>
-                    <p className="text-[11px] text-amber-700">
-                      Các đơn hàng dưới đây có cùng số điện thoại nhưng không được tự động gộp vào hồ sơ để tránh sai lệch dữ liệu:
-                    </p>
-                    <div className="divide-y divide-amber-100 bg-white border border-amber-200 rounded-lg overflow-hidden mt-2">
+                    <div className="divide-y divide-amber-100 bg-white border border-amber-200 rounded-lg overflow-hidden">
                       {customerDetail.suggestedOrders.map((so) => (
-                        <div key={so.id} className="p-2.5 flex justify-between items-center text-xs">
+                        <div key={so.id} className="p-2 flex justify-between items-center">
                           <div>
                             <div className="font-bold text-slate-900">
                               #{so.orderNumber || so.id.slice(0, 8)} — {so.customerName}
                             </div>
                             <div className="text-slate-500 text-[11px]">
-                              {new Date(so.createdAt).toLocaleString("vi-VN")} • {so.itemsCount} sản phẩm
+                              {new Date(so.createdAt).toLocaleString("vi-VN")} • {so.itemsCount} SP
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right tabular-nums">
                             <div className="font-bold text-slate-900">{so.totalAmount.toLocaleString("vi-VN")}đ</div>
                             <span className="text-[11px] font-semibold text-slate-600">{so.status}</span>
                           </div>
@@ -543,21 +588,21 @@ function CustomersContent() {
 
                 {/* Suggested Contacts */}
                 {customerDetail.suggestedContacts && customerDetail.suggestedContacts.length > 0 && (
-                  <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5 text-xs uppercase tracking-wider">
-                      <MessageSquare className="w-4 h-4 text-indigo-600" />
-                      <span>Yêu cầu tư vấn gửi cùng số điện thoại/email ({customerDetail.suggestedContacts.length})</span>
+                  <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                      <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Tư vấn trùng SĐT/Email ({customerDetail.suggestedContacts.length})</span>
                     </h4>
                     <div className="divide-y divide-slate-100 bg-white border border-slate-200 rounded-lg overflow-hidden">
                       {customerDetail.suggestedContacts.map((sc) => (
-                        <div key={sc.id} className="p-2.5 text-xs">
+                        <div key={sc.id} className="p-2">
                           <div className="flex justify-between items-center">
                             <span className="font-semibold text-slate-800">{sc.name}</span>
                             <span className="text-[11px] text-slate-500 font-mono">
                               {new Date(sc.createdAt).toLocaleString("vi-VN")}
                             </span>
                           </div>
-                          {sc.message && <p className="text-slate-600 text-[11px] mt-1">{sc.message}</p>}
+                          {sc.message && <p className="text-slate-600 text-[11px] mt-0.5">{sc.message}</p>}
                         </div>
                       ))}
                     </div>
@@ -565,20 +610,6 @@ function CustomersContent() {
                 )}
               </div>
             ) : null}
-
-            <div className="flex justify-end pt-2 border-t border-slate-200">
-              <AdminButton
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setSelectedCustomerId(null);
-                  setCustomerDetail(null);
-                }}
-              >
-                Đóng
-              </AdminButton>
-            </div>
           </div>
         </div>
       )}
@@ -588,7 +619,7 @@ function CustomersContent() {
 
 export default function CustomersPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-slate-400">Đang tải trang khách hàng...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-slate-400">Đang tải khách hàng...</div>}>
       <CustomersContent />
     </Suspense>
   );

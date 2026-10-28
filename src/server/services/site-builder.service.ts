@@ -538,7 +538,8 @@ export async function resolveSectionsForStorefront(
         resolvedSec.resolvedTabs = data.tabs.map(t => ({ ...t, products: t.productIds.flatMap(id => byId.has(id) ? [byId.get(id)!] : []) }));
       }
     } else if (data.type === 'news_reviews') {
-      const { items } = await publicPostList(db, { ids: data.postIds, categoryId: data.categoryId || undefined, limit: data.limit });
+      const effectiveLimit = data.postIds.length > 0 ? data.limit : Math.max(data.limit || 10, 10);
+      const { items } = await publicPostList(db, { ids: data.postIds, categoryId: data.categoryId || undefined, limit: effectiveLimit });
       if (data.postIds.length) items.sort((a, b) => data.postIds.indexOf(a.id) - data.postIds.indexOf(b.id));
       resolvedSec.resolvedPosts = items;
     } else if (data.type === 'featured_collection') {

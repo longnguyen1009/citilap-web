@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   Menu, PhoneCall,
-  ClipboardCheck, User, Monitor, ChevronDown, ChevronRight,
+  ClipboardCheck, Monitor, ChevronDown, ChevronRight,
   Laptop, Gamepad2, Briefcase, Palette, RefreshCw, Cpu,
   Tablet, HardDrive, Camera, Sparkles, X, Heart
 } from "lucide-react";
@@ -318,9 +318,9 @@ export default function Header({ categories = [], brands = [], navigation, setti
               </div>
             </Link>
 
-            <Link href="/profile" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-14 lg:w-16 h-10 transition">
-              <User className="w-4 h-4 text-gray-300 mb-0.5" />
-              <span className="text-[10px] text-gray-300">Tài khoản</span>
+            <Link href="/order-tracking" className="flex lg:hidden flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-14 h-10 transition">
+              <ClipboardCheck className="w-4 h-4 text-gray-300 mb-0.5" />
+              <span className="text-[10px] text-gray-300">Đơn hàng</span>
             </Link>
 
             <Link href="/wishlist" className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-14 lg:w-16 h-10 transition relative">

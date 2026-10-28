@@ -1,39 +1,134 @@
 'use client';
 import { useState } from 'react';
-import { Images, Plus } from 'lucide-react';
-import type { MediaAssetDto } from '@/contracts/cms/media';
-import { videoSchema, youtubeId } from '@/contracts/cms/media';
+import { Plus } from 'lucide-react';
+import { PageHeader, AdminButton } from '@/components/admin/ui';
+import type { ExternalMediaKind, MediaAssetDto } from '@/contracts/cms/media';
+import {
+  googleDriveFileId,
+  tiktokVideoId,
+  videoSchema,
+  youtubeId,
+} from '@/contracts/cms/media';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaUpload from '@/components/admin/media/MediaUpload';
 import MediaEditor from '@/components/admin/media/MediaEditor';
 import MediaDialog from '@/components/admin/media/MediaDialog';
 
+function isValidExternalMediaUrl(url: string, mediaKind: ExternalMediaKind): boolean {
+  if (mediaKind === 'YOUTUBE') return Boolean(youtubeId(url));
+  if (mediaKind === 'TIKTOK') return Boolean(tiktokVideoId(url));
+  if (mediaKind.startsWith('GDRIVE')) return Boolean(googleDriveFileId(url));
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.port) return false;
+    if (mediaKind === 'PDF_URL') return true;
+    if (mediaKind === 'SVG_URL') return true;
+    return Boolean(
+      youtubeId(url) ||
+        tiktokVideoId(url) ||
+        googleDriveFileId(url) ||
+        /\.(pdf|svg)(?:$|\?)/i.test(url),
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function MediaPage() {
   const [selected, setSelected] = useState<MediaAssetDto | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [videoOpen, setVideoOpen] = useState(false);
-  const [video, setVideo] = useState({ name: '', url: '' });
+  const [video, setVideo] = useState<{ name: string; url: string; mediaKind: ExternalMediaKind }>({
+    name: '',
+    url: '',
+    mediaKind: 'AUTO',
+  });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const reload = () => setRefresh((n) => n + 1);
   async function addVideo() {
-    if (!videoSchema.safeParse(video).success || !youtubeId(video.url)) { setError('Điền tên và liên kết HTTPS YouTube hợp lệ.'); document.getElementById('video-name')?.focus(); return; }
+    if (!videoSchema.safeParse(video).success || !isValidExternalMediaUrl(video.url, video.mediaKind)) {
+      setError('Điền tên và liên kết HTTPS hợp lệ (YouTube, TikTok, Google Drive, PDF hoặc SVG).');
+      document.getElementById('video-name')?.focus();
+      return;
+    }
     setBusy(true); setError('');
-    try { await mediaRequest('/api/admin/media', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(video) }); setVideoOpen(false); setVideo({ name: '', url: '' }); setNotice('Đã lưu liên kết video vào thư viện.'); reload(); }
-    catch (e) { setError(e instanceof Error ? e.message : 'Không thể thêm video.'); }
-    finally { setBusy(false); }
+    try {
+      await mediaRequest('/api/admin/media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(video),
+      });
+      setVideoOpen(false);
+      setVideo({ name: '', url: '', mediaKind: 'AUTO' });
+      setNotice('Đã lưu liên kết media vào thư viện.');
+      reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Không thể thêm liên kết media.');
+    } finally {
+      setBusy(false);
+    }
   }
-  return <div className="media-workspace space-y-6 max-w-7xl mx-auto">
-    <div className="flex flex-wrap justify-between items-center gap-4"><div><p className="text-blue-700 font-semibold text-xs uppercase tracking-widest mb-2">CitiLap · Nội dung</p><h1 className="text-2xl font-bold flex gap-3 items-center"><Images aria-hidden="true" />Thư viện ảnh & video</h1><p className="text-slate-600 mt-2">Một nơi lưu trữ, dùng lại cho sản phẩm và nội dung website.</p></div><button className="media-button" onClick={() => setVideoOpen(true)}><Plus size={18} />Thêm video YouTube</button></div>
-    <MediaUpload onUploaded={reload} /><p className="min-h-5 text-green-800" role="status">{notice}</p>
-    <MediaBrowser onSelect={setSelected} refresh={refresh} />
-    {selected && <MediaEditor key={selected.id} asset={selected} onClose={() => setSelected(null)} onSaved={reload} />}
-    {videoOpen && <MediaDialog title="Thêm video YouTube" onClose={() => { if (!busy) setVideoOpen(false); }}><form noValidate className="space-y-4" onSubmit={(e) => { e.preventDefault(); void addVideo(); }}>
-      <p className="media-muted">Lưu liên kết để dùng lại. Chưa tải video trực tiếp hoặc nhúng trình phát trên Frontstore trong giai đoạn này.</p>
-      <label className="media-field">Tên video<input id="video-name" value={video.name} maxLength={180} disabled={busy} onChange={(e) => setVideo({ ...video, name: e.target.value })} /></label>
-      <label className="media-field">Liên kết YouTube<input type="url" value={video.url} maxLength={512} disabled={busy} placeholder="https://www.youtube.com/watch?v=…" onChange={(e) => setVideo({ ...video, url: e.target.value })} /></label>
-      {error && <p role="alert" className="media-error">{error}</p>}<button className="media-button media-button-primary" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu video'}</button>
-    </form></MediaDialog>}
-  </div>;
+  return (
+    <div className="media-workspace space-y-3 max-w-7xl mx-auto pb-12">
+      <PageHeader
+        title="Thư viện ảnh & video"
+        actions={
+          <AdminButton type="button" size="sm" icon={<Plus size={15} />} onClick={() => setVideoOpen(true)}>
+            Thêm video YouTube / TikTok / Drive
+          </AdminButton>
+        }
+      />
+      <MediaUpload onUploaded={reload} />
+      {notice ? <p className="text-xs font-medium text-emerald-700" role="status">{notice}</p> : <p className="sr-only" role="status">{notice}</p>}
+      <MediaBrowser onSelect={setSelected} refresh={refresh} />
+      {selected && <MediaEditor key={selected.id} asset={selected} onClose={() => setSelected(null)} onSaved={reload} />}
+      {videoOpen && (
+        <MediaDialog title="Thêm video YouTube, TikTok, Google Drive, PDF/SVG" onClose={() => { if (!busy) setVideoOpen(false); }}>
+          <form noValidate className="space-y-3" onSubmit={(e) => { e.preventDefault(); void addVideo(); }}>
+            <label className="media-field">
+              Loại liên kết
+              <select
+                value={video.mediaKind}
+                disabled={busy}
+                onChange={(e) => setVideo({ ...video, mediaKind: e.target.value as ExternalMediaKind })}
+              >
+                <option value="AUTO">Tự động nhận diện (YouTube / TikTok / Google Drive / PDF / SVG)</option>
+                <option value="YOUTUBE">Video YouTube (watch, shorts, youtu.be)</option>
+                <option value="TIKTOK">Video TikTok (@user/video/...)</option>
+                <option value="GDRIVE_IMAGE">Ảnh từ Google Drive</option>
+                <option value="GDRIVE_VIDEO">Video từ Google Drive</option>
+                <option value="GDRIVE_PDF">Tài liệu PDF từ Google Drive</option>
+                <option value="PDF_URL">Link tệp PDF trực tiếp (HTTPS)</option>
+                <option value="SVG_URL">Link ảnh SVG trực tiếp (HTTPS)</option>
+              </select>
+            </label>
+            <label className="media-field">
+              Tên video / tệp media
+              <input id="video-name" value={video.name} maxLength={180} disabled={busy} placeholder="VD: Video đánh giá Lenovo Legion / Catalogue PDF…" onChange={(e) => setVideo({ ...video, name: e.target.value })} />
+            </label>
+            <label className="media-field">
+              Liên kết YouTube / TikTok / Google Drive / PDF / SVG
+              <input
+                type="url"
+                value={video.url}
+                maxLength={1000}
+                disabled={busy}
+                placeholder="https://www.youtube.com/watch?v=… | https://www.tiktok.com/@…/video/… | https://drive.google.com/file/d/…"
+                onChange={(e) => setVideo({ ...video, url: e.target.value })}
+              />
+            </label>
+            <p className="media-muted">
+              Hỗ trợ: YouTube, TikTok, Google Drive (chia sẻ công khai dạng <code>/file/d/...</code> hoặc <code>?id=...</code>), liên kết trực tiếp <code>.pdf</code> hoặc <code>.svg</code>.
+            </p>
+            {error && <p role="alert" className="media-error">{error}</p>}
+            <button className="media-button media-button-primary" disabled={busy}>
+              {busy ? 'Đang lưu…' : 'Lưu video'}
+            </button>
+          </form>
+        </MediaDialog>
+      )}
+    </div>
+  );
 }

@@ -7,11 +7,11 @@ async function GETHandler(request: Request) {
 }
 async function POSTHandler(request: Request) {
   return mediaAdmin(request, true, async (env) => {
-    if (Number(request.headers.get('content-length')) > 6 * 1024 * 1024) throw new MediaError('Ảnh vượt quá 5 MB.', 413);
+    if (Number(request.headers.get('content-length')) > 55 * 1024 * 1024) throw new MediaError('Tệp vượt quá dung lượng cho phép (tối đa 50 MB).', 413);
     if (request.headers.get('content-type')?.includes('application/json')) return addVideo(env.DB, await request.json());
     const form = await request.formData();
     const files = form.getAll('file');
-    if (files.length !== 1 || !(files[0] instanceof File)) throw new MediaError('Chọn một ảnh cho mỗi lần tải.');
+    if (files.length !== 1 || !(files[0] instanceof File)) throw new MediaError('Chọn một tệp cho mỗi lần tải.');
     return uploadLibraryImage(env, files[0]);
   });
 }

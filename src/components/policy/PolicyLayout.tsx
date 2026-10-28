@@ -78,7 +78,7 @@ export default function PolicyLayout({
     <div className="bg-[#f8fafc] min-h-screen pb-16">
       {/* 1. Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 max-w-[1240px]">
+        <div className="container mx-auto px-4 max-w-[1370px]">
           <nav aria-label="Đường dẫn trang" className="flex flex-wrap gap-y-2 text-sm text-gray-500 py-3.5 font-medium items-center">
             <Link href="/" className="hover:text-blue-600 transition">
               Trang chủ
@@ -91,7 +91,7 @@ export default function PolicyLayout({
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-[1240px] mt-8">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* 2. Left Sidebar (4 cols) */}
           <div className="order-2 lg:order-1 lg:col-span-4 space-y-6">

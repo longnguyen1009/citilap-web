@@ -229,20 +229,6 @@ body {
   padding-right: 1rem;
 }
 
-@media (min-width: 640px) {
-  .container-shop {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
-  }
-}
-
-@media (min-width: 1024px) {
-  .container-shop {
-    padding-left: 2rem;
-    padding-right: 2rem;
-  }
-}
-
 /* Storefront Surfaces & Borders */
 .surface-card {
   background-color: var(--color-surface-card);

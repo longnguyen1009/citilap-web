@@ -4,7 +4,6 @@ import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
 import DraftRecovery from '@/components/admin/DraftRecovery';
 import SchedulePanel from '@/components/admin/SchedulePanel';
 
-
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -22,9 +21,9 @@ import {
   Plus,
   Search,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import {
-  PageHeader,
   AdminCard,
   AdminButton,
   StatusBadge,
@@ -68,11 +67,10 @@ interface PostRevisionItem {
 export default function PostEditor({ id }: { id: string | null }) {
   const router = useRouter();
 
-  // Document state
   const [doc, setDoc] = useState<PostDocument>(blankPost());
   const [revision, setRevision] = useState(0);
-  const latestDoc=useRef(doc), saveLock=useRef(false);
-  useEffect(()=>{latestDoc.current=doc;},[doc]);
+  const latestDoc = useRef(doc), saveLock = useRef(false);
+  useEffect(() => { latestDoc.current = doc; }, [doc]);
   const [isPublished, setIsPublished] = useState(false);
   const [loading, setLoading] = useState(!!id);
   const [error, setError] = useState<string | null>(null);
@@ -80,29 +78,23 @@ export default function PostEditor({ id }: { id: string | null }) {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
 
-  // Categories & options
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Dialogs
   const [mediaDialogTarget, setMediaDialogTarget] = useState<'cover' | 'og' | 'body' | null>(null);
 
-  // Related products picker
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [productQuery, setProductQuery] = useState('');
   const [productResults, setProductResults] = useState<ProductPickerOption[]>([]);
   const [productSearching, setProductSearching] = useState(false);
   const [relatedProductDetails, setRelatedProductDetails] = useState<Record<string, ProductPickerOption>>({});
 
-  // Revisions history
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyList, setHistoryList] = useState<PostRevisionItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  // Preview modal
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  // Load categories
   useEffect(() => {
     mediaRequest<{ id: string; name: string; slug: string; status: 'ACTIVE' | 'INACTIVE' }[]>('/api/admin/post-categories?status=ALL')
       .then((cats) => setCategories(cats || []))
@@ -111,7 +103,6 @@ export default function PostEditor({ id }: { id: string | null }) {
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Load post details
   useEffect(() => {
     if (!id) return;
     let ignore = false;
@@ -142,7 +133,6 @@ export default function PostEditor({ id }: { id: string | null }) {
     setRefreshTrigger((prev) => prev + 1);
   }, []);
 
-  // Load related product details when relatedProductIds change
   useEffect(() => {
     if (!doc.relatedProductIds?.length) return;
     const missingIds = doc.relatedProductIds.filter(pid => !relatedProductDetails[pid]);
@@ -187,9 +177,9 @@ export default function PostEditor({ id }: { id: string | null }) {
   };
 
   const handleSave = async (action: 'save' | 'publish' | 'unpublish') => {
-    if(saveLock.current)return false;
-    saveLock.current=true;
-    const submitted=JSON.stringify(doc);
+    if (saveLock.current) return false;
+    saveLock.current = true;
+    const submitted = JSON.stringify(doc);
     setSaving(true);
     setConflictError(null);
     setSaveSuccess(null);
@@ -213,15 +203,15 @@ export default function PostEditor({ id }: { id: string | null }) {
 
       setRevision(result.revision);
       setIsPublished(result.published);
-      if(JSON.stringify(latestDoc.current)===submitted)setDoc(result.document);
-      setHasUnsavedChanges(JSON.stringify(latestDoc.current)!==submitted);
+      if (JSON.stringify(latestDoc.current) === submitted) setDoc(result.document);
+      setHasUnsavedChanges(JSON.stringify(latestDoc.current) !== submitted);
 
       if (action === 'publish') {
-        setSaveSuccess('Bài viết đã được xuất bản lên website thành công!');
+        setSaveSuccess('Đã xuất bản bài viết lên website.');
       } else if (action === 'unpublish') {
-        setSaveSuccess('Bài viết đã được chuyển về trạng thái ẩn.');
+        setSaveSuccess('Đã ẩn bài viết khỏi website.');
       } else {
-        setSaveSuccess(`Đã lưu bản nháp thành công (phiên bản #${result.revision}).`);
+        setSaveSuccess(`Đã lưu nháp (#v${result.revision}).`);
       }
 
       if (!id && result.id) {
@@ -237,12 +227,12 @@ export default function PostEditor({ id }: { id: string | null }) {
       }
       return false;
     } finally {
-      saveLock.current=false;
+      saveLock.current = false;
       setSaving(false);
     }
   };
 
-  const autosaveStatus=useDraftAutosave(doc,revision,!!id && !loading,hasUnsavedChanges,saving,()=>handleSave('save'));
+  const autosaveStatus = useDraftAutosave(doc, revision, !!id && !loading, hasUnsavedChanges, saving, () => handleSave('save'));
 
   const loadHistory = async () => {
     if (!id) return;
@@ -259,7 +249,7 @@ export default function PostEditor({ id }: { id: string | null }) {
 
   const handleRestore = async (targetRev: number) => {
     if (!id || saveLock.current) return;
-    const confirmed = window.confirm(`Bạn có chắc muốn khôi phục phiên bản #${targetRev} thành bản nháp mới? Website vẫn giữ nguyên bài viết công cộng cho đến khi bạn xuất bản lại.`);
+    const confirmed = window.confirm(`Khôi phục phiên bản #${targetRev} thành bản nháp mới?`);
     if (!confirmed) return;
 
     saveLock.current = true;
@@ -274,7 +264,7 @@ export default function PostEditor({ id }: { id: string | null }) {
       setRevision(result.newRevision);
       if (JSON.stringify(latestDoc.current) === beforeRestore) setDoc(result.document);
       setHasUnsavedChanges(JSON.stringify(latestDoc.current) !== beforeRestore);
-      setSaveSuccess(`Đã khôi phục phiên bản #${targetRev} thành bản nháp mới (rev #${result.newRevision}). Hãy kiểm tra và xuất bản khi sẵn sàng.`);
+      setSaveSuccess(`Đã khôi phục #${targetRev} thành nháp mới (rev #${result.newRevision}).`);
       setHistoryOpen(false);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Không thể khôi phục phiên bản.');
@@ -284,7 +274,6 @@ export default function PostEditor({ id }: { id: string | null }) {
     }
   };
 
-  // Search products for picker
   const handleSearchProducts = async (q: string) => {
     setProductSearching(true);
     try {
@@ -300,7 +289,7 @@ export default function PostEditor({ id }: { id: string | null }) {
   const addRelatedProduct = (product: ProductPickerOption) => {
     if (doc.relatedProductIds.includes(product.id)) return;
     if (doc.relatedProductIds.length >= 10) {
-      alert('Tối đa 10 sản phẩm liên quan cho mỗi bài viết.');
+      alert('Tối đa 10 sản phẩm liên quan.');
       return;
     }
     setRelatedProductDetails(prev => ({ ...prev, [product.id]: product }));
@@ -330,141 +319,160 @@ export default function PostEditor({ id }: { id: string | null }) {
     setMediaDialogTarget(null);
   };
 
-  if (loading) return <AdminLoadingState message="Đang tải dữ liệu bài viết..." />;
+  if (loading) return <AdminLoadingState message="Đang tải bài viết..." />;
   if (error && !doc.title) return <AdminErrorState message={error} onRetry={loadPost} />;
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Header */}
-      <p role="status" aria-live="polite">{autosaveStatus}</p>
-      {hasUnsavedChanges && id && <DraftRecovery draft={doc} endpoint={`/api/admin/posts/${id}`}/>}
-      <SchedulePanel entityType="post" entityId={id} revision={revision} dirty={hasUnsavedChanges || saving}/>
-      <PageHeader
-        title={id ? (doc.title || 'Biên tập bài viết') : 'Viết bài viết mới'}
-        description="Soạn thảo tin tức, đánh giá sản phẩm, quản lý phiên bản và xuất bản website."
-        actions={
-          <div className="flex items-center gap-3">
-            <Link href="/admin/posts">
-              <AdminButton variant="secondary" size="sm" icon={<ArrowLeft size={16} />}>
-                Quay lại
-              </AdminButton>
-            </Link>
-            {id && (
-              <AdminButton
-                variant="secondary"
-                size="sm"
-                icon={<History size={16} />}
-                onClick={() => {
-                  setHistoryOpen(true);
-                  loadHistory();
-                }}
-              >
-                Lịch sử ({revision})
-              </AdminButton>
-            )}
+    <div className="admin-content-editor space-y-3 pb-12">
+      {/* Compact 1-Line Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-2xs">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <Link
+            href="/admin/posts"
+            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition shrink-0"
+            title="Quay lại danh sách bài viết"
+          >
+            <ArrowLeft size={15} />
+          </Link>
+          <h1 className="text-sm font-bold text-slate-900 truncate">
+            {id ? (doc.title || 'Biên tập bài viết') : 'Viết bài mới'}
+          </h1>
+          <StatusBadge
+            status={isPublished ? 'PUBLISHED' : 'DRAFT'}
+            customLabel={isPublished ? 'Hiển thị' : 'Nháp'}
+          />
+          {hasUnsavedChanges && (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">
+              Chưa lưu
+            </span>
+          )}
+          <span className="text-[11px] font-mono text-slate-400 shrink-0">#v{revision}</span>
+          <p role="status" aria-live="polite" className="text-[11px] text-slate-400 truncate">
+            {autosaveStatus}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isPublished && doc.slug && (
+            <a
+              href={`/news/${doc.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 hover:text-blue-600 hover:bg-slate-50 rounded-lg border border-slate-200"
+            >
+              <ExternalLink size={13} />
+              <span>Xem web</span>
+            </a>
+          )}
+          {id && (
             <AdminButton
               variant="secondary"
               size="sm"
-              icon={<Eye size={16} />}
-              onClick={() => setPreviewOpen(true)}
+              icon={<History size={14} />}
+              onClick={() => {
+                setHistoryOpen(true);
+                loadHistory();
+              }}
             >
-              Xem trước
+              Lịch sử
             </AdminButton>
-          </div>
-        }
-      />
+          )}
+          <AdminButton
+            variant="secondary"
+            size="sm"
+            icon={<Eye size={14} />}
+            onClick={() => setPreviewOpen(true)}
+          >
+            Xem trước
+          </AdminButton>
+        </div>
+      </div>
 
       {/* Alerts */}
       {saveSuccess && (
-        <InlineAlert variant="success" title="Thành công" onClose={() => setSaveSuccess(null)}>
+        <InlineAlert variant="success" onClose={() => setSaveSuccess(null)}>
           {saveSuccess}
         </InlineAlert>
       )}
       {conflictError && (
         <InlineAlert variant="error" title="Xung đột phiên bản (409)">
-          {conflictError} Bản sửa hiện tại của bạn vẫn được giữ trên màn hình. Hãy sao chép nội dung hoặc tải lại để đồng bộ.
+          {conflictError} Bản sửa hiện tại vẫn được giữ trên màn hình.
         </InlineAlert>
       )}
       {error && (
-        <InlineAlert variant="error" title="Lỗi" onClose={() => setError(null)}>
+        <InlineAlert variant="error" onClose={() => setError(null)}>
           {error}
         </InlineAlert>
       )}
-      {hasUnsavedChanges && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-4 py-2.5 rounded-lg flex items-center justify-between">
-          <span>Có thay đổi chưa lưu. Hãy bấm &quot;Lưu nháp&quot; hoặc &quot;Xuất bản&quot; để lưu trữ.</span>
-          <span className="font-semibold text-amber-900">Phiên bản hiện tại: #{revision}</span>
-        </div>
-      )}
 
       {/* Main Grid: Left Editor (8 cols) + Right Sidebar (4 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* LEFT COLUMN: Main Editorial Content */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Basic Info Card */}
-          <AdminCard title="Nội dung chính bài viết">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tiêu đề bài viết <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="input-title"
-                  name="title"
-                  type="text"
-                  value={doc.title}
-                  onChange={(e) => updateDoc('title', e.target.value)}
-                  placeholder="Ví dụ: Đánh giá chi tiết Laptop ThinkPad T14 Gen 4..."
-                  className="w-full text-sm font-medium px-3.5 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Đường dẫn tĩnh (Slug) <span className="text-red-500">*</span>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        {/* LEFT COLUMN */}
+        <div className="lg:col-span-8 space-y-3">
+          <AdminCard>
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                <div className="md:col-span-7">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Tiêu đề bài viết <span className="text-red-500">*</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleSlugify}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-                  >
-                    <Sparkles size={12} /> Tự động tạo slug
-                  </button>
-                </div>
-                <div className="flex rounded-lg shadow-sm">
-                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-xs">
-                    /news/
-                  </span>
                   <input
-                    id="input-slug"
-                    name="slug"
+                    id="input-title"
+                    name="title"
                     type="text"
-                    value={doc.slug}
-                    onChange={(e) => updateDoc('slug', e.target.value)}
-                    placeholder="danh-gia-thinkpad-t14-gen-4"
-                    className="flex-1 text-sm px-3.5 py-2 border border-slate-300 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                    value={doc.title}
+                    onChange={(e) => updateDoc('title', e.target.value)}
+                    placeholder="VD: Đánh giá chi tiết ThinkPad T14 Gen 4..."
+                    className="w-full text-xs font-medium px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
+
+                <div className="md:col-span-5">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-600">
+                      Slug <span className="text-red-500">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSlugify}
+                      className="text-[11px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles size={11} /> Tự tạo
+                    </button>
+                  </div>
+                  <div className="flex rounded-lg">
+                    <span className="inline-flex items-center px-2 rounded-l-lg border border-r-0 border-slate-200 bg-slate-50 text-slate-400 text-[11px] font-mono">
+                      /news/
+                    </span>
+                    <input
+                      id="input-slug"
+                      name="slug"
+                      type="text"
+                      value={doc.slug}
+                      onChange={(e) => updateDoc('slug', e.target.value)}
+                      placeholder="danh-gia-thinkpad-t14"
+                      className="flex-1 min-w-0 text-xs px-2.5 py-1.5 border border-slate-200 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tóm tắt bài viết (Excerpt)
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Tóm tắt ngắn (Excerpt)
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={doc.excerpt}
                   onChange={(e) => updateDoc('excerpt', e.target.value)}
-                  placeholder="Mô tả ngắn gọn về nội dung bài viết hiển thị ở danh sách bài và thẻ xem trước..."
-                  className="w-full text-sm px-3.5 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="Mô tả ngắn hiển thị ở danh sách tin tức..."
+                  className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
-              {/* Rich Content Editor */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Nội dung chi tiết bài viết <span className="text-red-500">*</span>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Nội dung bài viết <span className="text-red-500">*</span>
                 </label>
                 <RichContentEditor
                   value={doc.contentHtml}
@@ -475,92 +483,91 @@ export default function PostEditor({ id }: { id: string | null }) {
             </div>
           </AdminCard>
 
-          {/* Related Products Card */}
-          <AdminCard
-            title={`Sản phẩm liên quan (${doc.relatedProductIds.length}/10)`}
-            subtitle="Các sản phẩm Laptop hoặc Phụ kiện xuất hiện ở khối gợi ý chân bài viết. Thứ tự hiển thị theo sắp xếp bên dưới."
+          {/* Collapsible Related Products */}
+          <details
+            className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden group"
+            open={doc.relatedProductIds.length > 0}
           >
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-slate-500">
-                  Chỉ các sản phẩm đang hiển thị công khai (Active & Published) mới xuất hiện trên Storefront.
-                </p>
-                <AdminButton
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  icon={<Plus size={14} />}
-                  onClick={() => {
-                    setProductSearchOpen(true);
-                    handleSearchProducts('');
-                  }}
-                >
-                  Chọn sản phẩm
-                </AdminButton>
-              </div>
+            <summary className="px-4 py-2.5 bg-slate-50/70 cursor-pointer flex items-center justify-between text-xs font-bold text-slate-800 select-none">
+              <span>Sản phẩm liên quan ({doc.relatedProductIds.length}/10)</span>
+              <AdminButton
+                type="button"
+                size="sm"
+                variant="secondary"
+                icon={<Plus size={13} />}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setProductSearchOpen(true);
+                  handleSearchProducts('');
+                }}
+              >
+                Chọn SP
+              </AdminButton>
+            </summary>
 
+            <div className="p-3.5 border-t border-slate-100">
               {doc.relatedProductIds.length === 0 ? (
-                <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
-                  Chưa gán sản phẩm liên quan nào cho bài viết này.
+                <div className="text-center py-4 text-slate-400 text-xs">
+                  Chưa gán sản phẩm liên quan.
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {doc.relatedProductIds.map((pid, idx) => {
                     const p = relatedProductDetails[pid];
                     return (
                       <div
                         key={pid}
-                        className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        className="flex items-center justify-between px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-slate-400 w-5">{idx + 1}.</span>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="font-bold text-slate-400 w-4">{idx + 1}.</span>
                           {p?.image ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded border border-slate-200 bg-white" />
+                            <img src={p.image} alt={p.name} className="w-8 h-8 object-cover rounded border border-slate-200 bg-white shrink-0" />
                           ) : (
-                            <div className="w-10 h-10 bg-slate-200 rounded flex items-center justify-center text-slate-400">
-                              <ImageIcon size={18} />
+                            <div className="w-8 h-8 bg-slate-200 rounded flex items-center justify-center text-slate-400 shrink-0">
+                              <ImageIcon size={14} />
                             </div>
                           )}
-                          <div>
-                            <div className="font-semibold text-slate-800">{p?.name || `Sản phẩm #${pid}`}</div>
-                            <div className="text-slate-500 font-mono">
-                              {p?.price ? `${p.price.toLocaleString('vi-VN')}₫` : 'ID: ' + pid}
+                          <div className="min-w-0">
+                            <div className="font-semibold text-slate-800 truncate">{p?.name || `SP #${pid}`}</div>
+                            <div className="text-[11px] text-slate-500 font-mono tabular-nums">
+                              {p?.price ? `${p.price.toLocaleString('vi-VN')}₫` : pid}
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 shrink-0">
                           {p && (
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${p.isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
-                              {p.isPublished ? 'Công khai' : 'Nháp/Ẩn'}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${p.isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>
+                              {p.isPublished ? 'Hiện' : 'Nháp'}
                             </span>
                           )}
                           <button
                             type="button"
                             disabled={idx === 0}
                             onClick={() => moveRelatedProduct(idx, 'up')}
-                            className="p-1 hover:bg-slate-200 rounded disabled:opacity-30"
-                            title="Di chuyển lên"
+                            className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 cursor-pointer"
+                            title="Lên"
                           >
-                            <ArrowUp size={14} />
+                            <ArrowUp size={13} />
                           </button>
                           <button
                             type="button"
                             disabled={idx === doc.relatedProductIds.length - 1}
                             onClick={() => moveRelatedProduct(idx, 'down')}
-                            className="p-1 hover:bg-slate-200 rounded disabled:opacity-30"
-                            title="Di chuyển xuống"
+                            className="p-1 hover:bg-slate-200 rounded disabled:opacity-30 cursor-pointer"
+                            title="Xuống"
                           >
-                            <ArrowDown size={14} />
+                            <ArrowDown size={13} />
                           </button>
                           <button
                             type="button"
                             onClick={() => removeRelatedProduct(pid)}
-                            className="p-1 hover:bg-red-100 text-red-600 rounded ml-1"
-                            title="Xóa khỏi danh sách"
+                            className="p-1 hover:bg-red-100 text-red-600 rounded cursor-pointer"
+                            title="Xóa"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </div>
@@ -569,26 +576,60 @@ export default function PostEditor({ id }: { id: string | null }) {
                 </div>
               )}
             </div>
-          </AdminCard>
+          </details>
 
-          {/* SEO Metadata Card */}
-          <AdminCard title="Cấu hình SEO & Mạng xã hội">
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tiêu đề SEO (Title Tag)
-                </label>
-                <input
-                  type="text"
-                  value={doc.seo.title}
-                  onChange={(e) => updateSeo('title', e.target.value)}
-                  placeholder={doc.title || 'Mặc định dùng tiêu đề bài viết'}
-                  className="w-full text-xs px-3.5 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+          {/* Collapsible SEO Metadata */}
+          <details className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
+            <summary className="px-4 py-2.5 bg-slate-50/70 cursor-pointer flex items-center justify-between text-xs font-bold text-slate-800 select-none">
+              <span>Cấu hình SEO & Chia sẻ mạng xã hội</span>
+              <span className="text-[11px] font-normal text-slate-400">
+                {doc.seo.title ? 'Đã tùy chỉnh' : 'Mặc định theo tiêu đề'}
+              </span>
+            </summary>
+            <div className="p-4 border-t border-slate-100 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                <div className="md:col-span-8">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Tiêu đề SEO (Title Tag)
+                  </label>
+                  <input
+                    type="text"
+                    value={doc.seo.title}
+                    onChange={(e) => updateSeo('title', e.target.value)}
+                    placeholder={doc.title || 'Mặc định dùng tiêu đề bài viết'}
+                    className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="md:col-span-4">
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Ảnh OG
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <AdminButton
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      icon={<ImageIcon size={13} />}
+                      onClick={() => setMediaDialogTarget('og')}
+                    >
+                      {doc.seo.ogImageAssetId ? 'Đổi ảnh OG' : 'Chọn ảnh OG'}
+                    </AdminButton>
+                    {doc.seo.ogImageAssetId && (
+                      <button
+                        type="button"
+                        onClick={() => updateSeo('ogImageAssetId', null)}
+                        className="text-xs text-red-600 hover:underline cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Mô tả SEO (Meta Description)
                 </label>
                 <textarea
@@ -596,105 +637,81 @@ export default function PostEditor({ id }: { id: string | null }) {
                   value={doc.seo.description}
                   onChange={(e) => updateSeo('description', e.target.value)}
                   placeholder={doc.excerpt || 'Mặc định dùng tóm tắt bài viết'}
-                  className="w-full text-xs px-3.5 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Ảnh chia sẻ mạng xã hội (OG Image)
-                </label>
-                <div className="flex items-center gap-3">
-                  <AdminButton
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    icon={<ImageIcon size={14} />}
-                    onClick={() => setMediaDialogTarget('og')}
-                  >
-                    {doc.seo.ogImageAssetId ? 'Đổi ảnh OG' : 'Chọn ảnh OG'}
-                  </AdminButton>
-                  {doc.seo.ogImageAssetId && (
-                    <button
-                      type="button"
-                      onClick={() => updateSeo('ogImageAssetId', null)}
-                      className="text-xs text-red-600 hover:underline"
-                    >
-                      Xóa ảnh OG
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
-          </AdminCard>
+          </details>
         </div>
 
-        {/* RIGHT COLUMN: Sidebar Publication & Settings */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Action / Publication Card */}
-          <AdminCard title="Xuất bản & Trạng thái">
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <span className="text-xs text-slate-500">Trạng thái:</span>
-                <StatusBadge
-                  status={isPublished ? 'PUBLISHED' : 'DRAFT'}
-                  customLabel={isPublished ? 'Đang hiển thị' : 'Bản nháp'}
-                />
-              </div>
+        {/* RIGHT COLUMN: Sticky Publication + Unified Classification & Cover */}
+        <div className="lg:col-span-4 space-y-3 lg:sticky lg:top-16">
+          <AdminCard>
+            <div className="space-y-2.5">
+              <AdminButton
+                className="w-full"
+                variant="primary"
+                icon={<Globe size={15} />}
+                loading={saving}
+                onClick={() => handleSave('publish')}
+              >
+                {isPublished ? 'Cập nhật website' : 'Xuất bản website'}
+              </AdminButton>
 
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100 text-xs">
-                <span className="text-slate-500">Phiên bản hiện tại:</span>
-                <span className="font-mono font-semibold text-slate-800">#{revision}</span>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="space-y-2 pt-2">
-                <AdminButton
-                  className="w-full"
-                  variant="primary"
-                  icon={<Globe size={16} />}
-                  loading={saving}
-                  onClick={() => handleSave('publish')}
-                >
-                  {isPublished ? 'Cập nhật website' : 'Xuất bản website'}
-                </AdminButton>
-
+              <div className="grid grid-cols-2 gap-2">
                 <AdminButton
                   className="w-full"
                   variant="secondary"
-                  icon={<Save size={16} />}
+                  size="sm"
+                  icon={<Save size={14} />}
                   loading={saving}
                   onClick={() => handleSave('save')}
                 >
                   Lưu bản nháp
                 </AdminButton>
 
-                {isPublished && (
+                {isPublished ? (
                   <AdminButton
                     className="w-full"
                     variant="ghost"
-                    icon={<EyeOff size={16} />}
+                    size="sm"
+                    icon={<EyeOff size={14} />}
                     loading={saving}
                     onClick={() => handleSave('unpublish')}
                   >
-                    Ẩn khỏi website (Unpublish)
+                    Ẩn khỏi web
+                  </AdminButton>
+                ) : (
+                  <AdminButton
+                    className="w-full"
+                    variant="secondary"
+                    size="sm"
+                    icon={<Eye size={14} />}
+                    onClick={() => setPreviewOpen(true)}
+                  >
+                    Xem trước
                   </AdminButton>
                 )}
+              </div>
+
+              <div className="pt-1 space-y-2 text-xs">
+                <SchedulePanel entityType="post" entityId={id} revision={revision} dirty={hasUnsavedChanges || saving} />
+                {hasUnsavedChanges && id && <DraftRecovery draft={doc} endpoint={`/api/admin/posts/${id}`} />}
               </div>
             </div>
           </AdminCard>
 
-          {/* Classification & Settings */}
-          <AdminCard title="Phân loại & Tác giả">
-            <div className="space-y-4">
+          {/* Unified Classification + Cover Image Card */}
+          <AdminCard title="Phân loại & Ảnh bìa">
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Chuyên mục bài viết
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Chuyên mục
                 </label>
                 <select
                   value={doc.categoryId || ''}
                   onChange={(e) => updateDoc('categoryId', e.target.value || null)}
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
                 >
                   <option value="">-- Chưa gán chuyên mục --</option>
                   {categories.map((c) => (
@@ -706,89 +723,80 @@ export default function PostEditor({ id }: { id: string | null }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tác giả hiển thị
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Tác giả
                 </label>
                 <input
                   type="text"
                   value={doc.authorName}
                   onChange={(e) => updateDoc('authorName', e.target.value)}
-                  placeholder="Ví dụ: CitiLap Editorial, Nguyễn Văn A..."
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="VD: Ban biên tập CitiLap"
+                  className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
 
-              <div className="pt-2 border-t border-slate-100">
-                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-medium text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={doc.isFeatured}
-                    onChange={(e) => updateDoc('isFeatured', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                  />
-                  <span>Đánh dấu là bài viết nổi bật (Featured)</span>
-                </label>
-              </div>
-            </div>
-          </AdminCard>
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700 pt-1">
+                <input
+                  type="checkbox"
+                  checked={doc.isFeatured}
+                  onChange={(e) => updateDoc('isFeatured', e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                />
+                <span>Bài viết nổi bật (Featured)</span>
+              </label>
 
-          {/* Cover Image Card */}
-          <AdminCard title="Ảnh đại diện (Cover Image)">
-            <div className="space-y-3">
-              {doc.coverImage?.assetId ? (
-                <div className="space-y-2">
-                  <div className="relative border border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center h-44">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/library/${doc.coverImage.assetId}`}
-                      alt={doc.coverImage.alt || 'Ảnh đại diện'}
-                      className="max-h-full max-w-full object-contain"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Mô tả ảnh (ALT Text) <span className="text-red-500">*</span>
-                    </label>
+              <div className="pt-3 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-600">Ảnh đại diện</span>
+                  {doc.coverImage?.assetId && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setMediaDialogTarget('cover')}
+                        className="text-blue-600 hover:underline font-medium cursor-pointer"
+                      >
+                        Đổi ảnh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc('coverImage', null)}
+                        className="text-rose-600 hover:underline cursor-pointer"
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {doc.coverImage?.assetId ? (
+                  <div className="space-y-2">
+                    <div className="relative border border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center h-32">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/library/${doc.coverImage.assetId}`}
+                        alt={doc.coverImage.alt || 'Ảnh đại diện'}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    </div>
                     <input
                       type="text"
                       value={doc.coverImage.alt}
                       onChange={(e) => updateDoc('coverImage', { ...doc.coverImage!, alt: e.target.value })}
-                      placeholder="Mô tả nội dung bức ảnh..."
-                      className="w-full text-xs px-3 py-1.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="Mô tả ảnh (ALT) *"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
-                  <div className="flex gap-2">
-                    <AdminButton
-                      size="sm"
-                      variant="secondary"
-                      className="w-full"
-                      onClick={() => setMediaDialogTarget('cover')}
-                    >
-                      Đổi ảnh
-                    </AdminButton>
-                    <AdminButton
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => updateDoc('coverImage', null)}
-                    >
-                      Xóa
-                    </AdminButton>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg">
-                  <ImageIcon size={32} className="mx-auto text-slate-400 mb-2" />
-                  <p className="text-xs text-slate-500 mb-3">Chưa có ảnh đại diện</p>
-                  <AdminButton
-                    size="sm"
-                    variant="secondary"
-                    icon={<Plus size={14} />}
+                ) : (
+                  <button
+                    type="button"
                     onClick={() => setMediaDialogTarget('cover')}
+                    className="w-full py-4 border border-dashed border-slate-300 hover:border-blue-400 rounded-lg text-xs text-slate-500 hover:text-blue-600 flex flex-col items-center gap-1 transition cursor-pointer bg-slate-50/50"
                   >
-                    Chọn từ thư viện
-                  </AdminButton>
-                </div>
-              )}
+                    <ImageIcon size={20} className="text-slate-400" />
+                    <span>+ Chọn ảnh đại diện</span>
+                  </button>
+                )}
+              </div>
             </div>
           </AdminCard>
         </div>
@@ -819,20 +827,20 @@ export default function PostEditor({ id }: { id: string | null }) {
       {productSearchOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="font-semibold text-slate-800 text-sm">Chọn sản phẩm liên quan</h3>
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <h3 className="font-bold text-slate-800 text-xs">Chọn sản phẩm liên quan</h3>
               <button
                 type="button"
                 onClick={() => setProductSearchOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-3 border-b border-slate-100">
               <div className="relative">
-                <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
                 <input
                   type="text"
                   value={productQuery}
@@ -841,13 +849,13 @@ export default function PostEditor({ id }: { id: string | null }) {
                     handleSearchProducts(e.target.value);
                   }}
                   placeholder="Tìm kiếm sản phẩm theo tên, model..."
-                  className="w-full text-xs pl-9 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full text-xs pl-8 pr-4 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   autoFocus
                 />
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
               {productSearching ? (
                 <div className="py-8 text-center text-xs text-slate-400">Đang tìm kiếm...</div>
               ) : productResults.length === 0 ? (
@@ -858,21 +866,21 @@ export default function PostEditor({ id }: { id: string | null }) {
                   return (
                     <div
                       key={p.id}
-                      className="flex items-center justify-between p-2.5 hover:bg-slate-50 border border-slate-100 rounded-lg text-xs"
+                      className="flex items-center justify-between p-2 hover:bg-slate-50 border border-slate-100 rounded-lg text-xs"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         {p.image ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.image} alt={p.name} className="w-10 h-10 object-cover rounded border border-slate-200 bg-white" />
+                          <img src={p.image} alt={p.name} className="w-9 h-9 object-cover rounded border border-slate-200 bg-white" />
                         ) : (
-                          <div className="w-10 h-10 bg-slate-200 rounded flex items-center justify-center text-slate-400">
-                            <ImageIcon size={16} />
+                          <div className="w-9 h-9 bg-slate-200 rounded flex items-center justify-center text-slate-400">
+                            <ImageIcon size={14} />
                           </div>
                         )}
                         <div>
                           <div className="font-semibold text-slate-800">{p.name}</div>
-                          <div className="text-slate-500 font-mono">
-                            {p.price ? `${p.price.toLocaleString('vi-VN')}₫` : 'Liên hệ'} • {p.isPublished ? 'Đang công khai' : 'Bản nháp'}
+                          <div className="text-[11px] text-slate-500 font-mono">
+                            {p.price ? `${p.price.toLocaleString('vi-VN')}₫` : 'Liên hệ'} • {p.isPublished ? 'Công khai' : 'Nháp'}
                           </div>
                         </div>
                       </div>
@@ -882,9 +890,7 @@ export default function PostEditor({ id }: { id: string | null }) {
                         size="sm"
                         variant={isSelected ? 'ghost' : 'secondary'}
                         disabled={isSelected}
-                        onClick={() => {
-                          addRelatedProduct(p);
-                        }}
+                        onClick={() => addRelatedProduct(p)}
                       >
                         {isSelected ? 'Đã thêm' : 'Chọn'}
                       </AdminButton>
@@ -894,7 +900,7 @@ export default function PostEditor({ id }: { id: string | null }) {
               )}
             </div>
 
-            <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-end">
               <AdminButton size="sm" variant="primary" onClick={() => setProductSearchOpen(false)}>
                 Hoàn tất
               </AdminButton>
@@ -903,25 +909,22 @@ export default function PostEditor({ id }: { id: string | null }) {
         </div>
       )}
 
-      {/* Revision History Modal / Drawer */}
+      {/* Revision History Modal */}
       {historyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-slate-800 text-sm">Lịch sử phiên bản (Revisions)</h3>
-                <p className="text-xs text-slate-500">Mỗi lần Lưu nháp hoặc Xuất bản tạo ra 1 revision bất biến. Khôi phục sẽ tạo 1 bản nháp mới.</p>
-              </div>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <h3 className="font-bold text-slate-800 text-xs">Lịch sử phiên bản</h3>
               <button
                 type="button"
                 onClick={() => setHistoryOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-2">
               {historyLoading ? (
                 <div className="py-8 text-center text-xs text-slate-400">Đang tải lịch sử...</div>
               ) : historyList.length === 0 ? (
@@ -930,28 +933,28 @@ export default function PostEditor({ id }: { id: string | null }) {
                 historyList.map((rev) => (
                   <div
                     key={rev.revision}
-                    className={`p-3.5 border rounded-lg text-xs flex items-center justify-between ${rev.isCurrent ? 'border-blue-300 bg-blue-50/50' : 'border-slate-200 bg-white'}`}
+                    className={`p-3 border rounded-lg text-xs flex items-center justify-between ${rev.isCurrent ? 'border-blue-300 bg-blue-50/50' : 'border-slate-200 bg-white'}`}
                   >
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 mb-0.5">
                         <span className="font-mono font-bold text-slate-800">#{rev.revision}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${rev.action === 'publish' ? 'bg-emerald-100 text-emerald-800' : rev.action === 'restore' ? 'bg-purple-100 text-purple-800' : rev.action === 'unpublish' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${rev.action === 'publish' ? 'bg-emerald-100 text-emerald-800' : rev.action === 'restore' ? 'bg-purple-100 text-purple-800' : rev.action === 'unpublish' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'}`}>
                           {rev.action === 'publish' ? 'Xuất bản' : rev.action === 'restore' ? 'Khôi phục' : rev.action === 'unpublish' ? 'Ẩn' : 'Lưu nháp'}
                         </span>
                         {rev.isCurrent && (
-                          <span className="bg-blue-100 text-blue-800 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                            Bản nháp hiện tại
+                          <span className="bg-blue-100 text-blue-800 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                            Hiện tại
                           </span>
                         )}
                         {rev.isPublished && (
-                          <span className="bg-emerald-600 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                            Bản đang công khai trên website
+                          <span className="bg-emerald-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                            Đang hiển thị
                           </span>
                         )}
                       </div>
-                      <div className="text-slate-600 text-xs mb-0.5">{rev.summary}</div>
+                      <div className="text-slate-600 text-xs">{rev.summary}</div>
                       <div className="text-[11px] text-slate-400">
-                        Bởi {rev.actor} • {new Date(rev.createdAt).toLocaleString('vi-VN')}
+                        {rev.actor} • {new Date(rev.createdAt).toLocaleString('vi-VN')}
                       </div>
                     </div>
 
@@ -961,18 +964,12 @@ export default function PostEditor({ id }: { id: string | null }) {
                         variant="secondary"
                         onClick={() => handleRestore(rev.revision)}
                       >
-                        Khôi phục thành nháp
+                        Khôi phục
                       </AdminButton>
                     )}
                   </div>
                 ))
               )}
-            </div>
-
-            <div className="p-3 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <AdminButton size="sm" variant="secondary" onClick={() => setHistoryOpen(false)}>
-                Đóng
-              </AdminButton>
             </div>
           </div>
         </div>
@@ -982,25 +979,24 @@ export default function PostEditor({ id }: { id: string | null }) {
       {previewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-2">
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-                  CHẾ ĐỘ XEM TRƯỚC (DRAFT PREVIEW)
+                  XEM TRƯỚC BẢN NHÁP
                 </span>
-                <span className="text-xs text-slate-500">Website công cộng chưa thay đổi</span>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 font-bold"
+                className="text-slate-400 hover:text-slate-600 p-1 font-bold cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {doc.coverImage?.assetId && (
-                <div className="max-h-80 overflow-hidden rounded-xl border border-slate-200">
+                <div className="max-h-72 overflow-hidden rounded-xl border border-slate-200">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`/api/library/${doc.coverImage.assetId}`}
@@ -1011,11 +1007,11 @@ export default function PostEditor({ id }: { id: string | null }) {
               )}
 
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 mb-2">{doc.title || '(Chưa có tiêu đề)'}</h1>
-                <div className="text-xs text-slate-500 flex items-center gap-3">
-                  <span>Tác giả: {doc.authorName || 'Ban biên tập CitiLap'}</span>
+                <h1 className="text-xl font-bold text-slate-900 mb-1.5">{doc.title || '(Chưa có tiêu đề)'}</h1>
+                <div className="text-xs text-slate-500 flex items-center gap-2">
+                  <span>{doc.authorName || 'Ban biên tập CitiLap'}</span>
                   <span>•</span>
-                  <span>Ngày: {new Date().toLocaleDateString('vi-VN')}</span>
+                  <span>{new Date().toLocaleDateString('vi-VN')}</span>
                   {doc.categoryId && (
                     <>
                       <span>•</span>
@@ -1028,7 +1024,7 @@ export default function PostEditor({ id }: { id: string | null }) {
               </div>
 
               {doc.excerpt && (
-                <p className="text-sm italic text-slate-600 p-3 bg-slate-50 border-l-4 border-blue-500 rounded">
+                <p className="text-xs italic text-slate-600 p-3 bg-slate-50 border-l-4 border-blue-500 rounded">
                   {doc.excerpt}
                 </p>
               )}
@@ -1039,9 +1035,9 @@ export default function PostEditor({ id }: { id: string | null }) {
               />
             </div>
 
-            <div className="p-3 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
+            <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
               <AdminButton size="sm" variant="secondary" onClick={() => setPreviewOpen(false)}>
-                Đóng xem trước
+                Đóng
               </AdminButton>
               <AdminButton size="sm" variant="primary" onClick={() => { setPreviewOpen(false); handleSave('publish'); }}>
                 Xuất bản bài viết

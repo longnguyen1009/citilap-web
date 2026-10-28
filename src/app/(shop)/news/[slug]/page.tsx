@@ -92,7 +92,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
     <div className="bg-[#f8fafc] min-h-screen pb-20">
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-200 mb-8">
-        <div className="container mx-auto px-4 max-w-[1240px]">
+        <div className="container mx-auto px-4 max-w-[1370px]">
           <nav className="flex text-xs md:text-sm text-gray-500 py-3.5 font-medium items-center flex-wrap gap-1">
             <Link href="/" className="hover:text-blue-600 transition">Trang chủ</Link>
             <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
@@ -113,7 +113,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 max-w-[1240px]">
+      <div className="container mx-auto px-4 max-w-[1370px]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           {/* Main Article Content (8 cols) */}
           <main className="lg:col-span-8">
