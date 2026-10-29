@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { mediaEnvironment } from '@/server/media-http';
 import {
   TrendingUp,
@@ -98,10 +99,24 @@ const EVENT_CONFIG: Record<
   },
 };
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ range?: string }>;
+}) {
+  const sp = (await searchParams) || {};
+  const range = ['7d', '30d', '90d', 'all'].includes(String(sp.range)) ? String(sp.range) : '30d';
+  const daysOffset = range === '7d' ? '-6 days' : range === '90d' ? '-89 days' : '-29 days';
+  const rangeLabel =
+    range === '7d' ? '7 ngày' : range === '90d' ? '90 ngày' : range === 'all' ? 'Toàn thời gian' : '30 ngày';
+
   const { DB } = await mediaEnvironment();
-  const { results } = await DB.prepare(
-    "SELECT day,event,count FROM StorefrontMetric WHERE day>=date('now','+7 hours','-29 days') ORDER BY day DESC,count DESC"
+  const { results } = await (
+    range === 'all'
+      ? DB.prepare('SELECT day,event,count FROM StorefrontMetric ORDER BY day DESC,count DESC')
+      : DB.prepare(
+          `SELECT day,event,count FROM StorefrontMetric WHERE day>=date('now','+7 hours',?) ORDER BY day DESC,count DESC`
+        ).bind(daysOffset)
   ).all<MetricRow>();
 
   // Aggregations
@@ -134,7 +149,7 @@ export default async function AnalyticsPage() {
     <div className="space-y-3">
       {/* Page Header */}
       <PageHeader
-        title="Thống kê Storefront (30 ngày)"
+        title={`Thống kê Storefront (${rangeLabel})`}
         badge={
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
@@ -143,6 +158,28 @@ export default async function AnalyticsPage() {
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               CVR Giỏ→Đơn: {cartToOrderRate}%
             </span>
+          </div>
+        }
+        actions={
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs">
+            {[
+              { key: '7d', label: '7 ngày' },
+              { key: '30d', label: '30 ngày' },
+              { key: '90d', label: '90 ngày' },
+              { key: 'all', label: 'Tất cả' },
+            ].map((opt) => (
+              <Link
+                key={opt.key}
+                href={`/admin/analytics?range=${opt.key}`}
+                className={`px-2.5 py-1 rounded-md transition font-semibold ${
+                  range === opt.key
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                {opt.label}
+              </Link>
+            ))}
           </div>
         }
       />

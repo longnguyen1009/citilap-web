@@ -166,10 +166,18 @@ export default function NewsVideoSidebarWidget({
 
       <dialog
         ref={dialogRef}
+        {...({ closedby: "any" } as Record<string, string>)}
         aria-label={activeVideo?.title || "Video review"}
         onClose={() => setActiveVideo(null)}
         onClick={(e) => {
-          if (e.target === e.currentTarget) closeVideo();
+          if (e.target !== e.currentTarget || !dialogRef.current) return;
+          const rect = dialogRef.current.getBoundingClientRect();
+          const inBox =
+            rect.top <= e.clientY &&
+            e.clientY <= rect.top + rect.height &&
+            rect.left <= e.clientX &&
+            e.clientX <= rect.left + rect.width;
+          if (!inBox) closeVideo();
         }}
         className="fixed inset-0 m-auto w-[min(920px,94vw)] max-w-none overflow-hidden rounded-2xl bg-slate-950 p-0 text-white backdrop:bg-black/75"
       >

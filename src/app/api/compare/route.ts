@@ -193,13 +193,13 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
         }
       }
 
-      const cond = productCondition;
-      const conditionLabel = conditionLabels[cond as keyof typeof conditionLabels] || cond;
-
       const card=cards.get(row.id);
       if (!card) continue;
+      const cond = card.condition || productCondition;
+      const conditionLabel = conditionLabels[cond as keyof typeof conditionLabels] || cond;
+
       if (kind === 'LAPTOP') {
-        for (const [key, value] of Object.entries({CPU:card.specs.cpu,RAM:card.specs.ram,SSD:card.specs.ssd,GPU:card.specs.gpu})) {
+        for (const [key, value] of Object.entries({CPU:card.specs.cpu,RAM:card.specs.ram,SSD:card.specs.ssd,GPU:card.specs.gpu,'Màn hình':card.specs.display})) {
           if (value) parsedSpecs[key] = value;
         }
       }

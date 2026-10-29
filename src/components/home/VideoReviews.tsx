@@ -1,22 +1,57 @@
 'use client';
 import { useRef, useState } from 'react';
-import { PlayCircle, X } from 'lucide-react';
+import { PlayCircle, X, ExternalLink } from 'lucide-react';
 import { youtubeId } from '@/contracts/cms/media';
+import { DEFAULT_REVIEW_VIDEOS } from '@/contracts/cms/settings';
 
 type Video = { title: string; url: string; thumbnail: string };
 function embed(url: string) {
   const id = youtubeId(url);
   if (id) return `https://www.youtube-nocookie.com/embed/${id}`;
   const u = new URL(url);
-  return `https://www.tiktok.com/player/v1/${u.pathname.split('/').at(-1)}`;
+  return `https://www.tiktok.com/player/v1/${u.pathname.split('/').filter(Boolean).at(-1)}`;
 }
-export default function VideoReviews({ title, videos }: { title: string; videos: Video[] }) {
+export default function VideoReviews({
+  title,
+  videos,
+  fallbackVideos,
+  youtubeChannelUrl,
+  tiktokChannelUrl,
+}: {
+  title: string;
+  videos: Video[];
+  fallbackVideos?: Video[];
+  youtubeChannelUrl?: string;
+  tiktokChannelUrl?: string;
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const [video, setVideo] = useState<Video | null>(null);
   const [platform, setPlatform] = useState('all');
-  const filtered = videos.filter(v => platform === 'all' || (platform === 'youtube' ? !!youtubeId(v.url) : v.url.includes('tiktok.com')));
+
+  const cleanCmsVideos = (videos || []).filter(
+    (v) => v && v.url && !/cellphones/i.test(v.title || '') && !/cellphones/i.test(v.url || '')
+  );
+  const cleanFallback = (fallbackVideos || DEFAULT_REVIEW_VIDEOS).filter(
+    (v) => v && v.url && !/cellphones/i.test(v.title || '')
+  );
+  // Merge CMS videos with fallback so both YouTube and TikTok tabs have videos
+  const mergedMap = new Map<string, Video>();
+  for (const v of [...cleanCmsVideos, ...cleanFallback]) {
+    if (v?.url && !mergedMap.has(v.url)) {
+      mergedMap.set(v.url, v);
+    }
+  }
+  const activeList = Array.from(mergedMap.values());
+
+  const filtered = activeList.filter(
+    (v) =>
+      platform === 'all' ||
+      (platform === 'youtube' ? !!youtubeId(v.url) : v.url.includes('tiktok.com'))
+  );
   const [main, ...rest] = filtered;
+  const ytLink = youtubeChannelUrl || 'https://www.youtube.com/@thinkview/videos';
+  const tkLink = tiktokChannelUrl || 'https://www.tiktok.com/@citilapvn';
 
   function open(v: Video, event?: React.MouseEvent) {
     triggerRef.current = (event?.currentTarget as HTMLElement) || null;
@@ -85,22 +120,44 @@ export default function VideoReviews({ title, videos }: { title: string; videos:
     ) : (
       <p className="py-10 text-center text-sm text-slate-500">Video {platform === 'tiktok' ? 'TikTok' : 'review'} đang cập nhật.</p>
     )}
-    <p className="mt-5 text-xs text-slate-500">Video tham khảo từ CellphoneS. Nội dung và đánh giá thuộc kênh gốc.</p>
-    <div className="mt-5 text-center">
+    <p className="mt-5 text-xs text-slate-500">
+      Tổng hợp video đánh giá chuyên sâu và trải nghiệm thực tế các mẫu Laptop Gaming, Ultrabook &amp; Like New.
+    </p>
+    <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
       <a
-        href="https://www.youtube.com/@CellphoneSOfficial"
+        href={ytLink}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex rounded-xl bg-red-600 px-6 py-3 text-sm font-bold uppercase text-white hover:bg-red-700 active:scale-95 transition duration-150 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden"
+        className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase text-white hover:bg-red-700 active:scale-95 transition duration-150 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden"
       >
-        Xem video review
+        <span>Kênh YouTube Review</span>
+        <ExternalLink className="h-3.5 w-3.5" />
+      </a>
+      <a
+        href={tkLink}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase text-white hover:bg-slate-800 active:scale-95 transition duration-150 focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:outline-hidden"
+      >
+        <span>Kênh TikTok @citilapvn</span>
+        <ExternalLink className="h-3.5 w-3.5" />
       </a>
     </div>
     <dialog
       ref={dialog}
+      {...({ closedby: 'any' } as Record<string, string>)}
       aria-label={video?.title || title}
       onClose={() => { setVideo(null); triggerRef.current?.focus(); }}
-      onClick={e => { if (e.target === e.currentTarget) close(); }}
+      onClick={e => {
+        if (e.target !== e.currentTarget || !dialog.current) return;
+        const rect = dialog.current.getBoundingClientRect();
+        const inBox =
+          rect.top <= e.clientY &&
+          e.clientY <= rect.top + rect.height &&
+          rect.left <= e.clientX &&
+          e.clientX <= rect.left + rect.width;
+        if (!inBox) close();
+      }}
       className="fixed inset-0 m-auto w-[min(960px,94vw)] max-w-none overflow-hidden rounded-2xl bg-slate-950 p-0 text-white backdrop:bg-black/75"
     >
       <div className="flex items-center justify-between gap-3 p-4">

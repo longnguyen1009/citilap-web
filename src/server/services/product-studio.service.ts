@@ -3,7 +3,7 @@ import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
 import { blankProduct, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
 import { sanitizeHtml } from '../../lib/sanitize-html';
-import { MediaError, mediaDetail, getAsset, type MediaEnvironment } from './media-library.service';
+import { MediaError, mediaDetail, getAsset, resolveMediaPresentation, type MediaEnvironment } from './media-library.service';
 
 export type ProductKind = 'LAPTOP' | 'ACCESSORY' | 'MOUSE' | 'TECH' | 'OTHER';
 
@@ -47,6 +47,8 @@ export interface CatalogItem {
   isBestSeller?: boolean;
   isFeatured?: boolean;
   image: string;
+  stock?: number;
+  availableSerialsCount?: number;
   updatedAt: string;
   hasStudio: boolean;
 }
@@ -69,29 +71,97 @@ function publicationSummary(document: ProductDocument | null) {
   return { name, slug, template, price, availability };
 }
 
-function parseSpecMetrics(specs: Record<string, string>) {
-  let ramGb: number | null = null;
-  const ramMatch = (specs.RAM || specs.ram || '').match(/(\d+)\s*(?:GB|G)/i);
-  if (ramMatch) ramGb = parseInt(ramMatch[1], 10);
+export function parseRamGb(raw?: string | null): number | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  const m = s.match(/(?:^|\D)(\d+)\s*(?:GB|G)(?:\b|$)/i) || s.match(/^(\d+)$/);
+  if (!m) return null;
+  const val = parseInt(m[1], 10);
+  return Number.isFinite(val) && val > 0 ? val : null;
+}
 
-  let storageGb: number | null = null;
-  const tbMatch = (specs.SSD || specs['Ổ cứng'] || specs.storage || '').match(/(\d+)\s*(?:TB|T)/i);
+export function parseStorageGb(raw?: string | null): number | null {
+  if (!raw) return null;
+  const s = String(raw).trim();
+  const tbMatch = s.match(/(?:^|\D)(\d+(?:\.\d+)?)\s*(?:TB|T)(?:\b|$)/i);
   if (tbMatch) {
-    storageGb = parseInt(tbMatch[1], 10) * 1024;
-  } else {
-    const gbMatch = (specs.SSD || specs['Ổ cứng'] || specs.storage || '').match(/(\d+)\s*(?:GB|G)/i);
-    if (gbMatch) storageGb = parseInt(gbMatch[1], 10);
+    const tb = parseFloat(tbMatch[1]);
+    if (Number.isFinite(tb) && tb > 0) return Math.round(tb * 1024);
   }
+  const gbMatch = s.match(/(?:^|\D)(\d+)\s*(?:GB|G)(?:\b|$)/i) || s.match(/^(\d+)$/);
+  if (!gbMatch) return null;
+  const gb = parseInt(gbMatch[1], 10);
+  if (!Number.isFinite(gb) || gb <= 0) return null;
+  if (gb === 1000) return 1024;
+  if (gb === 2000) return 2048;
+  if (gb === 4000) return 4096;
+  return gb;
+}
+
+export function deriveCpuSeries(raw?: string | null): string | null {
+  if (!raw || !String(raw).trim()) return null;
+  const s = String(raw).trim();
+  const ultra = s.match(/\b(?:Core\s+)?Ultra\s+([3579])\b/i);
+  if (ultra) return `Core Ultra ${ultra[1]}`;
+  const coreI = s.match(/\b(?:Core\s+)?i([3579])(?:\b|[-–—\s]\d)/i);
+  if (coreI) return `Core i${coreI[1]}`;
+  const coreSeries = s.match(/\bCore\s+([357])\s+\d{3}/i);
+  if (coreSeries) return `Core ${coreSeries[1]}`;
+  const ryzen = s.match(/\bRyzen\s+(?:AI\s+)?([3579])\b/i) || s.match(/\bR([3579])[-–—\s]\d{3,4}/i);
+  if (ryzen) return `Ryzen ${ryzen[1]}`;
+  const appleM = s.match(/\b(?:Apple\s+)?(M[1-9])(?:\s+(?:Pro|Max|Ultra))?\b/i);
+  if (appleM) return `Apple ${appleM[1].toUpperCase()}`;
+  if (/\bSnapdragon\s+X\b/i.test(s)) return 'Snapdragon X';
+  const celPent = s.match(/\b(Celeron|Pentium)\b/i);
+  if (celPent) return `Intel ${celPent[1][0].toUpperCase()}${celPent[1].slice(1).toLowerCase()}`;
+  if (/\bIntel\s+N\d{2,3}\b/i.test(s)) return 'Intel N-Series';
+  return null;
+}
+
+export function deriveGpuSeries(raw?: string | null): string | null {
+  if (!raw || !String(raw).trim()) return null;
+  const s = String(raw).trim();
+  if (/\bRTX\s*A\d{3,4}\b/i.test(s) || /\bRTX\s*\d{3,4}\s*Ada\b/i.test(s) || /\bQuadro\b/i.test(s)) {
+    return 'RTX Workstation';
+  }
+  const rtxGtx = s.match(/\b(RTX|GTX)\s*(\d{4})\s*(Ti|SUPER)?\b/i);
+  if (rtxGtx) {
+    const prefix = rtxGtx[1].toUpperCase();
+    const num = rtxGtx[2];
+    const suffix = rtxGtx[3] ? (/^ti$/i.test(rtxGtx[3]) ? 'Ti' : ` ${rtxGtx[3].toUpperCase()}`) : '';
+    return `${prefix} ${num}${suffix}`;
+  }
+  const rx = s.match(/\bRX\s*(\d{4}[A-Z]*)\b/i);
+  if (rx) return `RX ${rx[1].toUpperCase()}`;
+  if (/\bApple\b.*GPU|\b\d+-Core\s+GPU\b|\bApple\s+Silicon\b/i.test(s)) {
+    return 'Apple Silicon';
+  }
+  if (/\b(?:Iris\s+Xe|Intel\s+UHD|UHD\s+Graphics|Intel\s+Arc|Intel\s+Graphics|Radeon\s+\d{3}M|Radeon\s+Graphics|AMD\s+Radeon|Onboard|Integrated|Tích\s+hợp)\b/i.test(s)) {
+    return 'Onboard';
+  }
+  return null;
+}
+
+export function parseSpecMetrics(specs: Record<string, string | null | undefined>) {
+  const cpuStr = specs.CPU || specs.cpu || '';
+  const gpuStr = specs.GPU || specs.gpu || specs.VGA || '';
+  const ramStr = specs.RAM || specs.ram || '';
+  const storageStr = specs.SSD || specs['Ổ cứng'] || specs.storage || '';
+  const displayStr = specs['Màn hình'] || specs.display || '';
+
+  const cpuSeries = deriveCpuSeries(cpuStr);
+  const gpuSeries = deriveGpuSeries(gpuStr);
+  const ramGb = parseRamGb(ramStr);
+  const storageGb = parseStorageGb(storageStr);
 
   let screenSize: number | null = null;
   let refreshRate: number | null = null;
-  const displayStr = specs['Màn hình'] || specs.display || '';
-  const sizeMatch = displayStr.match(/(\d+(?:\.\d+)?)\s*(?:inch|"|'')/i);
+  const sizeMatch = String(displayStr).match(/(\d+(?:\.\d+)?)\s*(?:inch|"|'')/i);
   if (sizeMatch) screenSize = parseFloat(sizeMatch[1]);
-  const hzMatch = displayStr.match(/(\d+)\s*Hz/i);
+  const hzMatch = String(displayStr).match(/(\d+)\s*Hz/i);
   if (hzMatch) refreshRate = parseInt(hzMatch[1], 10);
 
-  return { ramGb, storageGb, screenSize, refreshRate };
+  return { cpuSeries, gpuSeries, ramGb, storageGb, screenSize, refreshRate };
 }
 
 /**
@@ -216,6 +286,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       p.slug,
       p.price,
       p.originalPrice,
+      p.stock,
       p.status AS productStatus,
       p.images,
       p.brand,
@@ -238,7 +309,9 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       json_extract(s.draft, '$.name') AS draftName,
       json_extract(s.draft, '$.price') AS draftPrice,
       json_extract(s.draft, '$.originalPrice') AS draftOriginalPrice,
+      json_extract(s.draft, '$.stock') AS draftStock,
       json_extract(s.draft, '$.brand') AS draftBrand,
+      (SELECT COUNT(*) FROM SerialUnit su WHERE su.productId = p.id AND su.status = 'AVAILABLE') AS availableSerialsCount,
       (SELECT json_object('id', a.id, 'storageKey', a.storageKey)
        FROM json_each(s.draft, '$.media') m JOIN MediaAsset a ON a.id=json_extract(m.value, '$.assetId')
        WHERE a.kind='IMAGE' AND a.state='READY' ORDER BY CAST(m.key AS INTEGER) LIMIT 1) AS draftImage,
@@ -315,6 +388,8 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       isFeatured: !!r.isFeatured,
       isFlashSale: !!r.isFlashSale,
       image,
+      stock: Number(r.draftStock ?? r.stock ?? 0),
+      availableSerialsCount: Number(r.availableSerialsCount ?? 0),
       updatedAt: String(r.updatedAt),
       hasStudio: r.studioId != null,
     };
@@ -348,6 +423,40 @@ export async function studioList(db: D1Database, q = '') {
   };
 }
 
+function normalizeStudioDocument(rawDoc: ProductDocument): ProductDocument {
+  const d = rawDoc;
+  if (['STAND', 'HARDWARE'].includes(d.template as string)) {
+    d.template = 'ACCESSORY';
+  }
+  if ((d.availability as string) === 'IN_STOCK') {
+    d.availability = 'AVAILABLE';
+  }
+  if (!Array.isArray(d.specs)) {
+    if (d.specs && typeof d.specs === 'object') {
+      d.specs = Object.entries(d.specs as unknown as Record<string, unknown>).map(([key, value]) => ({
+        key,
+        value: String(value ?? ''),
+      }));
+    } else {
+      d.specs = [];
+    }
+  }
+  if (Array.isArray(d.variants)) {
+    d.variants = d.variants.map((v) => ({
+      ...v,
+      availability: ((v.availability as string) === 'IN_STOCK' ? 'AVAILABLE' : v.availability) || 'AVAILABLE',
+    }));
+  } else {
+    d.variants = [];
+  }
+  d.faqs ??= [];
+  d.gifts ??= [];
+  d.accessoryProductIds ??= [];
+  d.warranties ??= [];
+  d.media ??= [];
+  return d;
+}
+
 /**
  * Retrieves editorial detail for a product.
  * Adopts legacy products into standard ProductDocument on-read without mutating DB.
@@ -355,10 +464,7 @@ export async function studioList(db: D1Database, q = '') {
 export async function studioDetail(db: D1Database, id: string) {
   const row = await db.prepare('SELECT s.*,p.tags legacyTags FROM ProductStudio s JOIN Product p ON p.id=s.productId WHERE productId=? AND p.deletedAt IS NULL').bind(id).first<Studio & { legacyTags: string | null }>();
   if (row) {
-    const document = JSON.parse(row.draft) as ProductDocument;
-    document.faqs ??= [];
-    document.gifts ??= [];
-    document.accessoryProductIds ??= [];
+    const document = normalizeStudioDocument(JSON.parse(row.draft) as ProductDocument);
     if (!document.tags) {
       try { document.tags = row.legacyTags?.startsWith('[') ? JSON.parse(row.legacyTags) : (row.legacyTags || '').split(',').map(tag => tag.trim()).filter(Boolean); }
       catch { document.tags = []; }
@@ -367,7 +473,7 @@ export async function studioDetail(db: D1Database, id: string) {
       document.isFlashSale = false;
     }
     return { id, revision: row.revision, document, published: !!row.published,
-      publishedSummary: publicationSummary(row.published ? JSON.parse(row.published) : null),
+      publishedSummary: publicationSummary(row.published ? normalizeStudioDocument(JSON.parse(row.published)) : null),
       hasUnpublishedDraft: !!row.published && row.draft !== row.published };
   }
 
@@ -547,7 +653,24 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
 
   if (action === 'publish') {
     const specs = Object.fromEntries(d.specs.map(s => [s.key, s.value]));
-    const { ramGb, storageGb, screenSize, refreshRate } = parseSpecMetrics(specs);
+    const pubVariants = d.variants.filter(v => !v.availability || ['AVAILABLE', 'PREORDER'].includes(v.availability));
+    const primaryVar = (pubVariants.length ? pubVariants : d.variants)[0];
+
+    const effectiveCpu = (primaryVar?.options?.CPU || primaryVar?.options?.cpu || specs.CPU || specs.cpu || '').trim() || null;
+    const effectiveGpu = (primaryVar?.gpu || primaryVar?.options?.GPU || primaryVar?.options?.gpu || specs.GPU || specs.gpu || '').trim() || null;
+    const effectiveRam = (primaryVar?.ram || primaryVar?.options?.RAM || primaryVar?.options?.ram || specs.RAM || specs.ram || '').trim() || null;
+    const effectiveStorage = (primaryVar?.storage || primaryVar?.options?.SSD || primaryVar?.options?.['Ổ cứng'] || primaryVar?.options?.storage || specs.SSD || specs['Ổ cứng'] || specs.storage || '').trim() || null;
+    const effectiveDisplay = (primaryVar?.options?.['Màn hình'] || primaryVar?.options?.display || specs['Màn hình'] || specs.display || '').trim() || null;
+    const effectiveCondition = primaryVar?.condition || d.condition || 'NEW';
+
+    const { cpuSeries, gpuSeries, ramGb, storageGb, screenSize, refreshRate } = parseSpecMetrics({
+      ...specs,
+      CPU: effectiveCpu || '',
+      GPU: effectiveGpu || '',
+      RAM: effectiveRam || '',
+      SSD: effectiveStorage || '',
+      'Màn hình': effectiveDisplay || '',
+    });
 
     statements.push(db.prepare(`
       UPDATE Product SET
@@ -571,7 +694,9 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         images = ?,
         specs = ?,
         cpu = ?,
+        cpuSeries = ?,
         gpu = ?,
+        gpuSeries = ?,
         ram = ?,
         storage = ?,
         display = ?,
@@ -584,12 +709,12 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
       WHERE id = ?
     `).bind(
       d.name, d.slug, d.description, d.contentHtml, d.brand, d.brandId || null,
-      d.condition || 'NEW', d.isNewArrival ? 1 : 0, d.isBestSeller ? 1 : 0, d.isFeatured ? 1 : 0, d.isFlashSale ? 1 : 0,
+      effectiveCondition, d.isNewArrival ? 1 : 0, d.isBestSeller ? 1 : 0, d.isFeatured ? 1 : 0, d.isFlashSale ? 1 : 0,
       JSON.stringify(d.tags),
       d.categoryId,
       d.price, d.originalPrice, d.seoTitle, d.seoDescription,
       JSON.stringify(assets.filter(a => a.kind === 'IMAGE').map(a => a.url)), JSON.stringify(specs),
-      specs.CPU || null, specs.GPU || null, specs.RAM || null, specs.SSD || specs['Ổ cứng'] || null, specs['Màn hình'] || null,
+      effectiveCpu, cpuSeries, effectiveGpu, gpuSeries, effectiveRam, effectiveStorage, effectiveDisplay,
       ramGb, storageGb, screenSize, refreshRate,
       productId
     ));
@@ -598,16 +723,24 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     for (const v of d.variants) {
       const owner = await db.prepare('SELECT productId FROM ProductVariant WHERE id=?').bind(v.id).first<{ productId: string }>();
       if (owner && owner.productId !== productId) throw new MediaError('Biến thể thuộc sản phẩm khác.', 409);
+      const vStatus = (!v.availability || ['AVAILABLE', 'PREORDER'].includes(v.availability)) ? 'ACTIVE' : 'INACTIVE';
+      const vCpu = (v.options?.CPU || v.options?.cpu || specs.CPU || specs.cpu || '').trim() || null;
+      const vDisplay = (v.options?.['Màn hình'] || v.options?.display || specs['Màn hình'] || specs.display || '').trim() || null;
+      const vRam = (v.ram || v.options?.RAM || v.options?.ram || specs.RAM || specs.ram || '').trim() || null;
+      const vStorage = (v.storage || v.options?.SSD || v.options?.['Ổ cứng'] || v.options?.storage || specs.SSD || specs['Ổ cứng'] || '').trim() || null;
+      const vGpu = (v.gpu || v.options?.GPU || v.options?.gpu || specs.GPU || specs.gpu || '').trim() || null;
       statements.push(db.prepare(`
-        INSERT INTO ProductVariant(id,productId,sku,name,options,price,originalPrice,status,ram,storage,gpu,updatedAt)
-        VALUES(?,?,?,?,?,?,?,'ACTIVE',?,?,?,CURRENT_TIMESTAMP)
+        INSERT INTO ProductVariant(id,productId,sku,name,options,price,originalPrice,status,cpu,display,ram,storage,gpu,updatedAt)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           sku = excluded.sku,
           name = excluded.name,
           options = excluded.options,
           price = excluded.price,
           originalPrice = excluded.originalPrice,
-          status = 'ACTIVE',
+          status = excluded.status,
+          cpu = excluded.cpu,
+          display = excluded.display,
           ram = excluded.ram,
           storage = excluded.storage,
           gpu = excluded.gpu,
@@ -617,12 +750,15 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         productId,
         v.sku,
         v.name,
-        JSON.stringify({ condition: v.condition, ...(v.options || {}) }),
+        JSON.stringify({ condition: v.condition || d.condition || 'NEW', ...(v.options || {}) }),
         v.price,
         v.originalPrice ?? null,
-        v.ram || null,
-        v.storage || null,
-        v.gpu || null
+        vStatus,
+        vCpu,
+        vDisplay,
+        vRam,
+        vStorage,
+        vGpu
       ));
     }
 
@@ -787,11 +923,13 @@ export async function restoreProductRevision(
 export async function publicStudio(db: D1Database, slug: string) {
   const row = await db.prepare("SELECT s.published,s.revision FROM ProductStudio s JOIN Product p ON p.id=s.productId WHERE p.slug=? AND p.status='ACTIVE' AND p.deletedAt IS NULL AND s.published IS NOT NULL").bind(slug).first<{ published: string; revision: number }>();
   if (!row) throw new MediaError('Không tìm thấy sản phẩm đã xuất bản.', 404);
-  const d = JSON.parse(row.published) as ProductDocument;
-  const media = [];
-  for (const m of d.media) {
-    const { asset } = await mediaDetail(db, m.assetId);
-    media.push({ url: asset.url, kind: asset.kind, alt: m.alt, variantId: m.variantId });
-  }
+  const d = normalizeStudioDocument(JSON.parse(row.published) as ProductDocument);
+  const media = await Promise.all(
+    d.media.map(async (m) => {
+      const assetRow = await getAsset(db, m.assetId);
+      const pres = resolveMediaPresentation(assetRow);
+      return { url: pres.url, kind: assetRow.kind, alt: m.alt, variantId: m.variantId };
+    })
+  );
   return { ...d, faqs: d.faqs || [], gifts: d.gifts || [], accessoryProductIds: d.accessoryProductIds || [], tags: d.tags || [], media, canOrder: ['AVAILABLE', 'PREORDER'].includes(d.availability) };
 }

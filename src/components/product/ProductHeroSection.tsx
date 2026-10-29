@@ -11,8 +11,12 @@ import {
   CreditCard,
   ShieldCheck,
   ArrowRight,
+  Heart,
+  Scale,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useOptionalWishlist } from "@/context/WishlistContext";
+import { useOptionalCompare } from "@/context/CompareContext";
 import { businessProfile } from "@/config/business-profile";
 import ProductGallery from "./ProductGallery";
 import ProductTrustBadges from "./ProductTrustBadges";
@@ -33,6 +37,12 @@ export interface HeroVariantItem {
   originalPrice?: number | null;
   tag?: string;
   condition?: string;
+  conditionLabel?: string;
+  cpu?: string | null;
+  ram?: string | null;
+  storage?: string | null;
+  gpu?: string | null;
+  display?: string | null;
   canOrder?: boolean;
   color?: string;
   colorHex?: string;
@@ -76,6 +86,8 @@ export interface ProductHeroSectionProps {
   accessories?: AccessoryItem[];
   gifts?: string[];
   settings?: PublicStorefrontSettings | null;
+  reviewCount?: number;
+  averageRating?: string;
 }
 
 export default function ProductHeroSection({
@@ -99,9 +111,15 @@ export default function ProductHeroSection({
   accessories = [],
   gifts = [],
   settings,
+  reviewCount = 32,
+  averageRating = "4.9",
 }: ProductHeroSectionProps) {
   const router = useRouter();
   const { addToCart } = useCart();
+  const wishlistCtx = useOptionalWishlist();
+  const compareCtx = useOptionalCompare();
+  const isLiked = wishlistCtx?.isInWishlist(productId) ?? false;
+  const isInCompare = compareCtx?.isInCompare(productId) ?? false;
 
   // 1. Variant state
   const initialVariant =
@@ -151,7 +169,6 @@ export default function ProductHeroSection({
     ? variantOriginalPrice + colorDiff + warrantyDiff + accessoriesTotal
     : null;
   const saving = totalOriginalPrice && totalOriginalPrice > totalPrice ? totalOriginalPrice - totalPrice : null;
-  const installmentMonthly = Math.round(totalPrice / 12);
   const orderable = canOrder && selectedVariant?.canOrder !== false;
 
   // Display Image (swaps if color has previewImg)
@@ -161,11 +178,10 @@ export default function ProductHeroSection({
   const handleSelectVariant = (v: HeroVariantItem) => {
     setSelectedVariant(v);
     setCartSuccessMsg("");
-    // Optionally sync URL query without full page reload
     if (v.sku) {
       const url = new URL(window.location.href);
       url.searchParams.set("sku", v.sku);
-      window.history.replaceState({}, "", url.toString());
+      router.replace(`${url.pathname}${url.search}`, { scroll: false });
     }
   };
 
@@ -209,20 +225,21 @@ export default function ProductHeroSection({
     <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-4 sm:p-6 lg:p-7 mb-8">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
         {/* ========================================================= */}
-        {/* CỘT TRÁI (COL 5): GALLERY ẢNH, ĐẶC QUYỀN AN TÂM, DEAL SỐC */}
+        {/* CỘT TRÁI (COL 6): GALLERY ẢNH, ĐẶC QUYỀN AN TÂM, DEAL SỐC */}
         {/* ========================================================= */}
-        <div className="lg:col-span-5 space-y-4">
+        <div className="lg:col-span-6 space-y-4">
           {/* Main Gallery */}
           <ProductGallery
             images={images}
             productName={productName}
             discount={discountBadge}
+            conditionLabel={selectedVariant?.conditionLabel || conditionLabel}
+            inStock={orderable}
             selectedImage={activeImage}
           />
 
           {/* Đặc quyền an tâm khi mua tại CitiLap */}
           <ProductTrustBadges items={settings?.productTrustItems} />
-          {conditionLabel && <p className="text-xs font-semibold text-slate-600">Tình trạng: {conditionLabel}</p>}
 
           {/* Mua kèm Deal sốc (Cross-sell combo - TÍNH TIỀN THẬT VÀO TỔNG) */}
           <ProductAccessoriesCombo
@@ -233,27 +250,28 @@ export default function ProductHeroSection({
         </div>
 
         {/* ========================================================= */}
-        {/* CỘT PHẢI (COL 7): TIÊU ĐỀ, GIÁ, CARD 365 CẤU HÌNH, MÀU, BH, CTA */}
+        {/* CỘT PHẢI (COL 6): TIÊU ĐỀ, GIÁ, CARD 365 CẤU HÌNH, MÀU, BH, CTA */}
         {/* ========================================================= */}
-        <div className="lg:col-span-7 flex flex-col space-y-4">
+        <div className="lg:col-span-6 flex flex-col space-y-4">
           {/* 1. TIÊU ĐỀ SẢN PHẨM & METADATA (ĐÁNH GIÁ, MODEL, THƯƠNG HIỆU) */}
           <div>
-            <h1 className="text-lg sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
               {productName}
             </h1>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-500">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs sm:text-sm text-slate-600">
               <a
                 href="#danh-gia-khach-hang"
                 className="flex items-center gap-1 text-amber-500 font-bold hover:underline"
               >
                 <span>★★★★★</span>
-                <span className="text-slate-800 ml-0.5">Gửi đánh giá</span>
+                <span className="text-slate-800 ml-0.5">{averageRating}</span>
+                <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
               </a>
               <span className="text-slate-300">•</span>
               <span>
                 Mã model:{" "}
-                <strong className="text-slate-700 font-semibold font-mono">
+                <strong className="text-slate-800 font-semibold font-mono">
                   {modelCode}
                 </strong>
               </span>
@@ -265,6 +283,11 @@ export default function ProductHeroSection({
               <span className="text-slate-300">•</span>
               <a
                 href="#thong-so-ky-thuat"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("citilap:open-full-specs"));
+                  }
+                }}
                 className="text-blue-600 hover:underline font-semibold flex items-center gap-1"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,67 +295,95 @@ export default function ProductHeroSection({
                 </svg>
                 Xem cấu hình chi tiết
               </a>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!wishlistCtx) return;
+                    if (isLiked) wishlistCtx.removeFromWishlist(productId);
+                    else wishlistCtx.addToWishlist({ productId });
+                  }}
+                  aria-pressed={isLiked}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold transition cursor-pointer ${
+                    isLiked
+                      ? "border-rose-200 bg-rose-50 text-rose-600"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:text-rose-600"
+                  }`}
+                >
+                  <Heart className="w-3.5 h-3.5" fill={isLiked ? "currentColor" : "none"} />
+                  <span>{isLiked ? "Đã lưu" : "Yêu thích"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!compareCtx) return;
+                    if (isInCompare) {
+                      compareCtx.removeFromCompare(productId);
+                    } else {
+                      const res = compareCtx.addToCompare({
+                        id: productId,
+                        name: productName,
+                        slug: productSlug || productId,
+                        price: totalPrice,
+                        image: activeImage,
+                      });
+                      if (!res.success && res.message) alert(res.message);
+                    }
+                  }}
+                  aria-pressed={isInCompare}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold transition cursor-pointer ${
+                    isInCompare
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-600"
+                  }`}
+                >
+                  <Scale className="w-3.5 h-3.5" />
+                  <span>{isInCompare ? "Đang so sánh" : "So sánh"}</span>
+                </button>
+              </div>
             </div>
           </div>
 
           {/* 2. KHỐI GIÁ NẰM TRÊN ĐẦU (DỄ THEO DÕI NHẤT) */}
           <div className="rounded-2xl border-2 border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 shadow-xs relative overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider animate-pulse">
-                    {saving ? 'GIÁ ƯU ĐÃI' : 'GIÁ BÁN'}
-                  </span>
-                </div>
-                <div className="flex items-baseline gap-2.5">
-                  <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
-                    {totalPrice.toLocaleString("vi-VN")}₫
-                  </span>
-                  {totalOriginalPrice && totalOriginalPrice > totalPrice && (
-                    <span className="text-sm sm:text-base text-slate-400 line-through">
-                      {totalOriginalPrice.toLocaleString("vi-VN")}₫
-                    </span>
-                  )}
-                  {saving && saving > 0 && (
-                    <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-xs">
-                      Tiết kiệm {saving.toLocaleString("vi-VN")}₫
-                    </span>
-                  )}
-                </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-xs font-black uppercase tracking-wider animate-pulse">
+                  {saving ? 'GIÁ ƯU ĐÃI' : 'GIÁ BÁN'}
+                </span>
               </div>
-
-              <div className="sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
-                <span className="text-xs font-semibold text-slate-700 block">
-                  Dự toán gốc chia 12 tháng:
+              <div className="flex flex-wrap items-baseline gap-2.5">
+                <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
+                  {totalPrice.toLocaleString("vi-VN")}₫
                 </span>
-                <span className="text-sm font-black text-blue-600 block">
-                  {installmentMonthly.toLocaleString("vi-VN")}₫ / tháng
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setIsInstallmentOpen(true)}
-                  className="text-[11px] text-blue-600 hover:underline font-bold mt-0.5 inline-block cursor-pointer"
-                >
-                  Bảng tính góp chi tiết →
-                </button>
+                {totalOriginalPrice && totalOriginalPrice > totalPrice && (
+                  <span className="text-sm sm:text-base text-slate-400 line-through">
+                    {totalOriginalPrice.toLocaleString("vi-VN")}₫
+                  </span>
+                )}
+                {saving && saving > 0 && (
+                  <span className="px-2.5 py-0.5 rounded-md bg-rose-100 text-rose-800 font-bold text-xs whitespace-nowrap">
+                    Tiết kiệm {saving.toLocaleString("vi-VN")}₫
+                  </span>
+                )}
               </div>
             </div>
 
             {/* Tóm tắt cấu hình đang chọn */}
-            <div className="mt-3 pt-3 border-t border-rose-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="mt-3 pt-3 border-t border-rose-100 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
               <div className="flex items-center gap-1.5 text-slate-700 flex-wrap">
                 <span className="font-bold text-slate-900">Đang chọn:</span>
-                <span className="font-semibold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                <span className="font-semibold text-blue-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200">
                   {selectedVariant?.name || productName}
                 </span>
                 {selectedColor && (
-                  <span className="font-semibold text-slate-700 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                  <span className="font-semibold text-slate-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200">
                     {selectedColor.name}
                   </span>
                 )}
               </div>
               {selectedWarranty && (
-                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
+                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200 flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   {selectedWarranty.name}
                 </span>
@@ -344,11 +395,11 @@ export default function ProductHeroSection({
           {variants.length > 1 && (
             <section aria-label="Chọn cấu hình" className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-bold">1</span>
+                <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
                   <span>CHỌN CẤU HÌNH PHẦN CỨNG ({variants.length}):</span>
                 </label>
-                <span className="text-[11px] text-slate-400 font-medium">Bấm chọn đổi giá tức thì</span>
+                <span className="text-xs text-slate-500 font-medium">Bấm chọn đổi giá tức thì</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -368,14 +419,14 @@ export default function ProductHeroSection({
                     >
                       {/* Checkmark badge */}
                       {isSelected && (
-                        <span className="absolute top-2.5 right-2.5 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-black shadow-2xs">
+                        <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-black shadow-2xs">
                           <Check className="w-3 h-3 stroke-[3]" />
                         </span>
                       )}
 
                       {/* Tag badge */}
                       {item.tag && (
-                        <span className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold shadow-xs">
+                        <span className="absolute -top-2.5 left-3 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-bold shadow-xs">
                           {item.tag}
                         </span>
                       )}
@@ -387,18 +438,18 @@ export default function ProductHeroSection({
                           {item.name}
                         </span>
                         {item.subSpecs && (
-                          <p className="text-[11px] text-slate-500 line-clamp-1 mt-1 font-medium">
+                          <p className="text-xs text-slate-500 line-clamp-1 mt-1 font-medium">
                             {item.subSpecs}
                           </p>
                         )}
                       </div>
 
                       <div className="pt-2.5 mt-2.5 border-t border-slate-200/70 flex items-baseline justify-between">
-                        <span className="text-xs sm:text-sm font-black text-rose-600">
+                        <span className="text-sm font-black text-rose-600">
                           {item.price.toLocaleString("vi-VN")}₫
                         </span>
                         {item.originalPrice && item.originalPrice > item.price && (
-                          <span className="text-[10px] sm:text-[11px] text-slate-400 line-through">
+                          <span className="text-xs text-slate-400 line-through">
                             {item.originalPrice.toLocaleString("vi-VN")}₫
                           </span>
                         )}
@@ -414,11 +465,11 @@ export default function ProductHeroSection({
           {colorOptions.length > 1 && (
             <section aria-label="Chọn màu sắc" className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-[11px] font-bold">2</span>
+                <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-bold">2</span>
                   <span>CHỌN MÀU SẮC PHIÊN BẢN ({colorOptions.length}):</span>
                 </label>
-                <span className="text-[11px] text-slate-400 font-medium">Đổi hình ảnh & phối màu</span>
+                <span className="text-xs text-slate-500 font-medium">Đổi hình ảnh & phối màu</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -440,11 +491,11 @@ export default function ProductHeroSection({
                           className="h-4 w-4 rounded-full border border-slate-300 shadow-2xs shrink-0"
                           style={{ backgroundColor: c.hex }}
                         />
-                        <span className="text-xs font-semibold truncate">{c.name}</span>
+                        <span className="text-xs sm:text-sm font-semibold truncate">{c.name}</span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {c.priceDiff > 0 && (
-                          <span className="text-[10px] font-bold text-rose-600">
+                          <span className="text-xs font-bold text-rose-600">
                             +{c.priceDiff.toLocaleString("vi-VN")}₫
                           </span>
                         )}
@@ -461,13 +512,13 @@ export default function ProductHeroSection({
           {warranties.length > 1 && (
             <section aria-label="Chọn bảo hành" className="space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[11px] font-bold">3</span>
+                <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">3</span>
                   <span>CHỌN GÓI BẢO HÀNH & AN TÂM SỬ DỤNG:</span>
                 </label>
                 <Link
                   href="/chinh-sach-bao-hanh"
-                  className="text-[11px] text-blue-600 hover:underline font-semibold"
+                  className="text-xs text-blue-600 hover:underline font-semibold"
                 >
                   Chi tiết điều khoản BH →
                 </Link>
@@ -489,35 +540,35 @@ export default function ProductHeroSection({
                     >
                       {/* Tag badge */}
                       {w.tag && (
-                        <span className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9.5px] font-bold shadow-xs">
+                        <span className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[11px] font-bold shadow-xs">
                           {w.tag}
                         </span>
                       )}
 
                       <div>
                         <div className="flex items-start justify-between gap-1 mb-1">
-                          <span className={`text-xs font-black ${isSelected ? "text-emerald-950" : "text-slate-900"}`}>
+                          <span className={`text-xs sm:text-sm font-black ${isSelected ? "text-emerald-950" : "text-slate-900"}`}>
                             {w.name}
                           </span>
                           {isSelected && (
-                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white text-[9px] font-black shrink-0">
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-black shrink-0">
                               ✓
                             </span>
                           )}
                         </div>
                         {w.desc && (
-                          <p className="text-[10.5px] text-slate-500 line-clamp-2 leading-tight">
+                          <p className="text-xs text-slate-500 line-clamp-2 leading-tight">
                             {w.desc}
                           </p>
                         )}
                       </div>
 
                       <div className="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between">
-                        <span className={`text-xs font-bold ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
+                        <span className={`text-xs sm:text-sm font-bold ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
                           {w.priceDiff === 0 ? "Mặc định (0₫)" : `${w.priceDiff > 0 ? '+' : ''}${w.priceDiff.toLocaleString("vi-VN")}₫`}
                         </span>
                         {isSelected && (
-                          <span className="text-[10px] text-emerald-700 font-bold">Đã chọn</span>
+                          <span className="text-xs text-emerald-700 font-bold">Đã chọn</span>
                         )}
                       </div>
                     </button>
@@ -529,11 +580,11 @@ export default function ProductHeroSection({
 
           {/* 6. KHỐI QUÀ TẶNG KÈM THEO MÁY */}
           {gifts.length > 0 && <div className="rounded-2xl border border-amber-300/80 bg-gradient-to-b from-amber-50/70 to-orange-50/30 p-4 space-y-2 relative">
-            <div className="flex items-center gap-1.5 text-xs font-black text-amber-950 uppercase tracking-wide">
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-amber-950 uppercase tracking-wide">
               <Gift className="w-4 h-4 text-rose-600" />
               <span>QUÀ TẶNG KÈM THEO MÁY:</span>
             </div>
-            <ul className="space-y-1.5 text-xs text-slate-700">
+            <ul className="space-y-1.5 text-xs sm:text-sm text-slate-700">
               {gifts.map((gift, index) => <li key={index} className="flex items-start gap-2"><span className="text-rose-600 font-bold shrink-0">●</span><span>{gift}</span></li>)}
             </ul>
           </div>}
@@ -551,7 +602,7 @@ export default function ProductHeroSection({
                 <ShoppingCart className="w-5 h-5" />
                 <span>{orderable ? 'MUA NGAY - GIAO TẬN NƠI HOẶC NHẬN TẠI SHOP' : 'LIÊN HỆ ĐỂ ĐƯỢC TƯ VẤN'}</span>
               </div>
-              <span className="text-[11px] font-normal text-rose-100 mt-0.5">
+              <span className="text-xs font-normal text-rose-100 mt-0.5">
                 Kiểm tra máy chuẩn 100%, hài lòng mới thanh toán
               </span>
             </button>
@@ -566,7 +617,7 @@ export default function ProductHeroSection({
                 <span className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
                   <CreditCard className="w-4 h-4 text-blue-600" /> TƯ VẤN TRẢ GÓP
                 </span>
-                <span className="text-[10px] text-blue-600">Xem dự toán và gửi yêu cầu</span>
+                <span className="text-xs text-blue-600">Xem dự toán và gửi yêu cầu</span>
               </button>
 
               <button
@@ -582,7 +633,7 @@ export default function ProductHeroSection({
 
             {/* Thông báo thêm giỏ hàng thành công */}
             {cartSuccessMsg && (
-              <div role="status" aria-live="polite" className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between gap-2">
+              <div role="status" aria-live="polite" className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs sm:text-sm text-emerald-800 flex items-center justify-between gap-2">
                 <span>{cartSuccessMsg}</span>
                 <Link href="/cart" className="font-bold underline shrink-0 hover:text-emerald-900 inline-flex items-center gap-0.5">
                   Xem giỏ hàng <ArrowRight className="w-3.5 h-3.5" />
@@ -591,7 +642,7 @@ export default function ProductHeroSection({
             )}
 
             {/* Hotline tư vấn */}
-            <div className="flex items-center justify-center gap-2 pt-1 text-xs text-slate-500">
+            <div className="flex items-center justify-center gap-2 pt-1 text-xs sm:text-sm text-slate-600">
               <Phone className="w-4 h-4 text-emerald-600" />
               <span>
                 Tư vấn kỹ thuật & cấu hình riêng:{" "}

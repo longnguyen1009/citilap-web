@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 
 import { mediaEnvironment } from '@/server/media-http';
 import { MediaError } from '@/server/services/media-library.service';
@@ -163,9 +164,9 @@ async function publishedOrNull<T>(action: () => Promise<T>): Promise<T | null> {
   }
 }
 
-export function getPublishedNavigation() {
+export const getPublishedNavigation = cache(() => {
   return publishedOrNull(async () => publicNavigation((await mediaEnvironment()).DB));
-}
+});
 
 export function getPublishedStudio(slug: string) {
   return publishedOrNull(async () => publicStudio((await mediaEnvironment()).DB, slug));
@@ -182,12 +183,12 @@ export async function getPublishedCollectionList() {
   });
 }
 
-export async function getPublishedHomepage() {
+export const getPublishedHomepage = cache(async () => {
   return publishedOrNull(async () => {
     const { getPublicHomepage } = await import('@/server/services/site-builder.service');
     return getPublicHomepage((await mediaEnvironment()).DB);
   });
-}
+});
 
 export async function getPublishedLandingPage(slug: string) {
   return publishedOrNull(async () => {
@@ -196,12 +197,12 @@ export async function getPublishedLandingPage(slug: string) {
   });
 }
 
-export async function getStorefrontSettings() {
+export const getStorefrontSettings = cache(async () => {
   return publishedOrNull(async () => {
     const { getPublicStorefrontSettings } = await import('@/server/services/settings.service');
     return getPublicStorefrontSettings((await mediaEnvironment()).DB);
   });
-}
+});
 
 export function classifyProductPublicationById(
   productId: string,

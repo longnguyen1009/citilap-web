@@ -18,6 +18,9 @@ import {
   Scale,
   Star,
   QrCode,
+  Video,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { VIETQR_BANKS, findVietQrBank } from "@/lib/vietqr";
 import { PageHeader, InlineAlert, AdminCard } from "@/components/admin/ui";
@@ -42,6 +45,9 @@ export default function SettingsPage() {
   const [conflict, setConflict] = useState(false);
   const [localDraftStatus, setLocalDraftStatus] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [quickVideoUrl, setQuickVideoUrl] = useState("");
+  const [fetchingVideos, setFetchingVideos] = useState(false);
 
   const loadSettingsData = useCallback(async (isMounted?: () => boolean) => {
     try {
@@ -64,6 +70,7 @@ export default function SettingsPage() {
       if (!isMounted || isMounted()) {
         setSettings({ ...DEFAULT_SETTINGS, ...json.data.document });
         setRevision(json.data.revision ?? 0);
+        setIsDirty(false);
       }
     } catch (err) {
       if (!isMounted || isMounted()) {
@@ -95,7 +102,78 @@ export default function SettingsPage() {
   }, [loadSettingsData]);
 
   const update = <K extends keyof StorefrontSettings>(key: K, value: StorefrontSettings[K]) => {
+    setIsDirty(true);
     setSettings((current) => ({ ...current, [key]: value }));
+  };
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
+  const handleAddVideoByUrl = async () => {
+    const raw = quickVideoUrl.trim();
+    if (!raw || fetchingVideos) return;
+    setFetchingVideos(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/fetch-videos?videoUrl=${encodeURIComponent(raw)}`, {
+        credentials: "same-origin",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success || !json.data) {
+        throw new Error(json.error || "Không thể lấy thông tin video từ URL này.");
+      }
+      const current = settings.reviewVideos || [];
+      if (current.length >= 12) {
+        setMessage({ type: "warning", text: "Danh sách tối đa 12 video. Vui lòng xóa bớt trước khi thêm mới." });
+        return;
+      }
+      update("reviewVideos", [json.data, ...current.filter((v) => v.url !== json.data.url)].slice(0, 12));
+      setQuickVideoUrl("");
+      setMessage({ type: "success", text: `Đã thêm video: ${json.data.title}` });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Lỗi khi thêm video." });
+    } finally {
+      setFetchingVideos(false);
+    }
+  };
+
+  const handleFetchChannelVideos = async (channelUrl: string) => {
+    const raw = channelUrl.trim();
+    if (!raw || fetchingVideos) return;
+    setFetchingVideos(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/admin/fetch-videos?channelUrl=${encodeURIComponent(raw)}`, {
+        credentials: "same-origin",
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success || !Array.isArray(json.data)) {
+        throw new Error(json.error || "Không thể lấy danh sách video từ kênh.");
+      }
+      const existing = settings.reviewVideos || [];
+      const mergedMap = new Map<string, (typeof existing)[number]>();
+      for (const item of [...json.data, ...existing]) {
+        if (item?.url && !mergedMap.has(item.url)) {
+          mergedMap.set(item.url, item);
+        }
+      }
+      update("reviewVideos", Array.from(mergedMap.values()).slice(0, 12));
+      setMessage({
+        type: "success",
+        text: json.message || `Đã cập nhật ${json.data.length} video mới nhất từ kênh.`,
+      });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Lỗi khi tải video từ kênh." });
+    } finally {
+      setFetchingVideos(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -171,6 +249,7 @@ export default function SettingsPage() {
 
       setRevision(json.data.revision);
       setSettings({ ...DEFAULT_SETTINGS, ...json.data.document });
+      setIsDirty(false);
       setLocalDraftStatus(null);
       try {
         localStorage.removeItem(STORAGE_KEY);
@@ -501,7 +580,7 @@ export default function SettingsPage() {
 
               <div className="border-t border-slate-200 pt-4 space-y-3.5">
                 <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Share2 className="w-3.5 h-3.5 text-blue-600" /> Mạng xã hội
+                  <Share2 className="w-3.5 h-3.5 text-blue-600" /> Mạng xã hội &amp; Kênh Video
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                   <div>
@@ -510,29 +589,190 @@ export default function SettingsPage() {
                       type="text"
                       value={settings.facebookUrl}
                       onChange={(e) => update("facebookUrl", e.target.value)}
-                      placeholder="https://facebook.com/..."
+                      placeholder="https://www.facebook.com/citilap"
                       className={inputCls}
                     />
                   </div>
                   <div>
-                    <label className={labelCls}>TikTok</label>
-                    <input
-                      type="text"
-                      value={settings.tiktokUrl}
-                      onChange={(e) => update("tiktokUrl", e.target.value)}
-                      placeholder="https://tiktok.com/@..."
-                      className={inputCls}
-                    />
+                    <label className={labelCls}>Kênh TikTok (@citilapvn)</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={settings.tiktokUrl}
+                        onChange={(e) => update("tiktokUrl", e.target.value)}
+                        placeholder="https://www.tiktok.com/@citilapvn"
+                        className={inputCls}
+                      />
+                      <button
+                        type="button"
+                        disabled={fetchingVideos || !settings.tiktokUrl}
+                        onClick={() => void handleFetchChannelVideos(settings.tiktokUrl)}
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
+                        title="Nạp video mẫu từ kênh TikTok"
+                      >
+                        Lấy video
+                      </button>
+                    </div>
                   </div>
                   <div>
-                    <label className={labelCls}>YouTube</label>
+                    <label className={labelCls}>Kênh YouTube (tạm dùng ThinkView hoặc kênh riêng)</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={settings.youtubeUrl}
+                        onChange={(e) => update("youtubeUrl", e.target.value)}
+                        placeholder="https://www.youtube.com/@thinkview/videos"
+                        className={inputCls}
+                      />
+                      <button
+                        type="button"
+                        disabled={fetchingVideos || !settings.youtubeUrl}
+                        onClick={() => void handleFetchChannelVideos(settings.youtubeUrl)}
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
+                        title="Lấy các video mới nhất từ kênh YouTube"
+                      >
+                        Lấy mới nhất
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quản lý danh sách Video Review YouTube & TikTok */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Video className="w-3.5 h-3.5 text-rose-600" /> Danh sách Video Review (YouTube &amp; TikTok)
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Hiển thị trên Trang chủ và cột bên trang Tin tức. Bạn có thể dán trực tiếp link video YouTube hoặc TikTok để tự động lấy tiêu đề &amp; ảnh thu nhỏ, hoặc tự nhập từng ô.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={(settings.reviewVideos || []).length >= 12}
+                      onClick={() =>
+                        update("reviewVideos", [
+                          ...(settings.reviewVideos || []),
+                          {
+                            title: "Video đánh giá Laptop CitiLap",
+                            url: "https://www.youtube.com/watch?v=KsQTEyLOC6M",
+                            thumbnail: "https://i.ytimg.com/vi/KsQTEyLOC6M/hqdefault.jpg",
+                            platform: "youtube",
+                          },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-40 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Thêm dòng trống
+                    </button>
+                  </div>
+
+                  {/* Quick URL input box */}
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
-                      value={settings.youtubeUrl}
-                      onChange={(e) => update("youtubeUrl", e.target.value)}
-                      placeholder="https://youtube.com/@..."
+                      value={quickVideoUrl}
+                      onChange={(e) => setQuickVideoUrl(e.target.value)}
+                      placeholder="Dán URL video YouTube (https://www.youtube.com/watch?v=...) hoặc TikTok (https://www.tiktok.com/@citilapvn/video/...)"
                       className={inputCls}
                     />
+                    <button
+                      type="button"
+                      disabled={!quickVideoUrl.trim() || fetchingVideos}
+                      onClick={() => void handleAddVideoByUrl()}
+                      className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs cursor-pointer"
+                    >
+                      {fetchingVideos ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Đang lấy...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" /> Lấy thông tin &amp; Thêm
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Editable video list */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {(settings.reviewVideos || []).map((video, idx) => {
+                      const patchVideo = (patch: Partial<typeof video>) => {
+                        const next = (settings.reviewVideos || []).map((v, i) =>
+                          i === idx ? { ...v, ...patch } : v
+                        );
+                        update("reviewVideos", next);
+                      };
+                      return (
+                        <div
+                          key={`${video.url}-${idx}`}
+                          className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                video.url.includes("tiktok.com") || video.platform === "tiktok"
+                                  ? "bg-slate-900 text-white"
+                                  : "bg-rose-600 text-white"
+                              }`}
+                            >
+                              {video.url.includes("tiktok.com") || video.platform === "tiktok"
+                                ? "TikTok"
+                                : "YouTube"}{" "}
+                              #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update(
+                                  "reviewVideos",
+                                  (settings.reviewVideos || []).filter((_, i) => i !== idx)
+                                )
+                              }
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:underline cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" /> Xóa
+                            </button>
+                          </div>
+                          <div>
+                            <label className={labelCls}>Tiêu đề video</label>
+                            <input
+                              type="text"
+                              value={video.title}
+                              onChange={(e) => patchVideo({ title: e.target.value })}
+                              placeholder="Nhập tiêu đề hiển thị..."
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>URL Video (YouTube hoặc TikTok)</label>
+                            <input
+                              type="text"
+                              value={video.url}
+                              onChange={(e) =>
+                                patchVideo({
+                                  url: e.target.value,
+                                  platform: e.target.value.includes("tiktok.com") ? "tiktok" : "youtube",
+                                })
+                              }
+                              placeholder="https://www.youtube.com/watch?v=... hoặc https://www.tiktok.com/@citilapvn/video/..."
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>URL Ảnh Thumbnail</label>
+                            <input
+                              type="text"
+                              value={video.thumbnail || ""}
+                              onChange={(e) => patchVideo({ thumbnail: e.target.value })}
+                              placeholder="https://i.ytimg.com/vi/.../hqdefault.jpg hoặc /brand/store-photo-01.jpg"
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

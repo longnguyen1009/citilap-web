@@ -5,6 +5,8 @@ import { categoryHref, categoryDescendantIds, type CategoryNode } from '../../li
 import { getProductImageUrl, getPublicMediaUrl } from "@/infra/cloudflare/r2/storage";
 import { ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 import { normalizeVnd, calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
+import { parseRamGb, parseStorageGb, deriveCpuSeries, deriveGpuSeries, parseSpecMetrics } from "./product-studio.service";
+export { parseRamGb, parseStorageGb, deriveCpuSeries, deriveGpuSeries, parseSpecMetrics };
 
 /**
  * Standardized Homepage & Card Product Data Contract (STORE-05)
@@ -165,8 +167,12 @@ export interface CategorySummary {
 export function categoryProductScope(category: CategoryNode, categories: CategoryNode[]) {
   if (['laptop-cu','laptop-likenew','laptop-moi'].includes(category.slug)) {
     const accessories = categories.filter(c => ['linh-kien','phu-kien'].includes(c.slug)).flatMap(c => categoryDescendantIds(c,categories));
+    const condList = category.slug === 'laptop-moi' ? ['NEW'] : ['LIKE_NEW','USED','REFURBISHED','LIQUIDATION'];
     return {AND:[
-      {condition:category.slug === 'laptop-moi' ? 'NEW' : {in:['LIKE_NEW','USED','REFURBISHED','LIQUIDATION']}},
+      {OR:[
+        {condition:category.slug === 'laptop-moi' ? 'NEW' : {in:condList}},
+        {variants:{some:{status:{in:['ACTIVE','active']},OR:condList.map(c=>({options:{contains:`"condition":"${c}"`}}))}}},
+      ]},
       {categoryId:{notIn:accessories}},
     ]};
   }
@@ -254,9 +260,13 @@ export type ProductDbRow = {
   status: string;
   isFlashSale?: boolean | number;
   cpu?: string | null;
+  cpuSeries?: string | null;
   gpu?: string | null;
+  gpuSeries?: string | null;
   ram?: string | null;
+  ramGb?: number | null;
   storage?: string | null;
+  storageGb?: number | null;
   display?: string | null;
   specs?: string | null;
   tags?: string | null;
@@ -276,12 +286,258 @@ export type ProductDbRow = {
     name: string;
     price: number;
     originalPrice?: number | null;
+    stock?: number;
+    cpu?: string | null;
+    display?: string | null;
     ram?: string | null;
     storage?: string | null;
     gpu?: string | null;
+    condition?: string | null;
     options?: string | null;
   }>;
 };
+
+export function normalizeStorageBucket(bucket: number): number {
+  if (bucket === 1000) return 1024;
+  if (bucket === 2000) return 2048;
+  if (bucket === 4000) return 4096;
+  return bucket;
+}
+
+export function matchesRamBucket(raw: string | null | undefined, targetBuckets?: number[]): boolean {
+  if (!targetBuckets || targetBuckets.length === 0) return true;
+  const parsed = parseRamGb(raw);
+  return parsed !== null && targetBuckets.includes(parsed);
+}
+
+export function matchesStorageBucket(raw: string | null | undefined, targetBuckets?: number[]): boolean {
+  if (!targetBuckets || targetBuckets.length === 0) return true;
+  const parsed = parseStorageGb(raw);
+  return parsed !== null && targetBuckets.some((b) => normalizeStorageBucket(b) === parsed);
+}
+
+function normalizeGpuToken(val: string): string {
+  return val.trim().toLowerCase().replace(/\s+ti\b/g, "ti").replace(/\s+/g, " ");
+}
+
+export function matchesCpuFilter(
+  cpuText: string | null | undefined,
+  fallbackCpuSeries: string | null | undefined,
+  cpuFilters?: string[]
+): boolean {
+  if (!cpuFilters || cpuFilters.length === 0) return true;
+  const rawCpu = (cpuText || "").trim();
+  const effectiveSeries = (rawCpu ? deriveCpuSeries(rawCpu) : null) ?? (rawCpu ? null : fallbackCpuSeries || null);
+  const lowerCpu = rawCpu.toLowerCase();
+  const lowerSeries = (effectiveSeries || "").toLowerCase();
+  return cpuFilters.some((f) => {
+    const target = f.trim().toLowerCase();
+    if (!target) return false;
+    return lowerSeries === target || lowerCpu.includes(target);
+  });
+}
+
+export function matchesGpuFilter(
+  gpuText: string | null | undefined,
+  fallbackGpuSeries: string | null | undefined,
+  gpuFilters?: string[]
+): boolean {
+  if (!gpuFilters || gpuFilters.length === 0) return true;
+  const rawGpu = (gpuText || "").trim();
+  const effectiveSeries = (rawGpu ? deriveGpuSeries(rawGpu) : null) ?? (rawGpu ? null : fallbackGpuSeries || null);
+  const normGpu = normalizeGpuToken(rawGpu);
+  const normSeries = normalizeGpuToken(effectiveSeries || "");
+  return gpuFilters.some((f) => {
+    const target = normalizeGpuToken(f);
+    if (!target) return false;
+    return normSeries === target || normGpu.includes(target);
+  });
+}
+
+export function extractVariantCondition(
+  v?: { condition?: string | null; options?: string | Record<string, unknown> | null } | null,
+  publishedVariant?: { condition?: string | null; options?: Record<string, unknown> | null } | null,
+  fallbackCondition?: string | null
+): string {
+  if (publishedVariant?.condition && typeof publishedVariant.condition === "string") {
+    return publishedVariant.condition;
+  }
+  if (v?.condition && typeof v.condition === "string") {
+    return v.condition;
+  }
+  if (v?.options) {
+    if (typeof v.options === "string") {
+      try {
+        const parsed = JSON.parse(v.options);
+        if (parsed && typeof parsed.condition === "string" && parsed.condition) {
+          return parsed.condition;
+        }
+      } catch {}
+    } else if (typeof v.options === "object" && typeof v.options.condition === "string" && v.options.condition) {
+      return v.options.condition;
+    }
+  }
+  if (publishedVariant?.options && typeof publishedVariant.options.condition === "string" && publishedVariant.options.condition) {
+    return publishedVariant.options.condition;
+  }
+  return fallbackCondition || "NEW";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parsePublishedSpecMap(published: any, rowSpecs?: string | null): Record<string, string> {
+  const map: Record<string, string> = {};
+  if (rowSpecs) {
+    try {
+      const parsed = JSON.parse(rowSpecs);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        Object.assign(map, parsed);
+      }
+    } catch {}
+  }
+  if (published && Array.isArray(published.specs)) {
+    for (const item of published.specs) {
+      if (item && typeof item.key === "string" && typeof item.value === "string" && item.value.trim()) {
+        map[item.key] = item.value.trim();
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Filters and enriches a product's variants against its published Studio document (if present)
+ * so every active variant has authoritative condition, CPU, GPU, RAM, storage, display, and options.
+ */
+export function enrichPublishedVariants<
+  T extends {
+    id: string;
+    sku: string;
+    name: string;
+    price: number;
+    originalPrice?: number | null;
+    stock?: number;
+    cpu?: string | null;
+    gpu?: string | null;
+    ram?: string | null;
+    storage?: string | null;
+    display?: string | null;
+    condition?: string | null;
+    options?: string | null;
+  }
+>(
+  variants: T[] | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  published: any,
+  row: {
+    condition?: string | null;
+    cpu?: string | null;
+    gpu?: string | null;
+    ram?: string | null;
+    storage?: string | null;
+    display?: string | null;
+    specs?: string | null;
+  }
+): Array<T & { condition: string; cpu: string | null; gpu: string | null; ram: string | null; storage: string | null; display: string | null }> {
+  if (!variants || variants.length === 0) return [];
+  const specMap = parsePublishedSpecMap(published, row.specs);
+  const pubVariants: Array<{
+    id: string;
+    sku?: string;
+    name?: string;
+    condition?: string;
+    price?: number;
+    originalPrice?: number | null;
+    stock?: number;
+    availability?: string;
+    ram?: string;
+    storage?: string;
+    gpu?: string;
+    options?: Record<string, string>;
+  }> | null = published && Array.isArray(published.variants) ? published.variants : null;
+
+  const filtered = variants.filter((v) => {
+    if (!pubVariants) return true;
+    const pv = pubVariants.find((p) => p.id === v.id || (p.sku && p.sku === v.sku));
+    return Boolean(pv && (!pv.availability || ["AVAILABLE", "PREORDER"].includes(pv.availability)));
+  });
+
+  return filtered.map((v) => {
+    const pv = pubVariants?.find((p) => p.id === v.id || (p.sku && p.sku === v.sku)) || null;
+    let parsedOpts: Record<string, string> = {};
+    if (v.options) {
+      try {
+        const p = JSON.parse(v.options);
+        if (p && typeof p === "object" && !Array.isArray(p)) parsedOpts = p;
+      } catch {}
+    }
+    const mergedOpts = { ...parsedOpts, ...(pv?.options || {}) };
+    const condition = extractVariantCondition(v, pv, published?.condition || row.condition || "NEW");
+    const cpu =
+      mergedOpts.CPU ||
+      mergedOpts.cpu ||
+      v.cpu ||
+      specMap.CPU ||
+      specMap.cpu ||
+      row.cpu ||
+      null;
+    const gpu =
+      pv?.gpu ||
+      mergedOpts.GPU ||
+      mergedOpts.gpu ||
+      v.gpu ||
+      specMap.GPU ||
+      specMap.gpu ||
+      specMap.VGA ||
+      row.gpu ||
+      null;
+    const ram =
+      pv?.ram ||
+      mergedOpts.RAM ||
+      mergedOpts.ram ||
+      v.ram ||
+      specMap.RAM ||
+      specMap.ram ||
+      row.ram ||
+      null;
+    const storage =
+      pv?.storage ||
+      mergedOpts.SSD ||
+      mergedOpts["Ổ cứng"] ||
+      mergedOpts.storage ||
+      v.storage ||
+      specMap.SSD ||
+      specMap["Ổ cứng"] ||
+      specMap.ssd ||
+      specMap.Storage ||
+      row.storage ||
+      null;
+    const display =
+      mergedOpts["Màn hình"] ||
+      mergedOpts.display ||
+      v.display ||
+      specMap["Màn hình"] ||
+      specMap.display ||
+      specMap.Screen ||
+      row.display ||
+      null;
+    const optionsJson = JSON.stringify({ ...mergedOpts, condition });
+    return {
+      ...v,
+      sku: pv?.sku || v.sku,
+      name: pv?.name || v.name,
+      price: pv?.price !== undefined ? Number(pv.price) : v.price,
+      originalPrice: pv?.originalPrice !== undefined ? pv.originalPrice : v.originalPrice,
+      stock: pv?.stock !== undefined ? Number(pv.stock) : v.stock,
+      condition,
+      cpu,
+      gpu,
+      ram,
+      storage,
+      display,
+      options: optionsJson,
+    };
+  });
+}
 
 /**
  * Normalizes RAM search criteria to avoid substring collision (e.g. 16GB matching 116GB).
@@ -310,7 +566,8 @@ export function buildStorageClauses(storageInput: number | number[]) {
   const storageList = Array.isArray(storageInput) ? storageInput : [storageInput];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const clauses: any[] = [];
-  for (const s of storageList) {
+  for (const rawS of storageList) {
+    const s = normalizeStorageBucket(rawS);
     if (s >= 1024) {
       const tb = s / 1024;
       clauses.push(
@@ -318,17 +575,20 @@ export function buildStorageClauses(storageInput: number | number[]) {
         { storage: { startsWith: `${tb} TB` } },
         { storage: { contains: ` ${tb}TB` } },
         { storage: { contains: ` ${tb} TB` } },
+        { storage: { equals: `${tb}TB` } },
         { storage: { startsWith: `${s}GB` } },
         { storage: { startsWith: `${s} GB` } },
         { storage: { contains: ` ${s}GB` } },
-        { storage: { contains: ` ${s} GB` } }
+        { storage: { contains: ` ${s} GB` } },
+        { storage: { equals: `${s}GB` } }
       );
       if (s === 1024) {
         clauses.push(
           { storage: { startsWith: "1000GB" } },
           { storage: { startsWith: "1000 GB" } },
           { storage: { contains: " 1000GB" } },
-          { storage: { contains: " 1000 GB" } }
+          { storage: { contains: " 1000 GB" } },
+          { storage: { equals: "1000GB" } }
         );
       }
     } else {
@@ -369,10 +629,28 @@ export function mapD1ProductToHomepageProduct(
   at: Date = new Date()
 ): HomepageProduct & { matchesFilter: boolean } {
   const published = row.studio?.published ? JSON.parse(row.studio.published) : null;
-  const effectiveVariantPrice = (v: NonNullable<ProductDbRow['variants']>[number]) => calculateEffectivePrice(v.price,v.originalPrice ?? null,Boolean(row.isFlashSale),true,pricingContext,at,{productId:row.id,variantId:v.id,isVariant:true,variantOriginalPrice:v.originalPrice ?? null}).effectivePrice;
-  const originalVariantCount = row.variants?.length || 0;
-  row = {...row, variants:row.variants?.filter(v=>!published || published.variants?.some((pv:{id:string;availability?:string})=>pv.id===v.id && (!pv.availability || ['AVAILABLE','PREORDER'].includes(pv.availability))))
-    .sort((a,b)=>effectiveVariantPrice(a)-effectiveVariantPrice(b) || a.id.localeCompare(b.id))};
+  const effectiveVariantPrice = (v: NonNullable<ProductDbRow["variants"]>[number]) =>
+    calculateEffectivePrice(
+      v.price,
+      v.originalPrice ?? null,
+      Boolean(row.isFlashSale),
+      true,
+      pricingContext,
+      at,
+      {
+        productId: row.id,
+        variantId: v.id,
+        isVariant: true,
+        variantOriginalPrice: v.originalPrice ?? null,
+      }
+    ).effectivePrice;
+
+  const originalVariantCount = (row.variants?.length || 0) + (published?.variants?.length || 0);
+  const enrichedVariants = enrichPublishedVariants(row.variants, published, row).sort(
+    (a, b) => effectiveVariantPrice(a) - effectiveVariantPrice(b) || a.id.localeCompare(b.id)
+  );
+  row = { ...row, variants: enrichedVariants };
+
   // 1. Resolve primary image from ProductImage table (metadata for Cloudflare R2)
   let resolvedImage: string | null = null;
 
@@ -403,90 +681,91 @@ export function mapD1ProductToHomepageProduct(
     }
   }
 
-  // 2. Resolve specs from normalized columns (cpu, ram, storage, gpu, display)
-  let specsObj: Record<string, string> = {};
-  if (row.specs) {
-    try {
-      const parsed = JSON.parse(row.specs);
-      if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-        specsObj = parsed;
+  // 2. Resolve specs from normalized columns & published Studio specs
+  const specsObj = parsePublishedSpecMap(published, row.specs);
+
+  // Resolve matching variant based on active filter context (strict single-variant multi-attribute alignment)
+  let chosenVariant = enrichedVariants.length > 0 ? enrichedVariants[0] : undefined;
+  let matchesFilter = !originalVariantCount || enrichedVariants.length > 0;
+
+  const checkSingleCandidate = (v: {
+    price: number;
+    cpu?: string | null;
+    gpu?: string | null;
+    ram?: string | null;
+    storage?: string | null;
+    condition?: string | null;
+    options?: string | null;
+  }) => {
+    if (!activeFilter) return true;
+    if (activeFilter.cpu?.length && !matchesCpuFilter(v.cpu, row.cpuSeries, activeFilter.cpu)) return false;
+    if (activeFilter.gpu?.length && !matchesGpuFilter(v.gpu, row.gpuSeries, activeFilter.gpu)) return false;
+    if (activeFilter.minPrice !== undefined && v.price < activeFilter.minPrice) return false;
+    if (activeFilter.maxPrice !== undefined && v.price > activeFilter.maxPrice) return false;
+    if (activeFilter.ram?.length && !matchesRamBucket(v.ram, activeFilter.ram)) return false;
+    if (activeFilter.storage?.length && !matchesStorageBucket(v.storage, activeFilter.storage)) return false;
+    if (activeFilter.condition?.length) {
+      const vCond = extractVariantCondition(v, null, published?.condition || row.condition || "NEW");
+      if (!activeFilter.condition.includes(vCond)) return false;
+    }
+    if (activeFilter.connection?.length) {
+      const opts = v.options || row.specs || "";
+      const matchesConn = activeFilter.connection.some((conn) => opts.includes(conn));
+      if (!matchesConn) return false;
+    }
+    if (activeFilter.power?.length) {
+      const opts = v.options || row.specs || "";
+      const matchesPow = activeFilter.power.some((pow) => opts.includes(pow));
+      if (!matchesPow) return false;
+    }
+    return true;
+  };
+
+  if (activeFilter) {
+    if (enrichedVariants.length > 0) {
+      const matched = enrichedVariants.find((v) =>
+        checkSingleCandidate({
+          ...v,
+          price: effectiveVariantPrice(v),
+        })
+      );
+      if (matched) {
+        chosenVariant = matched;
+      } else {
+        matchesFilter = false;
       }
-    } catch {}
+    } else if (originalVariantCount === 0) {
+      const baseEffPrice = calculateEffectivePrice(
+        normalizeVnd(row.price),
+        row.originalPrice !== null && row.originalPrice !== undefined ? normalizeVnd(row.originalPrice) : null,
+        Boolean(row.isFlashSale),
+        true,
+        pricingContext,
+        at,
+        { productId: row.id, isVariant: false }
+      ).effectivePrice;
+      matchesFilter = checkSingleCandidate({
+        price: baseEffPrice,
+        cpu: specsObj.CPU || specsObj.cpu || row.cpu,
+        gpu: specsObj.GPU || specsObj.gpu || specsObj.VGA || row.gpu,
+        ram: specsObj.RAM || specsObj.ram || row.ram,
+        storage: specsObj.SSD || specsObj["Ổ cứng"] || specsObj.ssd || specsObj.Storage || row.storage,
+        condition: published?.condition || row.condition || "NEW",
+        options: row.specs,
+      });
+    } else {
+      matchesFilter = false;
+    }
   }
 
-  // Resolve matching variant based on active filter context (strict variant-level price & spec alignment)
-  let chosenVariant = row.variants && row.variants.length > 0 ? row.variants[0] : undefined;
-  let matchesFilter = !originalVariantCount || !!row.variants?.length;
-
-  if (activeFilter && row.variants && row.variants.length > 0) {
-    const matched = row.variants.find((v) => {
-      if (activeFilter.cpu?.length && !activeFilter.cpu.some(cpu => ((v as {cpu?:string|null}).cpu || row.cpu || '').toLowerCase().includes(cpu.toLowerCase()))) return false;
-      if (activeFilter.gpu?.length && !activeFilter.gpu.some(gpu => (v.gpu || '').toLowerCase().includes(gpu.toLowerCase()))) return false;
-      if (activeFilter.minPrice !== undefined && effectiveVariantPrice(v) < activeFilter.minPrice) return false;
-      if (activeFilter.maxPrice !== undefined && effectiveVariantPrice(v) > activeFilter.maxPrice) return false;
-      if (activeFilter.ram && activeFilter.ram.length > 0) {
-        const vRam = v.ram || "";
-        const matchesRam = activeFilter.ram.some(
-          (r) =>
-            vRam.startsWith(`${r}GB`) ||
-            vRam.startsWith(`${r} GB`) ||
-            vRam.includes(` ${r}GB`) ||
-            vRam.includes(` ${r} GB`) ||
-            vRam === `${r}GB` ||
-            vRam === `${r}`
-        );
-        if (!matchesRam) return false;
-      }
-      if (activeFilter.storage && activeFilter.storage.length > 0) {
-        const vStorage = v.storage || "";
-        const matchesStorage = activeFilter.storage.some((s) => {
-          if (s >= 1024) {
-            const tb = s / 1024;
-            return (
-              vStorage.includes(`${tb}TB`) ||
-              vStorage.includes(`${tb} TB`) ||
-              vStorage.includes(`${s}GB`) ||
-              vStorage.includes("1000GB")
-            );
-          }
-          return (
-            vStorage.startsWith(`${s}GB`) ||
-            vStorage.startsWith(`${s} GB`) ||
-            vStorage.includes(` ${s}GB`) ||
-            vStorage.includes(` ${s} GB`) ||
-            vStorage === `${s}GB` ||
-            vStorage === `${s}`
-          );
-        });
-        if (!matchesStorage) return false;
-      }
-      if (activeFilter.condition && activeFilter.condition.length > 0) {
-        const opts = v.options || "";
-        const matchesCond = activeFilter.condition.some((c) => opts.includes(`"condition":"${c}"`));
-        if (!matchesCond) return false;
-      }
-      if (activeFilter.connection && activeFilter.connection.length > 0) {
-        const opts = v.options || "";
-        const matchesConn = activeFilter.connection.some((conn) => opts.includes(`"connection":"${conn}"`));
-        if (!matchesConn) return false;
-      }
-      if (activeFilter.power && activeFilter.power.length > 0) {
-        const opts = v.options || "";
-        const matchesPow = activeFilter.power.some((pow) => opts.includes(`"power":"${pow}"`));
-        if (!matchesPow) return false;
-      }
-      return true;
-    });
-    if (matched) {
-      chosenVariant = matched;
-    } else matchesFilter = false;
-  }
-
-  const cpu = (chosenVariant as { cpu?: string | null })?.cpu || row.cpu || specsObj.CPU || specsObj.cpu || "";
-  const ram = chosenVariant?.ram || row.ram || specsObj.RAM || specsObj.ram || "";
-  const ssd = chosenVariant?.storage || row.storage || specsObj.SSD || specsObj.ssd || specsObj.Storage || "";
-  const gpu = chosenVariant?.gpu || row.gpu || specsObj.GPU || specsObj.gpu || specsObj.VGA || "";
-  const display = row.display || specsObj["Màn hình"] || specsObj.display || specsObj.Screen || "";
+  const cpu = chosenVariant?.cpu || specsObj.CPU || specsObj.cpu || row.cpu || "";
+  const ram = chosenVariant?.ram || specsObj.RAM || specsObj.ram || row.ram || "";
+  const ssd = chosenVariant?.storage || specsObj.SSD || specsObj["Ổ cứng"] || specsObj.ssd || specsObj.Storage || row.storage || "";
+  const gpu = chosenVariant?.gpu || specsObj.GPU || specsObj.gpu || specsObj.VGA || row.gpu || "";
+  const display = chosenVariant?.display || specsObj["Màn hình"] || specsObj.display || specsObj.Screen || row.display || "";
+  const effectiveCondition = chosenVariant
+    ? extractVariantCondition(chosenVariant, null, published?.condition || row.condition || "NEW")
+    : (published?.condition || row.condition || "NEW");
 
   // 3. Integer money values (VND integer number faithful to chosen variant)
   const isVariant = Boolean(chosenVariant);
@@ -520,7 +799,7 @@ export function mapD1ProductToHomepageProduct(
     matchesFilter,
     template: published?.template,
     href: productHref({ slug: row.slug, template: published?.template, kind: /phu-kien|linh-kien|chuot|ban-phim/.test(categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' }),
-    availability: published?.availability === 'CONTACT' ? 'CONTACT' : originalVariantCount && !row.variants?.length ? 'UNAVAILABLE' : published?.availability || 'AVAILABLE',
+    availability: published?.availability === 'CONTACT' ? 'CONTACT' : originalVariantCount && !enrichedVariants.length ? 'UNAVAILABLE' : published?.availability || 'AVAILABLE',
     slug: row.slug,
     sku: chosenVariant?.sku,
     variantId: chosenVariant?.id,
@@ -530,7 +809,7 @@ export function mapD1ProductToHomepageProduct(
     categorySlug,
     model: row.model || undefined,
     series: row.series || undefined,
-    condition: row.condition || "NEW",
+    condition: effectiveCondition,
     rawPrice,
     rawOriginalPrice,
     price: resolved.effectivePrice,
@@ -569,7 +848,7 @@ const defaultInclude = {
   },
   variants: {
     where: { status: { in: ["ACTIVE", "active"] } },
-    select: { id: true, sku: true, name: true, price: true, originalPrice: true, cpu: true, ram: true, storage: true, gpu: true, options: true },
+    select: { id: true, sku: true, name: true, price: true, originalPrice: true, stock: true, cpu: true, display: true, ram: true, storage: true, gpu: true, options: true },
     orderBy: { price: "asc" as const },
   },
 };
@@ -705,17 +984,49 @@ export async function getCategoryProducts(
     const categories = await getActiveCategories(client);
     const category = categories.find(c => c.slug === categorySlug);
     if (!category) return [];
-    const rows = await client.product.findMany({
-      where: {
-        status: { in: ["ACTIVE", "active"] },
-        deletedAt: null, NOT: { studio: { is: { published: null } } },
-        ...categoryProductScope(category,categories),
-      },
-      include: defaultInclude,
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
+    const implicitCond =
+      category.slug === "laptop-moi"
+        ? ["NEW"]
+        : ["laptop-cu", "laptop-likenew"].includes(category.slug)
+          ? ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"]
+          : undefined;
+    const rows = implicitCond
+      ? await catalogBatches((skip, take) =>
+          client.product.findMany({
+            where: {
+              status: { in: ["ACTIVE", "active"] },
+              deletedAt: null,
+              NOT: { studio: { is: { published: null } } },
+              ...categoryProductScope(category, categories),
+            },
+            include: defaultInclude,
+            orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+            skip,
+            take,
+          })
+        )
+      : await client.product.findMany({
+          where: {
+            status: { in: ["ACTIVE", "active"] },
+            deletedAt: null,
+            NOT: { studio: { is: { published: null } } },
+            ...categoryProductScope(category, categories),
+          },
+          include: defaultInclude,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+        });
+    return rows
+      .map((r) =>
+        mapD1ProductToHomepageProduct(
+          r as unknown as ProductDbRow,
+          implicitCond ? { condition: implicitCond } : undefined,
+          context,
+          at
+        )
+      )
+      .filter((p) => p.matchesFilter)
+      .slice(0, limit);
   } catch (error) {
     console.error(`[CatalogService] Failed to query products for category '${categorySlug}' from D1:`, error);
     throw error;
@@ -734,17 +1045,35 @@ export async function getLikeNewProducts(
   const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
     const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
-    const rows = await client.product.findMany({
-      where: {
-        status: { in: ["ACTIVE", "active"] },
-        deletedAt: null, NOT: { studio: { is: { published: null } } },
-        condition: { in: ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"] },
-      },
-      include: defaultInclude,
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
+    const usedConds = ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"];
+    const rows = await catalogBatches((skip, take) =>
+      client.product.findMany({
+        where: {
+          status: { in: ["ACTIVE", "active"] },
+          deletedAt: null,
+          NOT: { studio: { is: { published: null } } },
+          OR: [
+            { condition: { in: usedConds } },
+            {
+              variants: {
+                some: {
+                  status: { in: ["ACTIVE", "active"] },
+                  OR: usedConds.map((c) => ({ options: { contains: `"condition":"${c}"` } })),
+                },
+              },
+            },
+          ],
+        },
+        include: defaultInclude,
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        skip,
+        take,
+      })
+    );
+    return rows
+      .map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, { condition: usedConds }, context, at))
+      .filter((p) => p.matchesFilter)
+      .slice(0, limit);
   } catch (error) {
     console.error("[CatalogService] Failed to query like-new products from D1:", error);
     throw error;
@@ -1074,157 +1403,6 @@ export async function getCategoryFilteredProducts(
       : [];
 
     const hasPriceFilter = options.minPrice !== undefined || options.maxPrice !== undefined;
-    const hasSpecFilters = ramList.length > 0 || storageList.length > 0 || gpuList.length > 0;
-    const hasAccessoryFilters = connectionList.length > 0 || powerList.length > 0;
-    const hasConditionFilter = conditionList.length > 0;
-
-    // CPU filter: Enforced at the Product level (and variant if variant has CPU)
-    if (cpuList.length > 0) {
-      const cpuClauses = [
-        { cpuSeries: { in: cpuList } },
-        { cpu: { in: cpuList } },
-        { variants: { some: { status: { in: ["ACTIVE", "active"] }, cpu: { in: cpuList } } } },
-      ];
-      if (where.OR) {
-        where.AND = [...(where.AND || []), { OR: cpuClauses }];
-      } else {
-        where.OR = cpuClauses;
-      }
-    }
-
-    // Atomic Variant vs Legacy Product filtering:
-    if (hasPriceFilter || hasSpecFilters || hasAccessoryFilters || hasConditionFilter) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const variantMatch: any = { status: { in: ["ACTIVE", "active"] } };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const baseMatch: any = {};
-
-      // 2. RAM alignment
-      if (ramList.length > 0) {
-        baseMatch.ramGb = { in: ramList };
-        const ramClauses = buildRamClauses(ramList);
-        variantMatch.OR = ramClauses;
-      }
-
-      // 3. Storage alignment
-      if (storageList.length > 0) {
-        baseMatch.storageGb = { in: storageList };
-        const storageClauses = buildStorageClauses(storageList);
-        if (variantMatch.OR) {
-          const prev = variantMatch.OR;
-          delete variantMatch.OR;
-          variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: storageClauses }];
-        } else {
-          variantMatch.OR = storageClauses;
-        }
-      }
-
-      // 4. GPU alignment
-      if (gpuList.length > 0) {
-        baseMatch.gpuSeries = { in: gpuList };
-        const gpuClauses = gpuList.map((g) => ({ gpu: { contains: g } }));
-        if (variantMatch.OR) {
-          const prev = variantMatch.OR;
-          delete variantMatch.OR;
-          variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: gpuClauses }];
-        } else {
-          variantMatch.OR = gpuClauses;
-        }
-      }
-
-      // 5. Condition alignment on variant options & base product
-      if (hasConditionFilter) {
-        baseMatch.condition = { in: conditionList };
-        const condClauses = conditionList.map((c) => ({
-          options: { contains: `"condition":"${c}"` },
-        }));
-        if (variantMatch.OR) {
-          const prev = variantMatch.OR;
-          delete variantMatch.OR;
-          variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: condClauses }];
-        } else {
-          variantMatch.OR = condClauses;
-        }
-      }
-
-      // 6. Accessory options (connection, power)
-      if (connectionList.length > 0) {
-        const baseConnClauses = connectionList.map((conn) => ({
-          specs: { contains: conn },
-        }));
-        if (baseMatch.OR) {
-          const prevBase = baseMatch.OR;
-          delete baseMatch.OR;
-          baseMatch.AND = [...(baseMatch.AND || []), { OR: prevBase }, { OR: baseConnClauses }];
-        } else {
-          baseMatch.OR = baseConnClauses;
-        }
-
-        const connClauses = connectionList.map((conn) => ({
-          OR: [
-            { options: { contains: `"connection":"${conn}"` } },
-            { options: { contains: `"Kết nối":"${conn}"` } },
-            { options: { contains: conn } },
-          ],
-        }));
-        if (variantMatch.OR) {
-          const prev = variantMatch.OR;
-          delete variantMatch.OR;
-          variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: connClauses }];
-        } else {
-          variantMatch.OR = connClauses;
-        }
-      }
-
-      if (powerList.length > 0) {
-        const basePowerClauses = powerList.map((p) => ({
-          specs: { contains: p },
-        }));
-        if (baseMatch.OR) {
-          const prevBase = baseMatch.OR;
-          delete baseMatch.OR;
-          baseMatch.AND = [...(baseMatch.AND || []), { OR: prevBase }, { OR: basePowerClauses }];
-        } else {
-          baseMatch.OR = basePowerClauses;
-        }
-
-        const powerClauses = powerList.map((p) => ({
-          OR: [
-            { options: { contains: `"power":"${p}"` } },
-            { options: { contains: `"Công suất":"${p}"` } },
-            { options: { contains: p } },
-          ],
-        }));
-        if (variantMatch.OR) {
-          const prev = variantMatch.OR;
-          delete variantMatch.OR;
-          variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: powerClauses }];
-        } else {
-          variantMatch.OR = powerClauses;
-        }
-      }
-
-      where.AND = [
-        ...(where.AND || []),
-        {
-          OR: [
-            // Branch 1: Variant-backed products (evaluated atomically on the SAME active variant)
-            {
-              variants: {
-                some: variantMatch,
-              },
-            },
-            // Branch 2: Legacy products without active variants (evaluated on Product level)
-            {
-              variants: {
-                none: { status: { in: ["ACTIVE", "active"] } },
-              },
-              ...baseMatch,
-            },
-          ],
-        },
-      ];
-    }
 
     // 3. Sorting configuration with stable secondary tie-breaker
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1256,6 +1434,7 @@ export async function getCategoryFilteredProducts(
         skip,take,orderBy:{id:'asc'},
         where: categoryWhere,
         select: {
+          id: true,
           name: true,
           slug: true,
           tags: true,
@@ -1263,21 +1442,49 @@ export async function getCategoryFilteredProducts(
           brand: true,
           brandRel: { select: { id: true, name: true, slug: true } },
           condition: true,
+          cpu: true,
           cpuSeries: true,
+          gpu: true,
           gpuSeries: true,
+          ram: true,
           ramGb: true,
+          storage: true,
           storageGb: true,
+          display: true,
           price: true,
+          originalPrice: true,
+          isFlashSale: true,
           specs: true,
+          studio: { select: { published: true } },
           variants: {
             where: { status: { in: ["ACTIVE", "active"] } },
-            select: { options: true, price: true },
+            select: {
+              id: true,
+              sku: true,
+              name: true,
+              price: true,
+              originalPrice: true,
+              stock: true,
+              cpu: true,
+              gpu: true,
+              ram: true,
+              storage: true,
+              display: true,
+              options: true,
+            },
           },
         },
       })),
     ]);
 
-    // 6. Aggregate facet options from the category's active catalog
+    const implicitCategoryConds =
+      category?.slug === "laptop-moi"
+        ? ["NEW"]
+        : category?.slug && ["laptop-cu", "laptop-likenew"].includes(category.slug)
+          ? ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"]
+          : [];
+
+    // 6. Aggregate facet options from the category's active published catalog
     const brandMap = new Map<string, { id: string; name: string; slug: string; count: number }>();
     const conditionMap = new Map<string, number>();
     const cpuMap = new Map<string, number>();
@@ -1290,10 +1497,33 @@ export async function getCategoryFilteredProducts(
     let maxPrice = 0;
 
     for (const p of facetPool) {
-      if (typeof p.price === "number") {
-        if (p.price < minPrice) minPrice = p.price;
-        if (p.price > maxPrice) maxPrice = p.price;
+      const published = p.studio?.published ? JSON.parse(p.studio.published) : null;
+      const specMap = parsePublishedSpecMap(published, p.specs);
+      const originalVarCount = (p.variants?.length || 0) + (published?.variants?.length || 0);
+      let activeVariants = enrichPublishedVariants(p.variants, published, p);
+      if (implicitCategoryConds.length > 0 && activeVariants.length > 0) {
+        activeVariants = activeVariants.filter((v) => implicitCategoryConds.includes(v.condition));
       }
+      if (originalVarCount > 0 && activeVariants.length === 0) continue;
+      if (
+        originalVarCount === 0 &&
+        implicitCategoryConds.length > 0 &&
+        !implicitCategoryConds.includes(published?.condition || p.condition || "NEW")
+      ) {
+        continue;
+      }
+
+      const mappedCard = mapD1ProductToHomepageProduct(
+        p as unknown as ProductDbRow,
+        implicitCategoryConds.length > 0 ? { condition: implicitCategoryConds } : undefined,
+        context,
+        at
+      );
+      if (["AVAILABLE", "PREORDER"].includes(mappedCard.availability || "") && mappedCard.price > 0) {
+        if (mappedCard.price < minPrice) minPrice = mappedCard.price;
+        if (mappedCard.price > maxPrice) maxPrice = mappedCard.price;
+      }
+
       if (p.brandRel) {
         const existing = brandMap.get(p.brandRel.slug) || {
           id: p.brandRel.id,
@@ -1309,54 +1539,70 @@ export async function getCategoryFilteredProducts(
         existing.count++;
         brandMap.set(slug, existing);
       }
-      if (p.condition) {
-        conditionMap.set(p.condition, (conditionMap.get(p.condition) || 0) + 1);
-      }
-      if (p.cpuSeries) {
-        cpuMap.set(p.cpuSeries, (cpuMap.get(p.cpuSeries) || 0) + 1);
-      }
-      if (p.gpuSeries) {
-        gpuMap.set(p.gpuSeries, (gpuMap.get(p.gpuSeries) || 0) + 1);
-      }
-      if (p.ramGb) {
-        ramMap.set(p.ramGb, (ramMap.get(p.ramGb) || 0) + 1);
-      }
-      if (p.storageGb) {
-        storageMap.set(p.storageGb, (storageMap.get(p.storageGb) || 0) + 1);
+
+      // Count each facet value at most ONCE per product across its active published variants
+      const prodConds = new Set<string>();
+      const prodCpus = new Set<string>();
+      const prodGpus = new Set<string>();
+      const prodRams = new Set<number>();
+      const prodStorages = new Set<number>();
+
+      if (activeVariants.length > 0) {
+        for (const v of activeVariants) {
+          if (v.condition) prodConds.add(v.condition);
+          const cSer = deriveCpuSeries(v.cpu) ?? (!v.cpu ? p.cpuSeries : null);
+          if (cSer) prodCpus.add(cSer);
+          const gSer = deriveGpuSeries(v.gpu) ?? (!v.gpu ? p.gpuSeries : null);
+          if (gSer) prodGpus.add(gSer);
+          const rGb = parseRamGb(v.ram);
+          if (rGb) prodRams.add(rGb);
+          const sGb = parseStorageGb(v.storage);
+          if (sGb) prodStorages.add(sGb);
+        }
+      } else {
+        const baseCond = published?.condition || p.condition;
+        if (baseCond) prodConds.add(baseCond);
+        const baseCpuStr = specMap.CPU || specMap.cpu || p.cpu;
+        const cSer = deriveCpuSeries(baseCpuStr) ?? (!baseCpuStr ? p.cpuSeries : null);
+        if (cSer) prodCpus.add(cSer);
+        const baseGpuStr = specMap.GPU || specMap.gpu || specMap.VGA || p.gpu;
+        const gSer = deriveGpuSeries(baseGpuStr) ?? (!baseGpuStr ? p.gpuSeries : null);
+        if (gSer) prodGpus.add(gSer);
+        const baseRamStr = specMap.RAM || specMap.ram || p.ram;
+        const rGb = parseRamGb(baseRamStr) ?? (!baseRamStr ? p.ramGb : null);
+        if (rGb) prodRams.add(rGb);
+        const baseStorageStr = specMap.SSD || specMap["Ổ cứng"] || specMap.ssd || specMap.Storage || p.storage;
+        const sGb = parseStorageGb(baseStorageStr) ?? (!baseStorageStr ? p.storageGb : null);
+        if (sGb) prodStorages.add( normalizeStorageBucket(sGb) );
       }
 
-      // Extract specs JSON for accessory options
-      let pSpecs: Record<string, string> = {};
-      if (p.specs) {
-        try {
-          const parsed = JSON.parse(p.specs);
-          if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) pSpecs = parsed;
-        } catch {}
-      }
+      for (const c of prodConds) conditionMap.set(c, (conditionMap.get(c) || 0) + 1);
+      for (const c of prodCpus) cpuMap.set(c, (cpuMap.get(c) || 0) + 1);
+      for (const g of prodGpus) gpuMap.set(g, (gpuMap.get(g) || 0) + 1);
+      for (const r of prodRams) ramMap.set(r, (ramMap.get(r) || 0) + 1);
+      for (const s of prodStorages) storageMap.set(s, (storageMap.get(s) || 0) + 1);
 
-      const specConn = pSpecs["Chuẩn kết nối"] || pSpecs["Kết nối"] || pSpecs.connection || pSpecs.Connection;
-      if (specConn) connectionMap.set(specConn, (connectionMap.get(specConn) || 0) + 1);
+      // Extract specs JSON & variant options for accessory options (once per product)
+      const connSet = new Set<string>();
+      const pwrSet = new Set<string>();
+      const specConn = specMap["Chuẩn kết nối"] || specMap["Kết nối"] || specMap.connection || specMap.Connection;
+      if (specConn) connSet.add(specConn);
+      const specPower = specMap["Công suất"] || specMap["Tổng công suất"] || specMap["Chuẩn sạc"] || specMap.power || specMap.Power;
+      if (specPower) pwrSet.add(specPower);
 
-      const specPower = pSpecs["Công suất"] || pSpecs["Tổng công suất"] || pSpecs["Chuẩn sạc"] || pSpecs.power || pSpecs.Power;
-      if (specPower) powerMap.set(specPower, (powerMap.get(specPower) || 0) + 1);
-
-      if (p.variants) {
-        for (const v of p.variants) {
-          if (v.options) {
-            try {
-              const vOpts = JSON.parse(v.options);
-              const vConn = vOpts.connection || vOpts.Connection || vOpts["Chuẩn kết nối"] || vOpts["Kết nối"];
-              if (vConn && vConn !== specConn) {
-                connectionMap.set(vConn, (connectionMap.get(vConn) || 0) + 1);
-              }
-              const vPwr = vOpts.power || vOpts.Power || vOpts["Công suất"];
-              if (vPwr && vPwr !== specPower) {
-                powerMap.set(vPwr, (powerMap.get(vPwr) || 0) + 1);
-              }
-            } catch {}
-          }
+      for (const v of activeVariants) {
+        if (v.options) {
+          try {
+            const vOpts = JSON.parse(v.options);
+            const vConn = vOpts.connection || vOpts.Connection || vOpts["Chuẩn kết nối"] || vOpts["Kết nối"];
+            if (vConn) connSet.add(vConn);
+            const vPwr = vOpts.power || vOpts.Power || vOpts["Công suất"];
+            if (vPwr) pwrSet.add(vPwr);
+          } catch {}
         }
       }
+      for (const conn of connSet) connectionMap.set(conn, (connectionMap.get(conn) || 0) + 1);
+      for (const pwr of pwrSet) powerMap.set(pwr, (powerMap.get(pwr) || 0) + 1);
     }
 
     const accessoryTypeMap = new Map<string, number>();
@@ -1427,6 +1673,9 @@ export async function getCategoryFilteredProducts(
       }))
       .sort((a, b) => a.value - b.value);
 
+    const effectiveConditionFilter =
+      conditionList.length > 0 ? conditionList : implicitCategoryConds;
+
     const activeFilter: ActiveFilterContext = {
       cpu: cpuList,
       gpu: gpuList,
@@ -1434,12 +1683,11 @@ export async function getCategoryFilteredProducts(
       maxPrice: options.maxPrice,
       ram: ramList,
       storage: storageList,
-      condition: conditionList,
+      condition: effectiveConditionFilter,
       connection: connectionList,
       power: powerList,
     };
 
-    // ponytail: resolve matched rows in memory; add indexed effective-price projection when catalog size requires it.
     const products = rows.map(r=>mapD1ProductToHomepageProduct(r as unknown as ProductDbRow,activeFilter,context,at)).filter(p=>
       p.matchesFilter && (!hasPriceFilter || (['AVAILABLE','PREORDER'].includes(p.availability || '') && p.price>0 &&
       (options.minPrice===undefined || p.price>=options.minPrice) && (options.maxPrice===undefined || p.price<=options.maxPrice))));
@@ -1497,6 +1745,9 @@ export async function getProductDetail(
         status: { in: ["ACTIVE", "active"] },
       },
       include: {
+        studio: {
+          select: { published: true },
+        },
         category: {
           select: { id: true, name: true, slug: true },
         },
@@ -1518,18 +1769,23 @@ export async function getProductDetail(
 
     if (!product) return null;
 
+    const published = product.studio?.published ? JSON.parse(product.studio.published) : null;
+    const enrichedVariants = enrichPublishedVariants(product.variants, published, product);
+
     // 1. Resolve selected variant if any
-    let activeVariant = product.variants.find(
+    let activeVariant = enrichedVariants.find(
       (v) => v.id === selectedVariantParam || v.sku === selectedVariantParam
     );
     if (selectedVariantParam && !activeVariant) return null;
-    if (!activeVariant && product.variants.length > 0) {
-      activeVariant = product.variants[0];
+    if (!activeVariant && enrichedVariants.length > 0) {
+      activeVariant = enrichedVariants[0];
     }
 
     // 2. Resolve pricing & stock according to selected variant vs base product
-    const basePrice = Math.round(Number(product.price) || 0);
-    const baseOriginalPrice = product.originalPrice ? Math.round(Number(product.originalPrice)) : null;
+    const basePrice = Math.round(Number(published?.price ?? product.price) || 0);
+    const baseOriginalPrice = (published?.originalPrice ?? product.originalPrice)
+      ? Math.round(Number(published?.originalPrice ?? product.originalPrice))
+      : null;
     const baseStock = typeof product.stock === "number" ? product.stock : 0;
 
     const activePrice = activeVariant ? Math.round(Number(activeVariant.price) || 0) : basePrice;
@@ -1547,34 +1803,31 @@ export async function getProductDetail(
       : baseStock;
 
     // 3. Resolve specifications
-    let parsedSpecs: Record<string, string> = {};
-    if (product.specs) {
-      try {
-        const p = JSON.parse(product.specs);
-        if (typeof p === "object" && p !== null && !Array.isArray(p)) {
-          parsedSpecs = p;
-        }
-      } catch {}
-    }
+    const parsedSpecs = parsePublishedSpecMap(published, product.specs);
 
-    const baseCpu = product.cpu || parsedSpecs.CPU || parsedSpecs.cpu || "";
-    const baseGpu = product.gpu || parsedSpecs.GPU || parsedSpecs.gpu || parsedSpecs.VGA || "";
-    const baseRam = product.ram || parsedSpecs.RAM || parsedSpecs.ram || "";
-    const baseStorage = product.storage || parsedSpecs.SSD || parsedSpecs.ssd || parsedSpecs.Storage || "";
-    const baseDisplay = product.display || parsedSpecs["Màn hình"] || parsedSpecs.display || parsedSpecs.Screen || "";
+    const baseCpu = parsedSpecs.CPU || parsedSpecs.cpu || product.cpu || "";
+    const baseGpu = parsedSpecs.GPU || parsedSpecs.gpu || parsedSpecs.VGA || product.gpu || "";
+    const baseRam = parsedSpecs.RAM || parsedSpecs.ram || product.ram || "";
+    const baseStorage = parsedSpecs.SSD || parsedSpecs["Ổ cứng"] || parsedSpecs.ssd || parsedSpecs.Storage || product.storage || "";
+    const baseDisplay = parsedSpecs["Màn hình"] || parsedSpecs.display || parsedSpecs.Screen || product.display || "";
 
     const activeCpu = activeVariant?.cpu || baseCpu;
     const activeGpu = activeVariant?.gpu || baseGpu;
     const activeRam = activeVariant?.ram || baseRam;
     const activeStorage = activeVariant?.storage || baseStorage;
     const activeDisplay = activeVariant?.display || baseDisplay;
+    const activeCondition = activeVariant
+      ? extractVariantCondition(activeVariant, null, published?.condition || product.condition || "NEW")
+      : (published?.condition || product.condition || "NEW");
+    const activeCpuSeries = deriveCpuSeries(activeCpu) ?? (!activeCpu ? product.cpuSeries : null);
+    const activeGpuSeries = deriveGpuSeries(activeGpu) ?? (!activeGpu ? product.gpuSeries : null);
 
     // Build structured full specifications table
     const fullSpecs: ProductDetailSpecGroup[] = [];
 
     const cpuItems: ProductDetailSpecItem[] = [];
     if (activeCpu) cpuItems.push({ label: "Model CPU", value: activeCpu });
-    if (product.cpuSeries) cpuItems.push({ label: "Dòng CPU", value: product.cpuSeries });
+    if (activeCpuSeries) cpuItems.push({ label: "Dòng CPU", value: activeCpuSeries });
     if (parsedSpecs["Số nhân"] || parsedSpecs.cores) cpuItems.push({ label: "Số nhân / luồng", value: parsedSpecs["Số nhân"] || parsedSpecs.cores });
     if (parsedSpecs["Tốc độ tối đa"] || parsedSpecs.speed) cpuItems.push({ label: "Xung nhịp tối đa", value: parsedSpecs["Tốc độ tối đa"] || parsedSpecs.speed });
     if (cpuItems.length > 0) fullSpecs.push({ group: "Bộ xử lý (CPU)", items: cpuItems });
@@ -1589,7 +1842,7 @@ export async function getProductDetail(
 
     const gpuItems: ProductDetailSpecItem[] = [];
     if (activeGpu) gpuItems.push({ label: "Card đồ họa (GPU)", value: activeGpu });
-    if (product.gpuSeries) gpuItems.push({ label: "Dòng GPU", value: product.gpuSeries });
+    if (activeGpuSeries) gpuItems.push({ label: "Dòng GPU", value: activeGpuSeries });
     if (parsedSpecs.vram || parsedSpecs["VRAM"]) gpuItems.push({ label: "Bộ nhớ đồ họa (VRAM)", value: parsedSpecs.vram || parsedSpecs["VRAM"] });
     if (gpuItems.length > 0) fullSpecs.push({ group: "Đồ họa & Màn hình", items: gpuItems });
 
@@ -1622,7 +1875,7 @@ export async function getProductDetail(
     if (product.series) generalItems.push({ label: "Dòng sản phẩm", value: product.series });
     if (product.model) generalItems.push({ label: "Model / Mã máy", value: product.model });
     if (activeVariant?.sku) generalItems.push({ label: "SKU phiên bản", value: activeVariant.sku });
-    generalItems.push({ label: "Tình trạng máy", value: conditionDisplayLabels[product.condition] || product.condition });
+    generalItems.push({ label: "Tình trạng máy", value: conditionDisplayLabels[activeCondition] || activeCondition });
     if (product.warranty) generalItems.push({ label: "Chế độ bảo hành", value: product.warranty });
     if (product.origin) generalItems.push({ label: "Xuất xứ", value: product.origin });
     if (parsedSpecs.os || parsedSpecs["HĐH"] || parsedSpecs["Hệ điều hành"]) {
@@ -1681,7 +1934,7 @@ export async function getProductDetail(
     }
 
     // 5. Map Variants
-    const variants: ProductDetailVariant[] = product.variants.map((v) => {
+    const variants: ProductDetailVariant[] = enrichedVariants.map((v) => {
       let opts: Record<string, string> = {};
       if (v.options) {
         try {
@@ -1712,8 +1965,8 @@ export async function getProductDetail(
       id: product.id,
       slug: product.slug,
       canonicalSlug,
-      name: product.name,
-      brand: product.brandRel?.name || product.brand || null,
+      name: published?.name || product.name,
+      brand: product.brandRel?.name || published?.brand || product.brand || null,
       brandSlug: product.brandRel?.slug || null,
       brandId: product.brandId || null,
       category: product.category?.name || null,
@@ -1722,8 +1975,8 @@ export async function getProductDetail(
       model: product.model || null,
       series: product.series || null,
       warranty: product.warranty || "12 tháng chính hãng",
-      condition: product.condition || "NEW",
-      conditionLabel: conditionDisplayLabels[product.condition] || product.condition,
+      condition: activeCondition,
+      conditionLabel: conditionDisplayLabels[activeCondition] || activeCondition,
       origin: product.origin || null,
 
       basePrice,
@@ -1736,7 +1989,7 @@ export async function getProductDetail(
       price: activePrice,
       originalPrice: activeOriginalPrice,
       discount: activeDiscount,
-      isFlashSale: Boolean(product.isFlashSale),
+      isFlashSale: Boolean(published?.isFlashSale ?? product.isFlashSale),
       stock: activeStock,
 
       specs: {
@@ -1750,17 +2003,17 @@ export async function getProductDetail(
       },
       fullSpecs,
 
-      description: product.description,
+      description: published?.description || product.description,
       shortDescription: product.shortDescription || null,
-      contentHtml: product.contentHtml || null,
+      contentHtml: published?.contentHtml || product.contentHtml || null,
 
       images,
       primaryImageUrl,
 
       variants,
 
-      seoTitle: product.seoTitle || null,
-      seoDescription: product.seoDescription || null,
+      seoTitle: published?.seoTitle || product.seoTitle || null,
+      seoDescription: published?.seoDescription || product.seoDescription || null,
     };
   } catch (error) {
     console.error("[CatalogService] Failed to getProductDetail on D1:", error);
@@ -1895,7 +2148,11 @@ export async function resolveProductsByCriteria(
   },
   client: PrismaClient = prisma,
   pricingContext?: PriceEvaluationContext | null,
-  at: Date = new Date()
+  at: Date = new Date(),
+  preloaded?: {
+    categories?: CategorySummary[];
+    studios?: Array<{ productId: string; published: string | null }>;
+  }
 ): Promise<HomepageProduct[]> {
   const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1905,7 +2162,7 @@ export async function resolveProductsByCriteria(
   };
 
   if (criteria.productType === 'accessory' || criteria.productType === 'laptop' || criteria.categoryId) {
-    const categories = await getActiveCategories(client);
+    const categories = preloaded?.categories ?? (await getActiveCategories(client));
     const accessories = categories.filter(c=>['linh-kien','phu-kien'].includes(c.slug)).flatMap(c=>categoryDescendantIds(c,categories));
     where.AND = [];
     if (criteria.productType === 'accessory') where.AND.push({categoryId:{in:accessories}});
@@ -1929,10 +2186,16 @@ export async function resolveProductsByCriteria(
   }
 
   if (criteria.availability && criteria.availability !== "all") {
-    const studios = await client.productStudio.findMany({ select: { productId: true, published: true } });
+    const studios = preloaded?.studios ?? (await client.productStudio.findMany({ select: { productId: true, published: true } }));
     const matching = studios.filter(s => {
-      try { return s.published && JSON.parse(s.published).availability === criteria.availability; }
-      catch { return false; }
+      try {
+        if (!s.published) return false;
+        const parsed = JSON.parse(s.published);
+        const avail = parsed.availability === 'IN_STOCK' ? 'AVAILABLE' : parsed.availability;
+        return avail === criteria.availability;
+      } catch {
+        return false;
+      }
     }).map(s => s.productId);
     // Legacy products without Studio use the existing AVAILABLE contract, never stock.
     where.OR = [{ id: { in: matching } }, ...(criteria.availability === "AVAILABLE" ? [{ studio: { is: null } }] : [])];

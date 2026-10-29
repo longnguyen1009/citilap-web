@@ -31,7 +31,7 @@ export default function WishlistPage() {
     const timer=setInterval(refresh,30000);
     return ()=>{controller.abort();window.removeEventListener('focus',refresh);window.removeEventListener('citilap:price-refresh',refresh);clearInterval(timer);};
   },[ids,loaded,retry]);
-  return <main className="container mx-auto max-w-[1370px] px-4 py-8 space-y-6">
+  return <div className="container mx-auto max-w-[1370px] px-4 py-8 space-y-6">
     <div className="border-b border-border-default pb-4">
       <h1 className="text-2xl font-bold text-gray-900">Danh sách yêu thích ({wishlist.length})</h1>
       <p className="text-sm text-gray-600 mt-1">Lưu trên thiết bị này, tối đa 100 sản phẩm. Mở sản phẩm để chọn cấu hình và kiểm tra khả dụng trước khi đặt.</p>
@@ -42,5 +42,5 @@ export default function WishlistPage() {
         {result.unavailableIds.map(id=><div key={id} role="status" className="p-3 bg-gray-100 rounded-lg text-sm text-gray-600 flex items-center justify-between">Một sản phẩm đã lưu không còn công khai. <button onClick={()=>removeFromWishlist(id)} className="underline text-red-600 font-medium cursor-pointer">Bỏ khỏi danh sách</button></div>)}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">{result.products.map(product=><ProductCard key={product.id} product={product}/>)}</div>
       </>}
-  </main>;
+  </div>;
 }

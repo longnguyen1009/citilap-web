@@ -42,6 +42,14 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<'' | 'COD' | 'BANK_TRANSFER'>('');
   const [priceChangeDetails, setPriceChangeDetails] = useState<PriceChangeDetails | null>(null);
   const [form, setForm] = useState({fullName:'',phone:'',email:'',province:'',ward:'',address:'',note:''});
+  const [serviceOptions, setServiceOptions] = useState<string[]>([
+    'Cài đặt sẵn Windows + bộ ứng dụng văn phòng cơ bản',
+  ]);
+  const toggleServiceOption = (label: string) => {
+    setServiceOptions((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+    );
+  };
   const [loaded, setLoaded] = useState(false);
   const [quoteState, setQuoteState] = useState<{key:string;data:CheckoutQuote | null;error:string}>({key:'',data:null,error:''});
   const [quoteRetry, setQuoteRetry] = useState(0);
@@ -109,7 +117,13 @@ export default function CheckoutPage() {
     e.preventDefault();
     if(pending){await sendAttempt(pending);return;}
     if(!quoteReady || !quote || priceChangeDetails || sending.current)return;
-    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName || null,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.ward.trim(),form.province].join(', ') : null,note:form.note,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
+    const combinedNote = [
+      serviceOptions.length > 0 ? `[Dịch vụ yêu cầu: ${serviceOptions.join('; ')}]` : '',
+      form.note.trim(),
+    ]
+      .filter(Boolean)
+      .join(' — ');
+    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName || null,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.ward.trim(),form.province].join(', ') : null,note:combinedNote,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
     const attempt={key:crypto.randomUUID(),body};
     try{sessionStorage.setItem('citilap-checkout-attempt-v1',JSON.stringify(attempt));}catch{setFormError('Không thể lưu yêu cầu để thử lại an toàn. Vui lòng bật lưu trữ trình duyệt.');return;}
     setPending(attempt);await sendAttempt(attempt);
@@ -307,6 +321,7 @@ export default function CheckoutPage() {
                     id="fullName"
                     name="fullName"
                     type="text"
+                    autoComplete="name"
                     value={form.fullName}
                     onChange={updateField("fullName")}
                     required
@@ -323,6 +338,8 @@ export default function CheckoutPage() {
                     id="phone"
                     name="phone"
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={form.phone}
                     onChange={updateField("phone")}
                     required
@@ -339,6 +356,8 @@ export default function CheckoutPage() {
                     id="email"
                     name="email"
                     type="email"
+                    inputMode="email"
+                    autoComplete="email"
                     value={form.email}
                     onChange={updateField("email")}
                     placeholder="name@example.com"
@@ -404,6 +423,40 @@ export default function CheckoutPage() {
                     </div>
                   </>
                 )}
+
+                <div className="col-span-1 md:col-span-2 space-y-2.5 pt-2 border-t border-gray-100">
+                  <div className="text-xs font-bold text-gray-700 uppercase">
+                    Tùy chọn dịch vụ kỹ thuật & chứng từ miễn phí trước khi giao:
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      "Cài đặt sẵn Windows + bộ ứng dụng văn phòng cơ bản",
+                      "Cài bộ phần mềm Đồ họa / Kỹ thuật (AutoCAD, Adobe...)",
+                      "Quay video kiểm tra ngoại hình & Stress-Test gửi qua Zalo",
+                      "Yêu cầu xuất Phiếu bảo hành công ty / Hóa đơn VAT",
+                    ].map((opt) => {
+                      const checked = serviceOptions.includes(opt);
+                      return (
+                        <label
+                          key={opt}
+                          className={`flex items-start gap-2.5 p-2.5 rounded-lg border text-xs cursor-pointer transition ${
+                            checked
+                              ? "border-blue-500 bg-blue-50/50 text-blue-950 font-semibold"
+                              : "border-gray-200 hover:bg-gray-50 text-gray-700"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleServiceOption(opt)}
+                            className="mt-0.5 rounded text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>{opt}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 <div className="col-span-1 md:col-span-2">
                   <label htmlFor="note" className="block text-xs font-bold text-gray-700 uppercase mb-1.5">

@@ -33,16 +33,18 @@ export default function Footer({
   const copyright = settings?.copyrightText || `© 2024 - ${new Date().getFullYear()} ${brandName}. ${businessProfile.primaryTagline}. Tất cả quyền được bảo lưu.`;
 
   const fb = settings ? settings.facebookUrl : businessProfile.socialProfiles.facebook;
-  const messenger = settings?.messengerUrl;
   const tiktok = settings ? settings.tiktokUrl : businessProfile.socialProfiles.tiktok;
   const zalo = settings ? settings.zaloUrl : businessProfile.socialProfiles.zalo;
-  const youtube = settings?.youtubeUrl;
+  const youtube = settings?.youtubeUrl || businessProfile.socialProfiles.youtube;
 
   const hanoiAddr = settings?.addressHanoi || hanoi.address;
   const bacNinhAddr = settings ? settings.addressBacNinh : bacNinh.address;
   const bacNinhPhone = settings?.storePhoneBacNinh || bacNinh.displayPhone;
 
   const DEFAULT_MOIT_BADGE_IMAGE = "https://bizweb.dktcdn.net/thumb/medium/100/372/934/themes/892516/assets/logo_bct.png";
+  const DEFAULT_MOIT_URL =
+    businessProfile.moitVerificationUrl ||
+    "https://online.gov.vn/nen-tang/9e483b5c-7da9-4159-bd80-2caab3d942e4";
   const legalName = settings?.legalBusinessName?.trim() || "HỘ KINH DOANH CITI LAP";
   const registrationNumber = settings?.businessRegistrationNumber?.trim() || "01D8053589";
   const registrationIssuer = settings?.businessRegistrationIssuer?.trim() || "";
@@ -50,7 +52,8 @@ export default function Footer({
   const legalRepresentative = settings?.legalRepresentative?.trim() || "";
   const legalAddress = settings?.legalAddress?.trim() || hanoiAddr;
   const moitEnabled = settings ? settings.moitBadgeEnabled !== false : true;
-  const moitUrl = settings?.moitBadgeUrl?.trim() || "#";
+  const rawMoitUrl = settings?.moitBadgeUrl?.trim();
+  const moitUrl = !rawMoitUrl || rawMoitUrl === "#" ? DEFAULT_MOIT_URL : rawMoitUrl;
   const rawMoitImage = settings?.moitBadgeImage?.trim();
   const moitImage =
     !rawMoitImage || rawMoitImage === "/brand/bo-cong-thuong.svg"
@@ -80,8 +83,8 @@ export default function Footer({
             <div className="flex items-center gap-4">
               <RefreshCw className="w-10 h-10 text-blue-500 shrink-0" />
               <div>
-                <h4 className="font-bold text-white text-sm uppercase">Đổi mới 7 ngày</h4>
-                <p className="text-xs text-gray-400">Đổi trả nếu phát sinh lỗi kỹ thuật phần cứng</p>
+                <h4 className="font-bold text-white text-sm uppercase">Lỗi 1 đổi 1 trong 7 ngày</h4>
+                <p className="text-xs text-gray-400">Lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu lỗi phần cứng</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -147,9 +150,12 @@ export default function Footer({
                     href={fb}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-blue-600 text-gray-300 hover:text-white transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-[#1877F2] text-gray-300 hover:text-white font-medium transition"
                   >
-                    Facebook
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
+                    </svg>
+                    <span>Facebook</span>
                   </a>
                 )}
                 {tiktok && (
@@ -157,9 +163,12 @@ export default function Footer({
                     href={tiktok}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white font-medium transition"
                   >
-                    TikTok
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+                    </svg>
+                    <span>TikTok</span>
                   </a>
                 )}
                 {zalo && (
@@ -167,19 +176,12 @@ export default function Footer({
                     href={zalo}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-blue-500 text-gray-300 hover:text-white transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-blue-500 text-gray-300 hover:text-white font-medium transition"
                   >
-                    Zalo
-                  </a>
-                )}
-                {messenger && (
-                  <a
-                    href={messenger}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white transition"
-                  >
-                    Messenger
+                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-xs bg-blue-500 text-[9px] font-black text-white">
+                      Z
+                    </span>
+                    <span>Zalo</span>
                   </a>
                 )}
                 {youtube && (
@@ -187,9 +189,12 @@ export default function Footer({
                     href={youtube}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded bg-gray-800 hover:bg-red-600 text-gray-300 hover:text-white transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-red-600 text-gray-300 hover:text-white font-medium transition"
                   >
-                    YouTube
+                    <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                    </svg>
+                    <span>YouTube</span>
                   </a>
                 )}
               </div>

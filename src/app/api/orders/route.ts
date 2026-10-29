@@ -32,7 +32,10 @@ async function GETHandler(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const paymentStatus = searchParams.get('paymentStatus');
     const search = searchParams.get('search');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     const page = Math.min(Math.max(Number(searchParams.get('page') || 1), 1), 10000);
     const limit = Math.min(Math.max(Number(searchParams.get('limit') || 25), 1), 100);
 
@@ -40,12 +43,13 @@ async function GETHandler(request: Request) {
       return errorResponse('Invalid pagination', 400);
     }
 
-    const result = await listOrders({ status, search, page, limit });
+    const result = await listOrders({ status, paymentStatus, search, startDate, endDate, page, limit });
 
     return NextResponse.json(
       {
         success: true,
         data: result.orders,
+        statusCounts: result.statusCounts,
         pagination: result.pagination,
       },
       {

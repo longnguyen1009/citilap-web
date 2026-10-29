@@ -184,12 +184,15 @@ export default function ProductCard({
     "BH hãng"
   );
 
-  // Format key specs for density & clarity
-  const cpu = formatCpuSpec(product.specs?.cpu);
-  const gpu = formatGpuSpec(product.specs?.gpu);
-  const ram = formatRamSpec(product.specs?.ram);
-  const ssd = formatStorageSpec(product.specs?.ssd);
-  const display = formatDisplaySpec(product.specs?.display);
+  // Format key specs for density & clarity (only for laptops)
+  const isAccessory =
+    Boolean(product.template && product.template !== "LAPTOP") ||
+    Boolean(product.href && product.href.startsWith("/phu-kien/"));
+  const cpu = isAccessory ? "" : formatCpuSpec(product.specs?.cpu);
+  const gpu = isAccessory ? "" : formatGpuSpec(product.specs?.gpu);
+  const ram = isAccessory ? "" : formatRamSpec(product.specs?.ram);
+  const ssd = isAccessory ? "" : formatStorageSpec(product.specs?.ssd);
+  const display = isAccessory ? "" : formatDisplaySpec(product.specs?.display);
   const hasSpecs = Boolean(cpu || gpu || ram || ssd || display);
 
   return (
@@ -297,13 +300,13 @@ export default function ProductCard({
       <div className="flex flex-col flex-1 p-2.5 sm:p-3.5">
         {/* Brand or Series line if present */}
         {(product.brand || product.series) && (
-          <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1 truncate">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 truncate">
             {[product.brand, product.series].filter(Boolean).join(" • ")}
           </p>
         )}
 
         {/* Title */}
-        <h3 className="text-[13px] sm:text-sm font-semibold text-slate-900 leading-5 line-clamp-2 min-h-10 group-hover/product:text-blue-700 transition-colors">
+        <h3 className="text-sm sm:text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-10 group-hover/product:text-blue-700 transition-colors">
           <Link
             href={productHref}
             title={product.name}

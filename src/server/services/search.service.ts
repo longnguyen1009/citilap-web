@@ -11,9 +11,19 @@ import { getProductImageUrl } from "@/infra/cloudflare/r2/storage";
 import {
   type HomepageProduct,
   type FacetOption,
-  buildRamClauses,
-  buildStorageClauses,
   categoryProductScope,
+  parseRamGb,
+  parseStorageGb,
+  normalizeStorageBucket,
+  matchesRamBucket,
+  matchesStorageBucket,
+  deriveCpuSeries,
+  deriveGpuSeries,
+  matchesCpuFilter,
+  matchesGpuFilter,
+  extractVariantCondition,
+  parsePublishedSpecMap,
+  enrichPublishedVariants,
 } from "./catalog.service";
 import { calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
 
@@ -264,22 +274,16 @@ function resolveRepresentativeVariant(
 
     // 1. Check spec filters match
     if (specFilters?.ram && specFilters.ram.length > 0) {
-      if (specFilters.ram.some((r) => vRam.includes(`${r}gb`))) score += 50;
+      if (matchesRamBucket(v.ram, specFilters.ram)) score += 50;
     }
     if (specFilters?.storage && specFilters.storage.length > 0) {
-      if (
-        specFilters.storage.some((s) =>
-          s >= 1024 ? vStorage.includes(`${s / 1024}tb`) : vStorage.includes(`${s}gb`)
-        )
-      ) {
-        score += 50;
-      }
+      if (matchesStorageBucket(v.storage, specFilters.storage)) score += 50;
     }
     if (specFilters?.gpu && specFilters.gpu.length > 0) {
-      if (specFilters.gpu.some((g) => vGpu.includes(g.toLowerCase()))) score += 50;
+      if (matchesGpuFilter(v.gpu, product.gpuSeries, specFilters.gpu)) score += 50;
     }
     if (specFilters?.cpu && specFilters.cpu.length > 0) {
-      if (specFilters.cpu.some((c) => vCpu.includes(c.toLowerCase()))) score += 50;
+      if (matchesCpuFilter(v.cpu, product.cpuSeries, specFilters.cpu)) score += 50;
     }
 
     // 2. Check price filters match
@@ -478,9 +482,10 @@ async function computeSearchProducts(
 
   const andConditions: unknown[] = [];
 
-  // Multi-token search: each token must match at least one aspect of the product or its variants
+  // Multi-token search: pre-filter with up to 2 tokens in SQL (staying well within D1's 100 bind variable limit),
+  // while all tokens are strictly verified against published product & variant fields in memory below.
   if (tokens.length > 0) {
-    for (const t of tokens) {
+    for (const t of tokens.slice(0, 2)) {
       andConditions.push({
         OR: [
           { name: { contains: t } },
@@ -500,10 +505,12 @@ async function computeSearchProducts(
           { storage: { contains: t } },
           { tags: { contains: t } },
           { description: { contains: t } },
+          { specs: { contains: t } },
+          { studio: { is: { published: { contains: t } } } },
           {
             variants: {
               some: {
-                status: "ACTIVE",
+                status: { in: ["ACTIVE", "active"] },
                 OR: [
                   { sku: { contains: t } },
                   { name: { contains: t } },
@@ -576,151 +583,6 @@ async function computeSearchProducts(
     : [];
 
   const hasPriceFilter = options.minPrice !== undefined || options.maxPrice !== undefined;
-  const hasSpecFilters = ramList.length > 0 || storageList.length > 0 || gpuList.length > 0;
-  const hasAccessoryFilters = connectionList.length > 0 || powerList.length > 0;
-  const hasConditionFilter = conditionList.length > 0;
-
-  // CPU filter: Enforced at the Product level (and variant if variant has CPU)
-  if (cpuList.length > 0) {
-    andConditions.push({
-      OR: [
-        { cpuSeries: { in: cpuList } },
-        { cpu: { in: cpuList } },
-        { variants: { some: { status: { in: ["ACTIVE", "active"] }, cpu: { in: cpuList } } } },
-      ],
-    });
-  }
-
-  // Atomic Variant vs Legacy Product filtering:
-  if (hasPriceFilter || hasSpecFilters || hasAccessoryFilters || hasConditionFilter) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const variantMatch: any = { status: { in: ["ACTIVE", "active"] } };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const baseMatch: any = {};
-
-    // 2. RAM alignment
-    if (ramList.length > 0) {
-      baseMatch.ramGb = { in: ramList };
-      const ramClauses = buildRamClauses(ramList);
-      variantMatch.OR = ramClauses;
-    }
-
-    // 3. Storage alignment
-    if (storageList.length > 0) {
-      baseMatch.storageGb = { in: storageList };
-      const storageClauses = buildStorageClauses(storageList);
-      if (variantMatch.OR) {
-        const prev = variantMatch.OR;
-        delete variantMatch.OR;
-        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: storageClauses }];
-      } else {
-        variantMatch.OR = storageClauses;
-      }
-    }
-
-    // 4. GPU alignment
-    if (gpuList.length > 0) {
-      baseMatch.gpuSeries = { in: gpuList };
-      const gpuClauses = gpuList.map((g) => ({ gpu: { contains: g } }));
-      if (variantMatch.OR) {
-        const prev = variantMatch.OR;
-        delete variantMatch.OR;
-        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: gpuClauses }];
-      } else {
-        variantMatch.OR = gpuClauses;
-      }
-    }
-
-    // 5. Condition alignment on variant options & base product
-    if (hasConditionFilter) {
-      baseMatch.condition = { in: conditionList };
-      const condClauses = conditionList.map((c) => ({
-        options: { contains: `"condition":"${c}"` },
-      }));
-      if (variantMatch.OR) {
-        const prev = variantMatch.OR;
-        delete variantMatch.OR;
-        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: condClauses }];
-      } else {
-        variantMatch.OR = condClauses;
-      }
-    }
-
-    // 6. Accessory options (connection, power)
-    if (connectionList.length > 0) {
-      const baseConnClauses = connectionList.map((conn) => ({
-        specs: { contains: conn },
-      }));
-      if (baseMatch.OR) {
-        const prevBase = baseMatch.OR;
-        delete baseMatch.OR;
-        baseMatch.AND = [...(baseMatch.AND || []), { OR: prevBase }, { OR: baseConnClauses }];
-      } else {
-        baseMatch.OR = baseConnClauses;
-      }
-
-      const connClauses = connectionList.map((conn) => ({
-        OR: [
-          { options: { contains: `"connection":"${conn}"` } },
-          { options: { contains: `"Kết nối":"${conn}"` } },
-          { options: { contains: conn } },
-        ],
-      }));
-      if (variantMatch.OR) {
-        const prev = variantMatch.OR;
-        delete variantMatch.OR;
-        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: connClauses }];
-      } else {
-        variantMatch.OR = connClauses;
-      }
-    }
-
-    if (powerList.length > 0) {
-      const basePowerClauses = powerList.map((p) => ({
-        specs: { contains: p },
-      }));
-      if (baseMatch.OR) {
-        const prevBase = baseMatch.OR;
-        delete baseMatch.OR;
-        baseMatch.AND = [...(baseMatch.AND || []), { OR: prevBase }, { OR: basePowerClauses }];
-      } else {
-        baseMatch.OR = basePowerClauses;
-      }
-
-      const powerClauses = powerList.map((p) => ({
-        OR: [
-          { options: { contains: `"power":"${p}"` } },
-          { options: { contains: `"Công suất":"${p}"` } },
-          { options: { contains: p } },
-        ],
-      }));
-      if (variantMatch.OR) {
-        const prev = variantMatch.OR;
-        delete variantMatch.OR;
-        variantMatch.AND = [...(variantMatch.AND || []), { OR: prev }, { OR: powerClauses }];
-      } else {
-        variantMatch.OR = powerClauses;
-      }
-    }
-
-    andConditions.push({
-      OR: [
-        // Branch 1: Variant-backed products (evaluated atomically on the SAME active variant)
-        {
-          variants: {
-            some: variantMatch,
-          },
-        },
-        // Branch 2: Legacy products without active variants (evaluated on Product level)
-        {
-          variants: {
-            none: { status: { in: ["ACTIVE", "active"] } },
-          },
-          ...baseMatch,
-        },
-      ],
-    });
-  }
 
   if (andConditions.length > 0) {
     where.AND = andConditions;
@@ -765,9 +627,25 @@ async function computeSearchProducts(
     id: string;
     categorySlug?: string;
     brandSlug?: string;
+    matchedVariants: Array<{
+      id: string;
+      sku: string;
+      name: string;
+      price: number;
+      originalPrice?: number | null;
+      stock: number;
+      cpu: string | null;
+      gpu: string | null;
+      ram: string | null;
+      storage: string | null;
+      display: string | null;
+      condition: string;
+      options?: string | null;
+    }>;
   }> = rawProducts.flatMap((row) => {
     const original = row as unknown as ProductDbRowWithRelations;
     const published = original.studio?.published ? JSON.parse(original.studio.published) : null;
+    const specMap = parsePublishedSpecMap(published, original.specs);
     if (options.tag?.length) {
       let tags: string[] = [];
       try { tags = original.tags?.startsWith('[') ? JSON.parse(original.tags) : (original.tags || '').split(','); } catch { tags = []; }
@@ -780,27 +658,135 @@ async function computeSearchProducts(
     let availability = published?.availability || 'AVAILABLE';
     const priceFor = (price:number,originalPrice:number|null|undefined,variantId?:string) => calculateEffectivePrice(price,originalPrice ?? null,Boolean(original.isFlashSale),true,context,at,{productId:original.id,variantId,isVariant:!!variantId,variantOriginalPrice:originalPrice ?? null});
     const base = priceFor(original.price,original.originalPrice);
-    const dbRow:ProductDbRowWithRelations = {...original,price:base.effectivePrice,originalPrice:base.compareAtPrice,
-      variants:original.variants?.filter(v=>!published || published.variants?.some((pv:{id:string;availability?:string})=>pv.id===v.id && (!pv.availability || ['AVAILABLE','PREORDER'].includes(pv.availability)))).map(v=>{
-        const price=priceFor(v.price,v.originalPrice,v.id);
-        return {...v,price:price.effectivePrice,originalPrice:price.compareAtPrice};
-      }).sort((a,b)=>a.price-b.price || a.id.localeCompare(b.id))};
-    if (original.variants?.length && !dbRow.variants?.length) availability='UNAVAILABLE';
-    if (dbRow.variants?.length) {
-      const matchesCapacity = (text:string|null|undefined, values:number[], storage=false) => !values.length || values.some(n=>{
-        const match=(text || '').match(/(?:^|\s)(\d+(?:\.\d+)?)\s*(GB|TB)\b/i);
-        return !!match && (Number(match[1])*(match[2].toUpperCase()==='TB'?1024:1)===n || (storage && n===1024 && Number(match[1])===1000));
+
+    const originalVariantCount = (original.variants?.length || 0) + (published?.variants?.length || 0);
+    const enrichedVars = enrichPublishedVariants(original.variants, published, original)
+      .map((v) => {
+        const p = priceFor(v.price, v.originalPrice, v.id);
+        return {
+          ...v,
+          price: p.effectivePrice,
+          originalPrice: p.compareAtPrice,
+          stock: typeof v.stock === "number" ? v.stock : 0,
+          status: "ACTIVE",
+        };
+      })
+      .sort((a, b) => a.price - b.price || a.id.localeCompare(b.id));
+
+    const effectiveCpu = specMap.CPU || specMap.cpu || original.cpu || null;
+    const effectiveGpu = specMap.GPU || specMap.gpu || specMap.VGA || original.gpu || null;
+    const effectiveRam = specMap.RAM || specMap.ram || original.ram || null;
+    const effectiveStorage = specMap.SSD || specMap["Ổ cứng"] || specMap.ssd || specMap.Storage || original.storage || null;
+    const effectiveDisplay = specMap["Màn hình"] || specMap.display || specMap.Screen || original.display || null;
+
+    const dbRow: ProductDbRowWithRelations = {
+      ...original,
+      cpu: effectiveCpu,
+      gpu: effectiveGpu,
+      ram: effectiveRam,
+      storage: effectiveStorage,
+      display: effectiveDisplay,
+      price: base.effectivePrice,
+      originalPrice: base.compareAtPrice,
+      variants: enrichedVars,
+    };
+
+    if (originalVariantCount > 0 && !dbRow.variants?.length) availability = 'UNAVAILABLE';
+
+    if (dbRow.variants && dbRow.variants.length > 0) {
+      dbRow.variants = dbRow.variants.filter((v) => {
+        const vCond = extractVariantCondition(v, null, published?.condition || original.condition || "NEW");
+        return (
+          matchesRamBucket(v.ram, ramList) &&
+          matchesStorageBucket(v.storage, storageList) &&
+          matchesGpuFilter(v.gpu, original.gpuSeries, gpuList) &&
+          matchesCpuFilter(v.cpu, original.cpuSeries, cpuList) &&
+          (options.minPrice === undefined || v.price >= options.minPrice) &&
+          (options.maxPrice === undefined || v.price <= options.maxPrice) &&
+          (!conditionList.length || conditionList.includes(vCond)) &&
+          (!connectionList.length || connectionList.some((c) => (v.options || original.specs || "").includes(c))) &&
+          (!powerList.length || powerList.some((c) => (v.options || original.specs || "").includes(c))) &&
+          (!options.inStock ||
+            (v.stock > 0 &&
+              (!published ||
+                published.variants?.some(
+                  (pv: { id: string; sku?: string; availability?: string }) =>
+                    (pv.id === v.id || (pv.sku && pv.sku === v.sku)) &&
+                    (!pv.availability || pv.availability === "AVAILABLE")
+                ))))
+        );
       });
-      dbRow.variants=dbRow.variants.filter(v=>matchesCapacity(v.ram,ramList) && matchesCapacity(v.storage,storageList,true) &&
-        (!gpuList.length || gpuList.some(g=>(v.gpu || '').toLowerCase().includes(g.toLowerCase()))) &&
-        (!cpuList.length || cpuList.some(c=>(v.cpu || original.cpuSeries || original.cpu || '').toLowerCase().includes(c.toLowerCase()))) &&
-        (options.minPrice===undefined || v.price>=options.minPrice) && (options.maxPrice===undefined || v.price<=options.maxPrice) &&
-        (!conditionList.length || conditionList.some(c=>(v.options || '').includes(`"condition":"${c}"`))) &&
-        (!connectionList.length || connectionList.some(c=>(v.options || '').includes(c))) &&
-        (!powerList.length || powerList.some(c=>(v.options || '').includes(c))) &&
-        (!options.inStock || (v.stock > 0 && (!published || published.variants?.some((pv:{id:string;availability?:string}) => pv.id === v.id && (!pv.availability || pv.availability === 'AVAILABLE'))))));
       if (!dbRow.variants.length) return [];
+    } else if (originalVariantCount === 0) {
+      const baseCond = published?.condition || original.condition || "NEW";
+      const baseMatches =
+        matchesRamBucket(effectiveRam, ramList) &&
+        matchesStorageBucket(effectiveStorage, storageList) &&
+        matchesGpuFilter(effectiveGpu, original.gpuSeries, gpuList) &&
+        matchesCpuFilter(effectiveCpu, original.cpuSeries, cpuList) &&
+        (options.minPrice === undefined || dbRow.price >= options.minPrice) &&
+        (options.maxPrice === undefined || dbRow.price <= options.maxPrice) &&
+        (!conditionList.length || conditionList.includes(baseCond)) &&
+        (!connectionList.length || connectionList.some((c) => (original.specs || "").includes(c))) &&
+        (!powerList.length || powerList.some((c) => (original.specs || "").includes(c))) &&
+        (!options.inStock || (original.stock > 0 && availability === "AVAILABLE"));
+      if (!baseMatches) return [];
+    } else {
+      // Had variants, all unpublished/unavailable, cannot satisfy any variant filter
+      if (
+        ramList.length ||
+        storageList.length ||
+        gpuList.length ||
+        cpuList.length ||
+        conditionList.length ||
+        connectionList.length ||
+        powerList.length ||
+        hasPriceFilter ||
+        options.inStock
+      ) {
+        return [];
+      }
     }
+
+    // Verify query tokens match active product fields or surviving published variants
+    if (tokens.length > 0) {
+      const baseSearchText = [
+        dbRow.name,
+        dbRow.slug,
+        dbRow.model,
+        dbRow.series,
+        dbRow.brand,
+        dbRow.brandRel?.name,
+        dbRow.brandRel?.slug,
+        dbRow.category?.name,
+        dbRow.category?.slug,
+        effectiveCpu,
+        deriveCpuSeries(effectiveCpu) ?? (!effectiveCpu ? dbRow.cpuSeries : null),
+        effectiveGpu,
+        deriveGpuSeries(effectiveGpu) ?? (!effectiveGpu ? dbRow.gpuSeries : null),
+        effectiveRam,
+        effectiveStorage,
+        dbRow.tags,
+        dbRow.description,
+        dbRow.specs,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/đ/g, "d");
+      const baseFolded = fold(baseSearchText);
+
+      const allTokensMatched = tokens.every((t) => {
+        const tf = fold(t);
+        if (baseSearchText.includes(t) || baseFolded.includes(tf)) return true;
+        return (dbRow.variants || []).some((v) => {
+          const vText = [v.sku, v.name, v.cpu, v.gpu, v.ram, v.storage].filter(Boolean).join(" ").toLowerCase();
+          return vText.includes(t) || fold(vText).includes(tf);
+        });
+      });
+      if (!allTokensMatched) return [];
+    }
+
     const resolvedImage = resolvePrimaryImageUrl(dbRow);
     const rep = resolveRepresentativeVariant(dbRow, tokens, specFilterParams);
     if (options.inStock && (rep.stock <= 0 || availability !== 'AVAILABLE')) return [];
@@ -809,6 +795,9 @@ async function computeSearchProducts(
     const brandName = dbRow.brandRel?.name || dbRow.brand || undefined;
     const categoryName = dbRow.category?.name || undefined;
     const categorySlug = dbRow.category?.slug || undefined;
+    const repCondition = rep.variant
+      ? extractVariantCondition(rep.variant, null, published?.condition || dbRow.condition || "NEW")
+      : (published?.condition || dbRow.condition || "NEW");
 
     const homepageProduct: HomepageProduct = {
       template: published?.template,
@@ -823,7 +812,7 @@ async function computeSearchProducts(
       categorySlug,
       model: dbRow.model || undefined,
       series: dbRow.series || undefined,
-      condition: dbRow.condition || "NEW",
+      condition: repCondition,
       price: rep.price,
       availability,
       originalPrice: rep.originalPrice,
@@ -842,6 +831,15 @@ async function computeSearchProducts(
       id: dbRow.id,
       categorySlug,
       brandSlug: dbRow.brandRel?.slug,
+      matchedVariants: (dbRow.variants || []).map((v) => ({
+        ...v,
+        cpu: v.cpu ?? null,
+        gpu: v.gpu ?? null,
+        ram: v.ram ?? null,
+        storage: v.storage ?? null,
+        display: v.display ?? null,
+        condition: extractVariantCondition(v, null, published?.condition || dbRow.condition || "NEW"),
+      })),
     }];
   });
 
@@ -875,7 +873,7 @@ async function computeSearchProducts(
     return 0;
   });
 
-  // 5. Build dynamic facets from the matched product pool
+  // 5. Build dynamic facets from the matched product pool (counting once per product across matched published variants)
   const brandCountMap = new Map<string, { label: string; count: number }>();
   const tagCounts = new Map<string, number>();
   const categoryCountMap = new Map<string, { label: string; count: number }>();
@@ -889,15 +887,23 @@ async function computeSearchProducts(
   let minPriceFound = Number.MAX_SAFE_INTEGER;
   let maxPriceFound = 0;
 
-  const shownProducts=new Map(processedProducts.map(p=>[p.id,p.product]));
+  const shownEntryMap = new Map(processedProducts.map((p) => [p.id, p]));
+  const shownProducts = new Map(processedProducts.map((p) => [p.id, p.product]));
   for (const item of rawProducts) {
     const row = item as unknown as ProductDbRowWithRelations;
-    const shown=shownProducts.get(row.id);
-    if (!shown) continue;
-    // Count each option once per product, across product specs and active variants.
+    const entry = shownEntryMap.get(row.id);
+    if (!entry) continue;
+    const shown = entry.product;
+    const published = row.studio?.published ? JSON.parse(row.studio.published) : null;
+    const specMap = parsePublishedSpecMap(published, row.specs);
+
+    // Count each accessory option once per product, across product specs and matched variants.
     for (const [counts, keys] of [[connectionCounts, ['connection','Connection','Chuẩn kết nối','Kết nối']], [powerCounts, ['power','Power','Công suất','Tổng công suất','Chuẩn sạc']]] as const) {
       const values = new Set<string>();
-      for (const document of [row.specs, ...row.variants?.map(v => v.options) || []]) {
+      for (const k of keys) {
+        if (typeof specMap[k] === 'string' && specMap[k].trim()) values.add(specMap[k].trim());
+      }
+      for (const document of [row.specs, ...entry.matchedVariants.map(v => v.options)]) {
         try {
           const data = JSON.parse(document || '{}');
           for (const key of keys) if (typeof data?.[key] === 'string' && data[key].trim()) values.add(data[key].trim());
@@ -921,29 +927,62 @@ async function computeSearchProducts(
       categoryCountMap.set(row.category.slug, cur);
     }
 
-    // Condition
-    if (row.condition) {
-      const cur = conditionCountMap.get(row.condition) || { label: row.condition, count: 0 };
-      cur.count += 1;
-      conditionCountMap.set(row.condition, cur);
+    // Per-product Set aggregation across matched published variants (or base product)
+    const prodConds = new Set<string>();
+    const prodCpus = new Set<string>();
+    const prodGpus = new Set<string>();
+    const prodRams = new Set<number>();
+    const prodStorages = new Set<number>();
+
+    if (entry.matchedVariants.length > 0) {
+      for (const v of entry.matchedVariants) {
+        if (v.condition) prodConds.add(v.condition);
+        const cSer = deriveCpuSeries(v.cpu) ?? (!v.cpu ? row.cpuSeries : null);
+        if (cSer) prodCpus.add(cSer);
+        const gSer = deriveGpuSeries(v.gpu) ?? (!v.gpu ? row.gpuSeries : null);
+        if (gSer) prodGpus.add(gSer);
+        const rGb = parseRamGb(v.ram);
+        if (rGb) prodRams.add(rGb);
+        const sGb = parseStorageGb(v.storage);
+        if (sGb) prodStorages.add(sGb);
+      }
+    } else {
+      const baseCond = published?.condition || row.condition;
+      if (baseCond) prodConds.add(baseCond);
+      const baseCpuStr = specMap.CPU || specMap.cpu || row.cpu;
+      const cSer = deriveCpuSeries(baseCpuStr) ?? (!baseCpuStr ? row.cpuSeries : null);
+      if (cSer) prodCpus.add(cSer);
+      const baseGpuStr = specMap.GPU || specMap.gpu || specMap.VGA || row.gpu;
+      const gSer = deriveGpuSeries(baseGpuStr) ?? (!baseGpuStr ? row.gpuSeries : null);
+      if (gSer) prodGpus.add(gSer);
+      const baseRamStr = specMap.RAM || specMap.ram || row.ram;
+      const rGb = parseRamGb(baseRamStr) ?? (!baseRamStr ? row.ramGb : null);
+      if (rGb) prodRams.add(rGb);
+      const baseStorageStr = specMap.SSD || specMap["Ổ cứng"] || specMap.ssd || specMap.Storage || row.storage;
+      const sGb = parseStorageGb(baseStorageStr) ?? (!baseStorageStr ? row.storageGb : null);
+      if (sGb) prodStorages.add(normalizeStorageBucket(sGb));
     }
 
-    // Specs
-    if (row.cpuSeries) {
-      const cur = cpuSeriesCountMap.get(row.cpuSeries) || { label: row.cpuSeries, count: 0 };
+    for (const c of prodConds) {
+      const cur = conditionCountMap.get(c) || { label: c, count: 0 };
       cur.count += 1;
-      cpuSeriesCountMap.set(row.cpuSeries, cur);
+      conditionCountMap.set(c, cur);
     }
-    if (row.gpuSeries) {
-      const cur = gpuSeriesCountMap.get(row.gpuSeries) || { label: row.gpuSeries, count: 0 };
+    for (const c of prodCpus) {
+      const cur = cpuSeriesCountMap.get(c) || { label: c, count: 0 };
       cur.count += 1;
-      gpuSeriesCountMap.set(row.gpuSeries, cur);
+      cpuSeriesCountMap.set(c, cur);
     }
-    if (row.ramGb) {
-      ramCountMap.set(row.ramGb, (ramCountMap.get(row.ramGb) || 0) + 1);
+    for (const g of prodGpus) {
+      const cur = gpuSeriesCountMap.get(g) || { label: g, count: 0 };
+      cur.count += 1;
+      gpuSeriesCountMap.set(g, cur);
     }
-    if (row.storageGb) {
-      storageCountMap.set(row.storageGb, (storageCountMap.get(row.storageGb) || 0) + 1);
+    for (const r of prodRams) {
+      ramCountMap.set(r, (ramCountMap.get(r) || 0) + 1);
+    }
+    for (const s of prodStorages) {
+      storageCountMap.set(s, (storageCountMap.get(s) || 0) + 1);
     }
   }
 

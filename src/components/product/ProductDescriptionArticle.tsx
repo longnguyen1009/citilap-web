@@ -14,7 +14,10 @@ export default function ProductDescriptionArticle({
 }: ProductDescriptionArticleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const hasContent = Boolean(safeDescription && safeDescription.trim().length > 0);
+  const plainTextLength = (safeDescription || "").replace(/<[^>]*>/g, "").trim().length;
+  const hasContent = plainTextLength > 0;
+  const isLongContent = plainTextLength > 550 || (safeDescription || "").includes("<h2") || (safeDescription || "").includes("<img");
+  const showFull = isExpanded || !isLongContent;
 
   return (
     <article className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-6 sm:p-8 relative overflow-hidden">
@@ -25,32 +28,34 @@ export default function ProductDescriptionArticle({
       {hasContent ? (
         <>
           <div
-            className={`prose prose-sm sm:prose-base max-w-none text-gray-700 leading-relaxed space-y-4 overflow-hidden transition-all duration-300 ${
-              isExpanded ? "max-h-none" : "max-h-[380px]"
+            className={`prose prose-base max-w-none text-gray-700 leading-relaxed space-y-4 overflow-hidden transition-all duration-300 ${
+              showFull ? "max-h-none" : "max-h-[420px]"
             }`}
             dangerouslySetInnerHTML={{ __html: safeDescription }}
           />
 
           {/* Fade overlay when collapsed */}
-          {!isExpanded && (
+          {!showFull && (
             <div className="absolute bottom-16 left-0 right-0 h-32 bg-gradient-to-t from-white via-white/80 to-transparent pointer-events-none" />
           )}
 
-          {/* Expand / Collapse Button */}
-          <div className="text-center pt-4 relative z-10">
-            <button
-              type="button"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full border-2 border-blue-600 bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs sm:text-sm transition shadow-2xs cursor-pointer"
-            >
-              <span>{isExpanded ? "Thu gọn bài đánh giá" : "Đọc tiếp bài đánh giá chi tiết"}</span>
-              <ChevronDown
-                className={`w-4 h-4 transition-transform duration-200 ${
-                  isExpanded ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </div>
+          {/* Expand / Collapse Button (only for long articles) */}
+          {isLongContent && (
+            <div className="text-center pt-4 relative z-10">
+              <button
+                type="button"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full border-2 border-blue-600 bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs sm:text-sm transition shadow-2xs cursor-pointer"
+              >
+                <span>{isExpanded ? "Thu gọn bài đánh giá" : "Đọc tiếp bài đánh giá chi tiết"}</span>
+                <ChevronDown
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isExpanded ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <div className="text-center py-8 text-gray-500 italic space-y-2">

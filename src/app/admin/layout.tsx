@@ -28,6 +28,7 @@ import {
   History,
   CornerUpRight,
   Folder,
+  Boxes,
 } from "lucide-react";
 import AdminNotificationBell from "@/components/admin/notifications/AdminNotificationBell";
 import AdminCommandPalette from "@/components/admin/ui/AdminCommandPalette";
@@ -67,6 +68,7 @@ const navGroups: NavGroup[] = [
     groupName: "Sản phẩm",
     items: [
       { name: "Sản phẩm", href: "/admin/products", icon: Package, keywords: "laptop máy tính product" },
+      { name: "Kho & Serial", href: "/admin/inventory", icon: Boxes, keywords: "tồn kho serial imei kiểm định warehouse" },
       { name: "Danh mục", href: "/admin/categories", icon: FolderTree, keywords: "category" },
       { name: "Thương hiệu", href: "/admin/brands", icon: Tag, keywords: "hãng brand" },
       { name: "Flash Sale", href: "/admin/campaigns", icon: Zap, keywords: "chiến dịch khuyến mãi campaign" },

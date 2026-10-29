@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Filter, Inbox } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import EmptyState from "@/components/ui/EmptyState";
@@ -21,6 +21,8 @@ export default function CategoryListingContainer({
   initialData,
 }: CategoryListingContainerProps) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const activeType = searchParams.get("type");
@@ -31,6 +33,39 @@ export default function CategoryListingContainer({
   const activeStorage = searchParams.getAll("storage");
   const activeCpus = searchParams.getAll("cpu");
   const activeGpus = searchParams.getAll("gpu");
+
+  const isAccessoryCategory =
+    initialData.category?.slug === "linh-kien" ||
+    initialData.category?.slug === "phu-kien";
+
+  const toggleConditionPill = (val: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    const curr = params.getAll("condition");
+    params.delete("condition");
+    if (curr.includes(val)) {
+      curr.filter((c) => c !== val).forEach((c) => params.append("condition", c));
+    } else {
+      [...curr, val].forEach((c) => params.append("condition", c));
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const togglePricePill = (preset: { value: string; min: number; max: number }) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    if (activePricePreset === preset.value) {
+      params.delete("pricePreset");
+      params.delete("minPrice");
+      params.delete("maxPrice");
+    } else {
+      params.set("pricePreset", preset.value);
+      if (preset.min > 0) params.set("minPrice", String(preset.min));
+      else params.delete("minPrice");
+      params.set("maxPrice", String(preset.max));
+    }
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
 
   const totalActiveFilters =
     (activeType ? 1 : 0) +
@@ -86,6 +121,57 @@ export default function CategoryListingContainer({
               <CategorySortSelect />
             </div>
           </div>
+
+          {/* Quick Filter Pills for Laptop Categories */}
+          {!isAccessoryCategory && (
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              <span className="text-xs font-bold text-text-secondary mr-1">Lọc nhanh:</span>
+              {[
+                { val: "NEW", label: "Mới 100% Fullbox" },
+                { val: "LIKE_NEW", label: "Like New 99% Tuyển chọn" },
+              ].map((cond) => {
+                const active = activeConditions.includes(cond.val);
+                return (
+                  <button
+                    key={cond.val}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => toggleConditionPill(cond.val)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition cursor-pointer ${
+                      active
+                        ? "bg-brand-primary text-text-inverse border-brand-primary"
+                        : "bg-surface-card hover:bg-brand-primary-subtle text-text-secondary border-border-default"
+                    }`}
+                  >
+                    {cond.label}
+                  </button>
+                );
+              })}
+              {[
+                { value: "under-15", label: "Dưới 15 triệu", min: 0, max: 15_000_000 },
+                { value: "15-20", label: "15 - 20 triệu", min: 15_000_000, max: 20_000_000 },
+                { value: "20-30", label: "20 - 30 triệu", min: 20_000_000, max: 30_000_000 },
+                { value: "over-30", label: "Trên 30 triệu", min: 30_000_000, max: 150_000_000 },
+              ].map((pr) => {
+                const active = activePricePreset === pr.value;
+                return (
+                  <button
+                    key={pr.value}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => togglePricePill(pr)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition cursor-pointer ${
+                      active
+                        ? "bg-brand-primary text-text-inverse border-brand-primary"
+                        : "bg-surface-card hover:bg-brand-primary-subtle text-text-secondary border-border-default"
+                    }`}
+                  >
+                    {pr.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* Product Grid or Empty State */}
           {initialData.products.length === 0 ? (

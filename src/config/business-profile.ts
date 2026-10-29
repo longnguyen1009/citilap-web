@@ -66,9 +66,11 @@ export interface BusinessProfile {
   socialProfiles: {
     facebook: string;
     tiktok: string;
+    youtube?: string;
     zalo: string;
     zaloPhone: string;
   };
+  moitVerificationUrl?: string;
   shippingPolicy: {
     estimatedFeeRange: string;
     consultationNotice: string;
@@ -109,9 +111,11 @@ export const businessProfile: BusinessProfile = {
   socialProfiles: {
     facebook: "https://www.facebook.com/citilap",
     tiktok: "https://www.tiktok.com/@citilapvn",
+    youtube: "https://www.youtube.com/@thinkview/videos",
     zalo: "https://zalo.me/0899188186",
     zaloPhone: "0899188186",
   },
+  moitVerificationUrl: "https://online.gov.vn/nen-tang/9e483b5c-7da9-4159-bd80-2caab3d942e4",
   shippingPolicy: {
     estimatedFeeRange: "100.000 – 300.000đ",
     consultationNotice: "Phí vận chuyển sẽ được chuyên viên tư vấn xác nhận khi gọi điện thoại",
@@ -125,7 +129,7 @@ export const businessProfile: BusinessProfile = {
     usedLaptop: "6 tháng theo gói tiêu chuẩn CitiLap",
     components: "6 tháng theo gói tiêu chuẩn CitiLap",
     returnPolicyDays: 7,
-    returnPolicyNote: "Đổi trả trong 7 ngày đầu nếu phát sinh lỗi kỹ thuật phần cứng do nhà sản xuất",
+    returnPolicyNote: "Lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu phát sinh lỗi kỹ thuật phần cứng do nhà sản xuất",
   },
   locations: [
     {

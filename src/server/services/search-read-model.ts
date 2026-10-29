@@ -6,7 +6,7 @@ export async function readSearchPage(db: D1Database, options: SearchFilterOption
   const page = Math.max(1, Math.floor(Number(requestedPage) || 1));
   const pageSize = Math.min(48, Math.max(1, Math.floor(Number(limit) || 12)));
   const offset = (page - 1) * pageSize;
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(['search-v7', filters])));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(['search-v8', filters])));
   const key = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
   const now = at.getTime();
   const valid = 's.cacheKey=? AND s.revision=r.revision AND s.createdAt<=? AND s.validUntil>?';

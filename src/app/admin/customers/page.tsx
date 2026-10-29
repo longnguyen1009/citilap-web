@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useSearchParams, usePathname } from "next/navigation";
 import {
   Search,
   Mail,
@@ -16,6 +17,8 @@ import {
   AlertTriangle,
   Package,
   MessageSquare,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   PageHeader,
@@ -38,6 +41,13 @@ type Customer = {
   source: "REGISTERED" | "GUEST_ORDER";
   sourceLabel: string;
   orderNumber?: string | null;
+};
+
+type CustomersSummary = {
+  total: number;
+  registered: number;
+  guest: number;
+  totalNonCancelled: number;
 };
 
 type CustomerDetail = Customer & {
@@ -80,13 +90,36 @@ const SOURCE_TABS = [
   { key: "GUEST_ORDER", label: "Vãng lai" },
 ] as const;
 
+const PAGE_LIMIT = 25;
+
 function CustomersContent() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [tierFilter, setTierFilter] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("ALL");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const initialSearch = searchParams.get("search") || "";
+  const initialTier = searchParams.get("tier") || "";
+  const rawSource = searchParams.get("source") || "ALL";
+  const initialSource = ["ALL", "REGISTERED", "GUEST_ORDER"].includes(rawSource)
+    ? rawSource
+    : "ALL";
+  const initialPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [tierFilter, setTierFilter] = useState(initialTier);
+  const [sourceFilter, setSourceFilter] = useState(initialSource);
+  const [page, setPage] = useState(initialPage);
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary] = useState<CustomersSummary>({
+    total: 0,
+    registered: 0,
+    guest: 0,
+    totalNonCancelled: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   // Detail Modal State
@@ -94,54 +127,136 @@ function CustomersContent() {
   const [customerDetail, setCustomerDetail] = useState<CustomerDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Anti-stale request guards
+  const requestSeqRef = useRef(0);
+  const listAbortRef = useRef<AbortController | null>(null);
+  const detailSeqRef = useRef(0);
+  const detailAbortRef = useRef<AbortController | null>(null);
+
+  const updateUrlParams = useCallback(
+    (nextSearch: string, nextTier: string, nextSource: string, nextPage: number) => {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams();
+      if (nextSearch.trim()) params.set("search", nextSearch.trim());
+      if (nextTier) params.set("tier", nextTier);
+      if (nextSource && nextSource !== "ALL") params.set("source", nextSource);
+      if (nextPage > 1) params.set("page", String(nextPage));
+
+      const queryStr = params.toString();
+      const targetUrl = queryStr ? `${pathname}?${queryStr}` : pathname;
+      const currentUrl = `${window.location.pathname}${window.location.search}`;
+      if (targetUrl !== currentUrl) {
+        window.history.replaceState(null, "", targetUrl);
+      }
+    },
+    [pathname]
+  );
+
   const fetchCustomers = useCallback(async () => {
+    const reqId = ++requestSeqRef.current;
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    listAbortRef.current = controller;
+
     setLoading(true);
+    setLoadError(null);
+
     const query = new URLSearchParams();
     if (searchTerm.trim()) query.set("search", searchTerm.trim());
     if (tierFilter) query.set("tier", tierFilter);
     if (sourceFilter !== "ALL") query.set("source", sourceFilter);
+    query.set("page", String(page));
+    query.set("limit", String(PAGE_LIMIT));
+
+    updateUrlParams(searchTerm, tierFilter, sourceFilter, page);
 
     try {
       const response = await fetch(`/api/customers?${query.toString()}`, {
+        credentials: "same-origin",
         headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
       });
-      const result = await response.json();
-      if (result.success && Array.isArray(result.data)) {
-        setCustomers(result.data);
-        if (result.pagination) setTotal(result.pagination.total);
+      const result = await response.json().catch(() => null);
+      if (reqId !== requestSeqRef.current || controller.signal.aborted) return;
+
+      if (response.ok && result?.success && Array.isArray(result.data)) {
+        const rows: Customer[] = result.data;
+        setCustomers(rows);
+        const pag = result.pagination;
+        const resolvedTotal = Number(pag?.total ?? rows.length);
+        const resolvedTotalPages = Math.max(1, Number(pag?.totalPages ?? 1));
+        const resolvedPage = Math.max(1, Number(pag?.page ?? page));
+
+        setTotal(resolvedTotal);
+        setTotalPages(resolvedTotalPages);
+        if (resolvedPage !== page) {
+          setPage(resolvedPage);
+        }
+
+        if (result.summary) {
+          setSummary({
+            total: Number(result.summary.total ?? resolvedTotal),
+            registered: Number(result.summary.registered ?? 0),
+            guest: Number(result.summary.guest ?? 0),
+            totalNonCancelled: Number(result.summary.totalNonCancelled ?? 0),
+          });
+        } else {
+          setSummary({
+            total: resolvedTotal,
+            registered: rows.filter((c) => c.source === "REGISTERED").length,
+            guest: rows.filter((c) => c.source === "GUEST_ORDER").length,
+            totalNonCancelled: rows.reduce(
+              (sum, c) => sum + (c.nonCancelledTotal ?? c.totalSpend ?? 0),
+              0
+            ),
+          });
+        }
       } else {
-        setFeedback({
-          type: "error",
-          message: result?.error || "Không thể tải danh sách khách hàng.",
-        });
+        const msg = result?.error || "Không thể tải danh sách khách hàng.";
+        setLoadError(msg);
+        setFeedback({ type: "error", message: msg });
       }
     } catch {
-      setFeedback({
-        type: "error",
-        message: "Lỗi kết nối khi tải danh sách khách hàng.",
-      });
+      if (controller.signal.aborted || reqId !== requestSeqRef.current) return;
+      const msg = "Lỗi kết nối khi tải danh sách khách hàng.";
+      setLoadError(msg);
+      setFeedback({ type: "error", message: msg });
     } finally {
-      setLoading(false);
+      if (reqId === requestSeqRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [searchTerm, tierFilter, sourceFilter]);
+  }, [searchTerm, tierFilter, sourceFilter, page, updateUrlParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchCustomers();
+      void fetchCustomers();
     }, 250);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      listAbortRef.current?.abort();
+    };
   }, [fetchCustomers]);
 
   const loadCustomerDetail = async (id: string) => {
+    const reqId = ++detailSeqRef.current;
+    detailAbortRef.current?.abort();
+    const controller = new AbortController();
+    detailAbortRef.current = controller;
+
     setSelectedCustomerId(id);
     setLoadingDetail(true);
     setCustomerDetail(null);
     try {
       const res = await fetch(`/api/admin/customers/${id}`, {
+        credentials: "same-origin",
         headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
       });
-      const data = await res.json();
-      if (data.success && data.data) {
+      const data = await res.json().catch(() => null);
+      if (reqId !== detailSeqRef.current || controller.signal.aborted) return;
+
+      if (res.ok && data?.success && data.data) {
         setCustomerDetail(data.data);
       } else {
         setFeedback({
@@ -150,25 +265,17 @@ function CustomersContent() {
         });
       }
     } catch {
+      if (controller.signal.aborted || reqId !== detailSeqRef.current) return;
       setFeedback({
         type: "error",
         message: "Lỗi kết nối khi tải chi tiết khách hàng.",
       });
     } finally {
-      setLoadingDetail(false);
+      if (reqId === detailSeqRef.current && !controller.signal.aborted) {
+        setLoadingDetail(false);
+      }
     }
   };
-
-  const stats = useMemo(() => {
-    const count = customers.length;
-    const registered = customers.filter((c) => c.source === "REGISTERED").length;
-    const guest = customers.filter((c) => c.source === "GUEST_ORDER").length;
-    const totalNonCancelled = customers.reduce(
-      (sum, c) => sum + (c.nonCancelledTotal ?? c.totalSpend ?? 0),
-      0
-    );
-    return { count, registered, guest, totalNonCancelled };
-  }, [customers]);
 
   const handleExport = () => {
     const query = new URLSearchParams();
@@ -179,6 +286,12 @@ function CustomersContent() {
     window.open(`/api/admin/customers/export?${query.toString()}`, "_blank");
   };
 
+  const rangeStart = total === 0 || customers.length === 0 ? 0 : (page - 1) * PAGE_LIMIT + 1;
+  const rangeEnd =
+    total === 0 || customers.length === 0
+      ? 0
+      : Math.min(total, (page - 1) * PAGE_LIMIT + customers.length);
+
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-3">
       {/* 1. Header */}
@@ -186,7 +299,7 @@ function CustomersContent() {
         title="Khách hàng"
         badge={
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">
-            {total || customers.length}
+            {total}
           </span>
         }
         actions={
@@ -195,7 +308,7 @@ function CustomersContent() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={fetchCustomers}
+              onClick={() => void fetchCustomers()}
               disabled={loading}
               aria-label="Tải lại danh sách"
               icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />}
@@ -205,10 +318,11 @@ function CustomersContent() {
               variant="secondary"
               size="sm"
               onClick={handleExport}
-              disabled={loading || customers.length === 0}
+              disabled={loading || total === 0}
+              title="Xuất toàn bộ khách hàng khớp bộ lọc hiện tại ra CSV"
               icon={<Download className="w-3.5 h-3.5" aria-hidden="true" />}
             >
-              Xuất CSV
+              Xuất CSV (toàn bộ lọc)
             </AdminButton>
           </div>
         }
@@ -220,7 +334,7 @@ function CustomersContent() {
         </InlineAlert>
       )}
 
-      {/* 2. Compact 4-Stat Strip */}
+      {/* 2. Compact 4-Stat Strip (Full Filtered Dataset Totals) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -228,7 +342,7 @@ function CustomersContent() {
             <span>Hồ sơ</span>
           </div>
           <div className="text-base font-black text-slate-900 tabular-nums">
-            {stats.count.toLocaleString("vi-VN")}
+            {summary.total.toLocaleString("vi-VN")}
           </div>
         </div>
 
@@ -238,7 +352,7 @@ function CustomersContent() {
             <span>Thành viên</span>
           </div>
           <div className="text-base font-black text-slate-900 tabular-nums">
-            {stats.registered.toLocaleString("vi-VN")}
+            {summary.registered.toLocaleString("vi-VN")}
           </div>
         </div>
 
@@ -248,14 +362,14 @@ function CustomersContent() {
             <span>Vãng lai</span>
           </div>
           <div className="text-base font-black text-slate-900 tabular-nums">
-            {stats.guest.toLocaleString("vi-VN")}
+            {summary.guest.toLocaleString("vi-VN")}
           </div>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
           <div className="text-xs font-medium text-slate-500">Tổng chi</div>
           <div className="text-base font-black text-blue-700 tabular-nums">
-            {stats.totalNonCancelled.toLocaleString("vi-VN")}đ
+            {summary.totalNonCancelled.toLocaleString("vi-VN")}đ
           </div>
         </div>
       </div>
@@ -273,7 +387,10 @@ function CustomersContent() {
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setSourceFilter(tab.key)}
+                  onClick={() => {
+                    setSourceFilter(tab.key);
+                    setPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     active
                       ? "bg-slate-900 text-white shadow-2xs"
@@ -291,15 +408,22 @@ function CustomersContent() {
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
+                aria-label="Tìm kiếm khách hàng"
                 placeholder="Tìm tên, SĐT, email…"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
               {searchTerm && (
                 <button
                   type="button"
-                  onClick={() => setSearchTerm("")}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setPage(1);
+                  }}
                   aria-label="Xóa tìm kiếm"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
@@ -310,7 +434,10 @@ function CustomersContent() {
 
             <select
               value={tierFilter}
-              onChange={(e) => setTierFilter(e.target.value)}
+              onChange={(e) => {
+                setTierFilter(e.target.value);
+                setPage(1);
+              }}
               aria-label="Lọc theo phân hạng"
               className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white font-medium text-slate-700 focus:ring-2 focus:ring-blue-500 outline-hidden"
             >
@@ -327,6 +454,7 @@ function CustomersContent() {
                   setSearchTerm("");
                   setTierFilter("");
                   setSourceFilter("ALL");
+                  setPage(1);
                 }}
                 className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-slate-200/60 transition cursor-pointer whitespace-nowrap"
               >
@@ -356,6 +484,22 @@ function CustomersContent() {
                   <td colSpan={7} className="py-12 text-center text-slate-500">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" />
                     <span>Đang tải khách hàng...</span>
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={7} className="py-10 text-center">
+                    <div className="max-w-md mx-auto space-y-2.5">
+                      <p className="text-xs font-semibold text-red-700">{loadError}</p>
+                      <button
+                        type="button"
+                        onClick={() => void fetchCustomers()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Thử lại</span>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : customers.length === 0 ? (
@@ -446,7 +590,7 @@ function CustomersContent() {
                     <td className="py-2.5 px-4 whitespace-nowrap text-right">
                       <button
                         type="button"
-                        onClick={() => loadCustomerDetail(customer.id)}
+                        onClick={() => void loadCustomerDetail(customer.id)}
                         className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-200 transition cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -460,14 +604,45 @@ function CustomersContent() {
           </table>
         </div>
 
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-500 flex justify-between items-center">
+        {/* Footer with Server Pagination */}
+        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-600 flex flex-wrap justify-between items-center gap-3">
           <div className="tabular-nums">
-            Hiển thị <span className="font-bold text-slate-900">{customers.length}</span> /{" "}
-            <span className="font-bold text-slate-900">{total || customers.length}</span>
+            Hiển thị{" "}
+            <span className="font-bold text-slate-900">
+              {rangeStart === 0 ? 0 : `${rangeStart}–${rangeEnd}`}
+            </span>{" "}
+            / <span className="font-bold text-slate-900">{total}</span> khách hàng
+            <span className="hidden sm:inline text-slate-400 ml-2">
+              • Khách vãng lai ghi nhận độc lập theo từng đơn
+            </span>
           </div>
-          <div className="text-slate-400 text-[11px]">
-            Khách vãng lai ghi nhận độc lập theo từng đơn
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 font-medium tabular-nums">
+              Trang {page} / {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Trang trước"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none text-slate-700 font-semibold cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Trước</span>
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Trang sau"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none text-slate-700 font-semibold cursor-pointer"
+              >
+                <span>Sau</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </AdminCard>
@@ -484,6 +659,7 @@ function CustomersContent() {
               <button
                 type="button"
                 onClick={() => {
+                  detailAbortRef.current?.abort();
                   setSelectedCustomerId(null);
                   setCustomerDetail(null);
                 }}

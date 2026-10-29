@@ -55,12 +55,15 @@ export default function CompareFloatingBar() {
 
             {/* Empty placeholders up to MAX_COMPARE_PRODUCTS */}
             {Array.from({ length: MAX_COMPARE_PRODUCTS - items.length }).map((_, idx) => (
-              <div
+              <button
                 key={`empty-${idx}`}
-                className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl border border-dashed border-slate-600 flex items-center justify-center text-slate-500 text-xs shrink-0"
+                type="button"
+                onClick={openCompare}
+                title="Bấm để mở bảng so sánh và thêm sản phẩm khác"
+                className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl border border-dashed border-slate-600 hover:border-blue-400 hover:text-blue-400 flex items-center justify-center text-slate-400 text-xs shrink-0 transition cursor-pointer"
               >
                 +{idx + 1 + items.length}
-              </div>
+              </button>
             ))}
           </div>
 

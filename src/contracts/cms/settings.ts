@@ -27,13 +27,78 @@ const safeUrlOrPath = z
 // Allows "#" as a temporary placeholder (e.g. MOIT badge link before registration completes).
 const safeLinkOrHash = z.union([z.literal("#"), safeUrlOrPath]);
 
-const testimonialSchema = z.object({
-  name: safeText(80).min(1),
-  role: safeText(120).default(""),
-  product: safeText(160).default(""),
-  text: safeText(800).min(1),
-  rating: z.number().int().min(1).max(5).default(5),
+const testimonialSchema = z.preprocess(
+  (val) => {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      const obj = val as Record<string, unknown>;
+      if (typeof obj.text !== "string" && typeof obj.quote === "string") {
+        return { ...obj, text: obj.quote };
+      }
+    }
+    return val;
+  },
+  z.object({
+    name: safeText(80).min(1),
+    role: safeText(120).default(""),
+    product: safeText(160).default(""),
+    text: safeText(800).min(1),
+    rating: z.number().int().min(1).max(5).default(5),
+  })
+);
+
+export const reviewVideoSchema = z.object({
+  title: safeText(200).min(1),
+  url: safeUrlOrPath,
+  thumbnail: safeUrlOrPath.default(""),
+  platform: z.enum(["youtube", "tiktok"]).optional(),
 });
+
+export type ReviewVideoItem = z.infer<typeof reviewVideoSchema>;
+
+export const DEFAULT_REVIEW_VIDEOS: ReviewVideoItem[] = [
+  {
+    title: "10 Bước Setup Laptop Gaming Mới - Tránh Những Sai Lầm Này!",
+    url: "https://www.youtube.com/watch?v=KsQTEyLOC6M",
+    thumbnail: "https://i.ytimg.com/vi/KsQTEyLOC6M/hqdefault.jpg",
+    platform: "youtube",
+  },
+  {
+    title: "Top 3 Laptop Lenovo: Trùm Cuối Cao Cấp Bậc Nhất!",
+    url: "https://www.youtube.com/watch?v=yuo-RIQeWeI",
+    thumbnail: "https://i.ytimg.com/vi/yuo-RIQeWeI/hqdefault.jpg",
+    platform: "youtube",
+  },
+  {
+    title: "Lenovo LOQ 2026: Mát Không Tưởng, Có Đáng 40 Triệu?",
+    url: "https://www.youtube.com/watch?v=P4rViOxqk8U",
+    thumbnail: "https://i.ytimg.com/vi/P4rViOxqk8U/hqdefault.jpg",
+    platform: "youtube",
+  },
+  {
+    title: "ThinkPad Chip ARM: Hiện Tại Đã Đáng Mua?",
+    url: "https://www.youtube.com/watch?v=TggjUtq3lfc",
+    thumbnail: "https://i.ytimg.com/vi/TggjUtq3lfc/hqdefault.jpg",
+    platform: "youtube",
+  },
+  {
+    title: "Đánh Giá ASUS Zenbook 14: Đẹp Thì Rõ Rồi Nhưng... Dùng Có Sướng?",
+    url: "https://www.youtube.com/watch?v=74SBcwfANGc",
+    thumbnail: "https://i.ytimg.com/vi/74SBcwfANGc/hqdefault.jpg",
+    platform: "youtube",
+  },
+  {
+    title: "Trải nghiệm thực tế Laptop Gaming & Ultrabook tại Showroom CitiLap",
+    url: "https://www.tiktok.com/@citilapvn/video/7420000000000000001",
+    thumbnail: "/brand/store-photo-01.jpg",
+    platform: "tiktok",
+  },
+  {
+    title: "Quy trình kiểm định Laptop Like New 99% nguyên zin tại CitiLap",
+    url: "https://www.tiktok.com/@citilapvn/video/7420000000000000002",
+    thumbnail: "/brand/store-photo-02.jpg",
+    platform: "tiktok",
+  },
+];
 
 const productBannerSchema = z.object({
   title: safeText(120).min(1), description: safeText(500),
@@ -61,9 +126,10 @@ export const adminSettingsDocumentSchema = z.object({
   faviconUrl: safeUrlOrPath.default(""),
   motto: safeText(200).default("Một chữ tín - Vạn niềm tin"),
   copyrightText: safeText(300).default(""),
-  facebookUrl: safeUrlOrPath.default("https://facebook.com/citilapvn"),
-  tiktokUrl: safeUrlOrPath.default("https://tiktok.com/@citilapvn"),
-  youtubeUrl: safeUrlOrPath.default(""),
+  facebookUrl: safeUrlOrPath.default("https://www.facebook.com/citilap"),
+  tiktokUrl: safeUrlOrPath.default("https://www.tiktok.com/@citilapvn"),
+  youtubeUrl: safeUrlOrPath.default("https://www.youtube.com/@thinkview/videos"),
+  reviewVideos: z.array(reviewVideoSchema).max(12).default(DEFAULT_REVIEW_VIDEOS),
 
   // Legal entity (Nghị định 52/2013 & 85/2021) shown in footer
   legalBusinessName: safeText(200).default(""),
@@ -73,7 +139,7 @@ export const adminSettingsDocumentSchema = z.object({
   legalRepresentative: safeText(120).default(""),
   legalAddress: safeText(255).default(""),
   moitBadgeEnabled: z.boolean().default(true),
-  moitBadgeUrl: safeLinkOrHash.default("#"),
+  moitBadgeUrl: safeLinkOrHash.default("https://online.gov.vn/nen-tang/9e483b5c-7da9-4159-bd80-2caab3d942e4"),
   moitBadgeImage: safeUrlOrPath.default("https://bizweb.dktcdn.net/thumb/medium/100/372/934/themes/892516/assets/logo_bct.png"),
 
   // Homepage testimonials (only real, admin-entered reviews are shown)
@@ -178,9 +244,10 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   faviconUrl: "/brand/citilap-mark.svg",
   motto: "Một chữ tín - Vạn niềm tin",
   copyrightText: "© 2024 - 2026 CitiLap. Tất cả quyền được bảo lưu.",
-  facebookUrl: businessProfile.socialProfiles.facebook || "https://facebook.com/citilapvn",
-  tiktokUrl: businessProfile.socialProfiles.tiktok || "https://tiktok.com/@citilapvn",
-  youtubeUrl: "",
+  facebookUrl: businessProfile.socialProfiles.facebook || "https://www.facebook.com/citilap",
+  tiktokUrl: businessProfile.socialProfiles.tiktok || "https://www.tiktok.com/@citilapvn",
+  youtubeUrl: businessProfile.socialProfiles.youtube || "https://www.youtube.com/@thinkview/videos",
+  reviewVideos: DEFAULT_REVIEW_VIDEOS,
 
   legalBusinessName: "HỘ KINH DOANH CITI LAP",
   businessRegistrationNumber: "01D8053589",
@@ -189,7 +256,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   legalRepresentative: "",
   legalAddress: "",
   moitBadgeEnabled: true,
-  moitBadgeUrl: "#",
+  moitBadgeUrl: businessProfile.moitVerificationUrl || "https://online.gov.vn/nen-tang/9e483b5c-7da9-4159-bd80-2caab3d942e4",
   moitBadgeImage: "https://bizweb.dktcdn.net/thumb/medium/100/372/934/themes/892516/assets/logo_bct.png",
 
   testimonials: [],
@@ -230,7 +297,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   feature2Title: "Thông tin rõ ràng",
   feature2Desc: "Kiểm tra hồ sơ máy và phụ kiện trước khi mua",
   feature3Title: "Dịch vụ vượt trội",
-  feature3Desc: "Bảo hành theo gói, đổi lỗi 7 ngày theo điều kiện",
+  feature3Desc: "Bảo hành theo gói, lỗi 1 đổi 1 trong 7 ngày đầu tiên",
   feature4Title: "Giao hàng toàn quốc",
   feature4Desc: "Xác nhận phí giao và phương án đồng kiểm",
 
@@ -273,6 +340,7 @@ export const publicStorefrontSettingsSchema = z.object({
   facebookUrl: z.string(),
   tiktokUrl: z.string(),
   youtubeUrl: z.string(),
+  reviewVideos: z.array(reviewVideoSchema).default(DEFAULT_REVIEW_VIDEOS),
 
   legalBusinessName: z.string().default(""),
   businessRegistrationNumber: z.string().default(""),
@@ -281,7 +349,7 @@ export const publicStorefrontSettingsSchema = z.object({
   legalRepresentative: z.string().default(""),
   legalAddress: z.string().default(""),
   moitBadgeEnabled: z.boolean().default(true),
-  moitBadgeUrl: z.string().default("#"),
+  moitBadgeUrl: z.string().default("https://online.gov.vn/nen-tang/9e483b5c-7da9-4159-bd80-2caab3d942e4"),
   moitBadgeImage: z.string().default(""),
   testimonials: z.array(testimonialSchema).default([]),
   testimonialsSourceUrl: z.string().default(""),

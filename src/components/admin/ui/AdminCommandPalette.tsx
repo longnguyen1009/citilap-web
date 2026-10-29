@@ -24,6 +24,7 @@ interface SearchResultItem {
 const STATIC_NAV_COMMANDS: SearchResultItem[] = [
   { id: "nav-dash", title: "Bảng tin Tổng quan", subtitle: "Thống kê vận hành thời gian thực", category: "navigation", href: "/admin/dashboard" },
   { id: "nav-prods", title: "Tất cả sản phẩm", subtitle: "Quản lý danh sách laptop và phụ kiện", category: "navigation", href: "/admin/products" },
+  { id: "nav-inventory", title: "Kho hàng, Serial & Kiểm định", subtitle: "Quản lý tồn kho showroom, mã Serial/IMEI và hồ sơ kiểm định 12 điểm", category: "navigation", href: "/admin/inventory" },
   { id: "nav-new-prod", title: "Thêm sản phẩm mới", subtitle: "Biên tập sản phẩm máy tính mới", category: "navigation", href: "/admin/products/new", badge: "Tạo mới" },
   { id: "nav-orders", title: "Quản lý đơn hàng", subtitle: "Danh sách đơn hàng từ Storefront", category: "navigation", href: "/admin/orders" },
   { id: "nav-customers", title: "Hồ sơ khách hàng", subtitle: "Danh sách khách hàng và lịch sử mua", category: "navigation", href: "/admin/customers" },
@@ -154,6 +155,42 @@ export default function AdminCommandPalette({
           }
         }
         if (orderRes && !orderRes.ok) failed = true;
+
+        // Query customers API
+        const custRes = canAdmin(principal, 'customers') ? await fetch(`/api/customers?search=${encodeURIComponent(q)}&limit=3`, { cache: 'no-store', signal: controller.signal }) : null;
+        if (custRes?.ok) {
+          const custData = await custRes.json();
+          const customers = Array.isArray(custData?.data) ? custData.data : [];
+          for (const cust of customers) {
+            dynamicResults.push({
+              id: `cust-${cust.id}`,
+              title: `Khách: ${cust.name || cust.phone || "Khách hàng"}`,
+              subtitle: `${cust.phone || ""} ${cust.email ? `· ${cust.email}` : ""}`,
+              category: "customers",
+              href: `/admin/customers?search=${encodeURIComponent(cust.phone || cust.name || q)}`,
+              badge: `${cust.ordersCount ?? 0} đơn`,
+              badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+            });
+          }
+        }
+
+        // Query posts API
+        const postRes = canAdmin(principal, 'content') ? await fetch(`/api/admin/posts?q=${encodeURIComponent(q)}&limit=3`, { cache: 'no-store', signal: controller.signal }) : null;
+        if (postRes?.ok) {
+          const postData = await postRes.json();
+          const posts = Array.isArray(postData?.items) ? postData.items : Array.isArray(postData?.data?.items) ? postData.data.items : [];
+          for (const post of posts) {
+            dynamicResults.push({
+              id: `post-${post.id}`,
+              title: post.title,
+              subtitle: `/news/${post.slug}`,
+              category: "posts",
+              href: `/admin/posts/${post.id}`,
+              badge: post.status === "PUBLISHED" ? "Đã đăng" : "Bản nháp",
+              badgeColor: "bg-purple-50 text-purple-700 border-purple-200",
+            });
+          }
+        }
       } catch {
         failed = true;
       }

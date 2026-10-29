@@ -26,7 +26,14 @@ type Row = Omit<MediaAssetDto, 'url' | 'usageCount' | 'assetType' | 'embedUrl' |
 export const PAGE_SIZE = 24;
 const fields = 'a.*,(SELECT count(*) FROM MediaUsage u WHERE u.assetId=a.id) AS usageCount';
 
-function resolveMediaPresentation(row: Row): {
+export function resolveMediaPresentation(row: {
+  id: string;
+  storageKey: string | null;
+  externalId: string | null;
+  mimeType: string | null;
+  provider: string;
+  kind: 'IMAGE' | 'VIDEO';
+}): {
   assetType: MediaAssetType;
   url: string | null;
   embedUrl: string | null;

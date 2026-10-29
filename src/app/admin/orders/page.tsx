@@ -36,6 +36,8 @@ type Order = {
   totalAmount: number;
   subtotalAmount: number;
   status: string;
+  paymentMethod?: string | null;
+  paymentStatus?: string | null;
   customerName: string;
   customerPhone: string;
   customerEmail?: string | null;
@@ -63,17 +65,20 @@ function OrdersContent() {
 
   const initialSearch = searchParams.get("search") || "";
   const initialStatus = searchParams.get("status") || "ALL";
+  const initialPaymentStatus = searchParams.get("paymentStatus") || "ALL";
   const initialStartDate = searchParams.get("startDate") || "";
   const initialEndDate = searchParams.get("endDate") || "";
   const initialPage = Math.max(1, Number(searchParams.get("page")) || 1);
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState(initialPaymentStatus);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
   const [page, setPage] = useState(initialPage);
 
   const [orders, setOrders] = useState<Order[]>([]);
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -83,10 +88,18 @@ function OrdersContent() {
   } | null>(null);
 
   const updateUrlParams = useCallback(
-    (newSearch: string, newStatus: string, newStart: string, newEnd: string, newPage: number) => {
+    (
+      newSearch: string,
+      newStatus: string,
+      newPaymentStatus: string,
+      newStart: string,
+      newEnd: string,
+      newPage: number
+    ) => {
       const params = new URLSearchParams();
       if (newSearch.trim()) params.set("search", newSearch.trim());
       if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
+      if (newPaymentStatus && newPaymentStatus !== "ALL") params.set("paymentStatus", newPaymentStatus);
       if (newStart) params.set("startDate", newStart);
       if (newEnd) params.set("endDate", newEnd);
       if (newPage > 1) params.set("page", String(newPage));
@@ -103,6 +116,7 @@ function OrdersContent() {
     const query = new URLSearchParams();
     if (searchTerm.trim()) query.set("search", searchTerm.trim());
     if (statusFilter && statusFilter !== "ALL") query.set("status", statusFilter);
+    if (paymentStatusFilter && paymentStatusFilter !== "ALL") query.set("paymentStatus", paymentStatusFilter);
     if (startDate) query.set("startDate", startDate);
     if (endDate) query.set("endDate", endDate);
     query.set("page", String(page));
@@ -116,6 +130,7 @@ function OrdersContent() {
       const result = await res.json();
       if (result.success && Array.isArray(result.data)) {
         setOrders(result.data);
+        if (result.statusCounts) setStatusCounts(result.statusCounts);
         setFeedback(null);
         if (result.pagination) {
           setTotal(result.pagination.total);
@@ -135,16 +150,16 @@ function OrdersContent() {
     } finally {
       setLoading(false);
     }
-  }, [searchTerm, statusFilter, startDate, endDate, page]);
+  }, [searchTerm, statusFilter, paymentStatusFilter, startDate, endDate, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       void fetchOrders();
-      updateUrlParams(searchTerm, statusFilter, startDate, endDate, page);
+      updateUrlParams(searchTerm, statusFilter, paymentStatusFilter, startDate, endDate, page);
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [fetchOrders, updateUrlParams, searchTerm, statusFilter, startDate, endDate, page]);
+  }, [fetchOrders, updateUrlParams, searchTerm, statusFilter, paymentStatusFilter, startDate, endDate, page]);
 
   const handleExport = () => {
     const query = new URLSearchParams();
@@ -156,7 +171,9 @@ function OrdersContent() {
     window.open(`/api/admin/orders/export?${query.toString()}`, "_blank");
   };
 
-  const hasFilters = Boolean(searchTerm.trim() || statusFilter !== "ALL" || startDate || endDate);
+  const hasFilters = Boolean(
+    searchTerm.trim() || statusFilter !== "ALL" || paymentStatusFilter !== "ALL" || startDate || endDate
+  );
 
   return (
     <div className="space-y-3 pb-10">
@@ -204,6 +221,7 @@ function OrdersContent() {
         <div className="px-4 pt-2 border-b border-slate-200 bg-slate-50/50 flex items-center gap-1 overflow-x-auto">
           {STATUS_TABS.map((t) => {
             const active = statusFilter === t.key;
+            const count = statusCounts[t.key];
             return (
               <button
                 key={t.key}
@@ -213,13 +231,22 @@ function OrdersContent() {
                   setStatusFilter(t.key);
                   setPage(1);
                 }}
-                className={`px-3 py-2 text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer ${
+                className={`px-3 py-2 text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
                   active
                     ? "border-blue-600 text-blue-700"
                     : "border-transparent text-slate-600 hover:text-slate-900"
                 }`}
               >
-                {t.label}
+                <span>{t.label}</span>
+                {typeof count === "number" && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold tabular-nums ${
+                      active ? "bg-blue-100 text-blue-700" : "bg-slate-200/70 text-slate-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -241,6 +268,20 @@ function OrdersContent() {
               className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
             />
           </div>
+
+          <select
+            aria-label="Lọc trạng thái thanh toán"
+            value={paymentStatusFilter}
+            onChange={(e) => {
+              setPaymentStatusFilter(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 cursor-pointer"
+          >
+            <option value="ALL">Thanh toán: Tất cả</option>
+            <option value="PAID">Đã thanh toán</option>
+            <option value="PENDING">Chờ thanh toán</option>
+          </select>
 
           <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-md px-2.5 py-1">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -275,6 +316,7 @@ function OrdersContent() {
               onClick={() => {
                 setSearchTerm("");
                 setStatusFilter("ALL");
+                setPaymentStatusFilter("ALL");
                 setStartDate("");
                 setEndDate("");
                 setPage(1);
@@ -296,6 +338,7 @@ function OrdersContent() {
                 <th>Khách hàng</th>
                 <th>Sản phẩm đặt</th>
                 <th className="text-right">Tổng tiền</th>
+                <th className="text-center">Thanh toán</th>
                 <th className="text-center">Trạng thái</th>
                 <th className="text-right">Ngày đặt</th>
                 <th className="text-right"></th>
@@ -304,14 +347,14 @@ function OrdersContent() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-slate-500">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" aria-hidden="true" />
                     <span>Đang tải...</span>
                   </td>
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                  <td colSpan={8} className="py-12 text-center text-slate-500">
                     Không có đơn hàng phù hợp.
                   </td>
                 </tr>
@@ -319,6 +362,8 @@ function OrdersContent() {
                 orders.map((order) => {
                   const itemCount = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
                   const firstItem = order.items?.[0]?.productName;
+                  const isPaid = order.paymentStatus === "PAID";
+                  const methodLabel = order.paymentMethod === "BANK_TRANSFER" ? "VietQR" : "COD";
 
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/70 transition">
@@ -347,6 +392,20 @@ function OrdersContent() {
 
                       <td className="whitespace-nowrap text-right font-bold text-slate-900 tabular-nums">
                         {order.totalAmount.toLocaleString("vi-VN")}đ
+                      </td>
+
+                      <td className="whitespace-nowrap text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                            isPaid
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-slate-100 text-slate-600 border-slate-200"
+                          }`}
+                        >
+                          <span>{methodLabel}</span>
+                          <span>·</span>
+                          <span>{isPaid ? "Đã thu" : "Chờ thu"}</span>
+                        </span>
                       </td>
 
                       <td className="whitespace-nowrap text-center">

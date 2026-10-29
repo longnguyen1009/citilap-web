@@ -287,6 +287,36 @@ export default function OrderTrackingPortal() {
               </button>
             </form>
 
+            {/* Quick-try Public Code Chips */}
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+              <span className="text-slate-500 font-semibold mr-1">
+                Mã kiểm định thực tế đang sẵn hàng:
+              </span>
+              {[
+                { code: 'CTL-X1G11-01', label: 'CTL-X1G11-01 (ThinkPad)' },
+                { code: 'CTL-LEGION-01', label: 'CTL-LEGION-01 (Legion)' },
+                { code: 'CTL-MACM3-01', label: 'CTL-MACM3-01 (MacBook)' },
+                { code: 'CTL-ZEN14-01', label: 'CTL-ZEN14-01 (Zenbook)' },
+                { code: 'CTL-XPS13-01', label: 'CTL-XPS13-01 (Dell XPS)' },
+              ].map((sample) => (
+                <button
+                  key={sample.code}
+                  type="button"
+                  onClick={() => {
+                    setCodeInput(sample.code);
+                    void handleLookupInspection(sample.code);
+                  }}
+                  className={`px-2.5 py-1 rounded-full font-mono text-[11px] font-bold border transition cursor-pointer ${
+                    codeInput.toUpperCase() === sample.code
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-slate-50 hover:bg-blue-50 text-blue-700 border-slate-200 hover:border-blue-300'
+                  }`}
+                >
+                  {sample.label}
+                </button>
+              ))}
+            </div>
+
             {inspectionError && (
               <div
                 role="alert"

@@ -8,9 +8,6 @@ interface __BaseEnv_Env {
 	APP_ENV?: "staging" | "production";
 	NEXT_PUBLIC_TURNSTILE_SITE_KEY?: "0x4AAAAAAFZsbdPpsQAHD2eQ";
 	NEXT_PUBLIC_SITE_URL?: "https://citilap-ecommerce-staging.restless-snowflake-aaae.workers.dev" | "https://citilap.vn";
-	NEXT_PUBLIC_SUPABASE_URL: string;
-	NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
-	SUPABASE_SERVICE_ROLE_KEY: string;
 	ADMIN_EMAIL: string;
 	ADMIN_PASSWORD: string;
 	ADMIN_API_TOKEN: string;
@@ -27,9 +24,6 @@ declare namespace Cloudflare {
 		APP_ENV: "staging";
 		NEXT_PUBLIC_TURNSTILE_SITE_KEY: "0x4AAAAAAFZsbdPpsQAHD2eQ";
 		NEXT_PUBLIC_SITE_URL: "https://citilap-ecommerce-staging.restless-snowflake-aaae.workers.dev";
-		NEXT_PUBLIC_SUPABASE_URL: string;
-		NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
-		SUPABASE_SERVICE_ROLE_KEY: string;
 		ADMIN_EMAIL: string;
 		ADMIN_PASSWORD: string;
 		ADMIN_API_TOKEN: string;
@@ -41,9 +35,6 @@ declare namespace Cloudflare {
 		ASSETS: Fetcher;
 		APP_ENV: "production";
 		NEXT_PUBLIC_SITE_URL: "https://citilap.vn";
-		NEXT_PUBLIC_SUPABASE_URL: string;
-		NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
-		SUPABASE_SERVICE_ROLE_KEY: string;
 		ADMIN_EMAIL: string;
 		ADMIN_PASSWORD: string;
 		ADMIN_API_TOKEN: string;
@@ -55,5 +46,5 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "APP_ENV" | "NEXT_PUBLIC_TURNSTILE_SITE_KEY" | "NEXT_PUBLIC_SITE_URL" | "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY" | "SUPABASE_SERVICE_ROLE_KEY" | "ADMIN_EMAIL" | "ADMIN_PASSWORD" | "ADMIN_API_TOKEN">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "APP_ENV" | "NEXT_PUBLIC_TURNSTILE_SITE_KEY" | "NEXT_PUBLIC_SITE_URL" | "ADMIN_EMAIL" | "ADMIN_PASSWORD" | "ADMIN_API_TOKEN">> {}
 }

@@ -6,6 +6,8 @@ import { PrismaD1 } from '@prisma/adapter-d1';
 // WeakMap cache for PrismaClient instances keyed by D1Database binding instance
 const clientCache = new WeakMap<D1Database, PrismaClient>();
 let explicitlyConfiguredD1: D1Database | undefined;
+let cachedFallbackClient: PrismaClient | undefined;
+let cachedFallbackUrl: string | undefined;
 
 /**
  * Creates or retrieves a cached Cloudflare D1-native Prisma Client using @prisma/adapter-d1.
@@ -105,7 +107,7 @@ export function getPrismaClient(d1?: D1Database): PrismaClient {
   }
 
   // Local Node environment fallback: explicit DATABASE_URL or local D1 SQLite file
-  let url = process.env.DATABASE_URL;
+  let url = process.env.DATABASE_URL || cachedFallbackUrl;
   if (!url) {
     try {
       const fs = safeRequire<{ existsSync: (p: string) => boolean; readdirSync: (p: string) => string[] }>('node:fs');
@@ -119,6 +121,7 @@ export function getPrismaClient(d1?: D1Database): PrismaClient {
           const targetFile = sqliteFiles.find(f => f.startsWith('b65da93e')) || sqliteFiles[0];
           if (targetFile) {
             url = `file:${path.resolve(d1Dir, targetFile)}`;
+            cachedFallbackUrl = url;
           }
         }
       }
@@ -128,11 +131,17 @@ export function getPrismaClient(d1?: D1Database): PrismaClient {
   }
 
   if (url && url.trim() !== '') {
+    if (cachedFallbackClient && cachedFallbackUrl === url) {
+      return cachedFallbackClient;
+    }
     try {
       const libsql = safeRequire<{ PrismaLibSql: new (args: { url: string; authToken?: string }) => unknown }>('@prisma/adapter-libsql');
       if (libsql?.PrismaLibSql) {
         const adapter = new libsql.PrismaLibSql({ url, authToken: process.env.DATABASE_AUTH_TOKEN });
-        return new PrismaClient({ adapter } as never);
+        const client = new PrismaClient({ adapter } as never) as unknown as PrismaClient;
+        cachedFallbackClient = client;
+        cachedFallbackUrl = url;
+        return client;
       }
     } catch {
       // Ignore if adapter-libsql is not available in current runtime

@@ -2920,6 +2920,10 @@ function CustomerGalleryForm({
                   <p className="text-[11px] text-amber-600 font-medium mt-1">
                     Đường dẫn ảnh phải bắt đầu bằng https:// hoặc /
                   </p>
+                ) : data.images.findIndex((other) => other.url.trim() === img.url.trim()) !== index ? (
+                  <p className="text-[11px] text-amber-600 font-medium mt-1">
+                    Ảnh này trùng với ảnh #{data.images.findIndex((other) => other.url.trim() === img.url.trim()) + 1} — trang chủ sẽ hiển thị lặp lại. Hãy chọn ảnh khác.
+                  </p>
                 ) : null}
               </div>
 

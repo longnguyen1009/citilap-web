@@ -1,8 +1,7 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import Image from "next/image";
-import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Maximize2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface GalleryImageItem {
   url: string;
@@ -12,281 +11,290 @@ export interface GalleryImageItem {
 }
 
 interface ProductGalleryProps {
-  images: Array<string | GalleryImageItem>;
   productName: string;
+  conditionLabel?: string;
   discount?: string;
-  selectedImage?: string | null;
+  inStock?: boolean;
+  images: (string | GalleryImageItem)[];
+  selectedImage?: string;
 }
 
-const PLACEHOLDER_IMAGE = "/images/placeholder-laptop.svg";
-
-export default function ProductGallery({
-  images,
+export function ProductGallery({
   productName,
+  conditionLabel,
   discount,
+  inStock = true,
+  images,
   selectedImage,
 }: ProductGalleryProps) {
-  // Normalize images to GalleryImageItem array
-  const normalizedImages: GalleryImageItem[] = images
-    .map((img) => (typeof img === "string" ? { url: img, alt: productName } : img))
-    .filter((img) => Boolean(img.url && img.url.trim() !== ""));
-
   const [activeIndex, setActiveIndex] = useState(0);
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [failedImages, setFailedImages] = useState<Record<number, boolean>>({});
-  const lightboxRef = useRef<HTMLDivElement>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const prevSelectedImageRef = useRef<string | undefined>(selectedImage);
 
-  // Sync active index if selectedImage from variant is provided
+  // Memoize normalized images so array reference stays stable across re-renders
+  const normalizedImages: GalleryImageItem[] = useMemo(() => {
+    const list = images
+      .map((item) => {
+        if (typeof item === 'string') {
+          return { url: item, alt: productName };
+        }
+        return { url: item.url, alt: item.alt || productName };
+      })
+      .filter((item) => Boolean(item.url));
+
+    if (list.length === 0) {
+      return [{ url: '/images/placeholder-laptop.svg', alt: productName }];
+    }
+    return list;
+  }, [images, productName]);
+
+  // Only sync activeIndex when selectedImage actually changes (e.g., user picked a different color/variant)
   useEffect(() => {
-    if (selectedImage) {
+    if (selectedImage && selectedImage !== prevSelectedImageRef.current) {
+      prevSelectedImageRef.current = selectedImage;
       const idx = normalizedImages.findIndex((img) => img.url === selectedImage);
       if (idx !== -1) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- sync active image on variant selection
         setActiveIndex(idx);
       }
     }
   }, [selectedImage, normalizedImages]);
 
-  const total = normalizedImages.length;
+  // Ensure activeIndex stays within bounds if image list changes
+  const safeActiveIndex =
+    activeIndex >= 0 && activeIndex < normalizedImages.length ? activeIndex : 0;
+  const activeImg = normalizedImages[safeActiveIndex] || {
+    url: '/images/placeholder-laptop.svg',
+    alt: productName,
+  };
 
-  const handlePrev = useCallback(() => {
-    setActiveIndex((prev) => (prev > 0 ? prev - 1 : total - 1));
-  }, [total]);
+  const handlePrev = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveIndex((prev) =>
+      prev <= 0 ? normalizedImages.length - 1 : prev - 1
+    );
+  };
 
-  const handleNext = useCallback(() => {
-    setActiveIndex((prev) => (prev < total - 1 ? prev + 1 : 0));
-  }, [total]);
+  const handleNext = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setActiveIndex((prev) =>
+      prev >= normalizedImages.length - 1 ? 0 : prev + 1
+    );
+  };
 
-  // Keyboard navigation for Lightbox
   useEffect(() => {
-    if (!isLightboxOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsLightboxOpen(false);
-      } else if (e.key === "ArrowLeft") {
-        handlePrev();
-      } else if (e.key === "ArrowRight") {
-        handleNext();
+    if (!lightboxOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxOpen(false);
+      if (e.key === 'ArrowLeft') {
+        setActiveIndex((prev) =>
+          prev <= 0 ? normalizedImages.length - 1 : prev - 1
+        );
+      }
+      if (e.key === 'ArrowRight') {
+        setActiveIndex((prev) =>
+          prev >= normalizedImages.length - 1 ? 0 : prev + 1
+        );
       }
     };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isLightboxOpen, handlePrev, handleNext]);
-
-  // Lock body scroll when lightbox is open
-  useEffect(() => {
-    if (isLightboxOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isLightboxOpen]);
-
-  if (normalizedImages.length === 0) {
-    return (
-      <div className="w-full aspect-[4/3] rounded-xl bg-gray-50 border border-gray-200 flex flex-col items-center justify-center p-6 text-center">
-        <div className="relative w-28 h-28 opacity-40 mb-3">
-          <Image src={PLACEHOLDER_IMAGE} alt={productName} fill className="object-contain" />
-        </div>
-        <p className="text-sm font-medium text-gray-500">Hình ảnh đang được cập nhật</p>
-      </div>
-    );
-  }
-
-  const currentImage = normalizedImages[activeIndex] || normalizedImages[0];
-  const currentImageUrl = failedImages[activeIndex] ? PLACEHOLDER_IMAGE : currentImage.url;
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [lightboxOpen, normalizedImages.length]);
 
   return (
-    <div className="w-full select-none">
-      {/* 1. Main Display Viewport */}
-      <div className="relative aspect-[4/3] sm:aspect-square w-full rounded-2xl bg-slate-50/70 border border-slate-200/90 p-4 overflow-hidden group flex items-center justify-center shadow-xs">
-        {/* Badges góc trên bên trái */}
-        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1.5 pointer-events-none">
+    <div className="flex flex-col">
+      {/* Main Image Box */}
+      <div
+        onClick={() => setLightboxOpen(true)}
+        className="group relative flex h-[350px] sm:h-[430px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50/70 to-white p-4 sm:p-6 cursor-zoom-in"
+      >
+        {/* Top Left Badges */}
+        <div className="absolute top-3.5 left-3.5 z-10 flex flex-wrap gap-1.5">
+          {conditionLabel && (
+            <span
+              data-testid="hero-condition-label"
+              className="rounded-lg bg-[#2563EB] px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-white shadow-xs"
+            >
+              {conditionLabel}
+            </span>
+          )}
           {discount && (
-            <span className="bg-rose-600 text-white font-black text-xs px-2.5 py-1 rounded-lg shadow-xs tracking-wide">
+            <span className="rounded-lg bg-rose-600 px-2.5 py-1 text-xs font-extrabold uppercase tracking-wider text-white shadow-xs">
               {discount}
             </span>
           )}
-          <span className="bg-blue-600 text-white font-bold text-[11px] px-2.5 py-0.5 rounded-lg shadow-xs">
-            Mới 100% Fullbox
-          </span>
         </div>
 
-        {/* Tình trạng kho góc trên bên phải */}
-        <div className="absolute top-3 right-3 z-10 pointer-events-none">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold shadow-xs">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-            <span>Sẵn hàng tại HN & Bắc Ninh</span>
-          </span>
+        {/* Top Right Stock Pill */}
+        <div className="absolute top-3.5 right-3.5 z-10">
+          {inStock ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Sẵn hàng tại HN &amp; Bắc Ninh
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+              <span className="h-2 w-2 rounded-full bg-amber-500" />
+              Đặt trước · Liên hệ kiểm tra kho
+            </span>
+          )}
         </div>
 
-        {/* Main Image with Zoom Trigger */}
-        <div
-          className="relative w-full h-full cursor-zoom-in flex items-center justify-center"
-          onClick={() => setIsLightboxOpen(true)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setIsLightboxOpen(true);
-            }
-          }}
-          aria-label={`Nhấn để phóng to ảnh: ${currentImage.alt || productName}`}
-        >
-          <Image
-            src={currentImageUrl}
-            alt={currentImage.alt || productName}
-            fill
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
-            priority={activeIndex === 0}
-            onError={() => setFailedImages((prev) => ({ ...prev, [activeIndex]: true }))}
-            className="object-contain transition-transform duration-300 ease-out group-hover:scale-105"
+        {/* Prev / Next Navigation Buttons */}
+        {normalizedImages.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrev}
+              aria-label="Ảnh trước"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm opacity-0 group-hover:opacity-100 transition hover:bg-white hover:text-blue-600 cursor-pointer"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              aria-label="Ảnh tiếp theo"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm opacity-0 group-hover:opacity-100 transition hover:bg-white hover:text-blue-600 cursor-pointer"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </>
+        )}
+
+        {/* Main Image (Uniform container size) */}
+        <div className="flex h-[250px] sm:h-[330px] w-full max-w-[460px] items-center justify-center">
+          <img
+            src={activeImg.url}
+            alt={activeImg.alt || productName}
+            className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
           />
         </div>
 
-        {/* Nút Xem ảnh to góc dưới phải */}
+        {/* Zoom Button */}
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            setIsLightboxOpen(true);
+            setLightboxOpen(true);
           }}
-          className="absolute bottom-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-xs border border-slate-200 text-slate-700 hover:text-blue-600 text-xs font-semibold shadow-xs transition cursor-pointer"
-          aria-label="Phóng to ảnh sản phẩm"
+          className="absolute bottom-3.5 right-3.5 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/95 px-3 py-1.5 text-xs font-bold text-slate-700 shadow-xs backdrop-blur transition hover:border-blue-500 hover:text-blue-600 cursor-pointer"
         >
-          <Maximize2 className="w-3.5 h-3.5" />
-          <span>Xem ảnh to</span>
+          <Maximize2 className="h-3.5 w-3.5" />
+          Xem ảnh to ({safeActiveIndex + 1}/{normalizedImages.length})
         </button>
-
-        {/* Previous / Next Arrows (visible on hover if > 1 images) */}
-        {total > 1 && (
-          <>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePrev();
-              }}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-md border border-gray-100 flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity z-10"
-              aria-label="Ảnh trước đó"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleNext();
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-md border border-gray-100 flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity z-10"
-              aria-label="Ảnh tiếp theo"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </>
-        )}
       </div>
 
-      {/* 2. Thumbnails List */}
-      {total > 1 && (
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-thin" role="tablist" aria-label="Danh sách ảnh thu nhỏ">
+      {/* Thumbnails Strip */}
+      {normalizedImages.length > 1 && (
+        <div className="mt-3.5 flex items-center gap-2.5 overflow-x-auto pb-1">
           {normalizedImages.map((img, idx) => {
-            const isSelected = idx === activeIndex;
-            const thumbUrl = failedImages[idx] ? PLACEHOLDER_IMAGE : img.url;
+            const isActive = idx === safeActiveIndex;
             return (
               <button
-                key={idx}
+                key={`${img.url}-${idx}`}
                 type="button"
                 onClick={() => setActiveIndex(idx)}
-                className={`relative shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-lg p-1 border-2 transition-all bg-white overflow-hidden ${
-                  isSelected
-                    ? "border-blue-600 ring-2 ring-blue-600/20 shadow-xs"
-                    : "border-gray-200 hover:border-gray-400 opacity-75 hover:opacity-100"
+                aria-label={`Xem ảnh ${idx + 1}`}
+                aria-pressed={isActive}
+                className={`relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-xl border-2 bg-white p-1.5 transition-all cursor-pointer ${
+                  isActive
+                    ? 'border-[#2563EB] ring-2 ring-blue-100 opacity-100 shadow-xs'
+                    : 'border-slate-200 opacity-75 hover:opacity-100 hover:border-blue-400'
                 }`}
-                role="tab"
-                aria-selected={isSelected}
-                aria-label={`Xem ảnh ${idx + 1}/${total}`}
               >
-                <div className="relative w-full h-full">
-                  <Image
-                    src={thumbUrl}
-                    alt={img.alt || `Ảnh ${idx + 1}`}
-                    fill
-                    sizes="80px"
-                    onError={() => setFailedImages((prev) => ({ ...prev, [idx]: true }))}
-                    className="object-contain"
-                  />
-                </div>
+                <img
+                  src={img.url}
+                  alt={img.alt || `${productName} - ảnh ${idx + 1}`}
+                  className="h-full w-full object-contain"
+                />
               </button>
             );
           })}
         </div>
       )}
 
-      {/* 3. Lightbox Modal */}
-      {isLightboxOpen && (
+      {/* Lightbox Overlay */}
+      {lightboxOpen && (
         <div
-          ref={lightboxRef}
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Phóng to ảnh ${productName}`}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 p-4 backdrop-blur-xs"
+          onClick={() => setLightboxOpen(false)}
         >
-          {/* Close Button */}
           <button
             type="button"
-            onClick={() => setIsLightboxOpen(false)}
-            className="absolute top-4 right-4 z-50 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-            aria-label="Đóng phóng to ảnh"
+            onClick={() => setLightboxOpen(false)}
+            className="absolute top-4 right-4 rounded-full bg-white/15 p-2.5 text-white transition hover:bg-white/25 cursor-pointer"
+            aria-label="Đóng ảnh phóng to"
           >
-            <X className="w-6 h-6" />
+            <X className="h-6 w-6" />
           </button>
 
-          {/* Lightbox Content */}
-          <div className="relative w-full max-w-4xl h-[70vh] sm:h-[80vh] flex items-center justify-center">
-            <Image
-              src={currentImageUrl}
-              alt={currentImage.alt || productName}
-              fill
-              sizes="90vw"
-              className="object-contain select-none"
-            />
-          </div>
-
-          {/* Navigation Arrows in Lightbox */}
-          {total > 1 && (
-            <>
+          <div
+            className="relative flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {normalizedImages.length > 1 && (
               <button
                 type="button"
                 onClick={handlePrev}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/90 hover:text-white p-3 rounded-full bg-white/10 hover:bg-white/25 transition-colors"
+                className="mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 cursor-pointer"
                 aria-label="Ảnh trước"
               >
-                <ChevronLeft className="w-8 h-8" />
+                <ChevronLeft className="h-6 w-6" />
               </button>
+            )}
+
+            {/* Fixed-dimension stage so every zoomed image scales uniformly */}
+            <div className="flex h-[52vh] sm:h-[64vh] max-h-[580px] w-[76vw] sm:w-[620px] md:w-[720px] items-center justify-center overflow-hidden rounded-2xl bg-white p-5 sm:p-8 shadow-2xl">
+              <img
+                src={activeImg.url}
+                alt={activeImg.alt || productName}
+                className="h-full w-full object-contain select-none"
+              />
+            </div>
+
+            {normalizedImages.length > 1 && (
               <button
                 type="button"
                 onClick={handleNext}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/90 hover:text-white p-3 rounded-full bg-white/10 hover:bg-white/25 transition-colors"
-                aria-label="Ảnh sau"
+                className="ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 cursor-pointer"
+                aria-label="Ảnh tiếp theo"
               >
-                <ChevronRight className="w-8 h-8" />
+                <ChevronRight className="h-6 w-6" />
               </button>
-            </>
-          )}
-
-          {/* Image index counter */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-sm font-medium bg-black/50 px-3 py-1 rounded-full">
-            {activeIndex + 1} / {total}
+            )}
           </div>
+
+          {/* Lightbox Thumbnails */}
+          {normalizedImages.length > 1 && (
+            <div
+              className="mt-4 flex items-center gap-2 overflow-x-auto max-w-full px-4 py-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {normalizedImages.map((img, idx) => (
+                <button
+                  key={`lb-${img.url}-${idx}`}
+                  type="button"
+                  onClick={() => setActiveIndex(idx)}
+                  className={`h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 bg-white p-1 transition cursor-pointer ${
+                    idx === safeActiveIndex
+                      ? 'border-blue-500 ring-2 ring-blue-400 scale-105'
+                      : 'border-transparent opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={img.url}
+                    alt={img.alt || `${productName} - ${idx + 1}`}
+                    className="h-full w-full object-contain"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
+export default ProductGallery;
+

@@ -16,7 +16,7 @@ async function GETHandler(request: Request) {
     const limit = Math.min(Math.max(Number(searchParams.get('limit') || 25), 1), 100);
 
     if (!Number.isInteger(page) || !Number.isInteger(limit) || (search && search.length > 100)) {
-      return NextResponse.json({ success: false, error: 'Invalid query' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Tham số truy vấn không hợp lệ.' }, { status: 400 });
     }
 
     const result = await listCustomers({ search, tier, source, page, limit });
@@ -26,6 +26,7 @@ async function GETHandler(request: Request) {
         success: true,
         data: result.customers,
         pagination: result.pagination,
+        summary: result.summary,
       },
       {
         headers: {
@@ -35,7 +36,15 @@ async function GETHandler(request: Request) {
     );
   } catch (error) {
     console.error('Failed to fetch customers:', error);
-    return NextResponse.json({ success: false, error: 'Failed to fetch customers' }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: 'Không thể tải danh sách khách hàng từ cơ sở dữ liệu.' },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+        },
+      }
+    );
   }
 }
 

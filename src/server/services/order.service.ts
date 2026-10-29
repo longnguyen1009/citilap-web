@@ -657,6 +657,18 @@ export async function getOrderById(orderId: string, d1Database?: D1Database) {
           product: {
             select: { id: true, name: true, slug: true, images: true },
           },
+          serialUnit: {
+            select: {
+              id: true,
+              serialNumber: true,
+              status: true,
+              condition: true,
+              warrantyMonths: true,
+              warehouse: {
+                select: { id: true, name: true, code: true },
+              },
+            },
+          },
         },
       },
       events: {
@@ -710,6 +722,7 @@ export function sanitizeOrderForPublic(order: OrderRecord | Record<string, unkno
 
 export interface ListOrdersFilters {
   status?: string | null;
+  paymentStatus?: string | null;
   search?: string | null;
   startDate?: string | null;
   endDate?: string | null;
@@ -740,6 +753,10 @@ export async function listOrders(
     }
   }
 
+  if (filters.paymentStatus && filters.paymentStatus !== 'ALL') {
+    where.paymentStatus = filters.paymentStatus;
+  }
+
   if (filters.search?.trim()) {
     const q = filters.search.trim();
     where.OR = [
@@ -768,7 +785,7 @@ export async function listOrders(
     }
   }
 
-  const [total, orders] = await Promise.all([
+  const [total, orders, groupedStatuses] = await Promise.all([
     prisma.order.count({ where }),
     prisma.order.findMany({
       where,
@@ -795,10 +812,35 @@ export async function listOrders(
       skip: (page - 1) * limit,
       take: limit,
     }),
+    prisma.order.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    }),
   ]);
+
+  const statusCounts: Record<string, number> = {
+    ALL: 0,
+    NEW: 0,
+    CONTACTED: 0,
+    CONFIRMED: 0,
+    COMPLETED: 0,
+    CANCELLED: 0,
+  };
+  for (const row of groupedStatuses) {
+    const c = row._count._all || 0;
+    statusCounts.ALL += c;
+    if (['NEW', 'PENDING', 'Chờ xác nhận', 'Đang xử lý', 'Đang vận chuyển'].includes(row.status)) {
+      statusCounts.NEW += c;
+    } else if (['COMPLETED', 'Đã hoàn thành'].includes(row.status)) {
+      statusCounts.COMPLETED += c;
+    } else if (statusCounts[row.status] !== undefined) {
+      statusCounts[row.status] += c;
+    }
+  }
 
   return {
     orders,
+    statusCounts,
     pagination: {
       page,
       limit,

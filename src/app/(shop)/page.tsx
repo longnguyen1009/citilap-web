@@ -80,6 +80,10 @@ export default async function Home() {
           settings={settings}
           flashSale={<FlashSaleSection settings={settings} />}
         />
+        <TestimonialSection
+          testimonials={settings?.testimonials ?? []}
+          sourceUrl={settings?.testimonialsSourceUrl}
+        />
       </div>
     );
   }

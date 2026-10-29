@@ -45,7 +45,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = new URLSearchParams();
   for (const [key,value] of Object.entries(sp)) for (const item of Array.isArray(value)?value:value===undefined?[]:[value]) params.append(key,item);
   const parsed = parseSearchParams(params);
-  if (!parsed.success) return <main className="container mx-auto p-8"><p role="alert">Bộ lọc không hợp lệ. Kiểm tra khoảng giá, số trang và giá trị đã nhập.</p><Link href="/search">Xóa bộ lọc</Link></main>;
+  if (!parsed.success) return <div className="container mx-auto p-8"><p role="alert">Bộ lọc không hợp lệ. Kiểm tra khoảng giá, số trang và giá trị đã nhập.</p><Link href="/search">Xóa bộ lọc</Link></div>;
   const options=parsed.data, query=options.query || '';
 
   const searchResult = await searchProducts(options);
@@ -60,7 +60,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     <div className="bg-surface min-h-screen pb-16">
       <Breadcrumb items={breadcrumbItems} />
 
-      <main className="container mx-auto px-4 max-w-[1370px] mt-6">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-6">
         <Suspense
           fallback={
             <div className="bg-surface-card border border-border-default rounded-card p-12 text-center">
@@ -71,7 +71,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         >
           <SearchListingContainer initialData={searchResult} />
         </Suspense>
-      </main>
+      </div>
     </div>
   );
 }

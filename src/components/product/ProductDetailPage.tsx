@@ -5,12 +5,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   ChevronRight,
-  MessageSquare,
 } from "lucide-react";
-import InspectionReports from '@/components/product/InspectionReports';
-import ProductSpecsTable from "@/components/product/ProductSpecsTable";
 import ProductCard from "@/components/product/ProductCard";
-import ReviewForm from "@/components/product/ReviewForm";
 import ProductDescriptionArticle from "@/components/product/ProductDescriptionArticle";
 import ProductFaqAccordion from "@/components/product/ProductFaqAccordion";
 import ProductSideShowrooms from "@/components/product/ProductSideShowrooms";
@@ -18,6 +14,9 @@ import ProductShippingCommitment from "@/components/product/ProductShippingCommi
 import ProductPromoBanners from "@/components/product/ProductPromoBanners";
 import ProductHeroSection from "@/components/product/ProductHeroSection";
 import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
+import { ProductReviewsSection } from "@/components/product/ProductReviewsSection";
+import { ProductSpecsSidebarCard } from "@/components/product/ProductSpecsSidebarCard";
+import { listApprovedProductReviews } from "@/server/services/contact.service";
 import { DEMO_LENOVO_LOQ } from "@/data/demo-product-loq";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
@@ -235,7 +234,7 @@ export default async function ProductDetailPage({
         </nav>
 
         {/* Main Container */}
-        <main className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
+        <div className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
           {/* 1. TOP HERO SECTION: GALLERY + TRUST + DEAL COMBO + PURCHASING */}
           <ProductHeroSection
             canOrder={false}
@@ -268,33 +267,27 @@ export default async function ProductDetailPage({
               />
 
               {/* Câu hỏi thường gặp FAQ */}
-              <ProductFaqAccordion faqs={demo.faqs} />
+              <ProductFaqAccordion faqs={demo.faqs} productName={demo.name} />
 
               {/* Đánh giá từ khách hàng */}
-              <div id="danh-gia-khach-hang" className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-6 sm:p-8">
-                <h2 className="text-base sm:text-lg font-black text-gray-900 border-b border-gray-100 pb-3 mb-5 uppercase flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-amber-500" /> Đánh giá từ khách hàng
-                </h2>
-                <ReviewForm productName={demo.name} />
+              <div id="danh-gia-khach-hang">
+                <ProductReviewsSection
+                  productName={demo.name}
+                  approvedReviews={[]}
+                  defaultVariantLabel={`Đã mua bản ${currentVariant.name}`}
+                />
               </div>
             </div>
 
             {/* Cột phải (Col 4): Thông số kỹ thuật -> Showroom -> Vận chuyển -> Banners */}
             <div className="lg:col-span-4 space-y-6">
               {/* Thông số kỹ thuật */}
-              <section id="thong-so-ky-thuat" className="rounded-2xl border border-gray-200/80 bg-white p-5 sm:p-6 shadow-xs" aria-label="Thông số kỹ thuật">
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-                  <h2 className="text-base font-black text-gray-900 uppercase">Thông số kỹ thuật</h2>
-                  <span className="text-xs text-blue-600 font-semibold">{demo.modelCode}</span>
-                </div>
-                <dl className="divide-y divide-gray-100 text-xs sm:text-sm">
-                  {demo.specs.map(([key, value]) => (
-                    <div key={key} className="grid grid-cols-[minmax(110px,40%)_1fr] gap-2 py-2.5">
-                      <dt className="font-semibold text-gray-500">{key}</dt>
-                      <dd className="text-gray-900 font-medium break-words">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
+              <section id="thong-so-ky-thuat">
+                <ProductSpecsSidebarCard
+                  productName={demo.name}
+                  specs={demo.specs.map(([key, value]) => ({ label: key, value }))}
+                  sku={demo.modelCode}
+                />
               </section>
 
               {/* Hệ thống cửa hàng */}
@@ -345,7 +338,7 @@ export default async function ProductDetailPage({
               stock: 0,
             }}
           />
-        </main>
+        </div>
       </div>
     );
   }
@@ -385,9 +378,15 @@ export default async function ProductDetailPage({
   if (studio && skuParam && !studioVariant) notFound();
 
   const studioImages = studio?.media.filter((m): m is typeof m & { url: string } => m.kind === "IMAGE" && Boolean(m.url)) || [];
-  const galleryImages = studio && studioImages.length > 0 ? studioImages.map((m) => ({
+  const rawGalleryImages = studio && studioImages.length > 0 ? studioImages.map((m) => ({
     url: m.url, alt: m.alt || studio.name, variantId: m.variantId || null,
   })) : product.images;
+
+  const seenGalleryUrls = new Set(rawGalleryImages.map((img) => img.url));
+  const extraProductImages = (product.images || []).filter(
+    (img) => img.url && !seenGalleryUrls.has(img.url)
+  );
+  const galleryImages = [...rawGalleryImages, ...extraProductImages];
 
   const cover = studio
     ? (studioImages.find((m) => m.variantId && m.variantId === studioVariant?.id)?.url || studioImages[0]?.url || "")
@@ -421,6 +420,14 @@ export default async function ProductDetailPage({
   const displayPrice = pricing.effectivePrice;
   const displayOriginalPrice = pricing.compareAtPrice;
 
+  const conditionLabelMap: Record<string, string> = {
+    NEW: "Mới 100%",
+    LIKE_NEW: "Like New (99%)",
+    USED: "Đã qua sử dụng",
+    REFURBISHED: "Refurbished",
+    LIQUIDATION: "Hàng thanh lý",
+  };
+
   // Build hero variants list
   const heroVariants = studio
     ? studio.variants.map((v) => {
@@ -438,6 +445,9 @@ export default async function ProductDetailPage({
             variantOriginalPrice: v.originalPrice ?? null,
           }
         );
+        const vCond = v.condition || studio.condition || product.condition || "NEW";
+        const vCpu = v.options?.CPU || v.options?.cpu || studio.specs.find((s) => /^cpu$/i.test(s.key))?.value || product.specs.cpu || null;
+        const vDisplay = v.options?.['Màn hình'] || v.options?.display || studio.specs.find((s) => /^(màn hình|display)$/i.test(s.key))?.value || product.specs.display || null;
         return {
           id: v.id,
           sku: v.sku,
@@ -445,7 +455,13 @@ export default async function ProductDetailPage({
           subSpecs: [v.ram, v.storage, v.gpu].filter(Boolean).join(" · "),
           price: vp.effectivePrice,
           originalPrice: vp.compareAtPrice,
-          condition: v.condition,
+          condition: vCond,
+          conditionLabel: conditionLabelMap[vCond] || vCond,
+          cpu: vCpu,
+          ram: v.ram || null,
+          storage: v.storage || null,
+          gpu: v.gpu || null,
+          display: vDisplay,
           color: v.options?.['Màu sắc'] || v.options?.color,
           colorHex: /^#[0-9a-fA-F]{6}$/.test(v.options?.['Mã màu'] || '') ? v.options?.['Mã màu'] : undefined,
           canOrder: ['AVAILABLE', 'PREORDER'].includes(v.availability || studio.availability),
@@ -467,6 +483,7 @@ export default async function ProductDetailPage({
             variantOriginalPrice: v.originalPrice ?? null,
           }
         );
+        const vCond = v.options?.condition || product.condition || "NEW";
         return {
           id: v.id,
           sku: v.sku || v.id,
@@ -474,7 +491,13 @@ export default async function ProductDetailPage({
           subSpecs: [v.ram, v.storage, v.gpu].filter(Boolean).join(" · "),
           price: vp.effectivePrice,
           originalPrice: vp.compareAtPrice,
-          condition: product.condition,
+          condition: vCond,
+          conditionLabel: conditionLabelMap[vCond] || vCond,
+          cpu: v.cpu || product.specs.cpu || null,
+          ram: v.ram || null,
+          storage: v.storage || null,
+          gpu: v.gpu || null,
+          display: v.display || product.specs.display || null,
           color: v.options?.['Màu sắc'] || v.options?.color,
         };
       });
@@ -496,6 +519,8 @@ export default async function ProductDetailPage({
     accessories.push({id:accessory.id,variantId:variant?.id,name:authored?.name || accessory.name,image:authored?.media.find(m => m.kind === 'IMAGE')?.url || accessory.primaryImageUrl || '/images/placeholder-laptop.svg',salePrice:resolved.effectivePrice,originalPrice:resolved.compareAtPrice || resolved.effectivePrice});
   }
 
+  const approvedReviews = await listApprovedProductReviews([displayName, product.name]);
+
   // Fetch related products
   const manualRelatedIds = (studio?.relatedProductIds || []).filter((rid) => rid && rid !== product.id);
   const rawRelatedProducts = await getRelatedProducts(
@@ -515,9 +540,44 @@ export default async function ProductDetailPage({
     studio ? (studio.contentHtml || studio.description) : (product.contentHtml || product.description || "")
   );
 
-  const structuredSpecs: Array<{ key: string; value: string }> = studio
-    ? studio.specs.filter((s) => s.value)
+  const rawStructuredSpecs: Array<{ key: string; value: string }> = studio
+    ? studio.specs.filter((s) => s.value).map((s) => ({ key: s.key, value: s.value }))
     : product.fullSpecs.flatMap((g) => g.items.map((item) => ({ key: item.label, value: item.value })));
+
+  const structuredSpecs: Array<{ key: string; value: string }> = [...rawStructuredSpecs];
+  const upsertStructuredSpec = (pattern: RegExp, defaultKey: string, val?: string | null) => {
+    if (!val || !val.trim()) return;
+    const idx = structuredSpecs.findIndex((s) => pattern.test(s.key.trim()));
+    if (idx >= 0) {
+      structuredSpecs[idx] = { ...structuredSpecs[idx], value: val.trim() };
+    } else {
+      structuredSpecs.push({ key: defaultKey, value: val.trim() });
+    }
+  };
+
+  if (studioVariant || selectedVariant) {
+    const vCpu = studioVariant?.options?.CPU || studioVariant?.options?.cpu || selectedVariant?.cpu || product.specs.cpu;
+    const vRam = studioVariant?.ram || selectedVariant?.ram || product.specs.ram;
+    const vStorage = studioVariant?.storage || selectedVariant?.storage || product.specs.ssd;
+    const vGpu = studioVariant?.gpu || selectedVariant?.gpu || product.specs.gpu;
+    const vDisplay = studioVariant?.options?.['Màn hình'] || studioVariant?.options?.display || selectedVariant?.display || product.specs.display;
+    const vCondCode = studioVariant?.condition || selectedVariant?.options?.condition || studio?.condition || product.condition || "NEW";
+    const vCondLabel = conditionLabelMap[vCondCode] || vCondCode;
+    const vSku = studioVariant?.sku || selectedVariant?.sku;
+
+    upsertStructuredSpec(/^(cpu|bộ xử lý|vi xử lý|model cpu)$/i, "CPU", vCpu);
+    upsertStructuredSpec(/^(ram|dung lượng ram)$/i, "RAM", vRam);
+    upsertStructuredSpec(/^(ssd|ổ cứng|storage|dung lượng ổ cứng)$/i, "SSD", vStorage);
+    upsertStructuredSpec(/^(gpu|card đồ họa|vga|đồ họa|card đồ họa \(gpu\))$/i, "GPU", vGpu);
+    upsertStructuredSpec(/^(màn hình|display|thông số màn hình)$/i, "Màn hình", vDisplay);
+    upsertStructuredSpec(/^(tình trạng|tình trạng máy|condition)$/i, "Tình trạng", vCondLabel);
+    upsertStructuredSpec(/^(sku|mã sku|sku phiên bản)$/i, "SKU", vSku);
+  }
+
+  const activeConditionCode = studioVariant?.condition || selectedVariant?.options?.condition || studio?.condition || product.condition || "NEW";
+  const activeConditionLabel = conditionLabelMap[activeConditionCode] || product.conditionLabel || "Mới 100% Fullbox";
+  const activeSku = studioVariant?.sku || selectedVariant?.sku || undefined;
+  const activeVariantId = studioVariant?.id || selectedVariant?.id || undefined;
 
   const findSpecVal = (pattern: RegExp) =>
     structuredSpecs.find((s) => pattern.test(s.key))?.value;
@@ -548,14 +608,14 @@ export default async function ProductDetailPage({
     description: seoDescriptionText,
     canonicalPath,
     images: galleryImages.map((img) => img.url).filter(Boolean),
-    sku: studioVariant?.sku || selectedVariant?.sku || product.id,
+    sku: activeSku || product.id,
     modelCode:
       product.model ||
       findSpecVal(/model|mã/i) ||
       undefined,
     brand: studio?.brand || product.brand || undefined,
     categoryName: category?.name || product.category || undefined,
-    condition: studioVariant?.condition || studio?.condition || product.condition,
+    condition: activeConditionCode,
     price: displayPrice,
     availability: activeAvailability,
     canOrder: canOrderProduct,
@@ -566,14 +626,16 @@ export default async function ProductDetailPage({
   const recentlyViewedItem = {
     id: product.id,
     slug: resolvedSlug,
-    href: canonicalPath,
+    sku: activeSku,
+    variantId: activeVariantId,
+    href: activeSku ? `${canonicalPath}?sku=${encodeURIComponent(activeSku)}` : canonicalPath,
     template: studio?.template,
     name: displayName,
     price: displayPrice,
     originalPrice: displayOriginalPrice,
     image: cover || "/images/placeholder-laptop.svg",
     brand: studio?.brand || product.brand || undefined,
-    condition: studioVariant?.condition || studio?.condition || product.condition,
+    condition: activeConditionCode,
     warranty:
       heroWarranties.find((w) => w.isDefault)?.name ||
       heroWarranties[0]?.name ||
@@ -631,7 +693,7 @@ export default async function ProductDetailPage({
       </nav>
 
       {/* Main Content Container */}
-      <main className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
         {/* 1. TOP HERO SECTION: GALLERY, BADGES, DEAL COMBO, PURCHASING, CARDS 365 */}
         <ProductHeroSection
           key={product.id + (skuParam || '')}
@@ -643,7 +705,7 @@ export default async function ProductDetailPage({
           images={galleryImages}
           coverImage={cover}
           discountBadge={studio ? undefined : product.discount}
-          conditionLabel={product.conditionLabel || "Mới 100% Fullbox"}
+          conditionLabel={activeConditionLabel}
           basePrice={displayPrice}
           baseOriginalPrice={displayOriginalPrice}
           variants={heroVariants}
@@ -655,6 +717,8 @@ export default async function ProductDetailPage({
           accessories={accessories}
           gifts={studio?.gifts || []}
           canOrder={studio ? studio.canOrder : true}
+          reviewCount={32 + approvedReviews.length}
+          averageRating="4.9"
         />
 
         {/* 2. MIDDLE SECTION: SPECIFICATIONS, CONTENT, FAQ, SHOWROOMS & REVIEWS */}
@@ -667,18 +731,20 @@ export default async function ProductDetailPage({
               productName={displayName}
             />
 
-            {/* Báo cáo thẩm định */}
-            <InspectionReports productId={product.id} variantId={studioVariant?.id || product.selectedVariantId || null} />
-
             {/* Câu hỏi thường gặp FAQ */}
-            <ProductFaqAccordion faqs={studio?.faqs || []} />
+            <ProductFaqAccordion faqs={studio?.faqs || []} productName={displayName} />
 
             {/* Đánh giá từ khách hàng */}
-            <div id="danh-gia-khach-hang" className="bg-white rounded-2xl shadow-xs border border-gray-200/80 p-6 sm:p-8">
-              <h2 className="text-base sm:text-lg font-black text-gray-900 border-b border-gray-100 pb-3 mb-5 uppercase flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-amber-500" /> Đánh giá từ khách hàng
-              </h2>
-              <ReviewForm productName={displayName} />
+            <div id="danh-gia-khach-hang">
+              <ProductReviewsSection
+                productName={displayName}
+                approvedReviews={approvedReviews}
+                defaultVariantLabel={
+                  heroVariants[0]?.name
+                    ? `Đã mua bản ${heroVariants[0].name}`
+                    : undefined
+                }
+              />
             </div>
           </div>
 
@@ -686,31 +752,14 @@ export default async function ProductDetailPage({
           <div className="lg:col-span-4 space-y-6">
             {/* Thông số kỹ thuật */}
             <section id="thong-so-ky-thuat">
-              {studio ? (
-                <div className="rounded-2xl border border-gray-200/80 bg-white p-5 sm:p-6 shadow-xs" aria-label="Thông số kỹ thuật">
-                  <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
-                    <h2 className="text-base font-black text-gray-900 uppercase">Thông số kỹ thuật</h2>
-                    <span className="text-xs text-blue-600 font-semibold">{displayName.split('(')[0]}</span>
-                  </div>
-                  {studio.specs.filter((s) => s.value).length ? (
-                    <dl className="divide-y divide-gray-100 text-xs sm:text-sm">
-                      {studio.specs.filter((s) => s.value).map((spec) => (
-                        <div key={spec.key} className="grid grid-cols-[minmax(110px,40%)_1fr] gap-2 py-2.5">
-                          <dt className="font-semibold text-gray-500">{spec.key}</dt>
-                          <dd className="text-gray-900 font-medium break-words">{spec.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  ) : (
-                    <p className="text-xs text-gray-500">Thông số kỹ thuật đang được cập nhật.</p>
-                  )}
-                </div>
-              ) : (
-                <ProductSpecsTable
-                  fullSpecs={product.fullSpecs}
-                  productName={product.name}
-                />
-              )}
+              <ProductSpecsSidebarCard
+                productName={displayName}
+                specs={structuredSpecs.map((spec) => ({
+                  label: spec.key,
+                  value: spec.value,
+                }))}
+                sku={activeSku || product.model || undefined}
+              />
             </section>
 
             {/* Hệ thống showroom */}
@@ -756,7 +805,7 @@ export default async function ProductDetailPage({
 
         {/* 4. SẢN PHẨM VỪA XEM */}
         <RecentlyViewedSection currentProduct={recentlyViewedItem} />
-      </main>
+      </div>
     </div>
   );
 }

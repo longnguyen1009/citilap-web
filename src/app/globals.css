@@ -126,85 +126,93 @@
   /* Container Storefront Width */
   --container-shop: 1370px;
   --max-width-shop: 1370px;
+
+  /* Slightly larger, more legible base text scale across the site */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.925rem;
+  --text-sm--line-height: 1.4rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-size: 0.96875rem;
+  line-height: 1.55;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
 /* Storefront Typography Utilities */
 .text-caption {
-  font-size: 0.6875rem; /* 11px */
-  line-height: 1rem;
-}
-
-.text-label {
-  font-size: 0.75rem; /* 12px */
-  line-height: 1rem;
-}
-
-.text-body-sm {
   font-size: 0.8125rem; /* 13px */
   line-height: 1.25rem;
 }
 
-.text-body {
+.text-label {
   font-size: 0.875rem; /* 14px */
-  line-height: 1.25rem;
+  line-height: 1.3rem;
+}
+
+.text-body-sm {
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.45rem;
+}
+
+.text-body {
+  font-size: 1rem; /* 16px */
+  line-height: 1.55rem;
 }
 
 .text-body-lg {
-  font-size: 1rem; /* 16px */
-  line-height: 1.5rem;
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.65rem;
 }
 
 .text-title-sm {
-  font-size: 1.125rem; /* 18px */
-  line-height: 1.5rem;
+  font-size: 1.1875rem; /* 19px */
+  line-height: 1.6rem;
   font-weight: 600;
 }
 
 .text-title {
-  font-size: 1.25rem; /* 20px */
-  line-height: 1.75rem;
+  font-size: 1.3125rem; /* 21px */
+  line-height: 1.8rem;
   font-weight: 700;
 }
 
 .text-heading {
-  font-size: 1.5rem; /* 24px */
-  line-height: 2rem;
+  font-size: 1.5625rem; /* 25px */
+  line-height: 2.1rem;
   font-weight: 800;
 }
 
 .text-display {
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-size: clamp(1.85rem, 4vw, 2.85rem);
   line-height: 1.15;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .text-title-hero {
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-size: clamp(1.85rem, 4vw, 2.85rem);
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: -0.02em;
 }
 
 .text-title-section {
-  font-size: clamp(1.125rem, 2vw, 1.375rem);
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
   font-weight: 700;
   line-height: 1.25;
   letter-spacing: -0.01em;
 }
 
 .text-title-card {
-  font-size: 0.84375rem; /* ~13.5px */
+  font-size: 0.95rem; /* ~15.2px */
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .text-price-current {
@@ -216,7 +224,7 @@ body {
 .text-price-old {
   color: var(--color-price-old);
   text-decoration: line-through;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 /* Storefront Container Utility */

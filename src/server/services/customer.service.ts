@@ -58,6 +58,13 @@ export interface ListCustomersFilters {
   limit?: number;
 }
 
+export interface CustomersSummaryStats {
+  total: number;
+  registered: number;
+  guest: number;
+  totalNonCancelled: number;
+}
+
 /**
  * List real customers from D1 database.
  * Explicitly separates registered User accounts and guest order customers.
@@ -71,11 +78,11 @@ export async function listCustomers(
 ): Promise<{
   customers: CustomerSummaryDto[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
+  summary: CustomersSummaryStats;
 }> {
   const prisma = getPrismaClient(d1Database);
-  const page = Math.max(1, filters.page || 1);
+  const requestedPage = Math.max(1, filters.page || 1);
   const limit = Math.min(100, Math.max(1, filters.limit || 25));
-  const skip = (page - 1) * limit;
 
   const registeredWhere: Record<string, unknown> = {
     role: 'USER',
@@ -123,12 +130,30 @@ export async function listCustomers(
   const shouldFetchRegistered = filters.source !== 'GUEST_ORDER' && registeredWhere.id !== '__NEVER_MATCH__';
   const shouldFetchGuest = filters.source !== 'REGISTERED' && guestOrderWhere.id !== '__NEVER_MATCH__';
 
-  const [countReg, countGuest] = await Promise.all([
+  const [countReg, countGuest, regSpendAgg, guestSpendAgg] = await Promise.all([
     shouldFetchRegistered ? prisma.user.count({ where: registeredWhere }) : Promise.resolve(0),
     shouldFetchGuest ? prisma.order.count({ where: guestOrderWhere }) : Promise.resolve(0),
+    shouldFetchRegistered
+      ? prisma.order.aggregate({
+          where: { user: registeredWhere, status: { not: 'CANCELLED' } },
+          _sum: { totalAmount: true },
+        })
+      : Promise.resolve({ _sum: { totalAmount: 0 } }),
+    shouldFetchGuest
+      ? prisma.order.aggregate({
+          where: { ...guestOrderWhere, status: { not: 'CANCELLED' } },
+          _sum: { totalAmount: true },
+        })
+      : Promise.resolve({ _sum: { totalAmount: 0 } }),
   ]);
 
   const total = countReg + countGuest;
+  const totalPages = Math.ceil(total / limit) || 1;
+  const page = Math.min(requestedPage, totalPages);
+  const skip = (page - 1) * limit;
+  const totalNonCancelled =
+    Number(regSpendAgg?._sum?.totalAmount ?? 0) + Number(guestSpendAgg?._sum?.totalAmount ?? 0);
+
   const customers: CustomerSummaryDto[] = [];
 
   if (shouldFetchRegistered && !shouldFetchGuest) {
@@ -147,7 +172,7 @@ export async function listCustomers(
           orderBy: { createdAt: 'desc' },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip,
       take: limit,
     });
@@ -186,7 +211,7 @@ export async function listCustomers(
         totalAmount: true,
         createdAt: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip,
       take: limit,
     });
@@ -210,7 +235,7 @@ export async function listCustomers(
       });
     }
   } else if (shouldFetchRegistered && shouldFetchGuest) {
-    // Both registered and guest: dual stream keyset/offset pagination
+    // Both registered and guest: dual stream offset pagination
     if (skip < countReg) {
       const takeReg = Math.min(limit, countReg - skip);
       const users = await prisma.user.findMany({
@@ -227,7 +252,7 @@ export async function listCustomers(
             orderBy: { createdAt: 'desc' },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip,
         take: takeReg,
       });
@@ -267,7 +292,7 @@ export async function listCustomers(
             totalAmount: true,
             createdAt: true,
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
           skip: 0,
           take: takeGuest,
         });
@@ -306,7 +331,7 @@ export async function listCustomers(
           totalAmount: true,
           createdAt: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         skip: guestSkip,
         take: limit,
       });
@@ -338,7 +363,13 @@ export async function listCustomers(
       page,
       limit,
       total,
-      totalPages: Math.ceil(total / limit) || 1,
+      totalPages,
+    },
+    summary: {
+      total,
+      registered: countReg,
+      guest: countGuest,
+      totalNonCancelled,
     },
   };
 }
@@ -357,7 +388,9 @@ export async function getAllCustomersForExport(
   const exportSnapshotTime = new Date();
   const all: CustomerSummaryDto[] = [];
 
-  const shouldIncludeRegistered = !filters.source || filters.source === 'ALL' || filters.source === 'REGISTERED';
+  const shouldIncludeRegistered =
+    (!filters.source || filters.source === 'ALL' || filters.source === 'REGISTERED') &&
+    filters.tier !== 'Khách vãng lai';
   const shouldIncludeGuests =
     (!filters.source || filters.source === 'ALL' || filters.source === 'GUEST_ORDER') &&
     (!filters.tier || filters.tier === 'ALL' || filters.tier === 'Khách vãng lai');
@@ -365,9 +398,10 @@ export async function getAllCustomersForExport(
   // Stream 1: Registered users with keyset pagination
   if (shouldIncludeRegistered) {
     const userWhere: Record<string, unknown> = {
+      role: 'USER',
       createdAt: { lte: exportSnapshotTime },
     };
-    if (filters.tier && filters.tier !== 'ALL') {
+    if (filters.tier && filters.tier !== 'ALL' && ['Vàng', 'Bạc', 'Mới'].includes(filters.tier)) {
       userWhere.tier = filters.tier;
     }
     if (filters.search?.trim()) {

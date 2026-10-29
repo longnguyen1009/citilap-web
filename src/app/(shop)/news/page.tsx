@@ -13,6 +13,7 @@ import { mediaEnvironment } from "@/server/media-http";
 import { publicPostList, listPostCategories } from "@/server/services/post.service";
 import { getPublishedHomepage, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { videoReviewsSectionDataSchema } from "@/contracts/cms/site-builder";
+import { DEFAULT_REVIEW_VIDEOS } from "@/contracts/cms/settings";
 import { businessProfile } from "@/config/business-profile";
 import NewsVideoSidebarWidget, { type SidebarVideoItem } from "@/components/news/NewsVideoSidebarWidget";
 
@@ -22,23 +23,7 @@ export const metadata = {
     "Tin tức công nghệ mới nhất, đánh giá laptop gaming, ultrabook, mẹo mua sắm và thủ thuật hữu ích từ CITILAP.VN.",
 };
 
-const DEFAULT_SIDEBAR_VIDEOS: SidebarVideoItem[] = [
-  {
-    title: "Đánh giá chi tiết Lenovo LOQ & Legion: Laptop Gaming quốc dân tầm giá 18 - 25 triệu",
-    url: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
-    thumbnail: "https://images.unsplash.com/photo-1603302576837-37561b2e2302?q=80&w=640&auto=format&fit=crop",
-  },
-  {
-    title: "Kinh nghiệm kiểm tra Laptop Like New 99% nguyên bản trước khi xuống tiền",
-    url: "https://www.youtube.com/watch?v=ysz5S6PUM-U",
-    thumbnail: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=640&auto=format&fit=crop",
-  },
-  {
-    title: "So sánh MacBook Air M2/M3 và Ultrabook Windows mỏng nhẹ cho dân văn phòng",
-    url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-    thumbnail: "https://images.unsplash.com/photo-1541807084-5c52b6b3adef?q=80&w=640&auto=format&fit=crop",
-  },
-];
+const DEFAULT_SIDEBAR_VIDEOS: SidebarVideoItem[] = DEFAULT_REVIEW_VIDEOS;
 
 const HOT_TOPICS = [
   { label: "#laptop-gaming", href: "/laptop-gaming" },
@@ -102,17 +87,32 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
     limit: 10,
   });
 
-  // Extract videos from CMS Homepage video_reviews block if configured
-  let sidebarVideos: SidebarVideoItem[] = DEFAULT_SIDEBAR_VIDEOS;
+  // Extract videos from Settings or CMS Homepage video_reviews block
+  let sidebarVideos: SidebarVideoItem[] =
+    settings?.reviewVideos && settings.reviewVideos.length > 0
+      ? settings.reviewVideos
+      : DEFAULT_SIDEBAR_VIDEOS;
   const videoSec = cmsHomepage?.sections?.find((s) => s.type === "video_reviews" && s.enabled);
   if (videoSec) {
     const parsedVideoSec = videoReviewsSectionDataSchema.safeParse(videoSec.data);
     if (parsedVideoSec.success && parsedVideoSec.data.videos.length > 0) {
-      sidebarVideos = parsedVideoSec.data.videos;
+      const cleanCms = parsedVideoSec.data.videos.filter(
+        (v) => !/cellphones/i.test(v.title) && !/cellphones/i.test(v.url)
+      );
+      if (cleanCms.length > 0) {
+        const merged = new Map<string, SidebarVideoItem>();
+        for (const v of [...cleanCms, ...sidebarVideos]) {
+          if (v?.url && !merged.has(v.url)) merged.set(v.url, v);
+        }
+        sidebarVideos = Array.from(merged.values());
+      }
     }
   }
 
-  const youtubeUrl = settings?.youtubeUrl || "https://www.youtube.com/@CellphoneSOfficial";
+  const youtubeUrl =
+    settings?.youtubeUrl && !/cellphones/i.test(settings.youtubeUrl)
+      ? settings.youtubeUrl
+      : businessProfile.socialProfiles.youtube || "https://www.youtube.com/@thinkview/videos";
   const tiktokUrl = settings?.tiktokUrl || businessProfile.socialProfiles.tiktok;
   const customPromo = settings?.productBanners?.[0];
   const topPromoBanner = {
@@ -151,6 +151,15 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
       </div>
 
       <div className="container mx-auto px-4 max-w-[1370px]">
+        <div className="mb-4">
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            {activeCategory ? `Chuyên mục: ${activeCategory.name}` : "Tin tức & Đánh giá Công nghệ"}
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Đánh giá chi tiết laptop gaming, ultrabook, tư vấn cấu hình và kinh nghiệm sử dụng từ đội ngũ CitiLap.
+          </p>
+        </div>
+
         {/* Categories Filter Bar */}
         <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
           <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-1">
@@ -189,7 +198,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
         {/* 2-COLUMN MAIN CONTENT */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT COLUMN (8 cols): VERTICAL ARTICLE FEED */}
-          <main className="lg:col-span-8 min-w-0">
+          <div className="lg:col-span-8 min-w-0">
             {items.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-200/80 p-12 text-center">
                 <Newspaper className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -347,7 +356,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                 )}
               </div>
             )}
-          </main>
+          </div>
 
           {/* RIGHT SIDEBAR (4 cols): BANNERS, HOT TAGS & VIDEO REVIEWS */}
           <aside className="lg:col-span-4 space-y-6 lg:sticky lg:top-24">

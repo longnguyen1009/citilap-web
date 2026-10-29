@@ -8,6 +8,9 @@ export default defineConfig({
   // Vinext's client-reference analysis runs outside the Workers environment.
   // Preserve the runtime binding module until the final Worker executes it.
   build: { rollupOptions: { external: ['cloudflare:workers'] } },
+  optimizeDeps: {
+    exclude: ['lucide-react'],
+  },
   plugins: [
     tailwindcss(),
     vinext({ images: { optimizer: imagesOptimizer() } }),

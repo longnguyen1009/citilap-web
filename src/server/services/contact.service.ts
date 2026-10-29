@@ -196,17 +196,13 @@ export async function listContactSubmissions(
   d1Database?: D1Database
 ) {
   const prisma = getPrismaClient(d1Database);
-  const page = Math.max(1, options.page || 1);
+  const requestedPage = Math.max(1, options.page || 1);
   const limit = Math.min(100, Math.max(1, options.limit || 20));
-  const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = {};
-  if (options.status && options.status !== 'ALL') {
-    where.status = options.status.toUpperCase();
-  }
+  const searchWhere: Record<string, unknown> = {};
   if (options.search && options.search.trim()) {
     const s = options.search.trim();
-    where.OR = [
+    searchWhere.OR = [
       { name: { contains: s } },
       { phone: { contains: s } },
       { email: { contains: s } },
@@ -214,16 +210,32 @@ export async function listContactSubmissions(
     ];
   }
 
-  const [total, contacts] = await Promise.all([
+  const where: Record<string, unknown> = { ...searchWhere };
+  if (options.status && options.status !== 'ALL') {
+    where.status = options.status.toUpperCase();
+  }
+
+  const pendingWhere: Record<string, unknown> = {
+    ...searchWhere,
+    status: 'PENDING',
+  };
+
+  const [total, pendingCount] = await Promise.all([
     prisma.contactSubmission.count({ where }),
-    prisma.contactSubmission.findMany({
-      where,
-      include: { events: { orderBy: { createdAt: 'desc' } } },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-    }),
+    prisma.contactSubmission.count({ where: pendingWhere }),
   ]);
+
+  const totalPages = Math.ceil(total / limit) || 1;
+  const page = Math.min(requestedPage, totalPages);
+  const skip = (page - 1) * limit;
+
+  const contacts = await prisma.contactSubmission.findMany({
+    where,
+    include: { events: { orderBy: { createdAt: 'desc' } } },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    skip,
+    take: limit,
+  });
 
   return {
     contacts,
@@ -231,7 +243,8 @@ export async function listContactSubmissions(
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit) || 1,
+      totalPages,
+      pendingCount,
     },
   };
 }
@@ -491,5 +504,92 @@ export async function getContactSubmissionById(id: string, d1Database?: D1Databa
     where: { id },
     include: { events: { orderBy: { createdAt: 'desc' } } },
   });
+}
+
+export interface ApprovedProductReview {
+  id: string;
+  reviewerName: string;
+  rating: number;
+  productName: string;
+  comment: string;
+  createdAt: string;
+  verifiedLabel?: string;
+  variantLabel?: string;
+}
+
+function normalizeProductTitleForReviewMatch(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/^\[[^\]]+\]\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export async function listApprovedProductReviews(
+  productNames: string[],
+  d1Database?: D1Database
+): Promise<ApprovedProductReview[]> {
+  try {
+    const prisma = getPrismaClient(d1Database);
+    const submissions = await prisma.contactSubmission.findMany({
+      where: {
+        status: 'HANDLED',
+        message: {
+          startsWith: '[Đánh giá',
+        },
+      },
+      orderBy: [{ handledAt: 'desc' }, { createdAt: 'desc' }],
+      take: 100,
+    });
+
+    const normalizedTargets = productNames
+      .map((name) => normalizeProductTitleForReviewMatch(name || ''))
+      .filter((name) => name.length >= 3);
+
+    const matched: ApprovedProductReview[] = [];
+
+    for (const row of submissions) {
+      if (!row.message) continue;
+      const match = row.message.match(
+        /^\[Đánh giá\s*(\d)\s*⭐\s*sản phẩm:\s*(.+?)\]\s*:\s*([\s\S]+)$/i
+      );
+      if (!match) continue;
+
+      const rating = Math.min(5, Math.max(1, Number(match[1]) || 5));
+      const rawProductName = match[2].trim();
+      const comment = match[3].trim();
+      if (!comment) continue;
+
+      const normalizedReviewProduct = normalizeProductTitleForReviewMatch(rawProductName);
+      const isMatch =
+        normalizedTargets.length === 0 ||
+        normalizedTargets.some(
+          (target) =>
+            target === normalizedReviewProduct ||
+            (target.length >= 5 && normalizedReviewProduct.includes(target)) ||
+            (normalizedReviewProduct.length >= 5 && target.includes(normalizedReviewProduct))
+        );
+
+      if (isMatch) {
+        matched.push({
+          id: row.id,
+          reviewerName: row.name,
+          rating,
+          productName: rawProductName,
+          comment,
+          createdAt:
+            row.createdAt instanceof Date
+              ? row.createdAt.toISOString()
+              : String(row.createdAt),
+          verifiedLabel: 'Đã mua tại CitiLap',
+        });
+      }
+    }
+
+    return matched;
+  } catch (err) {
+    console.error('[ContactService] Failed to list approved product reviews:', err);
+    return [];
+  }
 }
 

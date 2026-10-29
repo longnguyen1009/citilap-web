@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function OrderTrackingPage() {
   return (
-    <main className="min-h-[75vh] bg-slate-50 py-8 sm:py-10">
+    <div className="min-h-[75vh] bg-slate-50 py-8 sm:py-10">
       <div className="container mx-auto max-w-[1370px] px-4 space-y-5">
         <div>
           <nav aria-label="Đường dẫn" className="text-xs text-slate-500 mb-2">
@@ -36,6 +36,6 @@ export default function OrderTrackingPage() {
           <OrderTrackingPortal />
         </Suspense>
       </div>
-    </main>
+    </div>
   );
 }

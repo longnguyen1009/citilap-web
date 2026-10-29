@@ -16,27 +16,26 @@ export default async function ShopLayout({
   children: React.ReactNode;
 }) {
   await connection();
-  let categories: Awaited<ReturnType<typeof getActiveCategories>> = [];
-  let brands: Awaited<ReturnType<typeof getActiveBrands>> = [];
-  const [navigation, settings] = await Promise.all([
-    getPublishedNavigation(),
-    getStorefrontSettings(),
-  ]);
   // eslint-disable-next-line react-hooks/purity -- request-time server clock schedules public campaign refresh
   const serverTime=Date.now();
   const {DB}=await mediaEnvironment();
-  const boundary=await DB.prepare("SELECT min(boundary) AS nextChange FROM (SELECT startAt AS boundary FROM PromotionCampaign WHERE status='PUBLISHED' UNION ALL SELECT endAt FROM PromotionCampaign WHERE status='PUBLISHED') WHERE boundary>?").bind(new Date(serverTime).toISOString()).first<{nextChange:string|null}>();
+  const [navigation, settings, boundary, categories, brands] = await Promise.all([
+    getPublishedNavigation(),
+    getStorefrontSettings(),
+    DB.prepare("SELECT min(boundary) AS nextChange FROM (SELECT startAt AS boundary FROM PromotionCampaign WHERE status='PUBLISHED' UNION ALL SELECT endAt FROM PromotionCampaign WHERE status='PUBLISHED') WHERE boundary>?")
+      .bind(new Date(serverTime).toISOString())
+      .first<{nextChange:string|null}>(),
+    getActiveCategories().catch((err) => {
+      console.error("[ShopLayout] Failed to load categories from D1:", err);
+      return [] as Awaited<ReturnType<typeof getActiveCategories>>;
+    }),
+    getActiveBrands().catch((err) => {
+      console.error("[ShopLayout] Failed to load brands from D1:", err);
+      return [] as Awaited<ReturnType<typeof getActiveBrands>>;
+    }),
+  ]);
   const times=[boundary?.nextChange,settings?.flashSaleEnabled?settings.flashSaleStartAt:null,settings?.flashSaleEnabled?settings.flashSaleEndAt:null]
     .filter((value):value is string=>!!value).map(Date.parse).filter(time=>time>serverTime);
-
-  try {
-    [categories, brands] = await Promise.all([
-      getActiveCategories(),
-      getActiveBrands(),
-    ]);
-  } catch (err) {
-    console.error("[ShopLayout] Failed to load categories or brands from D1:", err);
-  }
 
   return (
     <StorefrontProviders><div className="flex flex-col min-h-screen">

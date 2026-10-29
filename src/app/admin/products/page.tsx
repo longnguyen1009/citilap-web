@@ -49,6 +49,8 @@ interface CatalogItem {
   category: { id: string; name: string; slug?: string } | null;
   brand: string;
   image: string;
+  stock?: number;
+  availableSerialsCount?: number;
   updatedAt: string;
   hasStudio: boolean;
 }
@@ -485,6 +487,7 @@ export default function UnifiedProductsPage() {
                   <th scope="col">Sản phẩm</th>
                   <th scope="col">Danh mục</th>
                   <th scope="col" className="text-right">Giá bán</th>
+                  <th scope="col" className="text-center">Tồn kho / QC</th>
                   <th scope="col" className="text-center">Trạng thái</th>
                   <th scope="col" className="text-right">Cập nhật</th>
                   <th scope="col" className="text-right"></th>
@@ -557,6 +560,32 @@ export default function UnifiedProductsPage() {
                             Web: {money(item.publicPrice)}
                           </div>
                         )}
+                      </td>
+
+                      {/* 3.5. Stock & Serial Units */}
+                      <td className="text-center whitespace-nowrap">
+                        <div className="inline-flex flex-col items-center gap-0.5">
+                          <span
+                            className={`text-xs font-bold tabular-nums ${
+                              (item.stock ?? 0) === 0
+                                ? "text-rose-600"
+                                : (item.stock ?? 0) <= 2
+                                ? "text-amber-700"
+                                : "text-slate-800"
+                            }`}
+                          >
+                            Tồn: {item.stock ?? 0}
+                          </span>
+                          {(item.availableSerialsCount ?? 0) > 0 && (
+                            <Link
+                              href="/admin/inventory"
+                              className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 hover:underline"
+                              title="Xem danh sách Serial & Hồ sơ QC tại Kho"
+                            >
+                              {item.availableSerialsCount} Serial QC
+                            </Link>
+                          )}
+                        </div>
                       </td>
 
                       {/* 4. Combined Status (Publication + Availability) */}

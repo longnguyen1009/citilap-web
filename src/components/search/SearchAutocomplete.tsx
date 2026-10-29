@@ -5,9 +5,19 @@ import { useState, useRef, useEffect, useCallback, FormEvent, KeyboardEvent } fr
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, X, Loader2, ArrowRight, Laptop, Tag, Grid3X3 } from "lucide-react";
+import { Search, X, Loader2, ArrowRight, Laptop, Tag, Grid3X3, Clock, Flame } from "lucide-react";
 import PriceTag from "@/components/ui/PriceTag";
 import type { SearchSuggestionItem, SearchSuggestionsResult } from "@/server/services/search.service";
+
+const RECENT_SEARCHES_KEY = "citilap_recent_searches_v1";
+const TRENDING_KEYWORDS = [
+  "RTX 4060",
+  "Lenovo Legion",
+  "ThinkPad X1",
+  "MacBook Air M3",
+  "Asus Zenbook",
+  "RAM DDR5",
+];
 
 export interface SearchAutocompleteProps {
   initialQuery?: string;
@@ -43,6 +53,8 @@ export default function SearchAutocomplete({
   const [categorySuggestions, setCategorySuggestions] = useState<Array<{ id: string; name: string; slug: string; href?: string }>>([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [showDiscovery, setShowDiscovery] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +74,15 @@ export default function SearchAutocomplete({
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 640);
     checkMobile();
+    try {
+      const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setRecentSearches(parsed.slice(0, 6));
+      }
+    } catch {
+      // ignore
+    }
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
@@ -147,6 +168,7 @@ export default function SearchAutocomplete({
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setShowDiscovery(false);
         setActiveIndex(-1);
       }
     }
@@ -157,15 +179,16 @@ export default function SearchAutocomplete({
   // Handle Escape and outside focus
   useEffect(() => {
     function handleKeyDown(e: globalThis.KeyboardEvent) {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape" && (isOpen || showDiscovery)) {
         setIsOpen(false);
+        setShowDiscovery(false);
         setActiveIndex(-1);
         inputRef.current?.focus();
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
+  }, [isOpen, showDiscovery]);
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -178,8 +201,18 @@ export default function SearchAutocomplete({
   // Handle Form Submit
   const executeSearch = (targetQuery: string) => {
     setIsOpen(false);
+    setShowDiscovery(false);
     setActiveIndex(-1);
     const finalQ = targetQuery.trim();
+    if (finalQ) {
+      try {
+        const nextRecent = [finalQ, ...recentSearches.filter((k) => k.toLowerCase() !== finalQ.toLowerCase())].slice(0, 6);
+        setRecentSearches(nextRecent);
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(nextRecent));
+      } catch {
+        // ignore
+      }
+    }
     if (onSubmitQuery) {
       onSubmitQuery(finalQ);
     } else {
@@ -294,6 +327,9 @@ export default function SearchAutocomplete({
           onFocus={() => {
             if (query.trim().length >= 2 && suggestions.length > 0) {
               setIsOpen(true);
+              setShowDiscovery(false);
+            } else if (query.trim().length < 2) {
+              setShowDiscovery(true);
             }
           }}
           onKeyDown={handleKeyDown}
@@ -308,6 +344,7 @@ export default function SearchAutocomplete({
           aria-controls="search-suggestions-dropdown"
           aria-activedescendant={activeIndex >= 0 ? `suggestion-item-${activeIndex}` : undefined}
           aria-label="Tìm kiếm sản phẩm"
+          suppressHydrationWarning
           className={`w-full bg-white rounded-lg border border-gray-200 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition shadow-xs ${sizeStyles} ${inputClassName}`}
         />
 
@@ -337,6 +374,78 @@ export default function SearchAutocomplete({
           </button>
         </div>
       </form>
+
+      {/* Empty-query Discovery Dropdown: Recent Searches & Trending Keywords */}
+      {showDiscovery && !isOpen && query.trim().length < 2 && (
+        <div
+          role="region"
+          aria-label="Từ khóa xu hướng và tìm kiếm gần đây"
+          className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-2xl border border-gray-200/90 z-50 overflow-hidden p-3.5 space-y-3.5 animate-in fade-in slide-in-from-top-1 duration-150"
+        >
+          {recentSearches.length > 0 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Tìm kiếm gần đây</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecentSearches([]);
+                    try {
+                      localStorage.removeItem(RECENT_SEARCHES_KEY);
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                  className="text-[11px] text-rose-600 hover:underline font-semibold cursor-pointer"
+                >
+                  Xóa lịch sử
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {recentSearches.map((kw) => (
+                  <button
+                    key={kw}
+                    type="button"
+                    onClick={() => {
+                      setQuery(kw);
+                      executeSearch(kw);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 text-xs font-medium transition cursor-pointer"
+                  >
+                    <Clock className="w-3 h-3 text-slate-400" />
+                    <span>{kw}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
+              <Flame className="w-3.5 h-3.5 text-rose-500" />
+              <span>Từ khóa xu hướng</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {TRENDING_KEYWORDS.map((kw) => (
+                <button
+                  key={kw}
+                  type="button"
+                  onClick={() => {
+                    setQuery(kw);
+                    executeSearch(kw);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-50/70 hover:bg-rose-100 border border-rose-200/70 text-rose-700 text-xs font-semibold transition cursor-pointer"
+                >
+                  <span>#{kw}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Autocomplete Dropdown List */}
       {isOpen && (

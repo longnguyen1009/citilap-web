@@ -13,6 +13,10 @@ export default function CustomerGallery({ title, images }: { title: string; imag
   const [selected, setSelected] = useState<GalleryImage | null>(null);
   const [bounds, setBounds] = useState({ start: true, end: false });
 
+  // Render exactly what admin configured (skip only empty URLs) so the storefront
+  // count always matches the Site Builder list. Duplicates are flagged in admin instead.
+  const uniqueImages = images.filter((img) => Boolean(img?.url?.trim()));
+
   useEffect(() => {
     const el = rail.current;
     if (!el) return;
@@ -67,7 +71,7 @@ export default function CustomerGallery({ title, images }: { title: string; imag
             aria-label="Ảnh khách hàng, cuộn ngang để xem thêm"
             className="flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto overscroll-x-contain hide-scrollbar p-1 scroll-smooth motion-reduce:scroll-auto rounded-xl focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 focus-visible:outline-hidden"
           >
-            {images.map((image, index) => (
+            {uniqueImages.map((image, index) => (
               <button
                 key={`${image.url}-${index}`}
                 type="button"
@@ -79,7 +83,7 @@ export default function CustomerGallery({ title, images }: { title: string; imag
               </button>
             ))}
           </div>
-          {images.length > 1 && <>
+          {uniqueImages.length > 1 && <>
             <button
               type="button"
               aria-label="Cuộn ảnh về trước"
@@ -104,9 +108,19 @@ export default function CustomerGallery({ title, images }: { title: string; imag
     </div>
     <dialog
       ref={dialog}
+      {...({ closedby: 'any' } as Record<string, string>)}
       aria-label={selected?.alt || title}
       onClose={() => { setSelected(null); triggerRef.current?.focus(); }}
-      onClick={event => { if (event.target === event.currentTarget) close(); }}
+      onClick={event => {
+        if (event.target !== event.currentTarget || !dialog.current) return;
+        const rect = dialog.current.getBoundingClientRect();
+        const inBox =
+          rect.top <= event.clientY &&
+          event.clientY <= rect.top + rect.height &&
+          rect.left <= event.clientX &&
+          event.clientX <= rect.left + rect.width;
+        if (!inBox) close();
+      }}
       className="fixed inset-0 m-auto max-h-[94dvh] w-[min(1100px,94vw)] max-w-none overflow-auto rounded-xl bg-slate-950 p-4 text-white backdrop:bg-black/80"
     >
       <div className="mb-3 flex items-center justify-between gap-4">

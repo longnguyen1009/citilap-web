@@ -99,7 +99,15 @@ export default function BlockRenderer({
           case 'cta':
             return <CtaBlock key={section.id} data={section.data} />;
           case 'video_reviews':
-            return <VideoReviews key={section.id} {...videoReviewsSectionDataSchema.parse(section.data)} />;
+            return (
+              <VideoReviews
+                key={section.id}
+                {...videoReviewsSectionDataSchema.parse(section.data)}
+                fallbackVideos={settings?.reviewVideos}
+                youtubeChannelUrl={settings?.youtubeUrl}
+                tiktokChannelUrl={settings?.tiktokUrl}
+              />
+            );
           case 'customer_gallery': {
             const data = customerGallerySectionDataSchema.parse(section.data);
             return <CustomerGallery key={section.id} title={data.title} images={data.images} />;

@@ -116,7 +116,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
       <div className="container mx-auto px-4 max-w-[1370px]">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           {/* Main Article Content (8 cols) */}
-          <main className="lg:col-span-8">
+          <div className="lg:col-span-8">
             <article className="bg-white rounded-3xl border border-gray-200/90 shadow-2xs p-6 sm:p-10 md:p-12">
               {/* Category & Date */}
               <div className="flex flex-wrap items-center gap-3 text-xs mb-4">
@@ -219,7 +219,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
                 </div>
               </section>
             )}
-          </main>
+          </div>
 
           {/* Right Sidebar (4 cols) */}
           <aside className="lg:col-span-4 space-y-6">

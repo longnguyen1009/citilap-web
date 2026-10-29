@@ -127,11 +127,11 @@ export default async function BrandPage({ params }: BrandPageProps) {
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 pt-2 text-xs text-slate-500">
                 <span className="inline-flex items-center gap-1">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  Bảo hành chính hãng 12-24 tháng
+                  Bảo hành theo gói 3 – 12 tháng
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Laptop className="w-3.5 h-3.5 text-blue-600" />
-                  Bao test 1 đổi 1 trong 15 ngày
+                  Lỗi 1 đổi 1 trong 7 ngày đầu tiên
                 </span>
               </div>
             </div>

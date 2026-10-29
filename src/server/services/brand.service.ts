@@ -39,6 +39,14 @@ export interface BrandListOptions {
   limit?: number;
 }
 
+function normalizeBrandLogo(logo: unknown): string | null {
+  if (!logo) return null;
+  const s = String(logo).trim();
+  if (!s) return null;
+  if (s.startsWith('/') || s.startsWith('http://') || s.startsWith('https://')) return s;
+  return `/${s}`;
+}
+
 /**
  * List brands with product count from Cloudflare D1.
  */
@@ -91,7 +99,7 @@ export async function listBrands(
     id: String(r.id),
     name: String(r.name),
     slug: String(r.slug),
-    logo: r.logo ? String(r.logo) : null,
+    logo: normalizeBrandLogo(r.logo),
     description: r.description ? String(r.description) : null,
     seoTitle: r.seoTitle ? String(r.seoTitle) : null,
     seoDescription: r.seoDescription ? String(r.seoDescription) : null,
@@ -136,7 +144,7 @@ export async function getBrandDetail(db: D1Database, idOrSlug: string): Promise<
     id: String(row.id),
     name: String(row.name),
     slug: String(row.slug),
-    logo: row.logo ? String(row.logo) : null,
+    logo: normalizeBrandLogo(row.logo),
     description: row.description ? String(row.description) : null,
     seoTitle: row.seoTitle ? String(row.seoTitle) : null,
     seoDescription: row.seoDescription ? String(row.seoDescription) : null,

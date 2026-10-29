@@ -19,12 +19,35 @@ import {
   XCircle,
   RotateCcw,
   ExternalLink,
+  Printer,
+  CreditCard,
 } from "lucide-react";
 import Image from "next/image";
 import { StatusBadge, InlineAlert } from "@/components/admin/ui";
 
+type AvailableSerial = {
+  id: string;
+  productId: string;
+  serialNumber: string;
+  status: string;
+  condition: string;
+  warrantyMonths: number;
+  warehouseName: string | null;
+  publicCode: string | null;
+};
+
 type OrderItem = {
   id: string;
+  productId: string;
+  serialUnitId?: string | null;
+  serialUnit?: {
+    id: string;
+    serialNumber: string;
+    status: string;
+    condition: string;
+    warrantyMonths: number;
+    warehouse?: { id: string; name: string; code: string } | null;
+  } | null;
   quantity: number;
   price: number;
   priceSnapshot?: number | null;
@@ -80,6 +103,7 @@ type OrderDetail = {
   paymentStatus?: string | null;
   note: string | null;
   items: OrderItem[];
+  availableSerials?: AvailableSerial[];
   events: OrderEvent[];
   internalNotes: OrderNote[];
 };
@@ -109,6 +133,9 @@ export default function OrderDetailPage({
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState(false);
   const [addingNote, setAddingNote] = useState(false);
+  const [updatingBilling, setUpdatingBilling] = useState(false);
+  const [shippingFeeDraft, setShippingFeeDraft] = useState<string>("");
+  const [editingShipping, setEditingShipping] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
@@ -249,6 +276,76 @@ export default function OrderDetailPage({
     }
   };
 
+  const handleUpdateBilling = async (payload: { paymentStatus?: string; shippingFee?: number }) => {
+    if (!order || updatingBilling) return;
+    setUpdatingBilling(true);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/orders/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "UPDATE_BILLING",
+          ...payload,
+        }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success && result.data) {
+        setOrder(result.data);
+        setEditingShipping(false);
+        setFeedback({
+          type: "success",
+          text: "Đã cập nhật thông tin thanh toán / phí vận chuyển.",
+        });
+      } else {
+        setFeedback({
+          type: "error",
+          text: result?.error || "Không thể cập nhật thông tin thanh toán.",
+        });
+      }
+    } catch {
+      setFeedback({ type: "error", text: "Lỗi kết nối khi cập nhật thanh toán." });
+    } finally {
+      setUpdatingBilling(false);
+    }
+  };
+
+  const handleAssignSerial = async (orderItemId: string, serialUnitId: string) => {
+    if (!order || updatingBilling) return;
+    setUpdatingBilling(true);
+    setFeedback(null);
+    try {
+      const response = await fetch(`/api/orders/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ASSIGN_SERIAL",
+          orderItemId,
+          serialUnitId: serialUnitId || null,
+        }),
+      });
+      const result = await response.json();
+      if (response.ok && result.success && result.data) {
+        setOrder(result.data);
+        setFeedback({
+          type: "success",
+          text: serialUnitId
+            ? "Đã gán Serial máy & Hồ sơ kiểm định vào đơn hàng."
+            : "Đã gỡ gán Serial máy khỏi dòng sản phẩm.",
+        });
+      } else {
+        setFeedback({
+          type: "error",
+          text: result?.error || "Không thể gán Serial cho sản phẩm.",
+        });
+      }
+    } catch {
+      setFeedback({ type: "error", text: "Lỗi kết nối khi gán Serial." });
+    } finally {
+      setUpdatingBilling(false);
+    }
+  };
+
   const handleAddInternalNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNoteContent.trim() || addingNote) return;
@@ -339,7 +436,16 @@ export default function OrderDetailPage({
         </div>
 
         {/* Transition Action Buttons */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap print:hidden">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-1.5 px-2.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5"
+            title="In phiếu giao hàng & bảo hành"
+          >
+            <Printer className="w-3.5 h-3.5 text-slate-600" />
+            <span>In phiếu BH</span>
+          </button>
           {(currentStatus === "NEW" || currentStatus === "PENDING") && (
             <>
               <button
@@ -562,6 +668,54 @@ export default function OrderDetailPage({
                           • {unitPrice.toLocaleString("vi-VN")}đ × <strong>{item.quantity}</strong>
                         </span>
                       </div>
+
+                      {/* Serial & Public Code Assignment */}
+                      <div className="mt-2 flex flex-wrap items-center gap-2 print:hidden">
+                        {(() => {
+                          const productSerials = (order.availableSerials || []).filter(
+                            (su) => su.productId === item.productId
+                          );
+                          const assignedInfo = productSerials.find(
+                            (su) => su.id === item.serialUnitId
+                          );
+                          return (
+                            <>
+                              <label className="text-[11px] font-semibold text-slate-600">
+                                Gán máy (Serial / QC):
+                              </label>
+                              <select
+                                aria-label={`Chọn Serial cho ${itemName}`}
+                                disabled={updatingBilling}
+                                value={item.serialUnitId || ""}
+                                onChange={(e) => void handleAssignSerial(item.id, e.target.value)}
+                                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-800 focus:border-blue-500 focus:outline-none cursor-pointer"
+                              >
+                                <option value="">
+                                  {productSerials.length > 0
+                                    ? `-- Chọn Serial (${productSerials.length} máy sẵn kho) --`
+                                    : "-- Sản phẩm quản lý theo số lượng (không cần Serial) --"}
+                                </option>
+                                {productSerials.map((su) => (
+                                  <option key={su.id} value={su.id}>
+                                    SN: {su.serialNumber}
+                                    {su.publicCode ? ` · QC: ${su.publicCode}` : ""}
+                                    {su.warehouseName ? ` (${su.warehouseName})` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                              {assignedInfo?.publicCode && (
+                                <Link
+                                  href={`/order-tracking?code=${encodeURIComponent(assignedInfo.publicCode)}`}
+                                  target="_blank"
+                                  className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono text-[10px] font-bold hover:underline"
+                                >
+                                  Hồ sơ QC: #{assignedInfo.publicCode} ↗
+                                </Link>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
 
                     <div className="text-right shrink-0 tabular-nums">
@@ -686,18 +840,101 @@ export default function OrderDetailPage({
               </div>
             )}
 
-            <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-slate-600">
+            <div className="pt-2.5 border-t border-slate-100 space-y-2 text-slate-600">
               <div className="flex justify-between items-center">
                 <span className="flex items-center gap-1 text-slate-500">
-                  <Truck className="w-3 h-3" /> Thanh toán:
+                  <CreditCard className="w-3 h-3" /> Phương thức:
                 </span>
-                <strong className="text-slate-900">{order.paymentMethod || "COD"}</strong>
+                <strong className="text-slate-900">
+                  {order.paymentMethod === "BANK_TRANSFER"
+                    ? "Chuyển khoản VietQR"
+                    : order.paymentMethod === "COD" || !order.paymentMethod
+                    ? "Thanh toán khi nhận hàng (COD)"
+                    : order.paymentMethod}
+                </strong>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">Thu hộ:</span>
-                <span className="text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200 text-[11px]">
-                  Thu tiền khi nhận máy
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-slate-500">Trạng thái thu tiền:</span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`font-semibold px-2 py-0.5 rounded border text-[11px] ${
+                      order.paymentStatus === "PAID"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : "bg-amber-50 text-amber-800 border-amber-200"
+                    }`}
+                  >
+                    {order.paymentStatus === "PAID"
+                      ? "Đã thanh toán"
+                      : order.paymentMethod === "BANK_TRANSFER"
+                      ? "Chờ xác nhận CK"
+                      : "Thu tiền khi nhận máy"}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={updatingBilling}
+                    onClick={() =>
+                      void handleUpdateBilling({
+                        paymentStatus: order.paymentStatus === "PAID" ? "PENDING" : "PAID",
+                      })
+                    }
+                    className="text-[11px] font-bold text-blue-600 hover:underline disabled:opacity-50 cursor-pointer print:hidden"
+                  >
+                    {order.paymentStatus === "PAID" ? "Đánh dấu chưa thu" : "Xác nhận đã thu"}
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-between items-center gap-2 pt-1">
+                <span className="flex items-center gap-1 text-slate-500">
+                  <Truck className="w-3 h-3" /> Phí giao hàng:
                 </span>
+                {editingShipping ? (
+                  <div className="flex items-center gap-1 print:hidden">
+                    <input
+                      type="number"
+                      min={0}
+                      step={1000}
+                      value={shippingFeeDraft}
+                      onChange={(e) => setShippingFeeDraft(e.target.value)}
+                      className="w-24 px-2 py-1 border border-slate-300 rounded text-xs font-mono text-right"
+                    />
+                    <button
+                      type="button"
+                      disabled={updatingBilling}
+                      onClick={() => {
+                        const parsed = parseInt(shippingFeeDraft || "0", 10);
+                        if (!isNaN(parsed) && parsed >= 0) {
+                          void handleUpdateBilling({ shippingFee: parsed });
+                        }
+                      }}
+                      className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-bold cursor-pointer"
+                    >
+                      Lưu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingShipping(false)}
+                      className="px-1.5 py-1 text-slate-500 hover:text-slate-700 text-[11px] cursor-pointer"
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <strong className="text-slate-900">
+                      {order.shippingFee === 0 ? "Miễn phí / Xác nhận sau" : `${order.shippingFee.toLocaleString("vi-VN")}đ`}
+                    </strong>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShippingFeeDraft(String(order.shippingFee || 0));
+                        setEditingShipping(true);
+                      }}
+                      className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer print:hidden"
+                    >
+                      Sửa phí
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -734,6 +971,86 @@ export default function OrderDetailPage({
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Print-only Warranty & Delivery Slip */}
+      <div className="hidden print:block bg-white p-6 border border-slate-300 rounded-xl text-xs text-slate-900 space-y-4">
+        <div className="flex justify-between items-start border-b border-slate-300 pb-3">
+          <div>
+            <div className="text-lg font-black uppercase tracking-wider">CITILAP.VN — HỆ THỐNG LAPTOP TUYỂN CHỌN</div>
+            <div className="text-[11px] text-slate-600">
+              Showroom HN: Số 23/40 Tạ Quang Bửu, Bạch Mai, Hà Nội | Showroom BN: Số 40 Trần Hưng Đạo, TP. Bắc Ninh
+            </div>
+            <div className="text-[11px] text-slate-600">Hotline bảo hành &amp; kỹ thuật: 0988.343.005 — Website: https://citilap.vn</div>
+          </div>
+          <div className="text-right">
+            <div className="font-bold text-sm">PHIẾU GIAO HÀNG &amp; BẢO HÀNH</div>
+            <div className="font-mono">Mã đơn: #{order.orderNumber || order.id}</div>
+            <div>Ngày lập: {new Date(order.createdAt).toLocaleString("vi-VN")}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <div><strong>Khách hàng:</strong> {order.customerName}</div>
+            <div><strong>Điện thoại:</strong> {order.customerPhone}</div>
+            <div><strong>Địa chỉ nhận:</strong> {order.shippingAddress || "Nhận tại Showroom CitiLap"}</div>
+          </div>
+          <div>
+            <div><strong>Phương thức thanh toán:</strong> {order.paymentMethod === "BANK_TRANSFER" ? "Chuyển khoản VietQR" : "COD"}</div>
+            <div><strong>Trạng thái thanh toán:</strong> {order.paymentStatus === "PAID" ? "Đã thanh toán" : "Thu tiền khi giao"}</div>
+            <div><strong>Tổng thanh toán:</strong> <span className="font-bold">{order.totalAmount.toLocaleString("vi-VN")}đ</span></div>
+          </div>
+        </div>
+        <table className="w-full border-collapse border border-slate-300 text-[11px]">
+          <thead>
+            <tr className="bg-slate-100">
+              <th className="border border-slate-300 px-2.5 py-1.5 text-left">Sản phẩm / Cấu hình</th>
+              <th className="border border-slate-300 px-2.5 py-1.5 text-left">Serial / Mã Kiểm định (QC)</th>
+              <th className="border border-slate-300 px-2.5 py-1.5 text-center">SL</th>
+              <th className="border border-slate-300 px-2.5 py-1.5 text-right">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.items.map((it) => {
+              const assignedSu = (order.availableSerials || []).find((s) => s.id === it.serialUnitId);
+              const sn = assignedSu?.serialNumber || it.serialUnit?.serialNumber || "Theo tem bảo hành";
+              const qcCode = assignedSu?.publicCode;
+              return (
+                <tr key={it.id}>
+                  <td className="border border-slate-300 px-2.5 py-1.5 font-semibold">
+                    {it.productNameSnapshot || it.productName || "Sản phẩm"}
+                    {it.variantNameSnapshot ? ` (${it.variantNameSnapshot})` : ""}
+                  </td>
+                  <td className="border border-slate-300 px-2.5 py-1.5 font-mono">
+                    SN: {sn}
+                    {qcCode ? ` · QC: #${qcCode}` : ""}
+                  </td>
+                  <td className="border border-slate-300 px-2.5 py-1.5 text-center">{it.quantity}</td>
+                  <td className="border border-slate-300 px-2.5 py-1.5 text-right font-bold">
+                    {it.lineTotal.toLocaleString("vi-VN")}đ
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="border-t border-slate-300 pt-3 text-[11px] space-y-1">
+          <div className="font-bold uppercase">Cam kết bảo hành &amp; Đổi trả CitiLap:</div>
+          <p>• Bảo hành phần cứng theo gói bảo hành ghi nhận trên đơn hàng (3 – 12 tháng), lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu phát sinh lỗi kỹ thuật phần cứng do nhà sản xuất.</p>
+          <p>• Hỗ trợ cài đặt phần mềm, vệ sinh tra keo tản nhiệt miễn phí trọn đời máy tại hệ thống showroom CitiLap.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-8 pt-4 text-center">
+          <div>
+            <div className="font-bold">Khách hàng ký nhận</div>
+            <div className="text-[10px] text-slate-500">(Đã kiểm tra ngoại quan &amp; cấu hình máy)</div>
+            <div className="h-16" />
+          </div>
+          <div>
+            <div className="font-bold">Đại diện CitiLap</div>
+            <div className="text-[10px] text-slate-500">(Ký &amp; ghi rõ họ tên)</div>
+            <div className="h-16" />
           </div>
         </div>
       </div>

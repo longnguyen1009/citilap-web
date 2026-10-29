@@ -513,68 +513,78 @@ export async function resolveSectionsForStorefront(
     return (canonicalCategoryPath(target, categoryPaths) || target.replace(/^\/product\//,'/san-pham/')) + suffix;
   }));
   const enabledSections = publicSections.filter((s) => s.enabled);
-  const resolvedList: ResolvedSectionItem[] = [];
-
   // Fail-closed: evaluate pricing context with active campaigns, surfacing infrastructure errors
   const evaluatedAt = new Date();
-  const pricingContext = await getStorefrontPricingContext(db, evaluatedAt);
+  const [pricingContext, allBrands, allStudios] = await Promise.all([
+    getStorefrontPricingContext(db, evaluatedAt),
+    getActiveBrands(client).catch(() => []),
+    client.productStudio.findMany({ select: { productId: true, published: true } }).catch(() => []),
+  ]);
 
-  for (const sec of enabledSections) {
-    const resolvedSec: ResolvedSectionItem = { ...sec };
+  const preloadedCatalogMeta = { categories: allCategories, studios: allStudios };
 
-    const data = sec.data;
-    if (data.type === 'product_grid') {
-      let prods: HomepageProduct[] = [];
-      if (data.sourceMode === 'manual') {
-        prods = await resolveProductsByIds(data.manualProductIds, getPrismaClient(db), pricingContext, evaluatedAt);
-      } else {
-        prods = await resolveProductsByCriteria(data.ruleCriteria, getPrismaClient(db), pricingContext, evaluatedAt);
-      }
-      resolvedSec.resolvedProducts = prods;
-      if (data.tabs?.length) {
-        const ids = [...new Set(data.tabs.flatMap(t => t.productIds))];
-        const all = await resolveProductsByIds(ids, getPrismaClient(db), pricingContext, evaluatedAt);
-        const byId = new Map(all.map(p => [p.id, p]));
-        resolvedSec.resolvedTabs = data.tabs.map(t => ({ ...t, products: t.productIds.flatMap(id => byId.has(id) ? [byId.get(id)!] : []) }));
-      }
-    } else if (data.type === 'news_reviews') {
-      const effectiveLimit = data.postIds.length > 0 ? data.limit : Math.max(data.limit || 10, 10);
-      const { items } = await publicPostList(db, { ids: data.postIds, categoryId: data.categoryId || undefined, limit: effectiveLimit });
-      if (data.postIds.length) items.sort((a, b) => data.postIds.indexOf(a.id) - data.postIds.indexOf(b.id));
-      resolvedSec.resolvedPosts = items;
-    } else if (data.type === 'featured_collection') {
-      try {
-        const col = await publicCollection(db, data.collectionId, pricingContext, evaluatedAt);
-        resolvedSec.resolvedCollection = col;
-      } catch {
-        // If collection not found or hidden, gracefully empty
-        resolvedSec.resolvedCollection = undefined;
-      }
-    } else if (data.type === 'featured_categories') {
-      try {
+  const resolvedList = await Promise.all(
+    enabledSections.map(async (sec) => {
+      const resolvedSec: ResolvedSectionItem = { ...sec };
+      const data = sec.data;
+
+      if (data.type === 'product_grid') {
+        const mainPromise =
+          data.sourceMode === 'manual'
+            ? resolveProductsByIds(data.manualProductIds, client, pricingContext, evaluatedAt)
+            : resolveProductsByCriteria(data.ruleCriteria, client, pricingContext, evaluatedAt, preloadedCatalogMeta);
+
+        const tabsPromise = data.tabs?.length
+          ? resolveProductsByIds(
+              [...new Set(data.tabs.flatMap((t) => t.productIds))],
+              client,
+              pricingContext,
+              evaluatedAt
+            )
+          : Promise.resolve(null);
+
+        const [prods, tabProducts] = await Promise.all([mainPromise, tabsPromise]);
+        resolvedSec.resolvedProducts = prods;
+        if (data.tabs?.length && tabProducts) {
+          const byId = new Map(tabProducts.map((p) => [p.id, p]));
+          resolvedSec.resolvedTabs = data.tabs.map((t) => ({
+            ...t,
+            products: t.productIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
+          }));
+        }
+      } else if (data.type === 'news_reviews') {
+        const effectiveLimit = data.postIds.length > 0 ? data.limit : Math.max(data.limit || 10, 10);
+        const { items } = await publicPostList(db, {
+          ids: data.postIds,
+          categoryId: data.categoryId || undefined,
+          limit: effectiveLimit,
+        });
+        if (data.postIds.length) items.sort((a, b) => data.postIds.indexOf(a.id) - data.postIds.indexOf(b.id));
+        resolvedSec.resolvedPosts = items;
+      } else if (data.type === 'featured_collection') {
+        try {
+          const col = await publicCollection(db, data.collectionId, pricingContext, evaluatedAt);
+          resolvedSec.resolvedCollection = col;
+        } catch {
+          resolvedSec.resolvedCollection = undefined;
+        }
+      } else if (data.type === 'featured_categories') {
         if (data.categoryIds.length > 0) {
           resolvedSec.resolvedCategories = allCategories.filter((c) => data.categoryIds.includes(c.id));
         } else {
-          resolvedSec.resolvedCategories = allCategories.filter(c => !c.parentId).slice(0, 8);
+          resolvedSec.resolvedCategories = allCategories.filter((c) => !c.parentId).slice(0, 8);
         }
-      } catch {
-        resolvedSec.resolvedCategories = [];
-      }
-    } else if (data.type === 'featured_brands') {
-      try {
-        const allBrands = await getActiveBrands(client);
+      } else if (data.type === 'featured_brands') {
         if (data.brandIds.length > 0) {
           resolvedSec.resolvedBrands = allBrands.filter((b) => data.brandIds.includes(b.id));
         } else {
           resolvedSec.resolvedBrands = allBrands.slice(0, 12);
         }
-      } catch {
-        resolvedSec.resolvedBrands = [];
       }
-    }
 
-    resolvedList.push(resolvedSec);
-  }
+      return resolvedSec;
+    })
+  );
 
   return resolvedList;
 }

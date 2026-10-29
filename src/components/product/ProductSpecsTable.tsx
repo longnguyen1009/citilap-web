@@ -77,7 +77,7 @@ export default function ProductSpecsTable({
                   <dt className="text-xs sm:text-sm font-medium text-gray-500 sm:w-2/5 shrink-0">
                     {item.label}:
                   </dt>
-                  <dd className="text-xs sm:text-sm font-bold text-gray-900 sm:w-3/5 break-words">
+                  <dd data-spec-key={item.label} className="text-xs sm:text-sm font-bold text-gray-900 sm:w-3/5 break-words">
                     {item.value}
                   </dd>
                 </div>

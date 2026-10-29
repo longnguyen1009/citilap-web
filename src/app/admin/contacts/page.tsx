@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useSearchParams, usePathname } from "next/navigation";
 import {
   Mail,
   Phone,
@@ -13,6 +14,8 @@ import {
   CheckCircle2,
   History,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   PageHeader,
@@ -56,56 +59,130 @@ const STATUS_TABS = [
   { key: "HANDLED", label: "Đã xong" },
 ] as const;
 
+type ContactFilterStatus = "ALL" | "PENDING" | "PROCESSING" | "HANDLED";
+
+const PAGE_LIMIT = 20;
+
 function ContactsContent() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const initialSearch = searchParams.get("search") || "";
+  const rawStatus = (searchParams.get("status") || "ALL").toUpperCase();
+  const initialStatus: ContactFilterStatus = ["ALL", "PENDING", "PROCESSING", "HANDLED"].includes(rawStatus)
+    ? (rawStatus as ContactFilterStatus)
+    : "ALL";
+  const initialPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
   const [contacts, setContacts] = useState<ContactSubmission[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [page, setPage] = useState(initialPage);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "PENDING" | "PROCESSING" | "HANDLED">("ALL");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [statusFilter, setStatusFilter] = useState<ContactFilterStatus>(initialStatus);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
-  const fetchContacts = useCallback(() => {
+  // Anti-stale request guards
+  const requestSeqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const updateUrlParams = useCallback(
+    (nextSearch: string, nextStatus: ContactFilterStatus, nextPage: number) => {
+      if (typeof window === "undefined") return;
+      const params = new URLSearchParams();
+      if (nextSearch.trim()) params.set("search", nextSearch.trim());
+      if (nextStatus && nextStatus !== "ALL") params.set("status", nextStatus);
+      if (nextPage > 1) params.set("page", String(nextPage));
+
+      const queryStr = params.toString();
+      const targetUrl = queryStr ? `${pathname}?${queryStr}` : pathname;
+      const currentUrl = `${window.location.pathname}${window.location.search}`;
+      if (targetUrl !== currentUrl) {
+        window.history.replaceState(null, "", targetUrl);
+      }
+    },
+    [pathname]
+  );
+
+  const fetchContacts = useCallback(async () => {
+    const reqId = ++requestSeqRef.current;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
+    setLoadError(null);
+
     const params = new URLSearchParams();
     if (searchTerm.trim()) params.set("search", searchTerm.trim());
     if (statusFilter !== "ALL") params.set("status", statusFilter);
+    params.set("page", String(page));
+    params.set("limit", String(PAGE_LIMIT));
 
-    fetch(`/api/admin/contacts?${params.toString()}`, {
-      credentials: "same-origin",
-      headers: { "Cache-Control": "no-cache" },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && Array.isArray(data.data)) {
-          setContacts(data.data);
-          if (data.pagination) setTotal(data.pagination.total);
-        } else {
-          setFeedback({
-            type: "error",
-            message: data?.error || "Không thể tải danh sách liên hệ.",
-          });
+    updateUrlParams(searchTerm, statusFilter, page);
+
+    try {
+      const res = await fetch(`/api/admin/contacts?${params.toString()}`, {
+        credentials: "same-origin",
+        headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(() => null);
+      if (reqId !== requestSeqRef.current || controller.signal.aborted) return;
+
+      if (res.ok && data?.success && Array.isArray(data.data)) {
+        const rows: ContactSubmission[] = data.data;
+        setContacts(rows);
+        const pag = data.pagination;
+        const resolvedTotal = Number(pag?.total ?? rows.length);
+        const resolvedTotalPages = Math.max(1, Number(pag?.totalPages ?? 1));
+        const resolvedPage = Math.max(1, Math.min(resolvedTotalPages, Number(pag?.page ?? page)));
+        const resolvedPending =
+          pag?.pendingCount !== undefined
+            ? Number(pag.pendingCount)
+            : rows.filter((c) => c.status === "PENDING").length;
+
+        setTotal(resolvedTotal);
+        setTotalPages(resolvedTotalPages);
+        setPendingCount(resolvedPending);
+        if (resolvedPage !== page) {
+          setPage(resolvedPage);
         }
-      })
-      .catch((err) => {
-        console.error("Failed to load contact submissions:", err);
-        setFeedback({
-          type: "error",
-          message: "Lỗi kết nối đến máy chủ khi tải liên hệ.",
-        });
-      })
-      .finally(() => setLoading(false));
-  }, [searchTerm, statusFilter]);
+      } else {
+        const msg = data?.error || "Không thể tải danh sách liên hệ.";
+        setLoadError(msg);
+        setFeedback({ type: "error", message: msg });
+      }
+    } catch (err) {
+      if (controller.signal.aborted || reqId !== requestSeqRef.current) return;
+      console.error("Failed to load contact submissions:", err);
+      const msg = "Lỗi kết nối đến máy chủ khi tải liên hệ.";
+      setLoadError(msg);
+      setFeedback({ type: "error", message: msg });
+    } finally {
+      if (reqId === requestSeqRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, [searchTerm, statusFilter, page, updateUrlParams]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchContacts();
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [fetchContacts]);
+      void fetchContacts();
+    }, 150);
+    return () => {
+      clearTimeout(timer);
+      abortRef.current?.abort();
+    };
+  }, [fetchContacts, refreshVersion]);
 
   const handleUpdateStatus = async (
     contact: ContactSubmission,
@@ -127,7 +204,7 @@ function ContactsContent() {
         }),
       });
 
-      const result = await res.json();
+      const result = await res.json().catch(() => null);
 
       if (res.status === 409) {
         setFeedback({
@@ -139,16 +216,14 @@ function ContactsContent() {
         return;
       }
 
-      if (res.ok && result.success && result.data) {
-        setContacts((prev) =>
-          prev.map((c) => (c.id === contact.id ? { ...result.data } : c))
-        );
+      if (res.ok && result?.success && result.data) {
         setEditingNoteId(null);
         setNoteDraft("");
         setFeedback({
           type: "success",
-          message: `Đã cập nhật sang "${newStatus}".`,
+          message: `Đã cập nhật sang "${result.data.status || newStatus}".`,
         });
+        setRefreshVersion((v) => v + 1);
       } else {
         setFeedback({
           type: "error",
@@ -170,7 +245,11 @@ function ContactsContent() {
     window.open(`/api/admin/contacts/export?${params.toString()}`, "_blank");
   };
 
-  const pendingCount = contacts.filter((c) => c.status === "PENDING").length;
+  const rangeStart = total === 0 || contacts.length === 0 ? 0 : (page - 1) * PAGE_LIMIT + 1;
+  const rangeEnd =
+    total === 0 || contacts.length === 0
+      ? 0
+      : Math.min(total, (page - 1) * PAGE_LIMIT + contacts.length);
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-3">
@@ -180,7 +259,7 @@ function ContactsContent() {
         badge={
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">
-              {total || contacts.length}
+              {total}
             </span>
             {pendingCount > 0 && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200 tabular-nums">
@@ -195,7 +274,7 @@ function ContactsContent() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={fetchContacts}
+              onClick={() => void fetchContacts()}
               disabled={loading}
               aria-label="Tải lại danh sách"
               icon={<RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />}
@@ -205,10 +284,11 @@ function ContactsContent() {
               variant="secondary"
               size="sm"
               onClick={handleExport}
-              disabled={loading || contacts.length === 0}
+              disabled={loading || total === 0}
+              title="Xuất toàn bộ liên hệ khớp bộ lọc hiện tại ra CSV"
               icon={<Download className="w-3.5 h-3.5" aria-hidden="true" />}
             >
-              Xuất CSV
+              Xuất CSV (toàn bộ lọc)
             </AdminButton>
           </div>
         }
@@ -233,7 +313,10 @@ function ContactsContent() {
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setStatusFilter(tab.key)}
+                  onClick={() => {
+                    setStatusFilter(tab.key);
+                    setPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                     active
                       ? "bg-slate-900 text-white shadow-2xs"
@@ -255,20 +338,27 @@ function ContactsContent() {
             })}
           </div>
 
-          <div className="flex items-center gap-2 flex-1 max-w-sm justify-end">
+          <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
+                aria-label="Tìm kiếm liên hệ"
                 placeholder="Tìm tên, SĐT, email, lời nhắn…"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
                 className="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg bg-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
               {searchTerm && (
                 <button
                   type="button"
-                  onClick={() => setSearchTerm("")}
+                  onClick={() => {
+                    setSearchTerm("");
+                    setPage(1);
+                  }}
                   aria-label="Xóa tìm kiếm"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
@@ -276,6 +366,20 @@ function ContactsContent() {
                 </button>
               )}
             </div>
+
+            {(searchTerm || statusFilter !== "ALL") && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("ALL");
+                  setPage(1);
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded hover:bg-slate-200/60 transition cursor-pointer whitespace-nowrap"
+              >
+                ✕ Xóa lọc
+              </button>
+            )}
           </div>
         </div>
 
@@ -285,6 +389,20 @@ function ContactsContent() {
             <div className="py-12 text-center text-slate-500 text-xs">
               <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" />
               <span>Đang tải yêu cầu tư vấn...</span>
+            </div>
+          ) : loadError ? (
+            <div className="py-10 text-center px-4">
+              <div className="max-w-md mx-auto space-y-2.5">
+                <p className="text-xs font-semibold text-red-700">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => void fetchContacts()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Thử lại</span>
+                </button>
+              </div>
             </div>
           ) : contacts.length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs">
@@ -507,6 +625,45 @@ function ContactsContent() {
               </div>
             ))
           )}
+        </div>
+
+        {/* Footer with Server Pagination */}
+        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-600 flex flex-wrap justify-between items-center gap-3">
+          <div className="tabular-nums">
+            Hiển thị{" "}
+            <span className="font-bold text-slate-900">
+              {rangeStart === 0 ? 0 : `${rangeStart}–${rangeEnd}`}
+            </span>{" "}
+            / <span className="font-bold text-slate-900">{total}</span> liên hệ
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 font-medium tabular-nums">
+              Trang {page} / {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                aria-label="Trang trước"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none text-slate-700 font-semibold cursor-pointer"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Trước</span>
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                aria-label="Trang sau"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none text-slate-700 font-semibold cursor-pointer"
+              >
+                <span>Sau</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
         </div>
       </AdminCard>
     </div>

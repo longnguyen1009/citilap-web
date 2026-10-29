@@ -1,16 +1,40 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trash2, ShoppingCart, ArrowRight, Minus, Plus, Tag, ShieldCheck, Truck, Headphones } from "lucide-react";
+import { Trash2, ShoppingCart, ArrowRight, Minus, Plus, Tag, ShieldCheck, Truck, Headphones, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import CartValidationStatus from '@/components/cart/CartValidationStatus';
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 import { productHref } from '@/lib/product-paths';
+import type { SearchSuggestionItem } from "@/server/services/search.service";
 
 export default function CartPage() {
-  const { cart, removeFromCart, updateQuantity, cartTotal, cartCount, checkoutReady } = useCart();
+  const { cart, addToCart, removeFromCart, updateQuantity, cartTotal, cartCount, checkoutReady } = useCart();
+  const [addons, setAddons] = useState<SearchSuggestionItem[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch("/api/search/suggestions?q=rapoo&limit=3").then((r) => r.json()).catch(() => null),
+      fetch("/api/search/suggestions?q=ram%20samsung&limit=2").then((r) => r.json()).catch(() => null),
+    ]).then(([res1, res2]) => {
+      if (!active) return;
+      const list: SearchSuggestionItem[] = [
+        ...(res1?.data?.products || []),
+        ...(res2?.data?.products || []),
+      ];
+      const unique = list.filter(
+        (item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx
+      );
+      setAddons(unique.slice(0, 4));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (cart.length === 0) {
     return (
@@ -68,6 +92,12 @@ export default function CartPage() {
                         {item.variantLabel && (
                           <div className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-md px-2 py-1 mt-1.5 w-fit leading-relaxed">
                             {item.variantLabel}
+                          </div>
+                        )}
+                        {item.warrantyName && (
+                          <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-0.5 mt-1 w-fit flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span>Gói BH: {item.warrantyName} (Lỗi 1 đổi 1 7 ngày đầu)</span>
                           </div>
                         )}
                         <button
@@ -132,6 +162,74 @@ export default function CartPage() {
                 Tiếp tục mua sắm
               </Link>
             </div>
+
+            {/* Phụ kiện & Nâng cấp mua kèm ưu đãi */}
+            {addons.filter((a) => !cart.some((c) => c.productId === a.id)).length > 0 && (
+              <div className="mt-6 bg-white rounded-xl shadow-sm border border-blue-100 p-5">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <h3 className="text-sm md:text-base font-bold text-gray-900 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>Phụ kiện & Nâng cấp mua kèm ưu đãi</span>
+                  </h3>
+                  <Link href="/linh-kien" className="text-xs font-semibold text-blue-600 hover:underline">
+                    Xem tất cả phụ kiện →
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {addons
+                    .filter((a) => !cart.some((c) => c.productId === a.id))
+                    .map((addon) => (
+                      <div
+                        key={addon.id}
+                        className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50/60 hover:border-blue-200 transition"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-12 h-12 rounded-lg bg-white border border-gray-200 p-1 shrink-0 relative">
+                            <Image
+                              src={addon.image || "/images/placeholder-laptop.svg"}
+                              alt={addon.name}
+                              fill
+                              sizes="48px"
+                              className="object-contain"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <Link
+                              href={productHref({ id: addon.id, slug: addon.slug, template: "ACCESSORY" })}
+                              className="text-xs font-bold text-gray-900 hover:text-blue-600 line-clamp-1"
+                            >
+                              {addon.name}
+                            </Link>
+                            <div className="text-xs font-black text-red-600 mt-0.5">
+                              {(addon.price || 0).toLocaleString("vi-VN")}đ
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            addToCart({
+                              id: addon.id,
+                              productId: addon.id,
+                              slug: addon.slug,
+                              template: "ACCESSORY",
+                              name: addon.name,
+                              price: addon.price || 0,
+                              displayPrice: `${(addon.price || 0).toLocaleString("vi-VN")}đ`,
+                              image: addon.image || "/images/placeholder-laptop.svg",
+                              quantity: 1,
+                            })
+                          }
+                          className="shrink-0 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Thêm</span>
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right: Summary */}
@@ -178,15 +276,15 @@ export default function CartPage() {
               <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100">
                 <div className="flex flex-col items-center gap-1 text-center">
                   <ShieldCheck className="w-5 h-5 text-blue-600" />
-                  <span className="text-[10px] font-bold text-gray-600">Bảo hành tới 12T</span>
+                  <span className="text-[10px] font-bold text-gray-600">1 đổi 1 7 ngày · BH 3-12T</span>
                 </div>
                 <div className="flex flex-col items-center gap-1 text-center">
                   <Truck className="w-5 h-5 text-blue-600" />
-                  <span className="text-[10px] font-bold text-gray-600">Giao nhanh</span>
+                  <span className="text-[10px] font-bold text-gray-600">Giao nhanh toàn quốc</span>
                 </div>
                 <div className="flex flex-col items-center gap-1 text-center">
                   <Headphones className="w-5 h-5 text-blue-600" />
-                  <span className="text-[10px] font-bold text-gray-600">Hỗ trợ kỹ thuật</span>
+                  <span className="text-[10px] font-bold text-gray-600">Hỗ trợ phần mềm trọn đời</span>
                 </div>
               </div>
             </div>
