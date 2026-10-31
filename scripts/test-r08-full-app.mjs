@@ -166,6 +166,7 @@ try {
   await check('R08 full Worker redirect returns exact 301 and drops sensitive query',async()=>{
     let r=await send('/api/admin/redirects','POST',{expectedRevision:0,source:'/fixture-old',target:'/news',enabled:true,note:'Fixture'},true);assert.equal(r.status,200,r.text);
     const moved=await fetch(base+'/fixture-old?token=private',{redirect:'manual'});assert.equal(moved.status,301);assert.equal(new URL(moved.headers.get('location'),base).href,base+'/news');
+    const filtered=await fetch(base+'/category?brand=asus&brand=dell&ram=16&token=private&email=private',{redirect:'manual'});assert.equal(filtered.status,301);const filteredUrl=new URL(filtered.headers.get('location'),base);assert.equal(filteredUrl.pathname,'/phan-loai');assert.deepEqual(filteredUrl.searchParams.getAll('brand'),['asus','dell']);assert.equal(filteredUrl.searchParams.get('ram'),'16');assert.equal(filteredUrl.searchParams.has('token'),false);assert.equal(filteredUrl.searchParams.has('email'),false);
     assert.equal((await send('/api/admin/redirects','POST',{expectedRevision:0,source:'/news',target:'/fixture-old',enabled:true,note:''},true)).status,409);
   });
   await check('R08 public metadata and sitemap use settings and published projection',async()=>{
@@ -216,6 +217,12 @@ try {
       const tracking=await send('/order-tracking');assert.equal(tracking.status,200);assert.ok(tracking.text.includes('Tra cứu tự động'));assert.ok(!tracking.text.includes('Số điện thoại người nhận'));
     });
   }
+  await check('Builder preview validates overrides and reports malformed input',async()=>{
+    const home=await send('/api/admin/builder/home','GET',undefined,true);assert.equal(home.status,200,home.text);
+    const valid=await send('/api/admin/builder/home/preview','POST',{document:home.json.data.document},true);assert.equal(valid.status,200,valid.text);
+    const invalid=await send('/api/admin/builder/home/preview','POST',{document:{sections:'invalid'}},true);assert.equal(invalid.status,400,invalid.text);
+    const malformed=await fetch(base+'/api/admin/builder/home/preview',{method:'POST',headers:{cookie,origin:base,'content-type':'application/json'},body:'{'});assert.equal(malformed.status,400);
+  });
   console.log('R08_FULL_APP_FIXTURE '+base);
   console.log('R08 full Worker HTTP/D1: '+passed+'/'+passed+' PASS');
   if(process.argv.includes('--serve'))await new Promise(r=>process.once('SIGINT',r));

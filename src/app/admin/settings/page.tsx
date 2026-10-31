@@ -35,6 +35,30 @@ const inputCls =
   "w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none";
 const labelCls = "block text-[11px] font-semibold text-slate-600 mb-1";
 
+function toDatetimeLocalGmt7(isoStr?: string): string {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return "";
+    const gmt7 = new Date(d.getTime() + 7 * 3600 * 1000);
+    return gmt7.toISOString().slice(0, 16);
+  } catch {
+    return "";
+  }
+}
+
+function fromDatetimeLocalGmt7(localStr: string): string {
+  if (!localStr) return "";
+  try {
+    const [datePart, timePart] = localStr.split("T");
+    const [y, m, d] = datePart.split("-").map(Number);
+    const [h, min] = timePart.split(":").map(Number);
+    return new Date(Date.UTC(y, m - 1, d, h - 7, min, 0)).toISOString();
+  } catch {
+    return localStr;
+  }
+}
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("store");
   const [settings, setSettings] = useState<StorefrontSettings>(DEFAULT_SETTINGS);
@@ -308,7 +332,7 @@ export default function SettingsPage() {
     { id: "banners", label: "Banners", icon: LayoutTemplate },
     { id: "features", label: "Cam kết & Đánh giá", icon: ShieldCheck },
     { id: "shipping", label: "Vận chuyển & TT", icon: Truck },
-    { id: "product", label: "Trang SP", icon: CreditCard },
+    { id: "product", label: "Trang sản phẩm", icon: CreditCard },
   ];
 
   const handleReloadLatest = () => {
@@ -880,13 +904,33 @@ export default function SettingsPage() {
           {/* TAB 2: FLASH SALE & GIỜ VÀNG */}
           {activeTab === "flashsale" && (
             <div className="space-y-4">
-              <div className="rounded-xl border border-red-200 bg-red-50/70 p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="font-bold text-red-900 text-xs">Banner HOT SALE & Chiến dịch</h2>
-                  <Link href="/admin/campaigns" className="text-xs font-bold text-red-700 hover:underline">
-                    Mở quản lý Chiến dịch →
-                  </Link>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 flex flex-col sm:flex-row items-start justify-between gap-3 text-xs text-blue-950">
+                <div className="flex items-start gap-2.5">
+                  <Flame className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-sm text-slate-900">Quản lý Flash Sale &amp; Giờ Vàng</p>
+                    <p className="text-slate-600 leading-relaxed">
+                      CitiLap quản lý các đợt Flash Sale chi tiết theo từng máy, biến thể và hẹn giờ tại mục{" "}
+                      <Link href="/admin/campaigns" className="font-bold text-blue-700 hover:underline">
+                        Quản lý Chiến dịch (/admin/campaigns)
+                      </Link>
+                      . Hệ thống tự động kiểm tra chống trùng giờ và cập nhật theo thời gian thực ngoài Storefront.
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Cấu hình bên dưới dành cho Banner ngang hiển thị đầu trang chủ và chế độ Flash Sale toàn trang dự phòng.
+                    </p>
+                  </div>
                 </div>
+                <Link
+                  href="/admin/campaigns"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shrink-0 shadow-2xs transition"
+                >
+                  Mở Quản lý Chiến dịch →
+                </Link>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3">
+                <h2 className="font-bold text-slate-900 text-xs">Banner HOT SALE ngang trên Storefront</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <label className={labelCls}>
                     Ảnh banner ngang (1600×160)
@@ -898,10 +942,11 @@ export default function SettingsPage() {
                     />
                   </label>
                   <label className={labelCls}>
-                    Liên kết banner
+                    Liên kết banner khi khách bấm vào
                     <input
                       value={settings.hotSaleBannerLink}
                       onChange={e => update('hotSaleBannerLink', e.target.value)}
+                      placeholder="/admin/campaigns hoặc /laptop"
                       className={`mt-1 font-normal ${inputCls}`}
                     />
                   </label>
@@ -917,8 +962,8 @@ export default function SettingsPage() {
                     className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
                   />
                   <div>
-                    <div className="font-bold text-slate-900 text-xs">Bật chương trình Flash Sale toàn trang</div>
-                    <div className="text-[11px] text-slate-500">Áp dụng cho sản phẩm gắn cờ isFlashSale.</div>
+                    <div className="font-bold text-slate-900 text-xs">Bật chương trình Flash Sale dự phòng toàn trang</div>
+                    <div className="text-[11px] text-slate-500">Áp dụng cho sản phẩm gắn cờ isFlashSale khi không có chiến dịch nâng cao nào hoạt động.</div>
                   </div>
                 </label>
 
@@ -935,23 +980,21 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className={labelCls}>Bắt đầu (ISO / YYYY-MM-DDTHH:MM)</label>
+                    <label className={labelCls}>Thời gian bắt đầu (GMT+7)</label>
                     <input
-                      type="text"
-                      value={settings.flashSaleStartAt}
-                      onChange={(e) => update("flashSaleStartAt", e.target.value)}
-                      placeholder="2026-10-01T00:00:00Z"
+                      type="datetime-local"
+                      value={toDatetimeLocalGmt7(settings.flashSaleStartAt)}
+                      onChange={(e) => update("flashSaleStartAt", fromDatetimeLocalGmt7(e.target.value))}
                       className={`${inputCls} font-mono`}
                     />
                   </div>
 
                   <div>
-                    <label className={labelCls}>Kết thúc (ISO / YYYY-MM-DDTHH:MM)</label>
+                    <label className={labelCls}>Thời gian kết thúc (GMT+7)</label>
                     <input
-                      type="text"
-                      value={settings.flashSaleEndAt}
-                      onChange={(e) => update("flashSaleEndAt", e.target.value)}
-                      placeholder="2026-12-31T23:59:59Z"
+                      type="datetime-local"
+                      value={toDatetimeLocalGmt7(settings.flashSaleEndAt)}
+                      onChange={(e) => update("flashSaleEndAt", fromDatetimeLocalGmt7(e.target.value))}
                       className={`${inputCls} font-mono`}
                     />
                   </div>

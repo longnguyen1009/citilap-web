@@ -560,6 +560,9 @@ export function defaultHomepageSections(): SectionItem[] {
 export interface LandingPageListItem {
   id: string;
   slug: string;
+  name: string;
+  isHome: boolean;
+  hasUnpublishedDraft: boolean;
   internalName: string;
   title: string;
   status: string;

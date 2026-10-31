@@ -111,8 +111,8 @@ export default function ProductHeroSection({
   accessories = [],
   gifts = [],
   settings,
-  reviewCount = 32,
-  averageRating = "4.9",
+  reviewCount = 0,
+  averageRating = "0.0",
 }: ProductHeroSectionProps) {
   const router = useRouter();
   const { addToCart } = useCart();
@@ -264,7 +264,7 @@ export default function ProductHeroSection({
                 href="#danh-gia-khach-hang"
                 className="flex items-center gap-1 text-amber-500 font-bold hover:underline"
               >
-                <span>★★★★★</span>
+                <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
                 <span className="text-slate-800 ml-0.5">{averageRating}</span>
                 <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
               </a>

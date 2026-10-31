@@ -4,8 +4,13 @@ import { useState } from "react";
 import { useTurnstile } from "@/components/Turnstile";
 import { MessageCircle, Phone, User, CheckCircle2, AlertCircle, Loader2, Sparkles } from "lucide-react";
 import { siteConfig } from "@/lib/site-config";
+import type { PublicStorefrontSettings } from "@/contracts/cms/settings";
 
-export default function ContactSection() {
+export default function ContactSection({ settings }: { settings?: PublicStorefrontSettings | null } = {}) {
+  const displayPhone = settings?.storePhone || siteConfig.phone;
+  const displayTelHref = settings?.storePhone ? `tel:${settings.storePhone.replace(/[^\d+]/g, '')}` : siteConfig.telHref;
+  const displayZaloUrl = settings?.zaloUrl || siteConfig.zaloUrl;
+
   const turnstile = useTurnstile("contact");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -92,13 +97,13 @@ export default function ContactSection() {
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <a
-                  href={siteConfig.telHref}
+                  href={displayTelHref}
                   className="flex justify-center items-center gap-3 bg-blue-600 hover:bg-blue-500 text-white px-7 py-3.5 rounded-full font-bold transition duration-300 shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 text-base"
                 >
-                  <Phone className="w-5 h-5 shrink-0" /> {siteConfig.phone}
+                  <Phone className="w-5 h-5 shrink-0" /> {displayPhone}
                 </a>
                 <a
-                  href={siteConfig.zaloUrl}
+                  href={displayZaloUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex justify-center items-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/25 text-white px-7 py-3.5 rounded-full font-bold transition duration-300 hover:-translate-y-0.5 text-base"

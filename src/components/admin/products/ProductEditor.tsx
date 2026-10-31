@@ -197,8 +197,22 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     }
   }, [id]);
 
+  const [errorTabs, setErrorTabs] = useState<Set<TabKey>>(new Set());
+
   const updateDoc = <K extends keyof ProductDocument>(key: K, value: ProductDocument[K]) => {
     setDoc(prev => (prev ? { ...prev, [key]: value } : prev));
+    setErrorTabs(prev => {
+      if (prev.size === 0) return prev;
+      const next = new Set(prev);
+      if (['price', 'originalPrice', 'variants', 'warranties'].includes(key as string)) next.delete('pricing');
+      else if (key === 'media') next.delete('media');
+      else if (key === 'specs') next.delete('specs');
+      else if (['faqs', 'gifts', 'accessoryProductIds'].includes(key as string)) next.delete('extras');
+      else if (['seoTitle', 'seoDescription'].includes(key as string)) next.delete('seo');
+      else if (key === 'contentHtml') next.delete('content');
+      else next.delete('info');
+      return next;
+    });
   };
 
   // Matrix Generator & Quick Add states
@@ -380,11 +394,45 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     if (!validation.success) {
       const issue = validation.error.issues[0];
       const field = String(issue.path[0] || '');
-      const labels: Record<string, string> = { name: 'Tên sản phẩm', slug: 'Đường dẫn', categoryId: 'Danh mục', price: 'Giá bán', originalPrice: 'Giá gốc', variants: 'Cấu hình', specs: 'Thông số', media: 'Ảnh', warranties: 'Bảo hành', tags: 'Thẻ tag', faqs: 'Câu hỏi', gifts: 'Quà tặng' };
-      setActiveTab(['price', 'originalPrice', 'variants', 'warranties'].includes(field) ? 'pricing' : field === 'media' ? 'media' : field === 'specs' ? 'specs' : ['faqs', 'gifts', 'accessoryProductIds'].includes(field) ? 'extras' : 'info');
-      setStatusMessage({ type: 'error', text: field ? `${labels[field] || field}: ${issue.code === 'custom' ? issue.message : 'kiểm tra giá trị, độ dài và trường bắt buộc.'}` : issue.message });
+      const labels: Record<string, string> = {
+        name: 'Tên sản phẩm',
+        slug: 'Đường dẫn',
+        categoryId: 'Danh mục',
+        price: 'Giá bán',
+        originalPrice: 'Giá gốc',
+        variants: 'Cấu hình',
+        specs: 'Thông số',
+        media: 'Ảnh',
+        warranties: 'Bảo hành',
+        tags: 'Thẻ tag',
+        faqs: 'Câu hỏi',
+        gifts: 'Quà tặng',
+        seoTitle: 'Tiêu đề SEO',
+        seoDescription: 'Mô tả SEO',
+      };
+
+      const invalidTabs = new Set<TabKey>();
+      for (const iss of validation.error.issues) {
+        const f = String(iss.path[0] || '');
+        if (['price', 'originalPrice', 'variants', 'warranties'].includes(f)) invalidTabs.add('pricing');
+        else if (f === 'media') invalidTabs.add('media');
+        else if (f === 'specs') invalidTabs.add('specs');
+        else if (['faqs', 'gifts', 'accessoryProductIds'].includes(f)) invalidTabs.add('extras');
+        else if (['seoTitle', 'seoDescription'].includes(f)) invalidTabs.add('seo');
+        else if (f === 'contentHtml') invalidTabs.add('content');
+        else invalidTabs.add('info');
+      }
+      setErrorTabs(invalidTabs);
+      setActiveTab(Array.from(invalidTabs)[0] || 'info');
+      setStatusMessage({
+        type: 'error',
+        text: field
+          ? `${labels[field] || field}: ${issue.code === 'custom' ? issue.message : 'kiểm tra giá trị, độ dài và trường bắt buộc.'}`
+          : issue.message,
+      });
       return false;
     }
+    setErrorTabs(new Set());
     saveLock.current=true;
     const submitted=JSON.stringify(doc);
     setSaving(true);
@@ -667,6 +715,12 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                 <span className="product-editor-tab-count">
                   {tab.count}
                 </span>
+              )}
+              {errorTabs.has(tab.key) && (
+                <span
+                  className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0 ml-0.5"
+                  title="Tab có thông tin chưa hợp lệ cần kiểm tra"
+                />
               )}
             </button>
           );
@@ -1263,6 +1317,10 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                               className="w-full text-xs border border-slate-300 rounded px-2 py-1"
                             />
                           </div>
+                        </div>
+                        <div className="text-[10px] text-slate-500 bg-slate-50 p-1.5 rounded border border-slate-200">
+                          <span className="font-semibold text-slate-700">Tăng theo bậc: </span>
+                          {money(matrixBasePrice)} → {money(matrixBasePrice + matrixStepPrice)} → {money(matrixBasePrice + matrixStepPrice * 2)}...
                         </div>
                       </div>
                     </div>

@@ -56,6 +56,9 @@ await build({
   stdin: {
     contents: `
       export * from './src/server/services/order.service';
+      export * from './src/server/services/checkout.service';
+      export * from './src/server/services/settings.service';
+      export { DEFAULT_ADMIN_SETTINGS } from './src/contracts/cms/settings';
       export * from './src/server/services/contact.service';
       export * from './src/server/services/notification.service';
       export * from './src/server/services/customer.service';
@@ -89,6 +92,13 @@ await build({
 });
 
 const api = await import('./.r06-1-test-bundle.mjs');
+await api.saveAdminSettings(DB, {expectedRevision: 0, document: api.DEFAULT_ADMIN_SETTINGS});
+async function createOrder(input, key, db) {
+  const selection = {paymentMethod:'COD', shippingMethod:'standard', shippingAddress:'Synthetic fixture address', ...input};
+  const {quote} = await api.calculateCheckout(selection, db);
+  return api.createOrder({...selection, items:selection.items.map((item,i)=>({...item, expectedPrice:quote.lines[i].price})), checkoutAcknowledgment:{shippingFee:quote.shippingFee, totalAmount:quote.totalAmount, termsVersion:quote.termsVersion}}, key, db);
+}
+
 
 let passed = 0;
 let failed = 0;
@@ -111,7 +121,7 @@ console.log('--- SECTION 1: Order CAS at DB Write Point & Race Concurrency ---')
 
 let testOrderId;
 await test('Seed base order with revision = 1', async () => {
-  const created = await api.createOrder(
+  const created = await createOrder(
     {
       customerName: 'Nguyễn Văn Test',
       customerPhone: '0901234567',
@@ -381,7 +391,7 @@ let guestOrderBId;
 const sharedPhone = '0988777666';
 
 await test('Seed 2 guest orders with SAME phone but DIFFERENT customer names', async () => {
-  const orderA = await api.createOrder(
+  const orderA = await createOrder(
     {
       customerName: 'Khách A Đặt Máy',
       customerPhone: sharedPhone,
@@ -393,7 +403,7 @@ await test('Seed 2 guest orders with SAME phone but DIFFERENT customer names', a
   );
   guestOrderAId = orderA.order.id;
 
-  const orderB = await api.createOrder(
+  const orderB = await createOrder(
     {
       customerName: 'Khách B Dùng Chung SĐT',
       customerPhone: sharedPhone,

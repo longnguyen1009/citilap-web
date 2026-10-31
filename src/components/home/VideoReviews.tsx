@@ -35,14 +35,11 @@ export default function VideoReviews({
   const cleanFallback = (fallbackVideos || DEFAULT_REVIEW_VIDEOS).filter(
     (v) => v && v.url && !/cellphones/i.test(v.title || '')
   );
-  // Merge CMS videos with fallback so both YouTube and TikTok tabs have videos
-  const mergedMap = new Map<string, Video>();
-  for (const v of [...cleanCmsVideos, ...cleanFallback]) {
-    if (v?.url && !mergedMap.has(v.url)) {
-      mergedMap.set(v.url, v);
-    }
-  }
-  const activeList = Array.from(mergedMap.values());
+  // If the admin configured custom videos in CMS or settings, respect them.
+  // Fall back to default videos only when no custom videos exist.
+  const activeList = cleanCmsVideos.length > 0
+    ? cleanCmsVideos
+    : cleanFallback;
 
   const filtered = activeList.filter(
     (v) =>
@@ -103,8 +100,8 @@ export default function VideoReviews({
           {thumbnail(main, true)}
           <h3 className="mt-3 font-bold leading-relaxed text-slate-900 group-hover:text-red-600 transition-colors">{main.title}</h3>
         </button>
-        <div className="space-y-4">
-          {rest.slice(0, 4).map(v => (
+        <div className={`space-y-4 ${rest.length > 4 ? 'max-h-[520px] overflow-y-auto pr-1.5 scrollbar-thin' : ''}`}>
+          {rest.map(v => (
             <button
               key={v.url}
               type="button"

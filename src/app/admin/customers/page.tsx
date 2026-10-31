@@ -297,6 +297,7 @@ function CustomersContent() {
       {/* 1. Header */}
       <PageHeader
         title="Khách hàng"
+        description="Hồ sơ tổng hợp từ tài khoản và đơn hàng. Khách vãng lai được ghi nhận theo từng đơn; trùng số điện thoại chỉ là gợi ý, không tự gộp hồ sơ."
         badge={
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">
             {total}

@@ -244,6 +244,7 @@ export default function UnifiedProductsPage() {
       {/* 1. Compact Header */}
       <PageHeader
         title="Sản phẩm"
+        description="Soạn thông tin, giá và cấu hình trong bản nháp; xuất bản để cập nhật website. Giá Flash Sale được quản lý tại Chiến dịch. Kho & Serial quản lý từng máy thực tế."
         badge={
           data && (
             <span className="text-xs px-2 py-0.5 bg-slate-200/70 text-slate-700 rounded-full font-semibold tabular-nums">

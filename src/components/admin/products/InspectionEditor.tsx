@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { mediaRequest } from '../media/MediaBrowser';
 import type { InspectionInput } from '@/contracts/catalog/inspection';
 
@@ -17,7 +17,7 @@ export default function InspectionEditor({ productId }: { productId: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
-  async function load() {
+  const load = useCallback(async () => {
     setBusy(true);
     setMessage('');
     try {
@@ -28,7 +28,11 @@ export default function InspectionEditor({ productId }: { productId: string }) {
     } finally {
       setBusy(false);
     }
-  }
+  }, [productId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function save(event: React.FormEvent<HTMLFormElement>, row: Row) {
     event.preventDefault();

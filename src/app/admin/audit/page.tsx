@@ -176,6 +176,22 @@ export default function AdminAuditPage() {
     setFilterStr(p.toString());
   }
 
+  function handleQuickDateRange(days: number) {
+    const to = new Date().toISOString().slice(0, 10);
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - days);
+    const from = fromDate.toISOString().slice(0, 10);
+    setFilterFields((prev) => ({ ...prev, from, to }));
+    setPage(1);
+    const p = new URLSearchParams();
+    if (actionQuery.trim()) p.set('action', actionQuery.trim());
+    if (filterFields.actor.trim()) p.set('actor', filterFields.actor.trim());
+    if (filterFields.entity.trim()) p.set('entity', filterFields.entity.trim());
+    p.set('from', from);
+    p.set('to', to);
+    setFilterStr(p.toString());
+  }
+
   const handleCopy = (text: string, id: string) => {
     void navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -270,6 +286,29 @@ export default function AdminAuditPage() {
                 onChange={(e) => setFilterFields({ ...filterFields, entity: e.target.value })}
                 className="w-28 text-xs px-2.5 py-1 border border-slate-200 rounded-md bg-white focus:outline-none focus:border-blue-500"
               />
+              <div className="flex items-center gap-1 border border-slate-200 rounded-md p-0.5 bg-slate-100">
+                <button
+                  type="button"
+                  onClick={() => handleQuickDateRange(0)}
+                  className="px-1.5 py-0.5 text-[10px] rounded font-medium bg-white text-slate-700 hover:text-blue-600 transition cursor-pointer"
+                >
+                  Hôm nay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDateRange(7)}
+                  className="px-1.5 py-0.5 text-[10px] rounded font-medium bg-white text-slate-700 hover:text-blue-600 transition cursor-pointer"
+                >
+                  7N
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDateRange(30)}
+                  className="px-1.5 py-0.5 text-[10px] rounded font-medium bg-white text-slate-700 hover:text-blue-600 transition cursor-pointer"
+                >
+                  30N
+                </button>
+              </div>
               <input
                 type="date"
                 title="Từ ngày"

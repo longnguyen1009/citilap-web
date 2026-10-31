@@ -21,7 +21,7 @@ import {
   AdminButton,
 } from '@/components/admin/ui';
 import { mediaRequest } from '@/components/admin/media/MediaBrowser';
-import type { LandingPageListItem } from '@/contracts/cms/site-builder';
+import type { LandingPageListItem, LandingPageStudioResponse } from '@/contracts/cms/site-builder';
 
 interface LandingPageListResponse {
   items: LandingPageListItem[];
@@ -38,6 +38,8 @@ export default function AdminBuilderListPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED'>('ALL');
+  const [homepage, setHomepage] = useState<LandingPageStudioResponse | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createTitle, setCreateTitle] = useState('');
@@ -98,16 +100,20 @@ export default function AdminBuilderListPage() {
   useEffect(() => {
     let ignore = false;
     const fetchPages = async () => {
+      setLoading(true);
       try {
         const params = new URLSearchParams();
         if (query.trim()) params.set('q', query.trim());
         params.set('page', String(page));
         params.set('limit', '20');
+        params.set('excludeHome', 'true');
+        if (statusFilter !== 'ALL') params.set('status', statusFilter);
 
         const res = await mediaRequest<LandingPageListResponse>(`/api/admin/builder?${params.toString()}`);
         if (!ignore) {
           setData(res);
           setError(null);
+          if (page > res.totalPages) setPage(res.totalPages);
         }
       } catch (err: unknown) {
         if (!ignore) {
@@ -124,18 +130,17 @@ export default function AdminBuilderListPage() {
     return () => {
       ignore = true;
     };
-  }, [query, page, reloadKey]);
+  }, [query, page, reloadKey, statusFilter]);
 
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT'>('ALL');
+  useEffect(() => {
+    let ignore = false;
+    mediaRequest<LandingPageStudioResponse>('/api/admin/builder/home').then(result => {
+      if (!ignore) setHomepage(result);
+    }).catch(() => { if (!ignore) setHomepage(null); });
+    return () => { ignore = true; };
+  }, [reloadKey]);
 
-  // Separate homepage from landing pages
-  const homepage = data?.items.find((p) => p.id === 'home');
-  const landingPages = data?.items.filter((p) => p.id !== 'home') || [];
-  const filteredLandingPages = landingPages.filter((lp) => {
-    if (statusFilter === 'PUBLISHED') return lp.status === 'PUBLISHED';
-    if (statusFilter === 'DRAFT') return lp.status !== 'PUBLISHED';
-    return true;
-  });
+  const filteredLandingPages = data?.items || [];
 
   const handleCreateLandingPage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,9 +156,16 @@ export default function AdminBuilderListPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          internalName: createName.trim() || createTitle.trim(),
-          title: createTitle.trim(),
-          slug: createSlug.trim().toLowerCase(),
+          expectedRevision: 0,
+          action: 'save',
+          document: {
+            schemaVersion: 1,
+            internalName: createName.trim() || createTitle.trim(),
+            title: createTitle.trim(),
+            slug: createSlug.trim().toLowerCase(),
+            seo: { title: '', description: '', ogImageAssetId: null },
+            sections: [],
+          },
         }),
       });
 
@@ -179,9 +191,10 @@ export default function AdminBuilderListPage() {
     <div className="space-y-3 pb-16">
       <PageHeader
         title="Bố cục trang (Site Builder)"
+        description="Trang chủ và trang đích gồm các khối nội dung. Lưu nháp để soạn; xuất bản để khách thấy. Sản phẩm, bài viết và bộ sưu tập lấy từ các màn quản lý tương ứng."
         badge={
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-            1 Trang chủ · {landingPages.length} Landing Pages
+            {data?.total ?? 0} trang đích khớp bộ lọc
           </span>
         }
         actions={
@@ -213,7 +226,7 @@ export default function AdminBuilderListPage() {
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-slate-900 truncate">
-                  {homepage?.title || 'Trang chủ cửa hàng (Homepage)'}
+                  {homepage?.document.title || 'Trang chủ cửa hàng (Homepage)'}
                 </span>
                 <span className="font-mono text-[11px] text-blue-700 bg-blue-100/80 px-1.5 py-0.5 rounded">
                   /
@@ -225,11 +238,11 @@ export default function AdminBuilderListPage() {
                       : 'bg-amber-50 text-amber-700 border border-amber-200'
                   }`}
                 >
-                  {homepage?.status === 'PUBLISHED' ? 'Đang hiển thị' : 'Bản nháp'}
+                  {homepage ? (homepage.isPublished ? 'Đang hiển thị' : 'Bản nháp') : 'Chưa tải trạng thái'}
                 </span>
                 <span className="text-[11px] text-slate-500 flex items-center gap-1">
                   <Layers className="w-3 h-3" />
-                  {homepage?.sectionCount || 0} sections · #v{homepage?.revision || 1}
+                  {homepage && `${homepage.document.sections.length} khối · phiên bản ${homepage.revision}${homepage.hasUnpublishedDraft ? ' · Có nháp chưa xuất bản' : ''}`}
                 </span>
               </div>
             </div>
@@ -261,43 +274,48 @@ export default function AdminBuilderListPage() {
           <div className="flex items-center gap-1 text-xs">
             <button
               type="button"
-              onClick={() => setStatusFilter('ALL')}
+              aria-pressed={statusFilter === 'ALL'}
+              onClick={() => { setStatusFilter('ALL'); setPage(1); }}
               className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
                 statusFilter === 'ALL'
                   ? 'bg-blue-600 text-white font-semibold'
                   : 'text-slate-600 hover:bg-slate-200/70'
               }`}
             >
-              Tất cả Landing Page <span className="opacity-75">({landingPages.length})</span>
+              Tất cả trang đích
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter('PUBLISHED')}
+              aria-pressed={statusFilter === 'PUBLISHED'}
+              onClick={() => { setStatusFilter('PUBLISHED'); setPage(1); }}
               className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
                 statusFilter === 'PUBLISHED'
                   ? 'bg-blue-600 text-white font-semibold'
                   : 'text-slate-600 hover:bg-slate-200/70'
               }`}
             >
-              Đang hiển thị <span className="opacity-75">({landingPages.filter((p) => p.status === 'PUBLISHED').length})</span>
+              Đang hiển thị
             </button>
             <button
               type="button"
-              onClick={() => setStatusFilter('DRAFT')}
+              aria-pressed={statusFilter === 'DRAFT'}
+              onClick={() => { setStatusFilter('DRAFT'); setPage(1); }}
               className={`px-2.5 py-1 rounded-md font-medium transition cursor-pointer ${
                 statusFilter === 'DRAFT'
                   ? 'bg-blue-600 text-white font-semibold'
                   : 'text-slate-600 hover:bg-slate-200/70'
               }`}
             >
-              Bản nháp / Ẩn <span className="opacity-75">({landingPages.filter((p) => p.status !== 'PUBLISHED').length})</span>
+              Bản nháp
             </button>
+            <button type="button" aria-pressed={statusFilter === 'ARCHIVED'} onClick={() => { setStatusFilter('ARCHIVED'); setPage(1); }} className={`px-2.5 py-1 rounded-md font-medium ${statusFilter === 'ARCHIVED' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-200/70'}`}>Đã ẩn</button>
           </div>
 
           <div className="relative w-64">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
+              aria-label="Tìm trang đích"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);
@@ -321,9 +339,9 @@ export default function AdminBuilderListPage() {
         ) : filteredLandingPages.length === 0 ? (
           <div className="p-10 text-center space-y-2">
             <LayoutTemplate className="w-8 h-8 text-slate-300 mx-auto" />
-            <h4 className="text-xs font-bold text-slate-700">Chưa có Landing Page nào</h4>
+            <h4 className="text-xs font-bold text-slate-700">Không có trang đích khớp bộ lọc</h4>
             <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-              Tạo trang đích riêng cho chiến dịch khuyến mãi hoặc bộ sưu tập chuyên đề.
+              Đổi từ khóa hoặc trạng thái; chọn Tạo Landing Page để tạo trang mới.
             </p>
           </div>
         ) : (
@@ -349,6 +367,7 @@ export default function AdminBuilderListPage() {
                       >
                         {lp.title}
                       </Link>
+                      {lp.hasUnpublishedDraft && <span className="text-xs text-amber-700">Có nháp chưa xuất bản</span>}
                       {lp.internalName && lp.internalName !== lp.title && (
                         <span className="text-[11px] text-slate-400">Nội bộ: {lp.internalName}</span>
                       )}
@@ -411,6 +430,13 @@ export default function AdminBuilderListPage() {
             </table>
           </div>
         )}
+        {data && <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs">
+          <span>{data.total} trang đích · Trang {data.page}/{data.totalPages}</span>
+          <div className="flex gap-2">
+            <AdminButton disabled={loading || page <= 1} onClick={() => setPage(page - 1)}>Trang trước</AdminButton>
+            <AdminButton disabled={loading || page >= data.totalPages} onClick={() => setPage(page + 1)}>Trang sau</AdminButton>
+          </div>
+        </div>}
       </AdminCard>
 
       {/* CREATE MODAL */}
@@ -452,8 +478,9 @@ export default function AdminBuilderListPage() {
               )}
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Tiêu đề trang *</label>
+                <label htmlFor="landing-title" className="font-bold text-slate-700 block mb-1">Tiêu đề trang *</label>
                 <input
+                  id="landing-title"
                   type="text"
                   required
                   value={createTitle}
@@ -476,8 +503,9 @@ export default function AdminBuilderListPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Tên nội bộ (Admin)</label>
+                <label htmlFor="landing-name" className="font-bold text-slate-700 block mb-1">Tên nội bộ (Admin)</label>
                 <input
+                  id="landing-name"
                   type="text"
                   value={createName}
                   onChange={(e) => setCreateName(e.target.value)}
@@ -487,12 +515,13 @@ export default function AdminBuilderListPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Đường dẫn tĩnh (Slug) *</label>
+                <label htmlFor="landing-slug" className="font-bold text-slate-700 block mb-1">Đường dẫn tĩnh (Slug) *</label>
                 <div className="flex items-center">
                   <span className="px-3 py-2 bg-slate-100 border border-r-0 border-slate-300 rounded-l-lg text-slate-500 font-mono">
                     /landing/
                   </span>
                   <input
+                    id="landing-slug"
                     type="text"
                     required
                     value={createSlug}

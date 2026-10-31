@@ -561,14 +561,8 @@ export async function listApprovedProductReviews(
       if (!comment) continue;
 
       const normalizedReviewProduct = normalizeProductTitleForReviewMatch(rawProductName);
-      const isMatch =
-        normalizedTargets.length === 0 ||
-        normalizedTargets.some(
-          (target) =>
-            target === normalizedReviewProduct ||
-            (target.length >= 5 && normalizedReviewProduct.includes(target)) ||
-            (normalizedReviewProduct.length >= 5 && target.includes(normalizedReviewProduct))
-        );
+      // ponytail: legacy reviews use exact titles; use product IDs before retaining history across renames.
+      const isMatch = normalizedTargets.includes(normalizedReviewProduct);
 
       if (isMatch) {
         matched.push({
@@ -581,7 +575,7 @@ export async function listApprovedProductReviews(
             row.createdAt instanceof Date
               ? row.createdAt.toISOString()
               : String(row.createdAt),
-          verifiedLabel: 'Đã mua tại CitiLap',
+          verifiedLabel: 'Phản hồi đã duyệt',
         });
       }
     }

@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 import { unstable_splitSqlQuery } from 'wrangler';
 
-const bundle = await build({
+await build({
   stdin: {
     contents: `
       export * from './src/server/services/storefront-cms.service';
@@ -17,17 +17,19 @@ const bundle = await build({
   bundle: true,
   platform: 'node',
   format: 'esm',
+  external: ['cloudflare:workers', 'node:*'],
   plugins: [{
     name: 'mock-server-only',
     setup(b) {
+      b.onResolve({ filter: /\.wasm/ }, args => ({ path: args.path, external: true }));
       b.onResolve({ filter: /^server-only$/ }, args => ({ path: args.path, namespace: 'server-only-ns' }));
       b.onLoad({ filter: /.*/, namespace: 'server-only-ns' }, () => ({ contents: '' }));
     },
   }],
-  write: false,
+  outfile: 'scripts/.publication-correctness-bundle.mjs',
 });
 
-const api = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const api = await import('./.publication-correctness-bundle.mjs');
 const mf = new Miniflare(
   convertV4MiniflareOptions({
     modules: true,

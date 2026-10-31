@@ -2101,6 +2101,33 @@ function ProductGridForm({
   update: (p: Partial<ProductGridData>) => void;
   onPickProduct: () => void;
 }) {
+  const [productNames, setProductNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let ignore = false;
+    const missingIds = (data.manualProductIds || []).filter((id) => !productNames[id]);
+    if (missingIds.length === 0) return;
+
+    async function fetchMissingNames() {
+      try {
+        const res = await mediaRequest<{ items: Array<{ id: string; name: string }> }>('/api/admin/products?limit=100');
+        if (!ignore && res?.items) {
+          const map: Record<string, string> = {};
+          for (const it of res.items) {
+            map[it.id] = it.name;
+          }
+          setProductNames((prev) => ({ ...prev, ...map }));
+        }
+      } catch {
+        // fail-soft
+      }
+    }
+    void fetchMissingNames();
+    return () => {
+      ignore = true;
+    };
+  }, [data.manualProductIds, productNames]);
+
   return (
     <div className="space-y-4">
       {!!data.tabs?.length && <fieldset className="space-y-3 rounded-xl border p-3"><legend className="px-1 font-bold">Các tab sản phẩm</legend>{data.tabs.map((tab, index) => <div key={tab.id} className="space-y-2 rounded border bg-slate-50 p-3"><label className="block text-xs">Tên tab<input value={tab.label} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, label: e.target.value } : t) })} className="mt-1 w-full rounded border p-2" /></label><label className="block text-xs">Link xem tất cả<input value={tab.href} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, href: e.target.value } : t) })} className="mt-1 w-full rounded border p-2" /></label><label className="block text-xs">ID sản phẩm, mỗi dòng một ID<textarea value={tab.productIds.join('\n')} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, productIds: e.target.value.split(/\s+/).filter(Boolean) } : t) })} rows={3} className="mt-1 w-full rounded border p-2 font-mono" /></label></div>)}</fieldset>}
@@ -2292,12 +2319,22 @@ function ProductGridForm({
               {data.manualProductIds.map((pId: string, idx: number) => (
                 <div
                   key={pId}
-                  className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  className="flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg text-xs transition"
                 >
-                  <span className="font-mono text-slate-600 truncate max-w-xs">
-                    {idx + 1}. {pId}
-                  </span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-900 truncate">
+                        {productNames[pId] || `Sản phẩm ${pId}`}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono truncate">
+                        ID: {pId}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
                       disabled={idx === 0}
@@ -2306,7 +2343,7 @@ function ProductGridForm({
                         [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
                         update({ manualProductIds: next });
                       }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"
+                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
                       title="Di chuyển lên"
                     >
                       <ArrowUp className="w-3.5 h-3.5" />
@@ -2319,7 +2356,7 @@ function ProductGridForm({
                         [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
                         update({ manualProductIds: next });
                       }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20"
+                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
                       title="Di chuyển xuống"
                     >
                       <ArrowDown className="w-3.5 h-3.5" />
@@ -2331,7 +2368,7 @@ function ProductGridForm({
                           manualProductIds: data.manualProductIds?.filter((x: string) => x !== pId),
                         });
                       }}
-                      className="p-1 text-red-500 hover:text-red-700"
+                      className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
                       title="Xóa khỏi danh sách"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -2433,6 +2470,16 @@ function FeaturedBrandsForm({
           placeholder="Khám Phá Theo Thương Hiệu"
         />
       </div>
+      <div>
+        <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+        <input
+          type="text"
+          value={data.subtitle || ''}
+          onChange={(e) => update({ subtitle: e.target.value })}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          placeholder="Phân phối chính hãng các dòng máy hàng đầu thế giới"
+        />
+      </div>
       <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1">
         <div className="font-bold">Đồng bộ từ thương hiệu sản phẩm:</div>
         <p>Logo các thương hiệu lớn (Dell, Lenovo, Asus, Apple, HP...) được tự động lấy từ danh mục thương hiệu catalog.</p>
@@ -2448,8 +2495,54 @@ function FeaturedCollectionForm({
   data: FeaturedCollectionData;
   update: (p: Partial<FeaturedCollectionData>) => void;
 }) {
+  const [collections, setCollections] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadCollections() {
+      try {
+        const res = await mediaRequest<{ document?: { collections?: Array<{ id: string; name: string; slug: string }> } }>('/api/admin/navigation');
+        if (!ignore && res?.document?.collections) {
+          setCollections(res.document.collections);
+        }
+      } catch {
+        // fail-soft
+      }
+    }
+    void loadCollections();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   return (
     <div className="space-y-4">
+      {collections.length > 0 && (
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Chọn từ bộ sưu tập đã có</label>
+          <select
+            value={collections.some((c) => c.id === data.collectionId || c.slug === data.collectionId) ? data.collectionId : ''}
+            onChange={(e) => {
+              const sel = collections.find((c) => c.id === e.target.value || c.slug === e.target.value);
+              if (sel) {
+                update({
+                  collectionId: sel.id,
+                  title: data.title || sel.name,
+                });
+              }
+            }}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+          >
+            <option value="">-- Chọn bộ sưu tập sẵn có --</option>
+            {collections.map((col) => (
+              <option key={col.id} value={col.id}>
+                {col.name} ({col.slug})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="font-bold text-slate-700 block mb-1">Tiêu đề bộ sưu tập (Tùy chọn ghi đè)</label>
@@ -2462,13 +2555,47 @@ function FeaturedCollectionForm({
           />
         </div>
         <div>
-          <label className="font-bold text-slate-700 block mb-1">Mã Bộ sưu tập (Collection ID / Slug)</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="font-bold text-slate-700 block">Mã Bộ sưu tập (Collection ID / Slug)</label>
+            <Link
+              href="/admin/navigation?tab=collections"
+              target="_blank"
+              className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Quản lý Bộ sưu tập ↗
+            </Link>
+          </div>
           <input
             type="text"
             value={data.collectionId || ''}
             onChange={(e) => update({ collectionId: e.target.value })}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
             placeholder="Ví dụ: col-gaming-deals"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Ví dụ: Bộ sưu tập tuyển chọn các dòng máy bán chạy nhất"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Số lượng hiển thị (Limit)</label>
+          <input
+            type="number"
+            min={1}
+            max={48}
+            value={data.limit || 12}
+            onChange={(e) => update({ limit: Math.min(48, Math.max(1, parseInt(e.target.value) || 12)) })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="12"
           />
         </div>
       </div>
@@ -2711,16 +2838,44 @@ function VideoReviewsForm({
           <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
             <div className="flex items-center justify-between pb-1 border-b border-slate-200">
               <span className="font-bold text-slate-700 text-xs">Video #{index + 1}</span>
-              <button
-                type="button"
-                className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
-                onClick={() => {
-                  if (!window.confirm(`Xóa video #${index + 1}?`)) return;
-                  update({ videos: data.videos.filter((_, i) => i !== index) });
-                }}
-              >
-                Xóa video
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => {
+                    const next = [...data.videos];
+                    [next[index], next[index - 1]] = [next[index - 1], next[index]];
+                    update({ videos: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển lên"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={index === data.videos.length - 1}
+                  onClick={() => {
+                    const next = [...data.videos];
+                    [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                    update({ videos: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển xuống"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
+                  onClick={() => {
+                    if (!window.confirm(`Xóa video #${index + 1}?`)) return;
+                    update({ videos: data.videos.filter((_, i) => i !== index) });
+                  }}
+                >
+                  Xóa video
+                </button>
+              </div>
             </div>
 
             <div>
@@ -2876,16 +3031,44 @@ function CustomerGalleryForm({
             <div className="flex-1 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-slate-700 text-xs">Ảnh #{index + 1}</span>
-                <button
-                  type="button"
-                  className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer"
-                  onClick={() => {
-                    if (!window.confirm(`Xóa ảnh #${index + 1}?`)) return;
-                    update({ images: data.images.filter((_, i) => i !== index) });
-                  }}
-                >
-                  Xóa
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => {
+                      const next = [...data.images];
+                      [next[index], next[index - 1]] = [next[index - 1], next[index]];
+                      update({ images: next });
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                    title="Di chuyển lên"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === data.images.length - 1}
+                    onClick={() => {
+                      const next = [...data.images];
+                      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                      update({ images: next });
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                    title="Di chuyển xuống"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
+                    onClick={() => {
+                      if (!window.confirm(`Xóa ảnh #${index + 1}?`)) return;
+                      update({ images: data.images.filter((_, i) => i !== index) });
+                    }}
+                  >
+                    Xóa
+                  </button>
+                </div>
               </div>
 
               <div>

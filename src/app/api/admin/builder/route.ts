@@ -15,6 +15,7 @@ async function GETHandler(request: Request) {
       page,
       limit,
       status,
+      excludeHome: url.searchParams.get('excludeHome') === 'true',
     })
   );
 }

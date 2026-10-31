@@ -256,6 +256,7 @@ function ContactsContent() {
       {/* 1. Page Header */}
       <PageHeader
         title="Tư vấn & Liên hệ"
+        description="Yêu cầu tư vấn và lịch hẹn từ website, chưa phải đơn hàng. Nhận xử lý, ghi chú kết quả rồi đánh dấu Đã xong; có thể mở lại khi cần."
         badge={
           <div className="flex items-center gap-1.5">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">

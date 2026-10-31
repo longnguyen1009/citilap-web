@@ -6,6 +6,7 @@ import {
   defaultHomepageSections,
   type LandingPageDocument,
   type SectionItem,
+  type LandingPageListItem,
 } from '../../contracts/cms/site-builder';
 import { RESERVED_SLUGS } from '../../contracts/cms/post';
 import { MediaError, type MediaEnvironment } from './media-library.service';
@@ -23,18 +24,6 @@ import { getPublicMediaUrl } from '../../infra/cloudflare/r2/storage';
 import { getStorefrontPricingContext } from './pricing.service';
 import { getPrismaClient } from '../../lib/prisma';
 import { canonicalCategoryPath } from '../../lib/category-paths';
-
-export interface LandingPageListItem {
-  id: string;
-  slug: string;
-  name: string;
-  isHome: boolean;
-  status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
-  revision: number;
-  publishedRevision: number | null;
-  hasUnpublishedDraft: boolean;
-  updatedAt: string;
-}
 
 interface StudioRow {
   pageId: string;
@@ -136,7 +125,7 @@ export const ensureHomepageBootstrapped = bootstrapHomepage;
 
 export async function getLandingPageList(
   db: D1Database,
-  opts: { q?: string; page?: number; limit?: number; status?: string } = {}
+  opts: { q?: string; page?: number; limit?: number; status?: string; excludeHome?: boolean } = {}
 ) {
   try {
     await ensureHomepageBootstrapped(db);
@@ -151,6 +140,7 @@ export async function getLandingPageList(
 
   const whereClauses: string[] = ['p.deletedAt IS NULL'];
   const params: (string | number)[] = [];
+  if (opts.excludeHome) whereClauses.push('p.isHome = 0');
 
   if (opts.status && ['DRAFT', 'PUBLISHED', 'ARCHIVED'].includes(opts.status)) {
     whereClauses.push('p.status = ?');
@@ -158,8 +148,8 @@ export async function getLandingPageList(
   }
 
   if (q) {
-    whereClauses.push('(instr(lower(p.name), lower(?)) > 0 OR instr(lower(p.slug), lower(?)) > 0)');
-    params.push(q, q);
+    whereClauses.push("(instr(lower(p.name), lower(?)) > 0 OR instr(lower(p.slug), lower(?)) > 0 OR EXISTS (SELECT 1 FROM LandingPageStudio s WHERE s.pageId = p.id AND instr(lower(json_extract(s.draft, '$.title')), lower(?)) > 0))");
+    params.push(q, q, q);
   }
 
   const whereSql = whereClauses.join(' AND ');
@@ -189,11 +179,15 @@ export async function getLandingPageList(
     const publishedRevision = r.publishedRevision != null ? Number(r.publishedRevision) : null;
     const draft = typeof r.draft === 'string' ? r.draft : '';
     const published = typeof r.published === 'string' ? r.published : null;
+    const document: LandingPageDocument = JSON.parse(draft || '{}');
 
     return {
       id: String(r.id),
       slug: String(r.slug),
       name: String(r.name),
+      internalName: document.internalName || String(r.name),
+      title: document.title || String(r.name),
+      sectionCount: document.sections?.length ?? 0,
       isHome,
       status: (r.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') || 'DRAFT',
       revision,
@@ -553,7 +547,7 @@ export async function resolveSectionsForStorefront(
           }));
         }
       } else if (data.type === 'news_reviews') {
-        const effectiveLimit = data.postIds.length > 0 ? data.limit : Math.max(data.limit || 10, 10);
+        const effectiveLimit = data.limit && data.limit > 0 ? data.limit : 10;
         const { items } = await publicPostList(db, {
           ids: data.postIds,
           categoryId: data.categoryId || undefined,

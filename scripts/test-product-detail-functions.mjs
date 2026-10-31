@@ -57,7 +57,7 @@ export async function runProductDetailChecks({db,send,base,cookie,bucket}) {
     const restored=await send('/api/admin/products/fixture-p','PUT',{expectedRevision:revision,action:'publish',document},true);assert.equal(restored.status,200,restored.text);revision=restored.json.data.revision;
   });
 
-  const evidence='docs/admin/evidence/product-detail-functions';await mkdir(evidence,{recursive:true});
+  const evidence='.wrangler/audit-2026-10-30/product-detail';await mkdir(evidence,{recursive:true});
   const profile=await mkdtemp(resolve('.wrangler/pdp-functions-edge-'));
   const browser=spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',['--headless=new','--remote-debugging-port=0','--user-data-dir='+profile,'--no-first-run','--disable-background-networking','about:blank'],{windowsHide:true,stdio:'ignore'});
   let ws,sequence=0;const calls=new Map(),errors=[];
@@ -67,7 +67,7 @@ export async function runProductDetailChecks({db,send,base,cookie,bucket}) {
   async function js(expression){const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;}
   async function navigate(path){await cdp('Page.navigate',{url:base+path});await until(()=>js(`location.pathname===${JSON.stringify(path)} && document.readyState==='complete' && !!document.querySelector('main')`),path);}
   async function click(text,selector='button'){await until(()=>js(`[...document.querySelectorAll(${JSON.stringify(selector)})].some(e=>e.textContent.includes(${JSON.stringify(text)}) && Object.keys(e).some(k=>k.startsWith('__reactProps$')))`),'hydrate '+text);await js(`[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.textContent.includes(${JSON.stringify(text)})).click()`);}
-  async function fill(selector,value){await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.focus();e.select?.();})()`);await cdp('Input.insertText',{text:value});}
+  async function fill(selector,value){await until(()=>js(`!!document.querySelector(${JSON.stringify(selector)})`),'Input '+selector);await js(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.focus();e.select?.();})()`);await cdp('Input.insertText',{text:value});}
   async function shot(name){const result=await cdp('Page.captureScreenshot',{format:'png'});await writeFile(evidence+'/'+name+'.png',Buffer.from(result.data,'base64'));}
   try {
     const port=await until(async()=>{try{return (await readFile(profile+'/DevToolsActivePort','utf8')).split('\n')[0];}catch{return null;}},'Edge');
@@ -112,18 +112,18 @@ export async function runProductDetailChecks({db,send,base,cookie,bucket}) {
       await fill('dialog input[name="name"]','Browser Installment Buyer');await fill('dialog input[name="phone"]','0900000000');await click('Gửi yêu cầu','dialog button');await until(()=>js("document.querySelector('dialog').innerText.includes('Yêu cầu đã được tiếp nhận')"),'installment saved');
       assert.equal(await db.prepare('SELECT COUNT(*) AS n FROM ContactSubmission').first('n'),before+1);assert.match((await db.prepare('SELECT message FROM ContactSubmission WHERE name=?').bind('Browser Installment Buyer').first()).message,/Tư vấn trả góp/);
       await js("document.querySelector('dialog button[aria-label=\"Đóng tư vấn trả góp\"]').click()");
-      await fill('#danh-gia-khach-hang input[type="text"]','Browser Reviewer');await fill('#danh-gia-khach-hang input[type="tel"]','0900000000');await fill('#danh-gia-khach-hang textarea','Fixture browser review');await click('Gửi đánh giá ngay');
+      await click('+ Thêm đánh giá');await fill('#danh-gia-khach-hang input[type="text"]','Browser Reviewer');await fill('#danh-gia-khach-hang input[type="tel"]','0900000000');await fill('#danh-gia-khach-hang textarea','Fixture browser review');await click('Gửi đánh giá ngay');
       await until(()=>js("document.body.innerText.includes('Phản hồi chưa được công khai')"),'review saved');assert.equal(await db.prepare('SELECT COUNT(*) AS n FROM ContactSubmission').first('n'),before+2);
     });
     await check('Admin PC settings + product fields edit, save and survive reload',async()=>{
       await cdp('Network.setCookie',{name:'admin_session',value:cookie.split('=')[1],url:base,httpOnly:true,sameSite:'Lax'});
-      await navigate('/admin/settings');await click('Trang sản phẩm');assert(await js("document.body.innerText.includes('Nội dung chung trang chi tiết sản phẩm')"));await shot('admin-settings-desktop');
-      await navigate('/admin/products/fixture-p');await click('Bài giới thiệu');await until(()=>js("document.body.innerText.includes('Phụ kiện mua kèm')"),'product admin fields');
+      await navigate('/admin/settings');await click('Trang sản phẩm');await until(()=>js("!!document.querySelector('input[aria-label=\"Đặc quyền 1\"]')"),'product settings');await shot('admin-settings-desktop');
+      await navigate('/admin/products/fixture-p');await click('Quà & FAQ');await until(()=>js("!!document.querySelector('section[aria-label=\"FAQ sản phẩm\"] input')"),'product admin fields');
       assert(await js("[...document.querySelectorAll('input')].some(e=>e.value==='Fixture upgrade question?')"));await shot('admin-product-desktop');
       await fill('section[aria-label="FAQ sản phẩm"] input','Fixture edited FAQ?');await click('Lưu nháp');
       await until(async()=>{const result=await send('/api/admin/products/fixture-p','GET',undefined,true);return result.json.data.document.faqs[0].q==='Fixture edited FAQ?';},'saved FAQ');
       const published=await send('/api/catalog/studio/fixture-p');assert.equal(published.json.data.faqs[0].q,'Fixture upgrade question?','Draft must not leak');
-      await navigate('/admin/products/fixture-p');await click('Bài giới thiệu');await until(()=>js("[...document.querySelectorAll('input')].some(e=>e.value==='Fixture edited FAQ?')"),'reloaded edited FAQ');
+      await navigate('/admin/products/fixture-p');await click('Quà & FAQ');await until(()=>js("[...document.querySelectorAll('input')].some(e=>e.value==='Fixture edited FAQ?')"),'reloaded edited FAQ');
     });
     assert.deepEqual(errors,[],'browser runtime errors');
   } finally {ws?.close();browser.kill();}

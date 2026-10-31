@@ -964,7 +964,8 @@ async function computeSearchProducts(
     }
 
     for (const c of prodConds) {
-      const cur = conditionCountMap.get(c) || { label: c, count: 0 };
+      const label = c === 'NEW' ? 'Mới 100%' : c === 'LIKE_NEW' ? 'Like New 99%' : c === 'USED' ? 'Đã qua sử dụng' : c === 'REFURBISHED' ? 'Refurbished' : c;
+      const cur = conditionCountMap.get(c) || { label, count: 0 };
       cur.count += 1;
       conditionCountMap.set(c, cur);
     }

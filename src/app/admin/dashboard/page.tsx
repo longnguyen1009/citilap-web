@@ -165,6 +165,7 @@ export default function DashboardPage() {
 
   const shortcuts = [
     { label: "+ Sản phẩm", href: "/admin/products/new", icon: Plus, primary: true },
+    { label: "+ Nhập máy", href: "/admin/inventory", icon: Package },
     { label: "+ Bài viết", href: "/admin/posts/new", icon: Newspaper },
     { label: "Flash Sale", href: "/admin/campaigns", icon: Zap },
     { label: "Trang chủ", href: "/admin/builder", icon: LayoutTemplate },

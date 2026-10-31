@@ -86,8 +86,8 @@ const navGroups: NavGroup[] = [
   {
     groupName: "Giao diện",
     items: [
-      { name: "Trang chủ", href: "/admin/builder", icon: LayoutTemplate, keywords: "landing builder" },
-      { name: "Menu", href: "/admin/navigation", icon: Menu, keywords: "mega menu điều hướng" },
+      { name: "Bố cục trang", href: "/admin/builder", icon: LayoutTemplate, keywords: "trang chủ landing builder" },
+      { name: "Menu & Bộ sưu tập", href: "/admin/navigation", icon: Menu, keywords: "mega menu điều hướng collection nhóm sản phẩm" },
     ],
   },
   {

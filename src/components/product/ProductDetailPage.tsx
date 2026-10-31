@@ -14,6 +14,7 @@ import ProductShippingCommitment from "@/components/product/ProductShippingCommi
 import ProductPromoBanners from "@/components/product/ProductPromoBanners";
 import ProductHeroSection from "@/components/product/ProductHeroSection";
 import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
+import InspectionReports from "@/components/product/InspectionReports";
 import { ProductReviewsSection } from "@/components/product/ProductReviewsSection";
 import { ProductSpecsSidebarCard } from "@/components/product/ProductSpecsSidebarCard";
 import { listApprovedProductReviews } from "@/server/services/contact.service";
@@ -717,8 +718,8 @@ export default async function ProductDetailPage({
           accessories={accessories}
           gifts={studio?.gifts || []}
           canOrder={studio ? studio.canOrder : true}
-          reviewCount={32 + approvedReviews.length}
-          averageRating="4.9"
+          reviewCount={approvedReviews.length}
+          averageRating={approvedReviews.length ? (approvedReviews.reduce((sum, review) => sum + review.rating, 0) / approvedReviews.length).toFixed(1) : "0.0"}
         />
 
         {/* 2. MIDDLE SECTION: SPECIFICATIONS, CONTENT, FAQ, SHOWROOMS & REVIEWS */}
@@ -730,6 +731,9 @@ export default async function ProductDetailPage({
               safeDescription={safeDescription}
               productName={displayName}
             />
+
+            {/* Hồ sơ kiểm định từng máy (nếu có biên bản kiểm tra công khai) */}
+            <InspectionReports productId={product.id} variantId={activeVariantId || null} />
 
             {/* Câu hỏi thường gặp FAQ */}
             <ProductFaqAccordion faqs={studio?.faqs || []} productName={displayName} />

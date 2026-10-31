@@ -585,6 +585,78 @@ export default function OrderDetailPage({
         </div>
       </div>
 
+      {/* Visual Order Lifecycle Pipeline Stepper */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs print:hidden">
+        {currentStatus === "CANCELLED" ? (
+          <div className="flex items-center justify-between text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+            <div className="flex items-center gap-2">
+              <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>
+                <strong>Đơn hàng đã hủy.</strong> Vui lòng xem lý do hủy trong lịch sử bên dưới. Bạn có thể bấm &quot;Mở lại đơn&quot; phía trên nếu khách đổi ý.
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-2 text-xs">
+            {([
+              { id: "NEW", stepNum: "1", title: "Tiếp nhận mới", desc: "Khách vừa gửi yêu cầu" },
+              { id: "CONTACTED", stepNum: "2", title: "Đã liên hệ", desc: "Tư vấn & chốt cấu hình" },
+              { id: "CONFIRMED", stepNum: "3", title: "Đã xác nhận", desc: "Gán máy QC & đóng gói" },
+              { id: "COMPLETED", stepNum: "4", title: "Hoàn tất xử lý", desc: "Bàn giao & kích hoạt BH" },
+            ] as const).map((step, idx) => {
+              const stepRanks: Record<string, number> = {
+                NEW: 0,
+                PENDING: 0,
+                CONTACTED: 1,
+                CONFIRMED: 2,
+                COMPLETED: 3,
+              };
+              const activeRank = stepRanks[currentStatus] ?? 0;
+              const isPast = idx < activeRank;
+              const isCurrent = idx === activeRank;
+
+              return (
+                <div
+                  key={step.id}
+                  className={`p-2.5 rounded-lg border transition-all ${
+                    isCurrent
+                      ? "bg-blue-50/70 border-blue-400 text-blue-900 shadow-2xs"
+                      : isPast
+                      ? "bg-slate-50 border-emerald-300 text-slate-800"
+                      : "bg-slate-50/50 border-slate-200 text-slate-400"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span
+                      className={`inline-flex items-center justify-center size-5 rounded-full text-[11px] font-bold ${
+                        isCurrent
+                          ? "bg-blue-600 text-white"
+                          : isPast
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {isPast ? "✓" : step.stepNum}
+                    </span>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider ${
+                        isCurrent ? "text-blue-700" : isPast ? "text-emerald-700" : "text-slate-400"
+                      }`}
+                    >
+                      {isCurrent ? "Đang xử lý" : isPast ? "Đã xong" : "Chờ"}
+                    </span>
+                  </div>
+                  <div className={`font-bold truncate ${isCurrent ? "text-blue-950 font-black" : "text-slate-900"}`}>
+                    {step.title}
+                  </div>
+                  <div className="text-[11px] text-slate-500 truncate mt-0.5">{step.desc}</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* 409 Conflict Banner */}
       {conflictError && (
         <div
@@ -693,7 +765,7 @@ export default function OrderDetailPage({
                                 <option value="">
                                   {productSerials.length > 0
                                     ? `-- Chọn Serial (${productSerials.length} máy sẵn kho) --`
-                                    : "-- Sản phẩm quản lý theo số lượng (không cần Serial) --"}
+                                    : "-- Chưa chọn Serial (hoặc không quản lý theo Serial) --"}
                                 </option>
                                 {productSerials.map((su) => (
                                   <option key={su.id} value={su.id}>
@@ -703,6 +775,16 @@ export default function OrderDetailPage({
                                   </option>
                                 ))}
                               </select>
+                              {productSerials.length === 0 && (
+                                <Link
+                                  href="/admin/inventory"
+                                  target="_blank"
+                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline"
+                                  title="Kho hiện không có sẵn máy cho sản phẩm này. Bấm để nhập máy mới."
+                                >
+                                  + Nhập máy vào kho ↗
+                                </Link>
+                              )}
                               {assignedInfo?.publicCode && (
                                 <Link
                                   href={`/order-tracking?code=${encodeURIComponent(assignedInfo.publicCode)}`}

@@ -118,22 +118,33 @@ export default function SearchListingContainer({
             className="w-full"
           />
 
-          {/* Quick popular keyword tags */}
-          <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-            <span className="text-caption text-text-muted flex items-center gap-1 mr-1">
-              <Sparkles className="w-3 h-3 text-brand-primary" />
-              <span>Gợi ý:</span>
-            </span>
-            {POPULAR_KEYWORDS.map((kw) => (
-              <button
-                key={kw}
-                onClick={() => router.push(`/search?q=${encodeURIComponent(kw)}`)}
-                className="px-2.5 py-1 rounded-pill bg-surface-subtle hover:bg-brand-primary-subtle hover:text-brand-primary text-text-secondary text-caption font-medium transition cursor-pointer border border-border-subtle hover:border-brand-primary/30"
+            {/* Quick popular keyword tags */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+              <span className="text-caption text-text-muted flex items-center gap-1 mr-1">
+                <Sparkles className="w-3 h-3 text-brand-primary" />
+                <span>Gợi ý:</span>
+              </span>
+              {POPULAR_KEYWORDS.map((kw) => (
+                <button
+                  key={kw}
+                  onClick={() => router.push(`/search?q=${encodeURIComponent(kw)}`)}
+                  className="px-2.5 py-1 rounded-pill bg-surface-subtle hover:bg-brand-primary-subtle hover:text-brand-primary text-text-secondary text-caption font-medium transition cursor-pointer border border-border-subtle hover:border-brand-primary/30"
+                >
+                  {kw}
+                </button>
+              ))}
+            </div>
+
+            {/* Smart advisor prompt */}
+            <div className="pt-1.5 text-center border-t border-border-subtle/60">
+              <Link
+                href="/chon-laptop"
+                className="inline-flex items-center gap-1.5 text-caption font-semibold text-brand-primary hover:text-brand-primary-hover hover:underline transition"
               >
-                {kw}
-              </button>
-            ))}
-          </div>
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>Chưa biết máy nào phù hợp với công việc? Dùng công cụ Chọn laptop theo nhu cầu →</span>
+              </Link>
+            </div>
         </div>
       </div>
 
@@ -253,7 +264,7 @@ export default function SearchListingContainer({
                     : "Không tìm thấy sản phẩm nào với các bộ lọc bạn đã chọn."
                 }
                 action={
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4">
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4 flex-wrap">
                     {totalActiveFilters > 0 && (
                       <Link
                         href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
@@ -262,6 +273,13 @@ export default function SearchListingContainer({
                         Xóa tất cả bộ lọc
                       </Link>
                     )}
+                    <Link
+                      href="/chon-laptop"
+                      className="px-5 py-2.5 rounded-control bg-blue-50 border border-blue-200 text-blue-700 font-bold text-body-sm hover:bg-blue-100 transition inline-flex items-center gap-1.5"
+                    >
+                      <Sparkles className="w-4 h-4 text-blue-600" />
+                      <span>Tư vấn chọn laptop phù hợp</span>
+                    </Link>
                     <Link
                       href="/phan-loai"
                       className="px-5 py-2.5 rounded-control border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"

@@ -11,6 +11,8 @@ const bundle = await build({
       export * from './src/server/services/settings.service';
       export * from './src/contracts/cms/settings';
       export * from './src/lib/auth';
+      export * from './src/server/admin-context';
+      export { loginAdmin } from './src/server/services/admin-identity.service';
     `,
     resolveDir: process.cwd(),
   },
@@ -40,6 +42,7 @@ async function check(name, fn) {
 
 try {
   const DB = await mf.getD1Database('DB');
+  globalThis.env = { DB, PRODUCT_MEDIA: {} };
 
   // Run all migrations including 0012_site_settings.sql
   const migrationFiles = (await readdir('d1-migrations')).filter((f) => f.endsWith('.sql')).sort();
@@ -49,6 +52,10 @@ try {
       await DB.prepare(stmt).run();
     }
   }
+
+  process.env.ADMIN_EMAIL = 'settings@fixture.invalid';
+  process.env.ADMIN_PASSWORD = 'FixtureSettingsPassword-2026';
+  const owner = await api.loginAdmin({ email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD }, DB);
 
   // TEST 1: Initial read without record returns revision 0 and confirmed defaults
   await check('initial read returns revision 0 and defaults without DB mutation', async () => {
@@ -93,7 +100,7 @@ try {
         freeShippingThreshold: 6000000,
       },
     };
-    const res = await api.saveAdminSettings(DB, input, 'admin-tester');
+    const res = await api.adminContext.run(owner.principal, () => api.saveAdminSettings(DB, input));
     assert.equal(res.revision, 1);
     assert.equal(res.document.storeName, 'CitiLap Store Official');
     savedDoc = res.document;
@@ -102,7 +109,7 @@ try {
     const row = await DB.prepare("SELECT * FROM SiteSettings WHERE id='site'").first();
     assert.equal(row.revision, 1);
     const revRow = await DB.prepare("SELECT * FROM SiteSettingsRevision WHERE revision=1").first();
-    assert.equal(revRow.actor, 'admin-tester');
+    assert.equal(revRow.actor, owner.principal.id);
     assert.equal(revRow.action, 'save');
   });
 
@@ -172,28 +179,30 @@ try {
   await check('auth guard: requireAdmin blocks unauthorized requests with 401', async () => {
     process.env.ADMIN_API_TOKEN = 'test-token-at-least-32-characters-long-12345';
     const noAuthReq = new Request('http://localhost:3000/api/admin/settings');
-    const denied = api.requireAdmin(noAuthReq);
+    const denied = await api.requireAdmin(noAuthReq);
     assert.ok(denied);
     assert.equal(denied.status, 401);
 
     const wrongTokenReq = new Request('http://localhost:3000/api/admin/settings', {
       headers: { authorization: 'Bearer wrong-token-wrong-token-wrong-token-32' },
     });
-    const deniedWrong = api.requireAdmin(wrongTokenReq);
+    const deniedWrong = await api.requireAdmin(wrongTokenReq);
     assert.ok(deniedWrong);
     assert.equal(deniedWrong.status, 401);
 
     const validReq = new Request('http://localhost:3000/api/admin/settings', {
       headers: { authorization: `Bearer ${process.env.ADMIN_API_TOKEN}` },
     });
-    const allowed = api.requireAdmin(validReq);
-    assert.equal(allowed, null);
+    const deniedLegacy = await api.requireAdmin(validReq);
+    assert.equal(deniedLegacy.status, 401, 'Legacy API token must not authenticate');
   });
 
   // TEST 9: CSRF protection: requireAdminMutation blocks cross-site mutations
   await check('CSRF guard: requireAdminMutation blocks cross-origin mutations with 403', async () => {
     process.env.ADMIN_API_TOKEN = 'test-token-at-least-32-characters-long-12345';
-    const validSession = api.createAdminSession(process.env.ADMIN_API_TOKEN);
+    process.env.ADMIN_EMAIL = 'settings@fixture.invalid';
+    process.env.ADMIN_PASSWORD = 'FixtureSettingsPassword-2026';
+    const { token: validSession } = await api.loginAdmin({ email: process.env.ADMIN_EMAIL, password: process.env.ADMIN_PASSWORD }, DB);
 
     // Cross-site request with cookie session
     const crossSiteReq = new Request('http://localhost:3000/api/admin/settings', {
@@ -203,7 +212,7 @@ try {
         origin: 'https://evil-attacker.com',
       },
     });
-    const csrfDenied = api.requireAdminMutation(crossSiteReq);
+    const csrfDenied = await api.requireAdminMutation(crossSiteReq);
     assert.ok(csrfDenied);
     assert.equal(csrfDenied.status, 403);
 
@@ -215,11 +224,12 @@ try {
         origin: 'http://localhost:3000',
       },
     });
-    const csrfAllowed = api.requireAdminMutation(sameOriginReq);
+    const csrfAllowed = await api.requireAdminMutation(sameOriginReq);
     assert.equal(csrfAllowed, null);
   });
 
   console.log(`Settings Service & Auth: ${passed}/${passed} PASS`);
 } finally {
   await mf.dispose();
+  delete globalThis.env;
 }

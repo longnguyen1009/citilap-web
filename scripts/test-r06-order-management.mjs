@@ -35,6 +35,9 @@ const serviceBundle = await build({
   stdin: {
     contents: `
       export * from './src/server/services/order.service';
+      export * from './src/server/services/checkout.service';
+      export * from './src/server/services/settings.service';
+      export { DEFAULT_ADMIN_SETTINGS } from './src/contracts/cms/settings';
       export * from './src/server/services/contact.service';
       export * from './src/server/services/notification.service';
       export * from './src/server/services/customer.service';
@@ -68,6 +71,13 @@ const serviceBundle = await build({
 });
 
 const api = await import('./.r06-test-bundle.mjs');
+await api.saveAdminSettings(DB, {expectedRevision: 0, document: api.DEFAULT_ADMIN_SETTINGS});
+async function createOrder(input, key, db) {
+  const selection = {paymentMethod:'COD', shippingMethod:'standard', shippingAddress:'Synthetic fixture address', ...input};
+  const {quote} = await api.calculateCheckout(selection, db);
+  return api.createOrder({...selection, items:selection.items.map((item,i)=>({...item, expectedPrice:quote.lines[i].price})), checkoutAcknowledgment:{shippingFee:quote.shippingFee, totalAmount:quote.totalAmount, termsVersion:quote.termsVersion}}, key, db);
+}
+
 
 let totalPassed = 0;
 let totalFailed = 0;
@@ -167,7 +177,7 @@ console.log('\n--- GATE 2: Order Creation & Notification Idempotency ---');
 
 let createdOrderId = '';
 await checkAsync('Create order defaults status to NEW, creates initial OrderEvent and AdminNotification', async () => {
-  const orderRes = await api.createOrder(
+  const orderRes = await createOrder(
     {
       items: [{ productId, quantity: 1 }],
       customerName: 'Nguyễn Văn Test',
@@ -199,7 +209,7 @@ await checkAsync('Create order defaults status to NEW, creates initial OrderEven
 });
 
 await checkAsync('Idempotent replay does not duplicate order or notification', async () => {
-  const replayRes = await api.createOrder(
+  const replayRes = await createOrder(
     {
       items: [{ productId, quantity: 1 }],
       customerName: 'Nguyễn Văn Test',
@@ -311,7 +321,7 @@ await checkAsync('Same-status transition: COMPLETED -> COMPLETED is rejected as 
 
 // Create second order to test cancellation & reopen
 let cancelOrderId = '';
-const cancelOrderRes = await api.createOrder(
+const cancelOrderRes = await createOrder(
   {
     items: [{ productId, quantity: 1 }],
     customerName: 'Trần Thị Hủy',

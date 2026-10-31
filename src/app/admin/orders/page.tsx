@@ -180,6 +180,7 @@ function OrdersContent() {
       {/* 1. Compact Header */}
       <PageHeader
         title="Đơn hàng"
+        description="Đơn gửi từ website. Mở chi tiết để xác nhận, xử lý giao hàng hoặc hủy; trạng thái đơn và thanh toán được theo dõi riêng."
         badge={
           <span className="text-xs px-2 py-0.5 bg-slate-200/70 text-slate-700 rounded-full font-semibold tabular-nums">
             {total}

@@ -69,7 +69,8 @@ async function GETHandler(request: Request, props: { params: Promise<{ id: strin
             let image = '';
             try {
               const parsedImages = JSON.parse(item.product?.images || '[]');
-              image = Array.isArray(parsedImages) ? parsedImages[0] : '';
+              const first = Array.isArray(parsedImages) ? parsedImages[0] : '';
+              image = typeof first === 'object' && first !== null ? (first.url || '') : String(first || '');
             } catch {
               image = '';
             }

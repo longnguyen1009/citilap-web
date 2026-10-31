@@ -78,14 +78,22 @@ export default function BlockRenderer({
             return <SliderBlock key={section.id} data={section.data} />;
 
           case 'product_grid':
-            if (section.id === 'sec-hot-sale' && flashSale !== undefined) return <Fragment key={section.id}>{flashSale}</Fragment>;
+            if (section.id === 'sec-hot-sale' && flashSale !== undefined) {
+              const d = section.data as { title?: string };
+              return (
+                <div key={section.id} className="hot-sale-wrapper" aria-label={d?.title || 'HOT SALE'}>
+                  {d?.title && <div className="sr-only">{d.title}</div>}
+                  {flashSale}
+                </div>
+              );
+            }
             return <ProductGridBlock key={section.id} section={section} />;
 
           case 'featured_categories':
             return <FeaturedCategoriesBlock key={section.id} section={section} />;
 
           case 'featured_brands':
-            return <FeaturedBrandsBlock key={section.id} />;
+            return <FeaturedBrandsBlock key={section.id} section={section} />;
 
           case 'featured_collection':
             return <FeaturedCollectionBlock key={section.id} section={section} />;
@@ -128,6 +136,24 @@ import SliderSection from '@/components/home/SliderSection';
 function BannerBlock({ data }: { data: any }) {
   const imageUrl = data.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop';
   const layout = data.layout || 'hero';
+
+  if (layout === 'fullwidth') {
+    return (
+      <section className="w-full relative overflow-hidden" aria-label={data.title || 'Banner'}>
+        <div className="container mx-auto px-4 max-w-[1370px] py-3 md:py-4">
+          <div className="relative w-full h-[140px] sm:h-[180px] md:h-[220px] rounded-2xl overflow-hidden shadow-xs border border-slate-200">
+            {data.link ? (
+              <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden" aria-label={data.title || 'Banner'}>
+                <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none" sizes="100vw" />
+              </Link>
+            ) : (
+              <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover" sizes="100vw" />
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (layout === 'split') {
     return (
@@ -371,16 +397,31 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
 }
 
 // 5. FEATURED BRANDS BLOCK
-function FeaturedBrandsBlock() {
-  return <BrandSection />;
+function FeaturedBrandsBlock({ section }: { section: ResolvedSectionItem }) {
+  const data = (section.data || {}) as { title?: string; subtitle?: string };
+  return (
+    <BrandSection
+      title={data.title}
+      subtitle={data.subtitle}
+      brands={section.resolvedBrands?.map((b) => ({
+        id: b.id,
+        name: b.name,
+        slug: b.slug,
+        logo: b.logo,
+        subtitle: b.description || 'Chính hãng',
+        href: `/brand/${b.slug}`,
+      }))}
+    />
+  );
 }
 
 // 6. FEATURED COLLECTION BLOCK
 function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) {
   const col = section.resolvedCollection;
-  const data = (section.data || {}) as { title?: string; subtitle?: string };
+  const data = (section.data || {}) as { title?: string; subtitle?: string; limit?: number };
 
   if (!col) return null;
+  const displayProducts = data.limit && data.limit > 0 ? (col.products || []).slice(0, data.limit) : (col.products || []);
 
   return (
     <section className="pb-16" aria-label={data.title || col.name}>
@@ -405,9 +446,9 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
           </div>
 
           <div className="p-4 md:p-6 bg-slate-50/30">
-            {col.products && col.products.length > 0 ? (
+            {displayProducts.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
-                {col.products.map((p) => (
+                {displayProducts.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
               </div>

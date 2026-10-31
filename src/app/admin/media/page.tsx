@@ -74,6 +74,7 @@ export default function MediaPage() {
     <div className="media-workspace space-y-3 max-w-7xl mx-auto pb-12">
       <PageHeader
         title="Thư viện ảnh & video"
+        description="Tải ảnh hoặc thêm video vào thư viện, sau đó chọn trong sản phẩm, bài viết hoặc bố cục trang. Tải lên thư viện chưa làm ảnh xuất hiện trên website."
         actions={
           <AdminButton type="button" size="sm" icon={<Plus size={15} />} onClick={() => setVideoOpen(true)}>
             Thêm video YouTube / TikTok / Drive

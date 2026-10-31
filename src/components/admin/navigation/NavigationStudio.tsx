@@ -384,6 +384,11 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
     <div className="navigation-studio">
       <PageHeader
         title={tab === 'categories' ? 'Danh mục' : tab === 'collections' ? 'Bộ sưu tập' : 'Menu'}
+        description={tab === 'categories'
+          ? 'Tạo nhóm sản phẩm, sau đó gán danh mục trong Sản phẩm. Menu quyết định lối truy cập; lưu nháp chưa cập nhật website.'
+          : tab === 'collections'
+            ? 'Gom sản phẩm chọn tay hoặc theo điều kiện. Xuất bản rồi gắn bộ sưu tập vào Menu hoặc khối Trang chủ.'
+            : 'Chọn vị trí đầu trang hoặc chân trang, thêm mục và chọn đích đến. Xuất bản áp dụng chung cả danh mục, menu và bộ sưu tập.'}
         badge={
           detail && (
             <span className="text-xs px-2 py-0.5 bg-slate-200/70 text-slate-700 rounded-full font-mono">
@@ -510,6 +515,32 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                 </>
               )}
             </div>
+          </div>
+
+          {/* Contextual Guidance Banner */}
+          <div className="mb-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-center justify-between gap-3">
+            <div>
+              {tab === 'categories' && (
+                <p>
+                  <strong className="text-slate-900">Danh mục sản phẩm:</strong> Phân loại cấu trúc ngành hàng (Laptop Gaming, Laptop Doanh nhân, Phụ kiện...). Hỗ trợ phân cấp cha/con và gán ảnh đại diện.
+                </p>
+              )}
+              {tab === 'menus' && (
+                <p>
+                  <strong className="text-slate-900">Menu điều hướng:</strong> Cấu hình thanh Header (Mega menu danh mục, link chính sách...) và Chân trang (Footer) hiển thị trực tiếp ngoài Storefront.
+                </p>
+              )}
+              {tab === 'collections' && (
+                <p>
+                  <strong className="text-slate-900">Bộ sưu tập:</strong> Nhóm sản phẩm linh hoạt theo chiến dịch hoặc phân khúc (VD: &quot;ThinkPad tuyển chọn dưới 15 triệu&quot;) để gắn lên Block trang chủ hoặc Menu.
+                </p>
+              )}
+            </div>
+            {dirty && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 shrink-0">
+                Có thay đổi nháp
+              </span>
+            )}
           </div>
 
           <fieldset disabled={busy}>

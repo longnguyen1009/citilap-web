@@ -88,6 +88,7 @@ export default function AdminPagesPage() {
     <div className="space-y-3 pb-16">
       <PageHeader
         title="Trang & Chính sách"
+        description="Nội dung giới thiệu, bảo hành và chính sách. Xuất bản trang rồi gắn đường dẫn vào Menu để khách dễ tìm; bố cục Trang chủ sửa tại Bố cục trang."
         badge={
           data ? (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import ReviewForm from './ReviewForm';
 import type { ApprovedProductReview } from '@/server/services/contact.service';
 
@@ -33,67 +33,18 @@ function formatRelativeOrDate(isoOrLabel: string): string {
 export function ProductReviewsSection({
   productName,
   approvedReviews,
-  defaultVariantLabel,
 }: ProductReviewsSectionProps) {
   const [showForm, setShowForm] = useState(false);
 
-  const curatedReviews: ApprovedProductReview[] = useMemo(
-    () => [
-      {
-        id: 'curated-review-1',
-        reviewerName: 'Hoàng Tuấn Minh',
-        rating: 5,
-        productName,
-        comment:
-          'Máy chuẩn như mô tả, mình qua trực tiếp showroom Lê Thanh Nghị kiểm tra máy và nhờ kỹ thuật viên cài giúp phần mềm. Máy tản nhiệt êm, màn hình sáng đẹp, hiệu năng rất mượt. Tư vấn nhiệt tình, 5 sao cho CitiLap!',
-        createdAt: '3 ngày trước',
-        verifiedLabel: 'Đã mua tại CitiLap',
-        variantLabel: defaultVariantLabel || `Đã mua tại Showroom CitiLap`,
-      },
-      {
-        id: 'curated-review-2',
-        reviewerName: 'Lê Quỳnh Nga',
-        rating: 5,
-        productName,
-        comment:
-          'Mình đặt ship COD toàn quốc, 2 ngày nhận được máy. Shipper cho mở hộp kiểm tra đúng ngoại hình, đúng mã model và cấu hình mới thanh toán. Quà tặng kèm balo với chuột không dây rất xịn!',
-        createdAt: '1 tuần trước',
-        verifiedLabel: 'Đã mua tại CitiLap',
-        variantLabel: 'Giao hàng COD toàn quốc',
-      },
-    ],
-    [productName, defaultVariantLabel]
-  );
-
-  const allReviews = useMemo(() => {
-    return [...approvedReviews, ...curatedReviews];
-  }, [approvedReviews, curatedReviews]);
-
-  // Base statistics matching preview-product-detail-ui.html + dynamic approved reviews
-  const base5Star = 29;
-  const base4Star = 3;
-  const baseLowStar = 0;
-
-  const extra5 = approvedReviews.filter((r) => r.rating === 5).length;
-  const extra4 = approvedReviews.filter((r) => r.rating === 4).length;
-  const extraLow = approvedReviews.filter((r) => r.rating <= 3).length;
-
-  const count5 = base5Star + extra5;
-  const count4 = base4Star + extra4;
-  const countLow = baseLowStar + extraLow;
-  const totalCount = count5 + count4 + countLow;
-
-  const weightedSum =
-    count5 * 5 +
-    count4 * 4 +
-    approvedReviews
-      .filter((r) => r.rating <= 3)
-      .reduce((acc, r) => acc + r.rating, 0);
-  const averageScore = totalCount > 0 ? (weightedSum / totalCount).toFixed(1) : '4.9';
-
-  const pct5 = totalCount > 0 ? Math.round((count5 / totalCount) * 100) : 91;
-  const pct4 = totalCount > 0 ? Math.round((count4 / totalCount) * 100) : 9;
-  const pctLow = totalCount > 0 ? Math.round((countLow / totalCount) * 100) : 0;
+  const allReviews = approvedReviews;
+  const count5 = approvedReviews.filter(r => r.rating === 5).length;
+  const count4 = approvedReviews.filter(r => r.rating === 4).length;
+  const countLow = approvedReviews.filter(r => r.rating <= 3).length;
+  const totalCount = approvedReviews.length;
+  const averageScore = totalCount ? (approvedReviews.reduce((sum, r) => sum + r.rating, 0) / totalCount).toFixed(1) : '0.0';
+  const pct5 = totalCount ? Math.round(count5 / totalCount * 100) : 0;
+  const pct4 = totalCount ? Math.round(count4 / totalCount * 100) : 0;
+  const pctLow = totalCount ? Math.round(countLow / totalCount * 100) : 0;
 
   return (
     <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs">
@@ -123,9 +74,9 @@ export function ProductReviewsSection({
             {averageScore}
             <span className="text-xl text-slate-400 font-bold">/5</span>
           </div>
-          <div className="text-amber-400 text-base tracking-widest my-1">★★★★★</div>
+          <div aria-hidden="true" className="text-amber-400 text-base tracking-widest my-1">{'★'.repeat(Math.round(Number(averageScore)))}{'☆'.repeat(5 - Math.round(Number(averageScore)))}</div>
           <div className="text-xs sm:text-sm font-semibold text-slate-600">
-            {totalCount} đánh giá thực tế từ khách mua
+            {totalCount ? `${totalCount} đánh giá đã duyệt` : 'Chưa có đánh giá'}
           </div>
         </div>
         <div className="flex-1 w-full space-y-2 text-xs sm:text-sm">
@@ -188,7 +139,7 @@ export function ProductReviewsSection({
                     {review.reviewerName}
                   </span>
                   <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2.5 py-0.5 rounded-full">
-                    ✓ {review.verifiedLabel || 'Đã mua tại CitiLap'}
+                    ✓ {review.verifiedLabel || 'Phản hồi đã duyệt'}
                   </span>
                 </div>
                 <span className="text-xs sm:text-sm text-slate-400 font-medium">

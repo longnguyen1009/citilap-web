@@ -254,4 +254,12 @@ try {
   assert.match(saved.message, /GMT\+7/);
   assert.equal((await DB.prepare('SELECT count(*) AS n FROM AdminNotification').first()).n, 1);
   console.log('PASS appointment: input/date/location checks, D1 persistence and admin notification');
+  for (const [id, productName, status] of [['review-base', 'Legion 5', 'HANDLED'], ['review-pro', 'Legion 5 Pro', 'HANDLED'], ['review-pending', 'Legion 5', 'PENDING']]) {
+    await DB.prepare("INSERT INTO ContactSubmission(id,name,phone,message,status,updatedAt) VALUES(?,'Fixture reviewer','0900000000',?,?,CURRENT_TIMESTAMP)").bind(id, `[Đánh giá 4 ⭐ sản phẩm: ${productName}]: Fixture review`, status).run();
+  }
+  const reviews = await api.listApprovedProductReviews(['Legion 5'], DB);
+  assert.deepEqual(reviews.map(r => r.id), ['review-base']);
+  assert.equal(reviews[0].verifiedLabel, 'Phản hồi đã duyệt');
+  assert.deepEqual(await api.listApprovedProductReviews([], DB), []);
+  console.log('PASS reviews: exact product match, approved only, no invented purchase verification');
 } finally { await mf.dispose(); local.close(); }

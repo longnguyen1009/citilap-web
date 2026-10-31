@@ -226,7 +226,7 @@ export default async function Home() {
       <TestimonialSection testimonials={settings?.testimonials ?? []} sourceUrl={settings?.testimonialsSourceUrl} />
 
       {/* 13. TƯ VẤN CHỌN MÁY */}
-      <ContactSection />
+      <ContactSection settings={settings} />
 
       {/* 14. KHÁM PHÁ THEO THƯƠNG HIỆU */}
       <BrandSection />

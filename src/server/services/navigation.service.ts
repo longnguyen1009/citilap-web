@@ -240,10 +240,10 @@ export async function publicNavigation(db: D1Database) {
   return resolveNavigation(db, snapshot.document, snapshot.revision);
 }
 
-export async function publicCollection(db: D1Database, slug: string, pricingContext?:PriceEvaluationContext, at:Date = new Date()) {
+export async function publicCollection(db: D1Database, slugOrId: string, pricingContext?:PriceEvaluationContext, at:Date = new Date()) {
   const snapshot = await navigationSnapshot(db);
   const d = snapshot?.document;
-  const c = d?.collections.find(c => c.slug === slug && c.visible);
+  const c = d?.collections.find(c => (c.slug === slugOrId || c.id === slugOrId) && c.visible);
   if (!c) throw new MediaError('Không tìm thấy bộ sưu tập.', 404);
 
   let products: HomepageProduct[] = [];

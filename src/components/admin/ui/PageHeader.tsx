@@ -50,9 +50,8 @@ export default function PageHeader({
             </h1>
             {badge && <div className="shrink-0">{badge}</div>}
           </div>
-          {/* Minimal: one muted line; full text stays available on hover. */}
           {description && (
-            <p className="text-xs text-slate-500 mt-1 truncate max-w-2xl" title={description}>
+            <p className="text-xs text-slate-600 mt-1 max-w-3xl leading-relaxed">
               {description}
             </p>
           )}

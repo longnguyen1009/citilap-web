@@ -16,7 +16,9 @@ import {
   Trash2,
   Clock,
   Search,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 
 interface CampaignItemForm {
   displayName?: string;
@@ -446,6 +448,44 @@ export default function AdminCampaignsPage() {
         </div>
       )}
 
+      {/* Live Storefront Status Banner */}
+      {(() => {
+        const activeCampaign = campaigns.find(
+          (c) => c.status === "PUBLISHED" && nowMs >= new Date(c.startAt).getTime() && nowMs < new Date(c.endAt).getTime()
+        );
+        if (activeCampaign) {
+          return (
+            <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between gap-3 text-emerald-900 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <div className="text-xs">
+                  <strong>Đang chạy Flash Sale trên Storefront:</strong> &quot;{activeCampaign.name}&quot; ({activeCampaign.itemCount} sản phẩm).
+                  <span className="ml-1.5 text-emerald-700">Kết thúc lúc {formatGmt7(activeCampaign.endAt)}</span>
+                </div>
+              </div>
+              <Link
+                href="/"
+                target="_blank"
+                className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1 shrink-0"
+              >
+                Xem ngoài Storefront <ExternalLink className="w-3 h-3" />
+              </Link>
+            </div>
+          );
+        }
+        return (
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <span>Hiện không có Flash Sale nào đang trực tiếp trên Storefront. Bạn có thể bật một chiến dịch hoặc tạo khung giờ mới.</span>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Unified Single-Card Workspace */}
       <AdminCard bodyClassName="p-0 overflow-hidden">
         {/* Top Bar: Tabs + Search */}
@@ -752,14 +792,17 @@ export default function AdminCampaignsPage() {
                     type="time"
                     value={formEndLocal.slice(11)}
                     onChange={e => {
-                      setFormEndLocal(`${formStartLocal.slice(0, 10)}T${e.target.value}`);
+                      const datePart = formEndLocal.slice(0, 10) || formStartLocal.slice(0, 10);
+                      setFormEndLocal(`${datePart}T${e.target.value}`);
                       setDurationHours('');
                     }}
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
                   />
                 </label>
-                <label className="text-[11px] font-semibold text-slate-600">
-                  Số giờ chạy
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block">
+                    Số giờ chạy
+                  </label>
                   <input
                     type="number"
                     min="0.25"
@@ -777,7 +820,32 @@ export default function AdminCampaignsPage() {
                     }}
                     className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-normal"
                   />
-                </label>
+                </div>
+                <div className="sm:col-span-4 flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/70">
+                  <span className="text-[11px] text-slate-500 font-semibold">Tăng nhanh kết thúc:</span>
+                  {[
+                    { label: '2 giờ', h: 2 },
+                    { label: '4 giờ', h: 4 },
+                    { label: '8 giờ', h: 8 },
+                    { label: '24 giờ (1 ngày)', h: 24 },
+                    { label: '3 ngày', h: 72 },
+                    { label: '7 ngày', h: 168 },
+                  ].map(({ label, h }) => (
+                    <button
+                      key={h}
+                      type="button"
+                      onClick={() => {
+                        if (!formStartLocal) return;
+                        setDurationHours(String(h));
+                        const endIso = new Date(new Date(datetimeLocalGmt7ToIso(formStartLocal)).getTime() + h * 3600000).toISOString();
+                        setFormEndLocal(isoToDatetimeLocalGmt7(endIso));
+                      }}
+                      className="px-2 py-0.5 rounded bg-white hover:bg-slate-200 border border-slate-300 text-[11px] font-medium text-slate-700 transition cursor-pointer"
+                    >
+                      +{label}
+                    </button>
+                  ))}
+                </div>
               </fieldset>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -842,68 +910,108 @@ export default function AdminCampaignsPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {formItems.map((it, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
-                      >
-                        <div className="sm:col-span-4">
-                          {it.displayName && <p className="mb-0.5 text-[11px] font-semibold text-slate-800 truncate">{it.displayName}</p>}
-                          <input
-                            type="text"
-                            value={it.productId}
-                            onChange={(e) => handleItemChange(idx, "productId", e.target.value)}
-                            placeholder="Product ID"
-                            aria-label="Product ID"
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
-                          />
-                        </div>
+                    <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 uppercase tracking-wide">
+                      <div className="col-span-4">Sản phẩm / ID</div>
+                      <div className="col-span-3">Biến thể (Variant ID)</div>
+                      <div className="col-span-2">Giá Sale (₫)</div>
+                      <div className="col-span-2">Giá gốc (₫) / % Giảm</div>
+                      <div className="col-span-1 text-right">Xóa</div>
+                    </div>
+                    {formItems.map((it, idx) => {
+                      const sale = Number(it.salePrice);
+                      const reg = Number(it.regularPrice);
+                      const hasDiscount = Number.isFinite(sale) && Number.isFinite(reg) && reg > 0 && sale > 0;
+                      const discountPct = hasDiscount ? Math.round((1 - sale / reg) * 100) : null;
 
-                        <div className="sm:col-span-3">
-                          <input
-                            type="text"
-                            value={it.variantId || ""}
-                            onChange={(e) => handleItemChange(idx, "variantId", e.target.value)}
-                            placeholder="Variant ID (trống = base)"
-                            aria-label="Variant ID"
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
-                          />
-                        </div>
+                      return (
+                        <div
+                          key={idx}
+                          className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
+                        >
+                          <div className="sm:col-span-4">
+                            {it.displayName ? (
+                              <p className="mb-1 text-[11px] font-semibold text-slate-900 truncate" title={it.displayName}>
+                                {it.displayName}
+                              </p>
+                            ) : (
+                              <span className="block text-[10px] text-slate-400 mb-0.5 sm:hidden font-semibold">Sản phẩm:</span>
+                            )}
+                            <input
+                              type="text"
+                              value={it.productId}
+                              onChange={(e) => handleItemChange(idx, "productId", e.target.value)}
+                              placeholder="Product ID (UUID)"
+                              aria-label="Product ID"
+                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
+                            />
+                          </div>
 
-                        <div className="sm:col-span-2">
-                          <input
-                            type="number"
-                            value={it.salePrice}
-                            onChange={(e) => handleItemChange(idx, "salePrice", e.target.value)}
-                            placeholder="Giá sale (₫)"
-                            aria-label="Giá sale"
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono tabular-nums"
-                          />
-                        </div>
+                          <div className="sm:col-span-3">
+                            <span className="block text-[10px] text-slate-400 mb-0.5 sm:hidden font-semibold">Biến thể:</span>
+                            <input
+                              type="text"
+                              value={it.variantId || ""}
+                              onChange={(e) => handleItemChange(idx, "variantId", e.target.value)}
+                              placeholder="Variant ID (trống = bản gốc)"
+                              aria-label="Variant ID"
+                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
+                            />
+                          </div>
 
-                        <div className="sm:col-span-2">
-                          <input
-                            type="number"
-                            value={it.regularPrice || ""}
-                            onChange={(e) => handleItemChange(idx, "regularPrice", e.target.value)}
-                            placeholder="Giá gốc (₫)"
-                            aria-label="Giá gốc"
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono tabular-nums"
-                          />
-                        </div>
+                          <div className="sm:col-span-2">
+                            <span className="block text-[10px] text-slate-400 mb-0.5 sm:hidden font-semibold">Giá sale (₫):</span>
+                            <input
+                              type="number"
+                              value={it.salePrice}
+                              onChange={(e) => handleItemChange(idx, "salePrice", e.target.value)}
+                              placeholder="Giá sale (₫)"
+                              aria-label="Giá sale"
+                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono tabular-nums font-bold text-red-600"
+                            />
+                          </div>
 
-                        <div className="sm:col-span-1 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(idx)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                            title="Xóa mục"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="sm:col-span-2">
+                            <div className="flex items-center justify-between mb-0.5 sm:hidden">
+                              <span className="text-[10px] text-slate-400 font-semibold">Giá gốc (₫):</span>
+                            </div>
+                            <div className="space-y-1">
+                              <input
+                                type="number"
+                                value={it.regularPrice || ""}
+                                onChange={(e) => handleItemChange(idx, "regularPrice", e.target.value)}
+                                placeholder="Giá gốc (₫)"
+                                aria-label="Giá gốc"
+                                className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono tabular-nums text-slate-600"
+                              />
+                              {discountPct !== null && (
+                                <div className="flex items-center gap-1">
+                                  {discountPct > 0 ? (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
+                                      -{discountPct}%
+                                    </span>
+                                  ) : (
+                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-700" title="Giá sale không được lớn hơn hoặc bằng giá gốc">
+                                      Không hợp lệ
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="sm:col-span-1 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(idx)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                              title="Xóa mục này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

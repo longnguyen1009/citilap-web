@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Maximize2, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface GalleryImageItem {
@@ -27,9 +27,9 @@ export function ProductGallery({
   images,
   selectedImage,
 }: ProductGalleryProps) {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(() => Math.max(0, images.filter(item => typeof item === 'string' ? item : item.url).findIndex(item => (typeof item === 'string' ? item : item.url) === selectedImage)));
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const prevSelectedImageRef = useRef<string | undefined>(selectedImage);
+  const [previousImage, setPreviousImage] = useState(selectedImage);
 
   // Memoize normalized images so array reference stays stable across re-renders
   const normalizedImages: GalleryImageItem[] = useMemo(() => {
@@ -48,16 +48,11 @@ export function ProductGallery({
     return list;
   }, [images, productName]);
 
-  // Only sync activeIndex when selectedImage actually changes (e.g., user picked a different color/variant)
-  useEffect(() => {
-    if (selectedImage && selectedImage !== prevSelectedImageRef.current) {
-      prevSelectedImageRef.current = selectedImage;
-      const idx = normalizedImages.findIndex((img) => img.url === selectedImage);
-      if (idx !== -1) {
-        setActiveIndex(idx);
-      }
-    }
-  }, [selectedImage, normalizedImages]);
+  if (selectedImage !== previousImage) {
+    setPreviousImage(selectedImage);
+    const index = normalizedImages.findIndex(img => img.url === selectedImage);
+    setActiveIndex(Math.max(0, index));
+  }
 
   // Ensure activeIndex stays within bounds if image list changes
   const safeActiveIndex =

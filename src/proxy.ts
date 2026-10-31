@@ -35,7 +35,10 @@ async function routeRequest(request: NextRequest) {
       }
       if(target) {
         const url = new URL(target,request.url);
-        url.search = request.nextUrl.search;
+        // Preserve catalog filters, never forward credentials or arbitrary query data.
+        for (const key of ['q', 'type', 'tag', 'subcat', 'brand', 'category', 'condition', 'cpu', 'gpu', 'connection', 'power', 'ram', 'storage', 'year', 'minPrice', 'maxPrice', 'pricePreset', 'inStock', 'sort', 'page', 'limit', 'sku', 'variant']) {
+          for (const value of request.nextUrl.searchParams.getAll(key)) url.searchParams.append(key, value);
+        }
         return NextResponse.redirect(url,301);
       }
       if (navigation && path.split('/').filter(Boolean).length > 1 &&

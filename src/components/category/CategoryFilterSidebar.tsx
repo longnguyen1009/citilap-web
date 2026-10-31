@@ -371,6 +371,13 @@ export default function CategoryFilterSidebar({
           <div className="flex flex-wrap gap-2">
             {facets.conditions.map((c) => {
               const isSelected = activeConditions.includes(c.value);
+              const condFallbackMap: Record<string, string> = {
+                NEW: "Mới 100%",
+                LIKE_NEW: "Like New 99%",
+                USED: "Đã qua sử dụng",
+                REFURBISHED: "Refurbished",
+              };
+              const displayLabel = condFallbackMap[c.value] || c.label;
               return (
                 <button
                   key={c.value}
@@ -382,7 +389,7 @@ export default function CategoryFilterSidebar({
                       : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
                   }`}
                 >
-                  <span>{c.label}</span>
+                  <span>{displayLabel}</span>
                   {c.count > 0 && (
                     <span className={`ml-1 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
                       ({c.count})

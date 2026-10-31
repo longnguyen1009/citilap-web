@@ -94,7 +94,14 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
 
   activeConditions.forEach((c) => {
     const condObj = facets.conditions.find((item) => item.value === c);
-    chips.push({ key: "condition", value: c, label: `Tình trạng: ${condObj ? condObj.label : c}` });
+    const condMap: Record<string, string> = {
+      NEW: "Mới 100%",
+      LIKE_NEW: "Like New 99%",
+      USED: "Đã qua sử dụng",
+      REFURBISHED: "Refurbished",
+    };
+    const condName = condObj && condObj.label !== condObj.value ? condObj.label : condMap[c] || c;
+    chips.push({ key: "condition", value: c, label: `Tình trạng: ${condName}` });
   });
 
   activeRams.forEach((r) => {

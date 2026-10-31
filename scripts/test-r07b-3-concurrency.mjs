@@ -445,7 +445,7 @@ try {
   // =========================================================================
   console.log('--- SECTION 5: Mandatory expectedRevision Validation ---');
 
-  await check('saveCampaign on existing campaign rejects missing expectedRevision with CAMPAIGN_VALIDATION_ERROR', async () => {
+  await check('saveCampaign on existing campaign rejects missing expectedRevision with MISSING_EXPECTED_REVISION', async () => {
     const existing = await api.saveCampaign({
       name: 'Rev Test Camp',
       status: 'DRAFT',
@@ -468,10 +468,10 @@ try {
       err = e;
     }
     assert.ok(err);
-    assert.equal(err.code, 'CAMPAIGN_VALIDATION_ERROR');
+    assert.equal(err.code, 'MISSING_EXPECTED_REVISION');
   });
 
-  await check('saveCampaign rejects negative or fractional expectedRevision with CAMPAIGN_VALIDATION_ERROR', async () => {
+  await check('saveCampaign rejects negative or fractional expectedRevision with INVALID_EXPECTED_REVISION', async () => {
     const existing = await api.listCampaigns(DB);
     const id = existing[0].id;
 
@@ -491,7 +491,7 @@ try {
         err = e;
       }
       assert.ok(err, `Must reject bad revision: ${badRev}`);
-      assert.equal(err.code, 'CAMPAIGN_VALIDATION_ERROR');
+      assert.equal(err.code, 'INVALID_EXPECTED_REVISION');
     }
   });
 
@@ -505,7 +505,7 @@ try {
     } catch (e) {
       pubErr = e;
     }
-    assert.equal(pubErr?.code, 'CAMPAIGN_VALIDATION_ERROR');
+    assert.equal(pubErr?.code, 'INVALID_EXPECTED_REVISION');
 
     let archErr = null;
     try {
@@ -513,7 +513,7 @@ try {
     } catch (e) {
       archErr = e;
     }
-    assert.equal(archErr?.code, 'CAMPAIGN_VALIDATION_ERROR');
+    assert.equal(archErr?.code, 'INVALID_EXPECTED_REVISION');
   });
 
   // =========================================================================

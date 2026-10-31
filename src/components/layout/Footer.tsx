@@ -254,20 +254,51 @@ export default function Footer({
               </div>
             </div>
 
-            {[{ title: 'Chính sách khách hàng', id: 'footer-policies', links: [
-              { label: 'Chính sách bảo hành', href: '/chinh-sach-bao-hanh' },
-              { label: 'Đổi trả & hoàn tiền', href: '/chinh-sach-doi-tra' },
-              { label: 'Vận chuyển & giao nhận', href: '/chinh-sach-van-chuyen' },
-              { label: 'Bảo vệ thông tin cá nhân', href: '/chinh-sach-bao-mat' },
-              { label: 'Điều khoản mua hàng', href: '/dieu-khoan-mua-hang' },
-            ] }, { title: 'Về CitiLap', id: 'footer-about', links: [
-              { label: 'Giới thiệu CitiLap', href: '/gioi-thieu' },
-              { label: 'Hệ thống cửa hàng', href: '/he-thong-cua-hang' },
-              { label: 'Liên hệ CitiLap', href: '/lien-he' },
-              { label: 'Hướng dẫn đặt hàng', href: '/huong-dan-mua-hang' },
-              { label: 'Tra cứu đơn hàng', href: '/order-tracking' },
-              { label: 'Câu hỏi thường gặp', href: '/cau-hoi-thuong-gap' },
-            ] }].map(group => <div key={group.id}><h3 className="mb-4 text-base font-bold uppercase tracking-wide text-white">{group.title}</h3><ul className="space-y-2.5 text-sm text-gray-400">{(navigation?.menus.footer.find(item => item.id === group.id)?.children || group.links).map(item => <li key={item.href}><Link href={item.href} className="transition hover:text-white">{item.label}</Link></li>)}</ul></div>)}
+            {(navigation?.menus.footer && navigation.menus.footer.length > 0
+              ? navigation.menus.footer.map((group) => ({
+                  id: group.id,
+                  title: group.label,
+                  links: group.children.length > 0 ? group.children : [{ label: group.label, href: group.href }],
+                }))
+              : [
+                  {
+                    title: 'Chính sách khách hàng',
+                    id: 'footer-policies',
+                    links: [
+                      { label: 'Chính sách bảo hành', href: '/chinh-sach-bao-hanh' },
+                      { label: 'Đổi trả & hoàn tiền', href: '/chinh-sach-doi-tra' },
+                      { label: 'Vận chuyển & giao nhận', href: '/chinh-sach-van-chuyen' },
+                      { label: 'Bảo vệ thông tin cá nhân', href: '/chinh-sach-bao-mat' },
+                      { label: 'Điều khoản mua hàng', href: '/dieu-khoan-mua-hang' },
+                    ],
+                  },
+                  {
+                    title: 'Về CitiLap',
+                    id: 'footer-about',
+                    links: [
+                      { label: 'Giới thiệu CitiLap', href: '/gioi-thieu' },
+                      { label: 'Hệ thống cửa hàng', href: '/he-thong-cua-hang' },
+                      { label: 'Liên hệ CitiLap', href: '/lien-he' },
+                      { label: 'Hướng dẫn đặt hàng', href: '/huong-dan-mua-hang' },
+                      { label: 'Tra cứu đơn hàng', href: '/order-tracking' },
+                      { label: 'Câu hỏi thường gặp', href: '/cau-hoi-thuong-gap' },
+                    ],
+                  },
+                ]
+            ).map((group) => (
+              <div key={group.id}>
+                <h3 className="mb-4 text-base font-bold uppercase tracking-wide text-white">{group.title}</h3>
+                <ul className="space-y-2.5 text-sm text-gray-400">
+                  {group.links.map((item) => (
+                    <li key={item.href}>
+                      <Link href={item.href} className="transition hover:text-white">
+                        {item.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
 
           </div>
         </div>
