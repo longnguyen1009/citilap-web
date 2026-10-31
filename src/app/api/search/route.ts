@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { parseSearchParams } from '@/contracts/catalog/search';
 import { searchProducts } from '@/server/services/search.service';
+import { getClientIp, hashIp, checkInMemoryRateLimit, rateLimitExceededResponse } from '@/lib/rate-limiter';
 
 export async function GET(request: Request) {
+  // Rate limiting: 60 search requests per minute per IP
+  const ip = getClientIp(request);
+  const rateLimit = checkInMemoryRateLimit(`rl:search:${hashIp(ip)}`, 60, 60);
+  if (!rateLimit.allowed) {
+    return rateLimitExceededResponse(rateLimit.retryAfter);
+  }
+
   try {
     const { searchParams } = new URL(request.url);
 

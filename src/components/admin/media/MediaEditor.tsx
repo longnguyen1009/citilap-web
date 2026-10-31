@@ -34,6 +34,7 @@ export default function MediaEditor({ asset, onClose, onSaved }: { asset: MediaA
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [optimization, setOptimization] = useState<{ status: string; bytes: number | null } | null>(null);
   const [discard, setDiscard] = useState(false);
   const [showEmbed, setShowEmbed] = useState(false);
   const [copiedKey, setCopiedKey] = useState<'url' | 'embed' | null>(null);
@@ -42,6 +43,7 @@ export default function MediaEditor({ asset, onClose, onSaved }: { asset: MediaA
   useEffect(() => {
     const c = new AbortController();
     mediaRequest<{ usages: MediaUsageDto[] }>(`/api/admin/media/${asset.id}`, { signal: c.signal }).then((data) => setUsages(data.usages)).catch((e) => { if (!c.signal.aborted) setError(e.message); });
+    mediaRequest<{ status: string; bytes: number | null }>(`/api/admin/media/${asset.id}/optimize`, { signal: c.signal }).then(setOptimization).catch((e) => { if (!c.signal.aborted) setError(e.message); });
     return () => c.abort();
   }, [asset.id]);
   useEffect(() => {
@@ -69,6 +71,15 @@ export default function MediaEditor({ asset, onClose, onSaved }: { asset: MediaA
       // Clipboard API unavailable
     }
   }
+  async function optimize() {
+    setBusy(true); setError('');
+    try {
+      setOptimization(await mediaRequest(`/api/admin/media/${asset.id}/optimize`, { method: 'POST' }));
+      setNotice('Đã tạo ảnh thu nhỏ. Ảnh gốc được giữ nguyên.');
+      onSaved();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Không thể tối ưu ảnh.'); }
+    finally { setBusy(false); }
+  }
   return <MediaDialog title="Chi tiết tệp" onClose={() => { if (!busy) { if (dirty) setDiscard(true); else onClose(); } }}>
     {discard ? <div className="space-y-4"><p>Thay đổi chưa được lưu. Bạn muốn tiếp tục chỉnh sửa hay bỏ thay đổi?</p><div className="flex flex-wrap gap-2"><button className="media-button media-button-primary" onClick={() => setDiscard(false)}>Tiếp tục chỉnh sửa</button><button className="media-button" onClick={onClose}>Bỏ thay đổi</button></div></div> :
       <div className="media-dialog-layout"><div className="space-y-4">
@@ -91,6 +102,10 @@ export default function MediaEditor({ asset, onClose, onSaved }: { asset: MediaA
           {current.mimeType ? ` · ${current.mimeType}` : ''}
         </p>
         <div className="flex flex-wrap gap-2">
+          {optimization && optimization.status !== 'NOT_APPLICABLE' && <div className="w-full text-sm" role="status">
+            {optimization.status === 'READY' ? `Ảnh thu nhỏ đã tối ưu: ${Math.ceil((optimization.bytes || 0) / 1024)} KB` : 'Ảnh thu nhỏ chưa tối ưu. Có thể tạo lại mà không thay ảnh gốc.'}
+            {optimization.status !== 'READY' && <button type="button" className="media-button ml-2" disabled={busy} onClick={() => void optimize()}>Tối ưu ảnh thu nhỏ</button>}
+          </div>}
           {current.url && (
             <a href={current.url} target="_blank" rel="noopener noreferrer" className="media-button">
               <ExternalLink size={13} />

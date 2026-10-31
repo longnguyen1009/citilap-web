@@ -188,10 +188,24 @@ export function extractImageDimensions(buffer: Buffer, ext: string): { width: nu
     if (ext === 'png' && buffer.length >= 24) {
       return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
     }
-    if (ext === 'webp' && buffer.length >= 30) {
+    if (ext === 'webp' && buffer.length >= 25) {
       const kind = buffer.toString('ascii', 12, 16);
-      if (kind === 'VP8X') {
+      if (kind === 'VP8X' && buffer.length >= 30) {
         return { width: 1 + buffer.readUIntLE(24, 3), height: 1 + buffer.readUIntLE(27, 3) };
+      }
+      if (kind === 'VP8 ' && buffer.length >= 30) {
+        if (buffer[23] === 0x9d && buffer[24] === 0x01 && buffer[25] === 0x2a) {
+          return { width: buffer.readUInt16LE(26) & 0x3fff, height: buffer.readUInt16LE(28) & 0x3fff };
+        }
+      }
+      if (kind === 'VP8L' && buffer.length >= 25 && buffer[20] === 0x2f) {
+        const b0 = buffer[21];
+        const b1 = buffer[22];
+        const b2 = buffer[23];
+        const b3 = buffer[24];
+        const width = 1 + (((b1 & 0x3f) << 8) | b0);
+        const height = 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6));
+        return { width, height };
       }
     }
     if (ext === 'jpg') {

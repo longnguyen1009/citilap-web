@@ -7,7 +7,10 @@ type Entry = {
   progress: number;
   state: 'pending' | 'uploading' | 'done' | 'error';
   error: string;
+  warning?: string;
 };
+
+type BackfillResult = { processed: number; created: number; alreadyReady: number; failed: Array<{ id: string; error: string }>; nextCursor: string | null };
 
 const ACCEPTED_MIME_TYPES = [
   'image/jpeg',
@@ -48,6 +51,35 @@ export default function MediaUpload({ onUploaded }: { onUploaded: () => void }) 
   const request = useRef<XMLHttpRequest | null>(null);
   const stopped = useRef(false);
   useEffect(() => () => { stopped.current = true; request.current?.abort(); }, []);
+  const [backfill, setBackfill] = useState<{ running: boolean; created: number; ready: number; failed: number; done: boolean; error: string } | null>(null);
+  const backfillStop = useRef(false);
+  useEffect(() => () => { backfillStop.current = true; }, []);
+
+  async function runBackfill() {
+    if (backfill?.running) return;
+    backfillStop.current = false;
+    let cursor: string | null = null, created = 0, ready = 0, failed = 0;
+    setBackfill({ running: true, created, ready, failed, done: false, error: '' });
+    try {
+      do {
+        const res = await fetch('/api/admin/media/thumbnails', {
+          method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cursor, limit: 10 }),
+        });
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error || 'Không thể tạo ảnh thu nhỏ.');
+        const data = body.data as BackfillResult;
+        created += data.created; ready += data.alreadyReady; failed += data.failed.length;
+        cursor = data.nextCursor;
+        setBackfill({ running: !!cursor, created, ready, failed, done: !cursor, error: '' });
+      } while (cursor && !backfillStop.current);
+      if (backfillStop.current) setBackfill({ running: false, created, ready, failed, done: false, error: '' });
+      onUploaded();
+    } catch (e) {
+      setBackfill({ running: false, created, ready, failed, done: false, error: e instanceof Error ? e.message : 'Không thể tạo ảnh thu nhỏ.' });
+    }
+  }
 
   function choose(files: FileList | null) {
     if (!files) return;
@@ -67,9 +99,9 @@ export default function MediaUpload({ onUploaded }: { onUploaded: () => void }) 
         update(entry.id, { state: 'error', error: validationError });
         continue;
       }
-      update(entry.id, { state: 'uploading', progress: 0, error: '' });
+      update(entry.id, { state: 'uploading', progress: 0, error: '', warning: '' });
       try {
-        await new Promise<void>((resolve, reject) => {
+        const warning = await new Promise<string>((resolve, reject) => {
           const xhr = new XMLHttpRequest(); request.current = xhr;
           xhr.open('POST', '/api/admin/media'); xhr.timeout = 180000;
           xhr.upload.onprogress = (e) => { if (e.lengthComputable) update(entry.id, { progress: Math.round(e.loaded * 100 / e.total) }); };
@@ -78,7 +110,12 @@ export default function MediaUpload({ onUploaded }: { onUploaded: () => void }) 
           xhr.onload = () => {
             try {
               const result = JSON.parse(xhr.responseText);
-              if (xhr.status >= 200 && xhr.status < 300 && result.success) resolve();
+              if (xhr.status >= 200 && xhr.status < 300 && result.success) {
+                const optimization = result.data?.optimization as { status?: string; error?: string | null } | undefined;
+                resolve(optimization?.status === 'PENDING'
+                  ? `${optimization.error || 'Ảnh thu nhỏ chưa được tạo.'} Ảnh gốc đã lưu; mở chi tiết tệp hoặc dùng "Tạo ảnh thu nhỏ còn thiếu" để thử lại.`
+                  : '');
+              }
               else reject(new Error(result.error || 'Không thể tải tệp.'));
             } catch {
               reject(new Error('Phản hồi không hợp lệ.'));
@@ -86,7 +123,7 @@ export default function MediaUpload({ onUploaded }: { onUploaded: () => void }) 
           };
           const body = new FormData(); body.append('file', entry.file); xhr.send(body);
         });
-        update(entry.id, { state: 'done', progress: 100 }); onUploaded();
+        update(entry.id, { state: 'done', progress: 100, warning }); onUploaded();
       } catch (e) {
         update(entry.id, { state: 'error', error: e instanceof Error ? e.message : 'Tải tệp thất bại.' });
       }
@@ -127,6 +164,16 @@ export default function MediaUpload({ onUploaded }: { onUploaded: () => void }) 
         </div>
       </div>
       {message && <p role="alert" className="media-error">{message}</p>}
+      <div className="flex flex-wrap items-center gap-2 text-xs border-t border-slate-100 pt-2">
+        <button type="button" className="media-button" disabled={backfill?.running} onClick={() => void runBackfill()}
+          title="Tạo ảnh thu nhỏ 480px WebP cho ảnh cũ, ưu tiên ảnh đang được sử dụng. Ảnh gốc không bị thay đổi.">
+          {backfill?.running ? 'Đang tạo ảnh thu nhỏ…' : 'Tạo ảnh thu nhỏ còn thiếu'}
+        </button>
+        {backfill?.running && <button type="button" className="media-button" onClick={() => { backfillStop.current = true; }}>Dừng</button>}
+        {backfill && <span role="status" className={backfill.error ? 'text-red-800' : 'media-muted'}>
+          {backfill.error || `${backfill.done ? 'Hoàn tất' : backfill.running ? 'Đang xử lý' : 'Đã dừng'}: tạo mới ${backfill.created}, đã có ${backfill.ready}${backfill.failed ? `, lỗi ${backfill.failed}` : ''}.`}
+        </span>}
+      </div>
       {entries.length > 0 && (
         <ul className="space-y-1.5 pt-1 border-t border-slate-100">
           {entries.map((e) => (
@@ -137,6 +184,7 @@ export default function MediaUpload({ onUploaded }: { onUploaded: () => void }) 
               </div>
               {e.state === 'uploading' && <progress className="w-full" value={e.progress} max={100} aria-label={`Tiến độ ${e.file.name}`} />}
               {e.error && <p role="alert" className="text-red-800">{e.error}</p>}
+              {e.warning && <p role="status" className="text-amber-800">{e.warning}</p>}
             </li>
           ))}
         </ul>

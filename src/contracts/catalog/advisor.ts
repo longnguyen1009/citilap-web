@@ -23,6 +23,7 @@ export function matchLaptop(input: AdvisorInput, product: { price: number; condi
   const reasons = [product.availability === 'CONTACT'
     ? `Giá tham khảo ${product.price.toLocaleString('vi-VN')}đ; cần xác nhận giá và hàng`
     : `Trong ngân sách ${input.budget.toLocaleString('vi-VN')}đ`, `RAM ${ram}GB`];
+  if (facts['Phù hợp']) reasons.push(`Phù hợp: ${facts['Phù hợp']}`);
   if (input.need !== 'office') reasons.push(`GPU rời ${gpu}; cần thử đúng game/phần mềm`);
   if (input.portable === 'yes') reasons.push(`Máy ${weight} kg, chưa gồm sạc`);
   return { reasons, limitation: facts['Hạn chế'] || 'Chưa có đánh giá thực tế. Xác minh màn hình, pin và khả năng nâng cấp trước khi mua.', score: (ram >= 32 && input.need === 'creator' ? 2 : 0) + (facts['Phù hợp'] ? 1 : 0) };

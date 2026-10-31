@@ -102,7 +102,7 @@ export default function MediaSectionView({ posts, title = 'TIN TỨC CÔNG NGH�
                   <div className="relative aspect-[16/10] shrink-0 overflow-hidden rounded-xl bg-slate-100">
                     {post.coverImage ? (
                       <Image
-                        src={post.coverImage.url}
+                        src={post.coverImage.thumbnailUrl || post.coverImage.url}
                         alt={post.coverImage.alt || post.title}
                         fill
                         sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 260px"

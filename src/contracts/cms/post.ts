@@ -8,7 +8,7 @@ const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(1).max(220
 export const RESERVED_SLUGS = [
   'news', 'product', 'category', 'brand', 'collection', 'search', 'cart', 'checkout',
   'contact', 'lien-he', 'wishlist', 'profile', 'order-tracking', 'hot-sale', 'admin',
-  'api', 'login', 'chon-laptop', 'san-pham', 'laptop', 'phu-kien', 'phan-loai',
+  'api', 'login', 'chon-laptop', 'san-pham', 'laptop', 'phu-kien', 'phan-loai', 'so-sanh',
 ] as const;
 
 const notReserved = (val: string) => !(RESERVED_SLUGS as readonly string[]).includes(val);
@@ -97,7 +97,7 @@ export const publicPostSchema = z.object({
   authorName: z.string(),
   isFeatured: z.boolean(),
   category: z.object({ id: z.string(), name: z.string(), slug: z.string() }).nullable(),
-  coverImage: z.object({ url: z.string(), alt: z.string() }).nullable(),
+  coverImage: z.object({ url: z.string(), alt: z.string(), thumbnailUrl: z.string().optional() }).nullable(),
   seo: z.object({ title: z.string(), description: z.string(), ogImageUrl: z.string().nullable() }),
   relatedProductIds: z.array(z.string()),
   publishedAt: z.string(),

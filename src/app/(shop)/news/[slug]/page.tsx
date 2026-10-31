@@ -10,6 +10,7 @@ import { getRelatedProducts } from "@/server/services/catalog.service";
 import ProductCard from "@/components/product/ProductCard";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { businessProfile } from "@/config/business-profile";
+import { generateBreadcrumbJsonLd, serializeJsonLd } from "@/lib/seo-helpers";
 
 interface PostDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -23,6 +24,8 @@ export async function generateMetadata({ params }: PostDetailPageProps): Promise
     const title = `${post.seo.title} | ${businessProfile.brandName}`;
     const description = post.seo.description || post.excerpt || undefined;
 
+    const ogImage = post.seo.ogImageUrl || post.coverImage?.url || '/brand/marketing-banner.webp';
+
     return {
       title,
       description,
@@ -33,7 +36,13 @@ export async function generateMetadata({ params }: PostDetailPageProps): Promise
         publishedTime: post.publishedAt,
         modifiedTime: post.updatedAt,
         authors: post.authorName ? [post.authorName] : undefined,
-        images: post.seo.ogImageUrl ? [{ url: post.seo.ogImageUrl }] : undefined,
+        images: [{ url: ogImage, alt: post.title }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: [ogImage],
       },
       alternates: {
         canonical: `${businessProfile.canonicalSiteUrl}/news/${post.slug}`,
@@ -88,8 +97,53 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
 
   const safeContent = sanitizeHtml(post.contentHtml || "");
 
+  const articleUrl = `${businessProfile.canonicalSiteUrl}/news/${post.slug}`;
+  const breadcrumbItems = [
+    { name: "Trang chủ", href: "/" },
+    { name: "Tin tức & Đánh giá", href: "/news" },
+    ...(post.category ? [{ name: post.category.name, href: `/news?category=${post.category.slug}` }] : []),
+    { name: post.title, href: `/news/${post.slug}` },
+  ];
+  const jsonLd = [
+    generateBreadcrumbJsonLd(breadcrumbItems),
+    {
+      "@context": "https://schema.org",
+      "@type": "NewsArticle",
+      "@id": `${articleUrl}#article`,
+      headline: post.title,
+      description: post.excerpt || post.seo.description,
+      datePublished: post.publishedAt,
+      dateModified: post.updatedAt || post.publishedAt,
+      mainEntityOfPage: {
+        "@type": "WebPage",
+        "@id": articleUrl,
+      },
+      url: articleUrl,
+      ...(post.coverImage?.url
+        ? { image: [post.coverImage.url.startsWith("http") ? post.coverImage.url : `${businessProfile.canonicalSiteUrl}${post.coverImage.url}`] }
+        : {}),
+      author: {
+        "@type": "Person",
+        name: post.authorName || businessProfile.brandName,
+      },
+      publisher: {
+        "@type": "Organization",
+        name: businessProfile.brandName,
+        url: businessProfile.canonicalSiteUrl,
+        logo: {
+          "@type": "ImageObject",
+          url: `${businessProfile.canonicalSiteUrl}${businessProfile.logoAsset}`,
+        },
+      },
+    },
+  ];
+
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-200 mb-8">
         <div className="container mx-auto px-4 max-w-[1370px]">
@@ -239,7 +293,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
                       <div className="relative w-20 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100">
                         {other.coverImage ? (
                           <Image
-                            src={other.coverImage.url}
+                            src={other.coverImage.thumbnailUrl || other.coverImage.url}
                             alt={other.coverImage.alt || other.title}
                             fill
                             sizes="80px"

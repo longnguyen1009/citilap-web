@@ -65,7 +65,7 @@ export default async function CollectionsListingPage() {
               >
                 <div className="relative h-48 sm:h-56 bg-slate-900 overflow-hidden">
                   <Image
-                    src={col.image || 'https://images.unsplash.com/photo-1598550476439-6847785fcea6?q=80&w=1200&auto=format&fit=crop'}
+                    src={col.image || '/brand/marketing-banner.webp'}
                     alt={col.name}
                     fill
                     className="object-cover group-hover:scale-105 transition duration-500"

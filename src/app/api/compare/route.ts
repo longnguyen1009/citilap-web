@@ -206,6 +206,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
 
       products.push({
         id: row.id,
+        variantId: card.variantId,
         name: productName,
         slug: card.slug,
         price: card.price,

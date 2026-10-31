@@ -1,4 +1,5 @@
 import { getStorefrontPricingContext } from '@/server/services/pricing.service';
+import { serializeJsonLd } from '@/lib/seo-helpers';
 import { Suspense } from "react";
 import { Metadata } from "next";
 import {
@@ -22,6 +23,8 @@ import BrandSection from "@/components/home/BrandSection";
 import { getPublishedNavigation, getPublishedHomepage, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import BlockRenderer from "@/components/builder/BlockRenderer";
 import { ProductGridSkeleton } from "@/components/ui/Skeleton";
+
+export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
   const {mediaEnvironment}=await import('@/server/media-http');
@@ -73,7 +76,7 @@ export default async function Home() {
       <div className="bg-surface-subtle min-h-screen">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
         <BlockRenderer
           sections={cmsHomepage.sections}
@@ -94,7 +97,7 @@ export default async function Home() {
     <div className="bg-surface-subtle min-h-screen">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
 
       {/* 1. HERO SECTION & SUB-BANNERS */}

@@ -1,5 +1,5 @@
 import { adminAuditStatements } from '../admin-context';
-import type { D1Database, R2Bucket } from '@cloudflare/workers-types';
+import type { D1Database, R2Bucket, ImagesBinding } from '@cloudflare/workers-types';
 import {
   googleDriveFileId,
   mediaEditSchema,
@@ -14,7 +14,13 @@ import {
 } from '../../contracts/cms/media';
 import { detectImageSignature, extractImageDimensions } from '../../infra/cloudflare/r2/storage';
 
-export interface MediaEnvironment { DB: D1Database; PRODUCT_MEDIA: R2Bucket }
+export type CloudflareImagesBinding = ImagesBinding;
+
+export interface MediaEnvironment {
+  DB: D1Database;
+  PRODUCT_MEDIA: R2Bucket;
+  IMAGES?: CloudflareImagesBinding;
+}
 export class MediaError extends Error {
   status: number;
   constructor(message: string, status = 400) { super(message); this.status = status; }
@@ -106,11 +112,12 @@ export function resolveMediaPresentation(row: {
   }
 
   const imageUrl = libraryUrl || (externalId?.startsWith('https://') ? externalId : null);
+  const thumbnailUrl = libraryUrl ? `${libraryUrl}?size=thumb&v=2` : imageUrl;
   return {
     assetType: 'IMAGE',
     url: imageUrl,
     embedUrl: null,
-    thumbnailUrl: imageUrl,
+    thumbnailUrl,
   };
 }
 
@@ -238,6 +245,11 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
   let key = '';
   let mime = '';
   let uploadBuffer = buffer;
+  let thumbKey: string | null = null;
+  let thumbBuffer: Buffer | null = null;
+  let thumbMime = 'image/webp';
+  let thumbnailStatus: 'READY' | 'PENDING' | 'NOT_APPLICABLE' = 'NOT_APPLICABLE';
+  let thumbnailError: string | null = null;
   let width: number | null = null;
   let height: number | null = null;
 
@@ -282,10 +294,74 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
     height = dim?.height ?? null;
     mime = detected.mime;
     key = `library/${id}.${detected.ext}`;
+    // No full-size "thumbnail" copy: a missing v2 thumbnail is reported as PENDING
+    // and can be regenerated lazily or from the admin library.
+    thumbnailStatus = 'PENDING';
+
+    // Standardize uploaded product / post images into 2 versions:
+    // + detail: max width 1600px, quality 90% (for PDP, zoom)
+    // + thumbnail: width 480px, quality 75% (for product grid, listings)
+    if (!env.IMAGES || typeof env.IMAGES.input !== 'function') {
+      thumbnailError = 'Dịch vụ tối ưu ảnh chưa sẵn sàng.';
+    } else {
+      try {
+        const detailResult = await env.IMAGES.input(new Blob([new Uint8Array(buffer)]).stream() as Parameters<ImagesBinding['input']>[0])
+          .transform({ width: 1600, fit: 'scale-down' })
+          .output({ format: 'image/webp', quality: 90 });
+        const detailResp = detailResult.response();
+        const detailBuf = Buffer.from(await detailResp.arrayBuffer());
+        if (detailResp.ok && detectImageSignature(detailBuf)?.mime === 'image/webp') {
+          uploadBuffer = detailBuf;
+          mime = 'image/webp';
+          key = `library/${id}.webp`;
+          const newDim = extractImageDimensions(detailBuf, 'webp');
+          if (newDim) {
+            width = newDim.width;
+            height = newDim.height;
+          } else if (dim) {
+            if (dim.width > 1600) {
+              width = 1600;
+              height = Math.round(dim.height * (1600 / dim.width));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Worker IMAGES detail transformation fallback to original buffer:', err);
+      }
+
+      // Independent of the detail step so one failure does not silently skip the other.
+      try {
+        const thumbResult = await env.IMAGES.input(new Blob([new Uint8Array(buffer)]).stream() as Parameters<ImagesBinding['input']>[0])
+          .transform({ width: 480, fit: 'scale-down' })
+          .output({ format: 'image/webp', quality: 75 });
+        const thumbResp = thumbResult.response();
+        const thumbBuf = Buffer.from(await thumbResp.arrayBuffer());
+        if (thumbResp.ok && detectImageSignature(thumbBuf)?.mime === 'image/webp') {
+          thumbBuffer = thumbBuf;
+          thumbMime = 'image/webp';
+          thumbKey = `library/${id}_thumb-v2.webp`;
+        } else {
+          thumbnailError = 'Không thể tạo ảnh thu nhỏ.';
+        }
+      } catch (err) {
+        console.warn('Worker IMAGES thumbnail transformation failed:', err);
+        thumbnailError = 'Không thể tạo ảnh thu nhỏ.';
+      }
+    }
   }
 
   const result = await env.PRODUCT_MEDIA.put(key, uploadBuffer, { httpMetadata: { contentType: mime } });
   if (!result) throw new MediaError('Không thể tải tệp lên bộ lưu trữ.', 503);
+
+  if (thumbKey && thumbBuffer) {
+    const saved = await env.PRODUCT_MEDIA.put(thumbKey, thumbBuffer, { httpMetadata: { contentType: thumbMime } }).catch((err) => {
+      console.warn('Thumbnail upload non-fatal failure:', err instanceof Error ? err.message : err);
+      return null;
+    });
+    if (saved) thumbnailStatus = 'READY';
+    else thumbnailError = 'Không thể lưu ảnh thu nhỏ vào bộ lưu trữ.';
+  }
+
   try {
     await env.DB.batch([
       env.DB.prepare(`INSERT INTO MediaAsset(id,kind,provider,storageKey,name,mimeType,size,width,height)
@@ -302,11 +378,14 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
       ...adminAuditStatements(env.DB, 'media.upload', id, 'Media uploaded'),
     ]);
   } catch (error) {
-    // R2/D1 cannot share a transaction. Compensate only our newly generated object.
-    await env.PRODUCT_MEDIA.delete(key).catch(() => console.error('Media cleanup pending', id));
+    // R2/D1 cannot share a transaction. Compensate only our newly generated object(s).
+    await Promise.allSettled([
+      env.PRODUCT_MEDIA.delete(key),
+      thumbKey ? env.PRODUCT_MEDIA.delete(thumbKey) : Promise.resolve(),
+    ]).catch(() => console.error('Media cleanup pending', id));
     throw error;
   }
-  return mediaDetail(env.DB, id);
+  return { ...(await mediaDetail(env.DB, id)), optimization: { status: thumbnailStatus, error: thumbnailStatus === 'READY' ? null : thumbnailError } };
 }
 
 function isSafeHttpsUrl(input: string): boolean {
@@ -388,16 +467,107 @@ export async function addVideo(db: D1Database, input: unknown) {
   return mediaDetail(db, row!.id);
 }
 
+export async function imageOptimization(env: MediaEnvironment, id: string, retry = false) {
+  const row = await getAsset(env.DB, id);
+  const applicable = row.provider === 'R2' && row.storageKey?.startsWith('library/') &&
+    row.kind === 'IMAGE' && RASTER_MIME.includes(row.mimeType || '');
+  if (!applicable) return { status: 'NOT_APPLICABLE', bytes: null };
+  const key = `library/${id}_thumb-v2.webp`;
+  let head = await env.PRODUCT_MEDIA.head(key);
+  if (!head && retry) {
+    if (!env.IMAGES) throw new MediaError('Dịch vụ tối ưu ảnh chưa sẵn sàng. Thử lại sau.', 503);
+    const original = await env.PRODUCT_MEDIA.get(row.storageKey!);
+    if (!original) throw new MediaError('Không tìm thấy ảnh gốc.', 404);
+    const output = await env.IMAGES.input(original.body)
+      .transform({ width: 480, fit: 'scale-down' }).output({ format: 'image/webp', quality: 75 });
+    const response = output.response();
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!response.ok || detectImageSignature(bytes)?.mime !== 'image/webp') throw new MediaError('Không thể tạo ảnh thu nhỏ.', 503);
+    const saved = await env.PRODUCT_MEDIA.put(key, bytes, { httpMetadata: { contentType: 'image/webp' } });
+    if (!saved) throw new MediaError('Không thể lưu ảnh thu nhỏ.', 503);
+    head = saved;
+  }
+  return { status: head ? 'READY' : 'PENDING', bytes: head?.size ?? null };
+}
+
+const RASTER_MIME = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * Backfills v2 thumbnails for legacy library images, in-use assets first.
+ * Processes a bounded batch per call; callers loop with `nextCursor` until it is null.
+ * Originals are never modified; new thumbnails use the versioned `?size=thumb&v=2` URL.
+ */
+export async function backfillThumbnails(env: MediaEnvironment, input: { cursor?: string | null; limit?: number } = {}) {
+  const limit = Math.min(Math.max(Math.trunc(input.limit ?? 10), 1), 25);
+  // Cursor encodes "<inUse 1|0>:<id>" to keep a stable in-use-first ordering across calls.
+  const [usedPart, idPart] = (input.cursor || '').split(':');
+  const cursorUsed = usedPart === '0' ? 0 : 1;
+  const cursorId = input.cursor ? idPart || '' : '';
+  const placeholders = RASTER_MIME.map(() => '?').join(',');
+  const { results } = await env.DB.prepare(`SELECT id,inUse FROM (
+      SELECT a.id, CASE WHEN EXISTS(SELECT 1 FROM MediaUsage u WHERE u.assetId=a.id) THEN 1 ELSE 0 END AS inUse
+      FROM MediaAsset a
+      WHERE a.provider='R2' AND a.kind='IMAGE' AND a.storageKey LIKE 'library/%' AND a.mimeType IN (${placeholders})
+    ) WHERE (inUse < ? OR (inUse = ? AND id > ?))
+    ORDER BY inUse DESC, id LIMIT ?`)
+    .bind(...RASTER_MIME, cursorUsed, cursorUsed, cursorId, limit)
+    .all<{ id: string; inUse: number }>();
+  let created = 0, ready = 0;
+  const failed: Array<{ id: string; error: string }> = [];
+  for (const row of results) {
+    try {
+      const before = await env.PRODUCT_MEDIA.head(`library/${row.id}_thumb-v2.webp`);
+      if (before) { ready++; continue; }
+      const outcome = await imageOptimization(env, row.id, true);
+      if (outcome.status === 'READY') created++;
+    } catch (error) {
+      failed.push({ id: row.id, error: error instanceof MediaError ? error.message : 'Không thể tạo ảnh thu nhỏ.' });
+    }
+  }
+  const last = results.at(-1);
+  return {
+    processed: results.length, created, alreadyReady: ready, failed,
+    nextCursor: results.length === limit && last ? `${last.inUse}:${last.id}` : null,
+  };
+}
+
 export async function serveLibraryImage(env: MediaEnvironment, id: string, request: Request) {
   const row = await getAsset(env.DB, id);
   // Archiving is library organization, not revocation; existing public links remain valid.
   if (row.provider !== 'R2' || !row.storageKey?.startsWith('library/')) throw new MediaError('Không tìm thấy tệp.', 404);
-  const object = await env.PRODUCT_MEDIA.get(row.storageKey);
+
+  const url = new URL(request.url);
+  const isThumb = url.searchParams.get('size') === 'thumb' || url.searchParams.get('variant') === 'thumb' || url.searchParams.get('w') === 'thumb';
+
+  let object = null;
+  let pendingOptimization = false;
+  let contentType = row.mimeType || 'application/octet-stream';
+
+  if (isThumb && row.kind === 'IMAGE' && RASTER_MIME.includes(row.mimeType || '')) {
+    const versioned = url.searchParams.get('v') === '2';
+    const thumbKey = versioned ? `library/${id}_thumb-v2.webp` : row.storageKey.replace(/(\.[a-zA-Z0-9]+)$/, '_thumb$1');
+    object = await env.PRODUCT_MEDIA.get(thumbKey);
+    if (!object && versioned) {
+      try {
+        await imageOptimization(env, id, true);
+        object = await env.PRODUCT_MEDIA.get(thumbKey);
+      } catch { /* Keep the original usable; never cache this fallback as immutable. */ }
+      pendingOptimization = !object;
+    }
+    if (object) {
+      contentType = object.httpMetadata?.contentType || 'image/webp';
+    }
+  }
+
+  if (!object) {
+    object = await env.PRODUCT_MEDIA.get(row.storageKey);
+  }
+
   if (!object) throw new MediaError('Không tìm thấy tệp trong bộ lưu trữ.', 404);
   const headers: Record<string, string> = {
-    'Content-Type': row.mimeType || 'application/octet-stream',
+    'Content-Type': contentType,
     'X-Content-Type-Options': 'nosniff',
-    'Cache-Control': 'public, max-age=3600',
+    'Cache-Control': pendingOptimization ? 'no-store' : 'public, max-age=31536000, immutable',
     ETag: object.httpEtag,
   };
   if (row.mimeType === 'image/svg+xml') {

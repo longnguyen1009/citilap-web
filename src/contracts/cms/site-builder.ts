@@ -111,6 +111,7 @@ export const productGridSectionDataSchema = z.object({
   rankNumbering: z.boolean().default(false), // Cho khối Bán chạy nhất
   viewAllLink: safeUrlOrPath.default(''),
 });
+export type ProductGridSectionData = z.infer<typeof productGridSectionDataSchema>;
 
 // 4. Featured Categories Section
 export const featuredCategoryItemSchema = z.object({
@@ -127,6 +128,7 @@ export const featuredCategoriesSectionDataSchema = z.object({
   categoryIds: z.array(z.string().max(128)).max(16).default([]),
   items: z.array(featuredCategoryItemSchema).max(16).default([]),
 });
+export type FeaturedCategoriesSectionData = z.infer<typeof featuredCategoriesSectionDataSchema>;
 
 // 5. Featured Brands Section
 export const featuredBrandsSectionDataSchema = z.object({
@@ -134,6 +136,7 @@ export const featuredBrandsSectionDataSchema = z.object({
   subtitle: text(300).default(''),
   brandIds: z.array(z.string().max(128)).max(20).default([]),
 });
+export type FeaturedBrandsSectionData = z.infer<typeof featuredBrandsSectionDataSchema>;
 
 // 6. Featured Collection Section
 export const featuredCollectionSectionDataSchema = z.object({
@@ -142,6 +145,7 @@ export const featuredCollectionSectionDataSchema = z.object({
   collectionId: z.string().max(128),
   limit: z.number().int().min(1).max(48).default(12),
 });
+export type FeaturedCollectionSectionData = z.infer<typeof featuredCollectionSectionDataSchema>;
 
 // 7. News & Reviews Section
 export const newsReviewsSectionDataSchema = z.object({
@@ -288,7 +292,7 @@ function defaultHeroSection(): SectionItem {
       title: 'LAPTOP GAMING & ULTRABOOK',
       subtitle: 'Hiệu Năng Mạnh Mẽ - Giá Tốt Nhất',
       badge: 'ƯU ĐÃI ĐẶC BIỆT',
-      imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop',
+      imageUrl: '/brand/marketing-banner.webp',
       imageAssetId: null,
       link: '/laptop-gaming',
       buttonText: 'Khám Phá Ngay',
@@ -311,7 +315,7 @@ export function defaultHomepageSections(): SectionItem[] {
         title: 'LAPTOP GAMING',
         subtitle: '✩ HIỆU NĂNG MẠNH MẼ - CHIẾN GAME CỰC ĐỈNH ✩',
         badge: 'CitiLap Gaming Zone',
-        imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop',
+        imageUrl: '/brand/marketing-banner.webp',
         imageAssetId: null,
         link: '/laptop-gaming',
         buttonText: 'Khám Phá Ngay',

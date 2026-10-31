@@ -1915,7 +1915,7 @@ function SliderForm({
                 title: `Slide ${currentSlides.length + 1}`,
                 subtitle: 'Mô tả ngắn gọn ưu đãi hoặc cấu hình',
                 badge: 'Hot Deal',
-                imageUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop',
+                imageUrl: '/brand/marketing-banner.webp',
                 imageAssetId: null,
                 link: '/laptop-gaming',
                 buttonText: 'Khám phá ngay',

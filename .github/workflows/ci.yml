@@ -1,0 +1,44 @@
+name: CI Quality Gate
+
+on:
+  push:
+    branches: [ staging, master, main ]
+  pull_request:
+    branches: [ staging, master, main ]
+
+jobs:
+  verify:
+    name: Typecheck & Automated Test Suites
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (tsc)
+        run: npx tsc --noEmit
+
+      - name: Test - Media Library & Cloudflare Storage
+        run: node scripts/test-media-library.mjs
+
+      - name: Test - Image Optimization & 60s Cache
+        run: node scripts/test-image-optimization-and-cache.mjs
+
+      - name: Test - Security (JSON-LD, atomic rate limit) & catalog cache token
+        run: node scripts/test-security-and-cache.mjs
+
+      - name: Test - Storefront Improvements & Search
+        run: node scripts/test-storefront-improvements.mjs
+
+      - name: Test - Admin & Storefront Integration Audit
+        run: node scripts/test-admin-storefront-audit.mjs
+

@@ -7,6 +7,7 @@ import { Check, Phone, ShoppingCart, ShieldCheck, Scale, Gift, CreditCard, Alert
 import { useCart } from "@/context/CartContext";
 import { useCompare } from "@/context/CompareContext";
 import { businessProfile } from "@/config/business-profile";
+import { trackStorefront } from "@/lib/storefront-metrics";
 import type { ProductDocument } from "@/contracts/cms/product-studio";
 import InstallmentCalculatorModal from "./InstallmentCalculatorModal";
 
@@ -460,7 +461,8 @@ export default function StudioPurchaseSection({
 
           <a
             href={`tel:${phone.replace(/\s+/g, "")}`}
-            className="flex items-center justify-center gap-2 flex-1 border-2 border-emerald-600 bg-emerald-50/40 text-emerald-800 hover:bg-emerald-100/60 rounded-xl py-2.5 text-xs font-bold transition"
+            onClick={() => trackStorefront('contact_click')}
+            className="flex items-center justify-center gap-2 flex-1 border-2 border-emerald-600 bg-emerald-50/40 text-emerald-800 hover:bg-emerald-100/60 rounded-xl py-2.5 text-xs font-bold transition cursor-pointer"
           >
             <Phone className="w-4 h-4 text-emerald-600" />
             <span>Tư vấn: {phone}</span>

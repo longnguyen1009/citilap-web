@@ -1068,6 +1068,16 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   + Năm ra mắt
                 </AdminButton>
               )}
+              {doc.template === 'LAPTOP' && !doc.specs.some(spec => spec.key === 'Phù hợp') && (
+                <AdminButton variant="secondary" size="sm" onClick={() => updateDoc('specs', [...doc.specs, { key: 'Phù hợp', value: '' }])}>
+                  + Phù hợp (Tư vấn)
+                </AdminButton>
+              )}
+              {doc.template === 'LAPTOP' && !doc.specs.some(spec => spec.key === 'Hạn chế') && (
+                <AdminButton variant="secondary" size="sm" onClick={() => updateDoc('specs', [...doc.specs, { key: 'Hạn chế', value: '' }])}>
+                  + Hạn chế (Tư vấn)
+                </AdminButton>
+              )}
               <AdminButton
                 variant="secondary"
                 size="sm"

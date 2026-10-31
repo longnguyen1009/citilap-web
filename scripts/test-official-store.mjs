@@ -7,12 +7,12 @@ const home = await fetch(base).then(r => { assert.equal(r.status,200); return r.
 assert(!home.includes('Bản demo CitiLap'));
 assert(!home.includes('aria-label="Hỗ trợ chọn máy"'));
 assert(home.includes('/brand/citilap-logo.svg'));
-assert(home.includes('Hộ kinh doanh CitiLap'));
+assert(/Hộ kinh doanh Citi\s*Lap/i.test(home));
 for(const slug of ['chinh-sach-bao-hanh','chinh-sach-doi-tra','chinh-sach-van-chuyen','chinh-sach-bao-mat','huong-dan-mua-hang','dieu-khoan-mua-hang','gioi-thieu','he-thong-cua-hang','cau-hoi-thuong-gap']) {
   const r=await fetch(`${base}/${slug}`); assert.equal(r.status,200,slug);
   const html=await r.text();
   assert(!html.includes('Dự thảo') && !html.includes('Bản dự thảo'),slug);
-  assert(html.includes('Hộ kinh doanh CitiLap'),slug);
+  assert(/Hộ kinh doanh Citi\s*Lap/i.test(html),slug);
   if(slug==='cau-hoi-thuong-gap')assert.equal((html.match(/<details\b/g)||[]).length,8);
   console.log('PASS published content',slug);
 }

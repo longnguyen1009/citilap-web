@@ -28,6 +28,7 @@ export type ProductCardProduct = {
   isFlashSale?: boolean;
   isOnSale?: boolean;
   image?: string | null;
+  thumbnailUrl?: string | null;
   brand?: string;
   model?: string;
   series?: string;
@@ -267,23 +268,27 @@ export default function ProductCard({
       {/* Product Image Container */}
       <div className="relative aspect-[4/3] w-full border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white p-3 pt-11 sm:p-4 sm:pt-10 flex items-center justify-center overflow-hidden">
         <div className="relative block w-full h-full">
-          {product.image && !imageError ? (
-            <Image
-              src={product.image}
-              alt={product.name}
-              fill
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-              onError={() => setImageError(true)}
-              className={`object-contain transition-transform duration-300 group-hover/product:scale-105 motion-reduce:transform-none ${
-                isOutOfStock ? "grayscale opacity-60" : ""
-              }`}
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-              <Laptop className="w-14 h-14 stroke-1" />
-              <span className="text-caption font-medium text-text-muted mt-1">Ảnh đang cập nhật</span>
-            </div>
-          )}
+          {(() => {
+            const rawImage = product.thumbnailUrl || product.image || (product as { primaryImage?: string }).primaryImage || null;
+            const cardImage = product.thumbnailUrl || (rawImage && rawImage.startsWith('/api/library/') && !rawImage.includes('?') ? `${rawImage}?size=thumb&v=2` : rawImage);
+            return cardImage && !imageError ? (
+              <Image
+                src={cardImage}
+                alt={product.name}
+                fill
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                onError={() => setImageError(true)}
+                className={`object-contain transition-transform duration-300 group-hover/product:scale-105 motion-reduce:transform-none ${
+                  isOutOfStock ? "grayscale opacity-60" : ""
+                }`}
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                <Laptop className="w-14 h-14 stroke-1" />
+                <span className="text-caption font-medium text-text-muted mt-1">Ảnh đang cập nhật</span>
+              </div>
+            );
+          })()}
 
           {/* Out of stock overlay */}
           {isOutOfStock && (

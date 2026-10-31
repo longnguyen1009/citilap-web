@@ -22,6 +22,9 @@ export async function generateMetadata({
     return {
       title: `Tìm kiếm "${q}" | CitiLap.vn`,
       description: `Kết quả tìm kiếm sản phẩm laptop, máy tính và linh kiện cho từ khóa "${q}" tại Citilap.vn. Hàng chính hãng, bảo hành uy tín.`,
+      alternates: {
+        canonical: "https://citilap.vn/search",
+      },
       robots: {
         index: false,
         follow: true,
@@ -32,6 +35,9 @@ export async function generateMetadata({
   return {
     title: "Tìm kiếm sản phẩm laptop chính hãng | CitiLap.vn",
     description: "Tìm kiếm laptop gaming, laptop văn phòng, đồ họa và linh kiện giá tốt nhất tại Citilap.vn.",
+    alternates: {
+      canonical: "https://citilap.vn/search",
+    },
     robots: {
       index: false,
       follow: true,

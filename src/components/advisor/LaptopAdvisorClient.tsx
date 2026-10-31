@@ -24,6 +24,8 @@ import {
 } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import Breadcrumb from "@/components/layout/Breadcrumb";
+import { trackStorefront } from "@/lib/storefront-metrics";
+import { businessProfile } from "@/config/business-profile";
 import type { AdvisorInput } from "@/contracts/catalog/advisor";
 import type { adviseLaptops } from "@/server/services/advisor.service";
 
@@ -31,6 +33,7 @@ interface LaptopAdvisorClientProps {
   initialInput: AdvisorInput;
   initialResults: Awaited<ReturnType<typeof adviseLaptops>>;
   initialError?: string;
+  zaloUrl?: string | null;
 }
 
 const BUDGET_PRESETS = [
@@ -84,9 +87,14 @@ export default function LaptopAdvisorClient({
   initialInput,
   initialResults,
   initialError,
+  zaloUrl,
 }: LaptopAdvisorClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const effectiveZaloBase = (zaloUrl || businessProfile.socialProfiles.zalo || 'https://zalo.me/0899188186').replace(/\/$/, '');
+  const hotline = businessProfile.displayPhone || '0899.188.186';
+  const hotlineTel = `tel:${businessProfile.phone || '0899188186'}`;
 
   const [budget, setBudget] = useState<number>(initialInput.budget);
   const [need, setNeed] = useState<"office" | "gaming" | "creator">(initialInput.need);
@@ -494,14 +502,15 @@ export default function LaptopAdvisorClient({
                     {/* Card Actions */}
                     <div className="pt-2 space-y-2">
                       <a
-                        href={`https://zalo.me/0899188186?text=${encodeURIComponent(
+                        href={`${effectiveZaloBase}?text=${encodeURIComponent(
                           `Chào CitiLap, mình đang xem laptop [${product.name}] giá ${formatCurrency(
                             typeof product.price === "number" ? product.price : parseInt(String(product.price))
                           )} theo công cụ tư vấn, cần hỗ trợ thêm thông tin máy.`
                         )}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition"
+                        onClick={() => trackStorefront('contact_click')}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
                       >
                         <MessageSquare className="w-4 h-4" />
                         <span>Chat Zalo tư vấn cấu hình máy này</span>
@@ -554,11 +563,11 @@ export default function LaptopAdvisorClient({
                   Nâng ngân sách +5 triệu & Xem lại
                 </button>
                 <a
-                  href="tel:0899188186"
+                  href={hotlineTel}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs transition inline-flex items-center justify-center gap-1.5"
                 >
                   <PhoneCall className="w-4 h-4 text-emerald-600" />
-                  <span>Gọi Hotline 0899.188.186</span>
+                  <span>Gọi Hotline {hotline}</span>
                 </a>
               </div>
             </div>
@@ -604,7 +613,7 @@ export default function LaptopAdvisorClient({
               </div>
               <div>
                 <h4 className="font-bold text-slate-900 mb-0.5">Tư vấn viên tận tâm</h4>
-                <p className="text-slate-500">Hotline 0899.188.186 & Zalo túc trực từ 9h đến 20h hàng ngày.</p>
+                <p className="text-slate-500">Hotline {hotline} & Zalo túc trực từ 9h đến 20h hàng ngày.</p>
               </div>
             </div>
           </div>

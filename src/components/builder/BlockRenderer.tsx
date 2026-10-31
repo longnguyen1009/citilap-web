@@ -20,7 +20,13 @@ import { Fragment, type ReactNode } from 'react';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
 import CategoryGridSection from '@/components/home/CategoryGridSection';
 import BrandSection from '@/components/home/BrandSection';
-import { newsReviewsSectionDataSchema, ctaSectionDataSchema } from '@/contracts/cms/site-builder';
+import {
+  newsReviewsSectionDataSchema,
+  ctaSectionDataSchema,
+  type ProductGridSectionData,
+  type FeaturedCategoriesSectionData,
+} from '@/contracts/cms/site-builder';
+import type { SliderSectionData } from '@/components/home/SliderSection';
 import FeatureStrip from '@/components/home/FeatureStrip';
 import MediaSection from '@/components/home/MediaSectionView';
 import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
@@ -134,7 +140,7 @@ import SliderSection from '@/components/home/SliderSection';
 // 1. BANNER BLOCK
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function BannerBlock({ data }: { data: any }) {
-  const imageUrl = data.imageUrl || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop';
+  const imageUrl = data.imageUrl || '/brand/marketing-banner.webp';
   const layout = data.layout || 'hero';
 
   if (layout === 'fullwidth') {
@@ -259,14 +265,12 @@ function BannerBlock({ data }: { data: any }) {
 
 // 2. SLIDER BLOCK
 function SliderBlock({ data }: { data: unknown }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <SliderSection data={data as any} />;
+  return <SliderSection data={data as SliderSectionData} />;
 }
 
 // 3. PRODUCT GRID BLOCK
 function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = section.data as any;
+  const data = section.data as ProductGridSectionData;
   const products = section.resolvedProducts || [];
   const colorClass = THEME_GRADIENT_MAP[data.colorTheme] || THEME_GRADIENT_MAP.blue;
   const links = Array.isArray(data.links) ? data.links : [];
@@ -348,8 +352,7 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
 
 // 4. FEATURED CATEGORIES BLOCK
 function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = section.data as any;
+  const data = section.data as FeaturedCategoriesSectionData;
   const resolved = section.resolvedCategories || [];
   const categories = data.items?.length ? data.items.flatMap((item: { categoryId: string; customName?: string; customImage?: string; href?: string }) => {
     const category = resolved.find(c => c.id === item.categoryId);

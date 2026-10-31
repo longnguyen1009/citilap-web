@@ -6,6 +6,7 @@ export const MAX_COMPARE_PRODUCTS = 3;
 
 export interface CompareProductItem {
   id: string;
+  variantId?: string | null;
   name: string;
   slug: string;
   price: number;

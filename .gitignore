@@ -48,3 +48,5 @@ scripts/.*bundle*.mjs
 scripts/verify-cf.mjs
 /.worktrees/
 /.claude/settings.local.json
+/backups/
+*.sql.gz

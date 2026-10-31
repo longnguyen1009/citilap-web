@@ -8,6 +8,7 @@ import { useCart } from '@/context/CartContext';
 import { conditionLabels } from '@/contracts/cms/product-studio';
 import type { ProductDetailVariant } from '@/server/services/catalog.service';
 import { businessProfile } from '@/config/business-profile';
+import { trackStorefront } from '@/lib/storefront-metrics';
 import ProductVariantSelector from './ProductVariantSelector';
 import InstallmentCalculatorModal from './InstallmentCalculatorModal';
 
@@ -237,7 +238,7 @@ export default function ProductPurchaseSection({
         {/* Hotline tư vấn */}
         <div className="flex items-center justify-center gap-2 pt-1 text-xs text-gray-500">
           <Phone className="w-4 h-4 text-emerald-600" />
-          <span>Tư vấn kỹ thuật & cấu hình riêng: <a href={'tel:' + phone.replace(/\s+/g, '')} className="text-blue-600 font-bold hover:underline">{phone}</a> (Zalo / Miễn phí)</span>
+          <span>Tư vấn kỹ thuật & cấu hình riêng: <a href={'tel:' + phone.replace(/\s+/g, '')} onClick={() => trackStorefront('contact_click')} className="text-blue-600 font-bold hover:underline">{phone}</a> (Zalo / Miễn phí)</span>
         </div>
       </div>
 

@@ -4,7 +4,7 @@ import { productHref } from '@/lib/product-paths';
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { X, Scale, AlertTriangle, RefreshCw, Search, Plus, ShoppingCart, ExternalLink } from "lucide-react";
+import { X, Scale, AlertTriangle, RefreshCw, Search, Plus, ShoppingCart, ExternalLink, Share2, Check } from "lucide-react";
 import { useCompare } from "@/context/CompareContext";
 import { useCart } from "@/context/CartContext";
 import { MAX_COMPARE_PRODUCTS, type CompareApiResponse } from "@/contracts/catalog/compare";
@@ -21,6 +21,7 @@ export default function CompareModal() {
   const [suggestions, setSuggestions] = useState<SearchSuggestionItem[]>([]);
   const [searching, setSearching] = useState(false);
   const [compareNotice, setCompareNotice] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
 
   // Keyboard Escape handler and focus return
@@ -98,7 +99,6 @@ export default function CompareModal() {
 
   useEffect(() => {
     if (!isCompareOpen || quickSearch.trim().length < 2) {
-      setSuggestions([]);
       return;
     }
     const controller = new AbortController();
@@ -181,7 +181,41 @@ export default function CompareModal() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const url = `${window.location.origin}/so-sanh?ids=${items.map((i) => i.id).join(",")}`;
+                  navigator.clipboard.writeText(url).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2500);
+                  });
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                  copied
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                    : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                }`}
+                title="Sao chép liên kết bảng so sánh này để gửi cho bạn bè hoặc tư vấn"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5 text-blue-600" />}
+                <span>{copied ? "Đã chép link!" : "Chia sẻ"}</span>
+              </button>
+            )}
+
+            {items.length > 0 && (
+              <Link
+                href={`/so-sanh?ids=${items.map((i) => i.id).join(",")}`}
+                onClick={closeCompare}
+                className="hidden sm:inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition"
+                title="Mở toàn màn hình trong trang riêng"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                <span>Toàn trang</span>
+              </Link>
+            )}
+
             {data?.success && data.specs.length > 0 && (
               <label className="hidden sm:inline-flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
                 <input
@@ -190,7 +224,7 @@ export default function CompareModal() {
                   onChange={(e) => setOnlyDifferences(e.target.checked)}
                   className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                 />
-                <span>Chỉ hiện điểm khác biệt</span>
+                <span>Chỉ hiện khác biệt</span>
               </label>
             )}
 
@@ -216,6 +250,7 @@ export default function CompareModal() {
                   value={quickSearch}
                   onChange={(e) => {
                     setQuickSearch(e.target.value);
+                    setSuggestions([]);
                     setCompareNotice(null);
                   }}
                   placeholder={`Tìm thêm sản phẩm để so sánh (còn trống ${MAX_COMPARE_PRODUCTS - items.length} ô)...`}
@@ -376,8 +411,10 @@ export default function CompareModal() {
                           type="button"
                           onClick={() => {
                             addToCart({
-                              id: p.id,
+                              id: p.variantId ? `${p.id}:${p.variantId}` : p.id,
                               productId: p.id,
+                              variantId: p.variantId || undefined,
+                              template: p.template,
                               slug: p.slug,
                               name: p.name,
                               price: p.price,

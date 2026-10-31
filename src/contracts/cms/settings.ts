@@ -276,7 +276,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   heroTitle: "LAPTOP",
   heroHighlight: "GAMING",
   heroSlogan: "✩ HIỆU NĂNG MẠNH MẼ - CHIẾN GAME CỰC ĐỈNH ✩",
-  heroBgImage: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop",
+  heroBgImage: "/brand/marketing-banner.webp",
   heroCtaPrimaryText: "Khám Phá Ngay",
   heroCtaPrimaryLink: "/laptop-gaming",
   heroCtaSecondaryText: "Xem Ưu Đãi",
@@ -285,12 +285,12 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   subBanner1Title: "Ultrabook Cao Cấp",
   subBanner1Subtitle: "Sang trọng & Mỏng nhẹ",
   subBanner1Link: "/laptop-van-phong",
-  subBanner1Image: "https://images.unsplash.com/photo-1598550476439-6847785fcea6?q=80&w=1200&auto=format&fit=crop",
+  subBanner1Image: "/brand/store-photo-01.webp",
 
   subBanner2Title: "Ưu đãi cực khủng",
   subBanner2Subtitle: "Tặng chuột Gaming & Balo",
   subBanner2Link: "/hot-sale",
-  subBanner2Image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=1200&auto=format&fit=crop",
+  subBanner2Image: "/brand/store-photo-02.webp",
 
   feature1Title: "Máy lướt, giá tốt",
   feature1Desc: "Đối chiếu cấu hình và tình trạng từng máy",

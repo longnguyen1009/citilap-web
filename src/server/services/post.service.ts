@@ -349,10 +349,10 @@ export async function publicFeaturedPosts(db: D1Database, limit = 3) {
 
 async function toPublicPost(db: D1Database, id: string, revision: number, updatedAt: string, publishedAt: string) {
   const d = await publishedDocument<PostDocument>(db, 'Post', id, revision);
-  let coverImage: { url: string; alt: string } | null = null;
+  let coverImage: { url: string; alt: string; thumbnailUrl?: string } | null = null;
   if (d.coverImage) {
     const { asset } = await mediaDetail(db, d.coverImage.assetId);
-    if (asset.url) coverImage = { url: asset.url, alt: d.coverImage.alt };
+    if (asset.url) coverImage = { url: asset.url, alt: d.coverImage.alt, thumbnailUrl: asset.thumbnailUrl || asset.url };
   }
   let ogImageUrl: string | null = null;
   if (d.seo.ogImageAssetId) {

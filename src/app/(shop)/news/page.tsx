@@ -118,7 +118,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   const topPromoBanner = {
     imageUrl:
       settings?.subBanner1Image ||
-      "https://images.unsplash.com/photo-1598550476439-6847785fcea6?q=80&w=1200&auto=format&fit=crop",
+      "/brand/store-photo-01.webp",
     title: customPromo?.title || settings?.subBanner1Title || "Săn Deal Laptop Chính Hãng Giá Tốt",
     subtitle: customPromo?.description || settings?.subBanner1Subtitle || "Ưu đãi CitiLap",
     href: customPromo?.href || settings?.subBanner1Link || "/hot-sale",
@@ -242,7 +242,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                       >
                         {post.coverImage ? (
                           <Image
-                            src={post.coverImage.url}
+                            src={post.coverImage.thumbnailUrl || post.coverImage.url}
                             alt={post.coverImage.alt || post.title}
                             fill
                             priority={idx < 2}

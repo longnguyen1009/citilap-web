@@ -106,6 +106,21 @@ try {
   console.log('PASS accessory discovery: scoped connection/power facets, native options and atomic stock/price filters');
   console.log('PASS advisor: real catalog, budget, portable facts, contact-only exclusion');
 
+  const saleInput = api.advisorSchema.parse({ budget: 5000000 });
+  const beforeSale = await api.adviseLaptops(saleInput);
+  assert(!beforeSale.some(item => item.product.id === 'demo-thinkpad-t14'));
+  const saleStart = new Date(Date.now() - 60000).toISOString();
+  const saleEnd = new Date(Date.now() + 3600000).toISOString();
+  await DB.prepare("INSERT INTO PromotionCampaign(id,name,status,startAt,endAt) VALUES('advisor-sale','Advisor regression','PUBLISHED',?,?)").bind(saleStart, saleEnd).run();
+  await DB.prepare("INSERT INTO PromotionCampaignItem(id,campaignId,productId,salePrice,regularPrice) VALUES('advisor-sale-item','advisor-sale','demo-thinkpad-t14',5000000,12345678)").run();
+  api.clearAdvisorCache();
+  const duringSale = await api.adviseLaptops(saleInput);
+  assert(duringSale.some(item => item.product.id === 'demo-thinkpad-t14' && item.product.price === 5000000), 'Advisor includes campaign prices below budget even when base price exceeds it');
+  await DB.prepare("DELETE FROM PromotionCampaign WHERE id='advisor-sale'").run();
+  api.clearAdvisorCache();
+  assert(!(await api.adviseLaptops(saleInput)).some(item => item.product.id === 'demo-thinkpad-t14'));
+  console.log('PASS advisor: budget uses campaign price, removal restores regular price');
+
   let reports = await api.publicInspections(DB, 'demo-thinkpad-t14', null);
   assert.equal(reports.length, 1);
   assert(!JSON.stringify(reports).includes('serialNumber'));

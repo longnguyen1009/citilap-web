@@ -1,3 +1,4 @@
+import { catalogState } from '@/server/services/catalog-state';
 import Header from "@/components/layout/Header";
 import StorefrontProviders from '@/components/layout/StorefrontProviders';
 import Footer from "@/components/layout/Footer";
@@ -22,9 +23,11 @@ export default async function ShopLayout({
   const [navigation, settings, boundary, categories, brands] = await Promise.all([
     getPublishedNavigation(),
     getStorefrontSettings(),
-    DB.prepare("SELECT min(boundary) AS nextChange FROM (SELECT startAt AS boundary FROM PromotionCampaign WHERE status='PUBLISHED' UNION ALL SELECT endAt FROM PromotionCampaign WHERE status='PUBLISHED') WHERE boundary>?")
-      .bind(new Date(serverTime).toISOString())
-      .first<{nextChange:string|null}>(),
+    catalogState(DB, serverTime).catch((err) => {
+      // Never take the storefront down for the refresh signal; the client adopts the first live token.
+      console.error("[ShopLayout] Failed to load catalog state from D1:", err);
+      return { token: '', nextChange: null, serverTime };
+    }),
     getActiveCategories().catch((err) => {
       console.error("[ShopLayout] Failed to load categories from D1:", err);
       return [] as Awaited<ReturnType<typeof getActiveCategories>>;
@@ -34,12 +37,10 @@ export default async function ShopLayout({
       return [] as Awaited<ReturnType<typeof getActiveBrands>>;
     }),
   ]);
-  const times=[boundary?.nextChange,settings?.flashSaleEnabled?settings.flashSaleStartAt:null,settings?.flashSaleEnabled?settings.flashSaleEndAt:null]
-    .filter((value):value is string=>!!value).map(Date.parse).filter(time=>time>serverTime);
 
   return (
     <StorefrontProviders><div className="flex flex-col min-h-screen">
-      <PublicPriceRefresh nextChange={times.length?Math.min(...times):null} serverTime={serverTime}/>
+      <PublicPriceRefresh nextChange={boundary.nextChange} version={boundary.token} serverTime={serverTime}/>
       <Header categories={categories} brands={brands} navigation={navigation} settings={settings} />
       <main className="flex-grow pb-16 md:pb-0">{children}</main>
       <Footer navigation={navigation} settings={settings} />

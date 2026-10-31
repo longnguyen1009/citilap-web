@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
-import { getPrismaClient } from '@/lib/prisma';
+import { getD1Database } from '@/lib/prisma';
 import type { D1Database } from '@cloudflare/workers-types';
 
 export interface RateLimitResult {
@@ -101,53 +101,29 @@ export async function checkRateLimit(
   const ip = getClientIp(request);
   const ipKey = hashIp(ip);
   const key = `rl:${action}:${ipKey}`;
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + windowSeconds * 1000);
-
+  const now = Date.now();
+  const expiresAt = now + windowSeconds * 1000;
   try {
-    const prisma = getPrismaClient(d1Database);
-
-    // Opportunistic cleanup of expired records (5% sample rate to keep D1 lean)
-    if (Math.random() < 0.05) {
-      prisma.rateLimitRecord.deleteMany({
-        where: { expiresAt: { lt: now } },
-      }).catch(() => {});
+    const db = d1Database || getD1Database();
+    if (!db) throw new Error('Rate limit database unavailable');
+    // One statement claims each slot; concurrent callers cannot share a remaining slot.
+    const expiry = "CASE WHEN typeof(expiresAt) IN ('integer','real') THEN expiresAt ELSE (julianday(expiresAt)-2440587.5)*86400000 END";
+    const row = await db.prepare(`INSERT INTO RateLimitRecord(key,count,expiresAt) VALUES(?,1,?)
+      ON CONFLICT(key) DO UPDATE SET
+        count=CASE WHEN (${expiry})<=? THEN 1 ELSE min(count+1,?) END,
+        expiresAt=CASE WHEN (${expiry})<=? THEN excluded.expiresAt ELSE expiresAt END
+      RETURNING count,(${expiry}) AS expiry`)
+      .bind(key, expiresAt, now, limit + 1, now).first<{ count: number; expiry: number }>();
+    if (!row) throw new Error('Rate limit claim failed');
+    // Opportunistic cleanup (~2%) keeps the table small; failures never affect the decision.
+    if (Math.random() < 0.02) {
+      await db.prepare(`DELETE FROM RateLimitRecord WHERE (${expiry})<=?`).bind(now).run().catch(() => {});
     }
-
-    const existing = await prisma.rateLimitRecord.findUnique({
-      where: { key },
-    });
-
-    if (!existing || existing.expiresAt <= now) {
-      await prisma.rateLimitRecord.upsert({
-        where: { key },
-        create: {
-          key,
-          count: 1,
-          expiresAt,
-        },
-        update: {
-          count: 1,
-          expiresAt,
-        },
-      });
-      return { allowed: true, remaining: limit - 1, retryAfter: 0 };
-    }
-
-    if (existing.count >= limit) {
-      const retryAfter = Math.max(1, Math.ceil((existing.expiresAt.getTime() - now.getTime()) / 1000));
-      return { allowed: false, remaining: 0, retryAfter };
-    }
-
-    await prisma.rateLimitRecord.update({
-      where: { key },
-      data: { count: { increment: 1 } },
-    });
-
-    return { allowed: true, remaining: limit - (existing.count + 1), retryAfter: 0 };
+    return { allowed: row.count <= limit, remaining: Math.max(0, limit - row.count),
+      retryAfter: row.count <= limit ? 0 : Math.max(1, Math.ceil((row.expiry - now) / 1000)) };
   } catch {
-    // Graceful fallback to memory check if database query fails or is not accessible
-    return checkInMemoryRateLimit(key, limit, windowSeconds);
+    // Sensitive writes fail closed if the shared limiter is unavailable.
+    return { allowed: false, remaining: 0, retryAfter: 60 };
   }
 }
 
