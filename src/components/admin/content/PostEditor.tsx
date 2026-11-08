@@ -818,8 +818,20 @@ export default function PostEditor({ id }: { id: string | null }) {
               defaultFolder="content"
               onSelect={(asset: MediaAssetDto) => {
                 if (mediaDialogTarget === 'body') {
-                  const imgTag = `<p><img src="/api/library/${asset.id}" alt="${asset.alt || asset.name}" class="rounded-lg shadow my-4 max-w-full" /></p>`;
-                  updateDoc('contentHtml', doc.contentHtml + imgTag);
+                  const figure = document.createElement('figure');
+                  figure.style.cssText = 'width: 100%; max-width: 100%; margin: 1rem auto; text-align: center;';
+                  const image = document.createElement('img');
+                  image.src = `/api/library/${asset.id}`;
+                  image.alt = asset.alt || asset.name || doc.title;
+                  image.style.cssText = 'width: 100%; height: auto; border-radius: 8px;';
+                  figure.append(image);
+                  if (asset.alt) {
+                    const caption = document.createElement('figcaption');
+                    caption.textContent = asset.alt;
+                    figure.append(caption);
+                  }
+                  const imgTag = figure.outerHTML + '<p></p>';
+                  updateDoc('contentHtml', (doc.contentHtml || '') + imgTag);
                   setMediaDialogTarget(null);
                 } else {
                   handleMediaSelect(asset);

@@ -36,6 +36,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { youtubeId, tiktokVideoId } from '@/contracts/cms/media';
+import { categoryHref } from '@/lib/category-paths';
 import type {
   LandingPageStudioResponse,
   SectionItem,
@@ -2870,6 +2871,33 @@ function ProductGridForm({
         </div>
       )}
 
+        {!hasTabs && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                update({
+                  tabs: [
+                    {
+                      id: `tab-${Date.now()}`,
+                      label: 'Tab 1',
+                      href: data.viewAllLink || '/search',
+                      limit: data.ruleCriteria?.limit || 10,
+                      productIds: data.manualProductIds || [],
+                      enabled: true,
+                      sourceMode: data.sourceMode || 'manual',
+                      ruleCriteria: data.ruleCriteria,
+                    },
+                  ],
+                });
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-blue-700 font-semibold text-xs cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Chuyển kệ này sang dạng nhiều Tab
+            </button>
+          </div>
+        )}
+
       {/* 3. HEADER & APPEARANCE SETTINGS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -3392,13 +3420,24 @@ function FeaturedCategoriesForm({
 }) {
   const { categories } = useCatalogOptions();
 
+  const resolveCatHref = (cat: CategoryOption) => {
+    try {
+      return categoryHref(
+        { id: cat.id, slug: cat.slug, parentId: cat.parentId || null },
+        categories.map(c => ({ id: c.id, slug: c.slug, parentId: c.parentId || null }))
+      );
+    } catch {
+      return `/${cat.slug}`;
+    }
+  };
+
   const handleSyncFromCatalog = () => {
     if (!categories.length) return;
     const synced = categories.slice(0, 10).map((c) => ({
       categoryId: c.id,
       customName: c.name,
       customImage: c.image || '',
-      href: `/category/${c.slug}`,
+      href: resolveCatHref(c),
       enabled: true,
     }));
     update({ items: synced, categoryIds: synced.map((x) => x.categoryId) });
@@ -3618,7 +3657,7 @@ function FeaturedCategoriesForm({
                       ...next[index],
                       categoryId: e.target.value,
                       customName: next[index].customName || selectedCat?.name || '',
-                      href: next[index].href || (selectedCat ? `/category/${selectedCat.slug}` : ''),
+                      href: selectedCat ? resolveCatHref(selectedCat) : next[index].href || '',
                     };
                     update({ items: next });
                   }}

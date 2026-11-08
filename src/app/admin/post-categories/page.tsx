@@ -106,6 +106,12 @@ export default function PostCategoriesPage() {
     });
   }, [categories, statusFilter, searchQuery]);
 
+  const counts = useMemo(() => ({
+    ALL: categories.length,
+    ACTIVE: categories.filter((c) => c.status === 'ACTIVE').length,
+    INACTIVE: categories.filter((c) => c.status !== 'ACTIVE').length,
+  }), [categories]);
+
   const handleOpenCreate = () => {
     setEditingId(null);
     setEditingRev(0);
@@ -250,7 +256,7 @@ export default function PostCategoriesPage() {
                       : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
                   }`}
                 >
-                  {t.label}
+                  {t.label} <span className="opacity-75">({counts[t.key]})</span>
                 </button>
               );
             })}

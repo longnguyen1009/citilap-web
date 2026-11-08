@@ -231,89 +231,90 @@ function OrdersContent() {
 
       {/* 2. Single-Card Workspace */}
       <AdminCard bodyClassName="p-0 overflow-hidden">
-        {/* Status Tabs */}
-        <div className="px-4 pt-2 border-b border-slate-200 bg-slate-50/50 flex items-center gap-1 overflow-x-auto">
-          {STATUS_TABS.map((t) => {
-            const active = statusFilter === t.key;
-            const count = statusCounts[t.key];
-            return (
-              <button
-                key={t.key}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  setStatusFilter(t.key);
-                  setPage(1);
-                }}
-                className={`px-3 py-2 text-xs font-semibold border-b-2 transition whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
-                  active
-                    ? "border-blue-600 text-blue-700"
-                    : "border-transparent text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <span>{t.label}</span>
-                {typeof count === "number" && (
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold tabular-nums ${
-                      active ? "bg-blue-100 text-blue-700" : "bg-slate-200/70 text-slate-600"
-                    }`}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Inline Filter Bar */}
-        <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center gap-2 bg-white text-xs">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              aria-label="Tìm mã đơn, tên khách, SĐT"
-              placeholder="Tìm mã đơn, tên khách, SĐT..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setPage(1);
-              }}
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-            />
+        {/* Status Tabs + Inline Filter Bar */}
+        <div className="px-4 py-2 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1 overflow-x-auto">
+            {STATUS_TABS.map((t) => {
+              const active = statusFilter === t.key;
+              const count = statusCounts[t.key];
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setStatusFilter(t.key);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition whitespace-nowrap cursor-pointer inline-flex items-center gap-1.5 ${
+                    active
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
+                  }`}
+                >
+                  <span>{t.label}</span>
+                  {typeof count === "number" && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold tabular-nums ${
+                        active ? "bg-blue-700 text-white" : "bg-slate-200/70 text-slate-600"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          <select
-            aria-label="Lọc trạng thái thanh toán"
-            value={paymentStatusFilter}
-            onChange={(e) => {
-              setPaymentStatusFilter(e.target.value);
-              setPage(1);
-            }}
-            className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 cursor-pointer"
-          >
-            <option value="ALL">Thanh toán: Tất cả</option>
-            <option value="PAID">Đã thanh toán</option>
-            <option value="PENDING">Chờ thanh toán</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2 text-xs flex-1 max-w-md justify-end">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="search"
+                aria-label="Tìm mã đơn, tên khách, SĐT"
+                placeholder="Tìm mã đơn, tên khách, SĐT..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
+                className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-200 rounded-md bg-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              />
+            </div>
 
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm("");
-                setStatusFilter("ALL");
-                setPaymentStatusFilter("ALL");
-                setStartDate("");
-                setEndDate("");
+            <select
+              aria-label="Lọc trạng thái thanh toán"
+              value={paymentStatusFilter}
+              onChange={(e) => {
+                setPaymentStatusFilter(e.target.value);
                 setPage(1);
               }}
-              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+              className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 cursor-pointer"
             >
-              <X className="w-3.5 h-3.5" />
-              <span>Xóa lọc</span>
-            </button>
-          )}
+              <option value="ALL">Thanh toán: Tất cả</option>
+              <option value="PAID">Đã thanh toán</option>
+              <option value="PENDING">Chờ thanh toán</option>
+            </select>
+
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("ALL");
+                  setPaymentStatusFilter("ALL");
+                  setStartDate("");
+                  setEndDate("");
+                  setPage(1);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Xóa lọc</span>
+              </button>
+            )}
+          </div>
         </div>
         <details className="admin-filter-details" open={Boolean(startDate || endDate)}>
           <summary>Lọc theo ngày{startDate || endDate ? " · Đang áp dụng" : ""}</summary>

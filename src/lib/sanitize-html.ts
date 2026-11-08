@@ -1,8 +1,8 @@
 const ALLOWED_TAGS = new Set([
-  "p", "br", "hr", "strong", "b", "em", "i", "u", "s", "strike",
+  "p", "br", "hr", "strong", "b", "em", "i", "u", "s", "strike", "mark", "sub", "sup",
   "h1", "h2", "h3", "h4", "h5", "h6",
   "ul", "ol", "li", "a", "blockquote",
-  "img", "figure", "figcaption", "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+  "img", "figure", "figcaption", "table", "colgroup", "col", "thead", "tbody", "tfoot", "tr", "th", "td",
   "span", "div", "pre", "code", "details", "summary"
 ]);
 
@@ -84,8 +84,8 @@ export function sanitizeHtml(input: string): string {
       allowedAttrs.push('loading="lazy"');
     }
 
-    // Safe inline style for sizing/alignment on img, figure, p, div, span, th, td
-    if (["img", "figure", "figcaption", "p", "div", "span", "th", "td", "h2", "h3", "h4"].includes(tag)) {
+    // Safe inline style for sizing/alignment/colors on rich text elements
+    if (["img", "figure", "figcaption", "p", "div", "span", "mark", "table", "colgroup", "col", "th", "td", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote"].includes(tag)) {
       const styleMatch = attrs.match(/\sstyle\s*=\s*("[^"]*"|'[^']*')/i);
       if (styleMatch) {
         const rawStyle = styleMatch[1].replace(/^['"]|['"]$/g, "").trim();
@@ -96,8 +96,8 @@ export function sanitizeHtml(input: string): string {
           const prop = propRaw.trim().toLowerCase();
           const val = valRaw.trim();
           if (
-            ["width", "max-width", "height", "text-align", "margin", "margin-left", "margin-right", "display", "float", "border-radius"].includes(prop) &&
-            /^[a-zA-Z0-9%\s._\-,]+$/.test(val) &&
+            ["width", "min-width", "max-width", "height", "text-align", "margin", "margin-left", "margin-right", "display", "float", "border-radius", "color", "background-color", "font-size"].includes(prop) &&
+            /^[a-zA-Z0-9%\s._\-,#()]+$/.test(val) &&
             !/url|expression|javascript/i.test(val)
           ) {
             safeRules.push(`${prop}: ${val}`);
@@ -109,12 +109,27 @@ export function sanitizeHtml(input: string): string {
       }
     }
 
-    // colspan, rowspan for <th>, <td>
+    if (tag === "mark") {
+      const dataColor = attrs.match(/\sdata-color\s*=\s*("[^"]*"|'[^']*')/i);
+      if (dataColor) {
+        const cVal = dataColor[1].replace(/^['"]|['"]$/g, "").trim();
+        if (/^[a-zA-Z0-9#(),.\s%-]+$/.test(cVal)) {
+          allowedAttrs.push(`data-color="${cVal}"`);
+        }
+      }
+    }
+
+    // colspan, rowspan, colwidth for <th>, <td>
     if (tag === "th" || tag === "td") {
       const colspan = attrs.match(/\scolspan\s*=\s*("[^"]*"|'[^']*'|\d+)/i);
       if (colspan) allowedAttrs.push(`colspan="${colspan[1].replace(/^['"]|['"]$/g, "")}"`);
       const rowspan = attrs.match(/\srowspan\s*=\s*("[^"]*"|'[^']*'|\d+)/i);
       if (rowspan) allowedAttrs.push(`rowspan="${rowspan[1].replace(/^['"]|['"]$/g, "")}"`);
+      const colwidth = attrs.match(/\scolwidth\s*=\s*("[^"]*"|'[^']*'|[0-9,]+)/i);
+      if (colwidth) {
+        const cw = colwidth[1].replace(/^['"]|['"]$/g, "").trim();
+        if (/^[0-9,]+$/.test(cw)) allowedAttrs.push(`colwidth="${cw}"`);
+      }
     }
 
     // class attribute if clean (allow Tailwind arbitrary/fraction/slash classes)
@@ -126,7 +141,7 @@ export function sanitizeHtml(input: string): string {
       }
     }
 
-    if (tag === "img" || tag === "br" || tag === "hr") {
+    if (tag === "img" || tag === "br" || tag === "hr" || tag === "col") {
       return allowedAttrs.length > 0 ? `<${tag} ${allowedAttrs.join(" ")} />` : `<${tag} />`;
     }
 

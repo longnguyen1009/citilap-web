@@ -8,9 +8,6 @@ import {
   Phone,
   Download,
   RefreshCw,
-  UserCheck,
-  ShoppingCart,
-  Users,
   Eye,
   X,
   Clock,
@@ -238,7 +235,7 @@ function CustomersContent() {
     };
   }, [fetchCustomers]);
 
-  const loadCustomerDetail = async (id: string) => {
+  const loadCustomerDetail = useCallback(async (id: string) => {
     const reqId = ++detailSeqRef.current;
     detailAbortRef.current?.abort();
     const controller = new AbortController();
@@ -275,7 +272,7 @@ function CustomersContent() {
         setLoadingDetail(false);
       }
     }
-  };
+  }, []);
 
   const handleExport = () => {
     const query = new URLSearchParams();
@@ -291,6 +288,12 @@ function CustomersContent() {
     total === 0 || customers.length === 0
       ? 0
       : Math.min(total, (page - 1) * PAGE_LIMIT + customers.length);
+
+  const phoneFreq = new Map<string, number>();
+  for (const c of customers) {
+    const p = (c.phone || "").trim();
+    if (p) phoneFreq.set(p, (phoneFreq.get(p) || 0) + 1);
+  }
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-3">
@@ -335,73 +338,44 @@ function CustomersContent() {
         </InlineAlert>
       )}
 
-      {/* 2. Compact 4-Stat Strip (Full Filtered Dataset Totals) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <Users className="w-3.5 h-3.5 text-blue-600" />
-            <span>Hồ sơ</span>
-          </div>
-          <div className="text-base font-black text-slate-900 tabular-nums">
-            {summary.total.toLocaleString("vi-VN")}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Thành viên</span>
-          </div>
-          <div className="text-base font-black text-slate-900 tabular-nums">
-            {summary.registered.toLocaleString("vi-VN")}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <ShoppingCart className="w-3.5 h-3.5 text-purple-600" />
-            <span>Vãng lai</span>
-          </div>
-          <div className="text-base font-black text-slate-900 tabular-nums">
-            {summary.guest.toLocaleString("vi-VN")}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl border border-slate-200 px-3.5 py-2.5 flex items-center justify-between">
-          <div className="text-xs font-medium text-slate-500">Tổng chi</div>
-          <div className="text-base font-black text-blue-700 tabular-nums">
-            {summary.totalNonCancelled.toLocaleString("vi-VN")}đ
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Unified Single-Card Workspace */}
+      {/* 2. Unified Single-Card Workspace */}
       <AdminCard bodyClassName="p-0 overflow-hidden">
         {/* Top Bar: Source Tabs + Inline Search & Tier */}
         <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
-          <div className="flex items-center gap-1" role="tablist" aria-label="Lọc theo nguồn">
-            {SOURCE_TABS.map((tab) => {
-              const active = sourceFilter === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => {
-                    setSourceFilter(tab.key);
-                    setPage(1);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                    active
-                      ? "bg-slate-900 text-white shadow-2xs"
-                      : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1" role="tablist" aria-label="Lọc theo nguồn">
+              {SOURCE_TABS.map((tab) => {
+                const active = sourceFilter === tab.key;
+                const count =
+                  tab.key === "ALL"
+                    ? summary.total
+                    : tab.key === "REGISTERED"
+                    ? summary.registered
+                    : summary.guest;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => {
+                      setSourceFilter(tab.key);
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                      active
+                        ? "bg-slate-900 text-white shadow-2xs"
+                        : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
+                    }`}
+                  >
+                    {tab.label} <span className="opacity-75">({count.toLocaleString("vi-VN")})</span>
+                  </button>
+                );
+              })}
+            </div>
+            <span className="text-xs text-slate-500 pl-2 border-l border-slate-200">
+              Tổng chi: <strong className="text-blue-700 tabular-nums">{summary.totalNonCancelled.toLocaleString("vi-VN")}đ</strong>
+            </span>
           </div>
 
           <div className="flex items-center gap-2 flex-1 max-w-lg justify-end">
@@ -509,15 +483,9 @@ function CustomersContent() {
                   </td>
                 </tr>
               ) : (
-                (() => {
-                  const phoneFreq = new Map<string, number>();
-                  for (const c of customers) {
-                    const p = (c.phone || "").trim();
-                    if (p) phoneFreq.set(p, (phoneFreq.get(p) || 0) + 1);
-                  }
-                  return customers.map((customer) => {
-                    const phoneCount = customer.phone ? phoneFreq.get(customer.phone.trim()) || 0 : 0;
-                    return (
+                customers.map((customer) => {
+                  const phoneCount = customer.phone ? phoneFreq.get(customer.phone.trim()) || 0 : 0;
+                  return (
                   <tr key={customer.id} className="hover:bg-slate-50/70 transition">
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
@@ -618,9 +586,8 @@ function CustomersContent() {
                       </button>
                     </td>
                   </tr>
-                    );
-                  });
-                })()
+                  );
+                })
               )}
             </tbody>
           </table>

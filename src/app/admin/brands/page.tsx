@@ -52,7 +52,7 @@ export default function AdminBrandsPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   // Edit/Create Modal state
@@ -78,22 +78,34 @@ export default function AdminBrandsPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (searchQuery.trim()) params.set('q', searchQuery.trim());
-      if (statusFilter !== 'ALL') params.set('status', statusFilter);
-
-      const res = await mediaRequest<{ items: BrandDto[]; total: number }>(`/api/admin/brands?${params.toString()}`);
+      const res = await mediaRequest<{ items: BrandDto[]; total: number }>('/api/admin/brands');
       setBrands(res.items || []);
     } catch (err) {
       setError((err as Error).message || 'Không thể tải danh sách thương hiệu.');
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, statusFilter]);
+  }, []);
 
   useEffect(() => {
-    void fetchBrands();
+    const timer = setTimeout(() => void fetchBrands(), 0);
+    return () => clearTimeout(timer);
   }, [fetchBrands, refreshTrigger]);
+
+  const counts = {
+    ALL: brands.length,
+    ACTIVE: brands.filter(b => b.status === 'ACTIVE').length,
+    INACTIVE: brands.filter(b => b.status !== 'ACTIVE').length,
+  };
+
+  const filteredBrands = brands.filter(b => {
+    if (statusFilter !== 'ALL' && b.status !== statusFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      if (!b.name.toLowerCase().includes(q) && !b.slug.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
 
   const handleSlugify = (name: string) => {
     return name
@@ -244,11 +256,11 @@ export default function AdminBrandsPage() {
         {/* Status Tabs + Search */}
         <div className="px-4 py-2 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            {[
+            {([
               { key: 'ALL', label: 'Tất cả' },
               { key: 'ACTIVE', label: 'Hiển thị' },
               { key: 'INACTIVE', label: 'Tạm ẩn' },
-            ].map(t => {
+            ] as const).map(t => {
               const active = statusFilter === t.key;
               return (
                 <button
@@ -260,7 +272,7 @@ export default function AdminBrandsPage() {
                     active ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-200/60'
                   }`}
                 >
-                  {t.label}
+                  {t.label} <span className="opacity-75">({counts[t.key]})</span>
                 </button>
               );
             })}
@@ -285,7 +297,7 @@ export default function AdminBrandsPage() {
           </div>
         ) : error ? (
           <div className="py-8 text-center text-rose-500 text-xs">{error}</div>
-        ) : brands.length === 0 ? (
+        ) : filteredBrands.length === 0 ? (
           <div className="py-12">
             <AdminEmptyState
               title="Chưa có thương hiệu"
@@ -310,7 +322,7 @@ export default function AdminBrandsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {brands.map(b => (
+                {filteredBrands.map(b => (
                   <tr key={b.id} className="hover:bg-slate-50/70 transition">
                     <td>
                       <div className="w-9 h-9 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden">

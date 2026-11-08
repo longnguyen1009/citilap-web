@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import {
   FolderTree,
   Plus,
@@ -27,6 +28,7 @@ import {
 import PageHeader from '@/components/admin/ui/PageHeader';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
+import MediaUpload from '@/components/admin/media/MediaUpload';
 import StudioAsset from '@/components/admin/products/StudioAsset';
 import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
 import type {
@@ -160,7 +162,8 @@ export default function CategoriesStudio() {
   }, [adoptDetail]);
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => void loadData(), 0);
+    return () => clearTimeout(timer);
   }, [loadData]);
 
   // Warn on tab/window close if unsaved
@@ -709,16 +712,10 @@ export default function CategoriesStudio() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 font-sans">
-      {/* Page Header with WordPress Inspiration */}
+    <div className="space-y-3 pb-12">
       <PageHeader
         title="Danh mục sản phẩm"
-        description="Quản lý cấu trúc ngành hàng, phân cấp cha/con và đường dẫn URL theo chuẩn chuyên nghiệp WordPress."
-        breadcrumbs={[
-          { label: 'Tổng quan', href: '/admin/dashboard' },
-          { label: 'Sản phẩm', href: '/admin/products' },
-          { label: 'Danh mục SP' },
-        ]}
+        description="Quản lý cấu trúc ngành hàng, phân cấp cha/con và đường dẫn URL."
         badge={
           <div className="flex items-center gap-2">
             <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-slate-100 text-slate-700 border border-slate-200">
@@ -1078,125 +1075,86 @@ export default function CategoriesStudio() {
         {/* RIGHT COLUMN: WordPress-Style Categories Data Table       */}
         {/* ======================================================== */}
         <div className="lg:col-span-8 xl:col-span-8 space-y-3">
-          {/* Controls Bar: Filter tabs & Search */}
-          <div className="bg-white border border-slate-200/90 rounded-xl p-3 shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              {/* Filter Tabs */}
-              <div className="flex items-center gap-1 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setFilterTab('all')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                    filterTab === 'all'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  Tất cả ({stats.total})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterTab('root')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                    filterTab === 'root'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  Cấp gốc ({stats.roots})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterTab('child')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                    filterTab === 'child'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  Danh mục con ({stats.children})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterTab('visible')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                    filterTab === 'visible'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  Hiển thị ({stats.visible})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFilterTab('hidden')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                    filterTab === 'hidden'
-                      ? 'bg-blue-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  Đang ẩn ({stats.hidden})
-                </button>
-              </div>
+          <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1" role="tablist" aria-label="Nhóm phân loại">
+            {([
+              { key: 'all', label: `Tất cả (${stats.total})` },
+              { key: 'root', label: `Cấp gốc (${stats.roots})` },
+              { key: 'child', label: `Danh mục con (${stats.children})` },
+              { key: 'visible', label: `Hiển thị (${stats.visible})` },
+              { key: 'hidden', label: `Đang ẩn (${stats.hidden})` },
+            ] as const).map(t => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setFilterTab(t.key)}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
+                  filterTab === t.key
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-200/70'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
 
-              {/* Instant Search Box */}
-              <div className="relative w-full sm:w-64">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Tìm danh mục, slug..."
-                  className="w-full text-xs pl-8 pr-7 py-1.5 border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Bulk Actions row */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-              <div className="flex items-center gap-2">
-                <select
-                  value={bulkAction}
-                  onChange={e => setBulkAction(e.target.value)}
-                  disabled={selectedIds.size === 0}
-                  className="text-xs px-2.5 py-1 border border-slate-200 rounded-lg bg-white disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  <option value="">Hành động hàng loạt</option>
-                  <option value="show">Hiển thị các mục đã chọn</option>
-                  <option value="hide">Ẩn các mục đã chọn</option>
-                  <option value="delete">Xóa các mục đã chọn</option>
-                </select>
+          <div className="flex items-center gap-2 flex-1 max-w-xs justify-end">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Tìm danh mục, slug..."
+                className="w-full text-xs pl-8 pr-7 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 transition"
+              />
+              {searchQuery && (
                 <button
                   type="button"
-                  onClick={handleApplyBulkAction}
-                  disabled={!bulkAction || selectedIds.size === 0}
-                  className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition disabled:opacity-40 cursor-pointer"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
                 >
-                  Áp dụng
+                  <X className="w-3 h-3" />
                 </button>
-                {selectedIds.size > 0 && (
-                  <span className="text-slate-500 font-medium">
-                    Đã chọn <strong className="text-slate-800">{selectedIds.size}</strong> mục
-                  </span>
-                )}
-              </div>
-
-              <div className="text-slate-500 text-[11.5px]">
-                Hiển thị <strong className="text-slate-800">{filteredCategories.length}</strong> /{' '}
-                {stats.total} danh mục
-              </div>
+              )}
             </div>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/70">
+          <div className="flex items-center gap-2">
+            <select
+              value={bulkAction}
+              onChange={e => setBulkAction(e.target.value)}
+              disabled={selectedIds.size === 0}
+              className="text-xs px-2.5 py-1 border border-slate-200 rounded-lg bg-white disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              <option value="">Hành động hàng loạt</option>
+              <option value="show">Hiển thị các mục đã chọn</option>
+              <option value="hide">Ẩn các mục đã chọn</option>
+              <option value="delete">Xóa các mục đã chọn</option>
+            </select>
+            <button
+              type="button"
+              onClick={handleApplyBulkAction}
+              disabled={!bulkAction || selectedIds.size === 0}
+              className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition disabled:opacity-40 cursor-pointer"
+            >
+              Áp dụng
+            </button>
+            {selectedIds.size > 0 && (
+              <span className="text-slate-600 font-medium">
+                Đã chọn <strong className="text-slate-900">{selectedIds.size}</strong> mục
+              </span>
+            )}
+          </div>
+          <span className="text-slate-500 text-[11.5px]">
+            Hiển thị <strong className="text-slate-800">{filteredCategories.length}</strong> / {stats.total} danh mục
+          </span>
+        </div>
+      </div>
 
           {/* Table Container */}
           <div className="bg-white border border-slate-200/90 rounded-xl shadow-xs overflow-hidden">
@@ -1388,15 +1346,17 @@ export default function CategoriesStudio() {
 
                           {/* Product Count */}
                           <td className="py-2.5 px-3 text-center align-middle">
-                            <span
-                              className={`inline-flex items-center justify-center min-w-[24px] px-2 py-0.5 rounded-full text-xs font-bold tabular-nums ${
+                            <Link
+                              href={`/admin/products?categoryId=${encodeURIComponent(cat.id)}`}
+                              title={`Xem ${cat.productCount} sản phẩm thuộc danh mục ${cat.name}`}
+                              className={`inline-flex items-center justify-center min-w-[24px] px-2 py-0.5 rounded-full text-xs font-bold tabular-nums hover:ring-2 hover:ring-blue-400 transition ${
                                 cat.productCount > 0
                                   ? 'bg-blue-100/70 text-blue-800'
                                   : 'bg-slate-100 text-slate-500'
                               }`}
                             >
                               {cat.productCount}
-                            </span>
+                            </Link>
                           </td>
 
                           {/* Status */}
@@ -1449,18 +1409,6 @@ export default function CategoriesStudio() {
                 </tbody>
               </table>
             </div>
-
-            {/* Table Footer Guide Callout */}
-            <div className="p-3.5 bg-slate-50/80 border-t border-slate-200 flex items-start gap-2 text-xs text-slate-600">
-              <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-              <div className="leading-relaxed">
-                <strong>💡 Hướng dẫn cấu trúc danh mục:</strong> Cấu trúc phân cấp cha/con tự động
-                đồng bộ với <strong>MegaMenu</strong> và bộ lọc tìm kiếm sản phẩm. Danh mục cha bị ẩn
-                sẽ tự động ẩn các danh mục con. Sau khi thay đổi, nhấn nút{' '}
-                <strong className="text-blue-700">&quot;Xuất bản ngay&quot;</strong> ở góc trên bên phải để áp
-                dụng tức thì ra trang web chính thức.
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1468,18 +1416,22 @@ export default function CategoriesStudio() {
       {/* Media Picker Dialog */}
       {imagePickerOpen && (
         <MediaDialog title="Chọn ảnh đại diện danh mục" onClose={() => setImagePickerOpen(false)}>
-          <MediaBrowser
-            picker
-            onSelect={a => {
-              setFormData(prev => ({
-                ...prev,
-                assetId: a.id,
-                image: '',
-                alt: a.alt || a.name || prev.alt,
-              }));
-              setImagePickerOpen(false);
-            }}
-          />
+          <div className="space-y-4">
+            <MediaUpload defaultFolder="brands" onUploaded={() => undefined} />
+            <MediaBrowser
+              picker
+              defaultFolder="brands"
+              onSelect={a => {
+                setFormData(prev => ({
+                  ...prev,
+                  assetId: a.id,
+                  image: '',
+                  alt: a.alt || a.name || prev.alt,
+                }));
+                setImagePickerOpen(false);
+              }}
+            />
+          </div>
         </MediaDialog>
       )}
 

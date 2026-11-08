@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useDraftAutosave } from '../useDraftAutosave';
 import SchedulePanel from '../SchedulePanel';
 import DraftRecovery from '../DraftRecovery';
@@ -21,6 +22,23 @@ import PageHeader from '../ui/PageHeader';
 
 type Tab = 'categories' | 'menus' | 'collections';
 type Product = { id: string; name: string; status: string };
+type CatalogTargetOptions = {
+  brands: { id: string; name: string; slug: string }[];
+  pages: { id: string; title: string; slug: string }[];
+  landings: { id: string; title: string; slug: string }[];
+};
+
+function generateNavSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
 
 const freshItem = (): NavigationItem => ({
   id: crypto.randomUUID(),
@@ -144,11 +162,13 @@ function TargetEditor({
   value,
   onChange,
   doc,
+  targetOpts,
   onProduct,
 }: {
   value: NavigationTarget;
   onChange: (t: NavigationTarget) => void;
   doc: NavigationDocument;
+  targetOpts: CatalogTargetOptions;
   onProduct: () => void;
 }) {
   return (
@@ -161,6 +181,9 @@ function TargetEditor({
             const kind = e.target.value as NavigationTarget['kind'];
             if (kind === 'path') onChange({ kind, path: '/' });
             else if (kind === 'external') onChange({ kind, url: 'https://' });
+            else if (kind === 'brand') onChange({ kind, id: targetOpts.brands[0]?.slug || '' });
+            else if (kind === 'page') onChange({ kind, id: targetOpts.pages[0]?.slug || '' });
+            else if (kind === 'landing') onChange({ kind, id: targetOpts.landings[0]?.slug || '' });
             else
               onChange({
                 kind,
@@ -172,8 +195,8 @@ function TargetEditor({
           <option value="collection">Bộ sưu tập</option>
           <option value="product">Sản phẩm</option>
           <option value="brand">Thương hiệu</option>
-          <option value="landing">Landing</option>
-          <option value="page">Trang</option>
+          <option value="landing">Landing Page</option>
+          <option value="page">Trang &amp; Chính sách</option>
           <option value="path">Đường dẫn nội bộ</option>
           <option value="external">URL ngoài</option>
         </select>
@@ -190,22 +213,55 @@ function TargetEditor({
         </label>
       ) : value.kind === 'brand' ? (
         <label>
-          Slug hãng
-          <input value={value.id} placeholder="dell, asus..." onChange={e => onChange({ kind: 'brand', id: e.target.value })} />
+          Thương hiệu
+          {targetOpts.brands.length > 0 ? (
+            <select value={value.id} onChange={e => onChange({ kind: 'brand', id: e.target.value })}>
+              <option value="">Chọn thương hiệu</option>
+              {targetOpts.brands.map(b => (
+                <option key={b.id} value={b.slug}>
+                  {b.name} (/brand/{b.slug})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input value={value.id} placeholder="dell, asus..." onChange={e => onChange({ kind: 'brand', id: e.target.value })} />
+          )}
         </label>
       ) : value.kind === 'landing' ? (
         <label>
-          Slug Landing
-          <input value={value.id} placeholder="slug-landing" onChange={e => onChange({ kind: 'landing', id: e.target.value })} />
+          Landing Page
+          {targetOpts.landings.length > 0 ? (
+            <select value={value.id} onChange={e => onChange({ kind: 'landing', id: e.target.value })}>
+              <option value="">Chọn trang đích</option>
+              {targetOpts.landings.map(lp => (
+                <option key={lp.id} value={lp.slug}>
+                  {lp.title} (/landing/{lp.slug})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input value={value.id} placeholder="slug-landing" onChange={e => onChange({ kind: 'landing', id: e.target.value })} />
+          )}
         </label>
       ) : value.kind === 'page' ? (
         <label>
-          Slug Trang
-          <input
-            value={value.id}
-            placeholder="chinh-sach-bao-hanh"
-            onChange={e => onChange({ kind: 'page', id: e.target.value })}
-          />
+          Trang &amp; Chính sách
+          {targetOpts.pages.length > 0 ? (
+            <select value={value.id} onChange={e => onChange({ kind: 'page', id: e.target.value })}>
+              <option value="">Chọn trang tĩnh</option>
+              {targetOpts.pages.map(pg => (
+                <option key={pg.id} value={pg.slug}>
+                  {pg.title} (/{pg.slug})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={value.id}
+              placeholder="chinh-sach-bao-hanh"
+              onChange={e => onChange({ kind: 'page', id: e.target.value })}
+            />
+          )}
         </label>
       ) : value.kind === 'product' ? (
         <button type="button" onClick={onProduct}>
@@ -231,6 +287,7 @@ function TargetEditor({
 
 export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?: Tab }) {
   const isDedicatedCategories = initialTab === 'categories';
+  const searchParams = useSearchParams();
   const [detail, setDetail] = useState<NavigationDetail | null>(null),
     [doc, setDoc] = useState<NavigationDocument | null>(null),
     [baseline, setBaseline] = useState('');
@@ -245,6 +302,7 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
   const [imageFor, setImageFor] = useState<string | null>(null),
     [productSelect, setProductSelect] = useState<((p: Product) => void) | null>(null),
     [names, setNames] = useState<Record<string, string>>({});
+  const [targetOpts, setTargetOpts] = useState<CatalogTargetOptions>({ brands: [], pages: [], landings: [] });
   const [preview, setPreview] = useState<ResolvedNavigation | null>(null),
     [previewMobile, setPreviewMobile] = useState(false),
     [leave, setLeave] = useState<(() => void) | null>(null);
@@ -253,6 +311,32 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
   useEffect(() => {
     latest.current = doc;
   }, [doc]);
+  useEffect(() => {
+    if (isDedicatedCategories) return;
+    const t = searchParams.get('tab');
+    if (t === 'collections' || t === 'menus') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync tab from URL query param
+      setTab(t);
+    }
+  }, [searchParams, isDedicatedCategories]);
+  useEffect(() => {
+    let ignore = false;
+    Promise.allSettled([
+      mediaRequest<{ items: { id: string; name: string; slug: string }[] }>('/api/admin/brands?status=ACTIVE'),
+      mediaRequest<{ items: { id: string; title: string; slug: string }[] }>('/api/admin/pages?status=PUBLISHED&limit=100'),
+      mediaRequest<{ items: { id: string; title: string; slug: string }[] }>('/api/admin/builder?status=PUBLISHED&excludeHome=true&limit=100'),
+    ]).then(([bRes, pRes, lRes]) => {
+      if (ignore) return;
+      setTargetOpts({
+        brands: bRes.status === 'fulfilled' && Array.isArray(bRes.value?.items) ? bRes.value.items : [],
+        pages: pRes.status === 'fulfilled' && Array.isArray(pRes.value?.items) ? pRes.value.items : [],
+        landings: lRes.status === 'fulfilled' && Array.isArray(lRes.value?.items) ? lRes.value.items : [],
+      });
+    });
+    return () => {
+      ignore = true;
+    };
+  }, []);
   const dirty = !!doc && JSON.stringify(doc) !== baseline;
   const adopt = useCallback((d: NavigationDetail) => {
     setDetail(d);
@@ -374,6 +458,7 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
         <TargetEditor
           value={item.target}
           doc={doc!}
+          targetOpts={targetOpts}
           onChange={target => onChange({ ...item, target })}
           onProduct={() =>
             setProductSelect(() => (p: Product) => {
@@ -465,7 +550,9 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
               <nav className="nav-tabs" aria-label="Khu vực biên tập">
                 {(['menus', 'collections'] as Tab[]).map(t => (
                   <button aria-pressed={tab === t} key={t} onClick={() => setTab(t)}>
-                    {t === 'menus' ? `Menu điều hướng` : `Bộ sưu tập (${doc.collections.length})`}
+                    {t === 'menus'
+                      ? `Menu điều hướng (${doc.menus.main.length + doc.menus.footer.length})`
+                      : `Bộ sưu tập (${doc.collections.length})`}
                   </button>
                 ))}
                 <Link
@@ -521,7 +608,7 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                         {
                           id: crypto.randomUUID(),
                           name: 'Bộ sưu tập mới',
-                          slug: '',
+                          slug: `bo-suu-tap-${doc.collections.length + 1}`,
                           description: '',
                           visible: true,
                           mode: 'manual',
@@ -569,31 +656,11 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
             </div>
           </div>
 
-          {/* Contextual Guidance Banner */}
-          <div className="mb-3 px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 flex items-center justify-between gap-3">
-            <div>
-              {tab === 'categories' && (
-                <p>
-                  <strong className="text-slate-900">Danh mục sản phẩm:</strong> Phân loại cấu trúc ngành hàng (Laptop Gaming, Laptop Doanh nhân, Phụ kiện...). Hỗ trợ phân cấp cha/con và gán ảnh đại diện.
-                </p>
-              )}
-              {tab === 'menus' && (
-                <p>
-                  <strong className="text-slate-900">Menu điều hướng:</strong> Cấu hình thanh Header (Mega menu danh mục, link chính sách...) và Chân trang (Footer) hiển thị trực tiếp ngoài Storefront.
-                </p>
-              )}
-              {tab === 'collections' && (
-                <p>
-                  <strong className="text-slate-900">Bộ sưu tập:</strong> Nhóm sản phẩm linh hoạt theo chiến dịch hoặc phân khúc (VD: &quot;ThinkPad tuyển chọn dưới 15 triệu&quot;) để gắn lên Block trang chủ hoặc Menu.
-                </p>
-              )}
+          {dirty && (
+            <div className="mb-3 px-3.5 py-2 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center justify-between">
+              <span>Có thay đổi bản nháp chưa lưu.</span>
             </div>
-            {dirty && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 shrink-0">
-                Có thay đổi nháp
-              </span>
-            )}
-          </div>
+          )}
 
           <fieldset disabled={busy}>
             {tab === 'categories' && (
@@ -756,10 +823,29 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                         <div className="nav-grid">
                           <label>
                             Tên bộ sưu tập
-                            <input value={c.name} onChange={e => changeCollection(c.id, { name: e.target.value })} />
+                            <input
+                              value={c.name}
+                              onChange={e => {
+                                const nextName = e.target.value;
+                                const autoSlug = !c.slug || c.slug.startsWith('bo-suu-tap-') || c.slug === generateNavSlug(c.name);
+                                changeCollection(c.id, {
+                                  name: nextName,
+                                  ...(autoSlug ? { slug: generateNavSlug(nextName) } : {}),
+                                });
+                              }}
+                            />
                           </label>
                           <label>
-                            Slug
+                            <span className="flex items-center justify-between">
+                              <span>Slug</span>
+                              <button
+                                type="button"
+                                onClick={() => changeCollection(c.id, { slug: generateNavSlug(c.name) })}
+                                style={{ minHeight: 'auto', padding: '1px 6px', fontSize: '11px' }}
+                              >
+                                Tự tạo
+                              </button>
+                            </span>
                             <input value={c.slug} onChange={e => changeCollection(c.id, { slug: e.target.value })} />
                           </label>
                           <label>
@@ -789,56 +875,139 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                           />
                         </label>
                         {c.mode === 'rule' ? (
-                          <div className="nav-grid">
-                            <label>
-                              Loại
-                              <select
-                                value={baseRule.productType}
-                                onChange={e =>
-                                  changeCollection(c.id, {
-                                    rule: { ...baseRule, productType: e.target.value as 'all' | 'laptop' | 'accessory' },
-                                  })
-                                }
-                              >
-                                <option value="all">Tất cả</option>
-                                <option value="laptop">Laptop</option>
-                                <option value="accessory">Phụ kiện</option>
-                              </select>
-                            </label>
-                            <label>
-                              Sắp xếp
-                              <select
-                                value={baseRule.sort}
-                                onChange={e =>
-                                  changeCollection(c.id, {
-                                    rule: {
-                                      ...baseRule,
-                                      sort: e.target.value as 'newest' | 'price-asc' | 'price-desc' | 'name-asc',
-                                    },
-                                  })
-                                }
-                              >
-                                <option value="newest">Mới nhất</option>
-                                <option value="price-asc">Giá ↑</option>
-                                <option value="price-desc">Giá ↓</option>
-                                <option value="name-asc">Tên A–Z</option>
-                              </select>
-                            </label>
-                            <label>
-                              Giới hạn
-                              <input
-                                type="number"
-                                min={1}
-                                max={48}
-                                value={baseRule.limit}
-                                onChange={e =>
-                                  changeCollection(c.id, {
-                                    rule: { ...baseRule, limit: parseInt(e.target.value) || 12 },
-                                  })
+                          <>
+                            <div className="nav-grid">
+                              <label>
+                                Loại
+                                <select
+                                  value={baseRule.productType}
+                                  onChange={e =>
+                                    changeCollection(c.id, {
+                                      rule: { ...baseRule, productType: e.target.value as 'all' | 'laptop' | 'accessory' },
+                                    })
+                                  }
+                                >
+                                  <option value="all">Tất cả</option>
+                                  <option value="laptop">Laptop</option>
+                                  <option value="accessory">Phụ kiện</option>
+                                </select>
+                              </label>
+                              <label>
+                                Danh mục
+                                <select
+                                  value={baseRule.categoryId || ''}
+                                  onChange={e =>
+                                    changeCollection(c.id, {
+                                      rule: { ...baseRule, categoryId: e.target.value || null },
+                                    })
+                                  }
+                                >
+                                  <option value="">Tất cả danh mục</option>
+                                  {doc.categories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.parentId ? `↳ ${cat.name}` : cat.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                Thương hiệu
+                                <select
+                                  value={baseRule.brandId || ''}
+                                  onChange={e =>
+                                    changeCollection(c.id, {
+                                      rule: { ...baseRule, brandId: e.target.value || null },
+                                    })
+                                  }
+                                >
+                                  <option value="">Tất cả hãng</option>
+                                  {targetOpts.brands.map(b => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                Nhãn nổi bật
+                                <select
+                                  value={baseRule.tag || 'all'}
+                                  onChange={e =>
+                                    changeCollection(c.id, {
+                                      rule: { ...baseRule, tag: e.target.value as 'all' | 'isFeatured' | 'isNewArrival' | 'isBestSeller' },
+                                    })
+                                  }
+                                >
+                                  <option value="all">Tất cả nhãn</option>
+                                  <option value="isFeatured">Nổi bật</option>
+                                  <option value="isNewArrival">Mới về</option>
+                                  <option value="isBestSeller">Bán chạy</option>
+                                </select>
+                              </label>
+                              <label>
+                                Tình trạng kho
+                                <select
+                                  value={baseRule.availability || 'all'}
+                                  onChange={e =>
+                                    changeCollection(c.id, {
+                                      rule: { ...baseRule, availability: e.target.value as 'all' | 'AVAILABLE' | 'PREORDER' | 'CONTACT' },
+                                    })
+                                  }
+                                >
+                                  <option value="all">Tất cả</option>
+                                  <option value="AVAILABLE">Sẵn hàng</option>
+                                  <option value="PREORDER">Đặt trước</option>
+                                  <option value="CONTACT">Liên hệ</option>
+                                </select>
+                              </label>
+                              <label>
+                                Sắp xếp
+                                <select
+                                  value={baseRule.sort}
+                                  onChange={e =>
+                                    changeCollection(c.id, {
+                                      rule: {
+                                        ...baseRule,
+                                        sort: e.target.value as 'newest' | 'price-asc' | 'price-desc' | 'name-asc',
+                                      },
+                                    })
+                                  }
+                                >
+                                  <option value="newest">Mới nhất</option>
+                                  <option value="price-asc">Giá ↑</option>
+                                  <option value="price-desc">Giá ↓</option>
+                                  <option value="name-asc">Tên A–Z</option>
+                                </select>
+                              </label>
+                              <label>
+                                Giới hạn
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={48}
+                                  value={baseRule.limit}
+                                  onChange={e =>
+                                    changeCollection(c.id, {
+                                      rule: { ...baseRule, limit: parseInt(e.target.value) || 12 },
+                                    })
+                                  }
+                                />
+                              </label>
+                            </div>
+                            <div className="flex items-center justify-end">
+                              <Order
+                                index={i}
+                                length={doc.collections.length}
+                                onMove={delta => update('collections', move(doc.collections, i, delta))}
+                                onRemove={() =>
+                                  update(
+                                    'collections',
+                                    doc.collections.filter(x => x.id !== c.id)
+                                  )
                                 }
                               />
-                            </label>
-                          </div>
+                            </div>
+                          </>
                         ) : (
                           <>
                             <ol className="nav-products">
@@ -899,13 +1068,23 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                   const items = doc.menus[location];
                   const replace = (next: NavigationItem) =>
                     update('menus', { ...doc.menus, [location]: items.map(x => (x.id === item.id ? next : x)) });
+                  const targetKindLabel: Record<string, string> = {
+                    category: 'Danh mục',
+                    collection: 'Bộ sưu tập',
+                    product: 'Sản phẩm',
+                    brand: 'Thương hiệu',
+                    landing: 'Landing Page',
+                    page: 'Trang tĩnh',
+                    path: 'Đường dẫn nội bộ',
+                    external: 'URL ngoài',
+                  };
                   return (
                     <details key={item.id} className="nav-card" open={i === 0}>
                       <summary>
                         <span>
                           {i + 1}. {item.label}
                         </span>
-                        <small>{item.children.length > 0 ? `${item.children.length} mục con` : item.target.kind}</small>
+                        <small>{item.children.length > 0 ? `${item.children.length} mục con` : (targetKindLabel[item.target.kind] || item.target.kind)}</small>
                       </summary>
                       <div className="nav-card-body">
                         {menuEditor(item, next => replace(next as NavigationItem))}

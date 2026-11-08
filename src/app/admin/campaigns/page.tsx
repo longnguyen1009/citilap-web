@@ -222,6 +222,18 @@ export default function AdminCampaignsPage() {
     return () => { clearTimeout(timer); clearInterval(clock); };
   }, [fetchCampaigns]);
 
+  const campaignCounts = useMemo(() => {
+    let active = 0, upcoming = 0, inactive = 0;
+    for (const c of campaigns) {
+      const startMs = new Date(c.startAt).getTime();
+      const endMs = new Date(c.endAt).getTime();
+      if (c.status === "PUBLISHED" && nowMs >= startMs && nowMs < endMs) active++;
+      else if (c.status === "PUBLISHED" && nowMs < startMs) upcoming++;
+      else inactive++;
+    }
+    return { ALL: campaigns.length, ACTIVE: active, UPCOMING: upcoming, INACTIVE: inactive };
+  }, [campaigns, nowMs]);
+
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
       if (searchQuery.trim()) {
@@ -319,6 +331,17 @@ export default function AdminCampaignsPage() {
   const handleItemChange = (index: number, field: keyof CampaignItemForm, value: string) => {
     setFormItems((prev) =>
       prev.map((it, i) => (i === index ? { ...it, [field]: value } : it))
+    );
+  };
+
+  const applyBulkDiscountPct = (pct: number) => {
+    setFormItems(prev =>
+      prev.map(it => {
+        const reg = Number(it.regularPrice);
+        if (!Number.isFinite(reg) || reg <= 0) return it;
+        const discounted = Math.max(1000, Math.round((reg * (1 - pct / 100)) / 10000) * 10000);
+        return { ...it, salePrice: discounted };
+      })
     );
   };
 
@@ -447,8 +470,8 @@ export default function AdminCampaignsPage() {
   const handleArchive = async (c: CampaignData) => {
     if (!confirm(`Bạn có chắc muốn lưu trữ chiến dịch "${c.name}"? Giá sẽ không còn áp dụng.`)) return;
     try {
-      const res = await fetch(`/api/admin/campaigns/${c.id}/archive`, {
-        method: "POST",
+      const res = await fetch(`/api/admin/campaigns/${c.id}`, {
+        method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ expectedRevision: c.revision }),
       });
@@ -664,7 +687,7 @@ export default function AdminCampaignsPage() {
                       : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
                   }`}
                 >
-                  {t.label}
+                  {t.label} <span className="opacity-75">({campaignCounts[t.key]})</span>
                 </button>
               );
             })}
@@ -1035,10 +1058,28 @@ export default function AdminCampaignsPage() {
 
               {/* Items Section */}
               <div className="pt-3 border-t border-slate-200 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-900">
-                    Sản phẩm khuyến mại ({formItems.length})
-                  </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-xs font-bold text-slate-900">
+                      Sản phẩm khuyến mại ({formItems.length})
+                    </h3>
+                    {formItems.length > 0 && (
+                      <div className="flex items-center gap-1 text-[11px]">
+                        <span className="text-slate-500">Giảm nhanh theo giá gốc:</span>
+                        {[3, 5, 10, 15, 20].map(pct => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => applyBulkDiscountPct(pct)}
+                            className="px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold cursor-pointer transition"
+                            title={`Áp dụng giảm ${pct}% trên giá gốc cho tất cả sản phẩm`}
+                          >
+                            -{pct}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={handleAddItem}
@@ -1064,9 +1105,8 @@ export default function AdminCampaignsPage() {
                 ) : (
                   <div className="space-y-2">
                     <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 uppercase tracking-wide">
-                      <div className="col-span-4">Sản phẩm / ID</div>
-                      <div className="col-span-3">Biến thể (Variant ID)</div>
-                      <div className="col-span-2">Giá Sale (₫)</div>
+                      <div className="col-span-6">Sản phẩm &amp; Cấu hình</div>
+                      <div className="col-span-3">Giá Sale (₫)</div>
                       <div className="col-span-2">Giá gốc (₫) / % Giảm</div>
                       <div className="col-span-1 text-right">Xóa</div>
                     </div>
@@ -1081,37 +1121,39 @@ export default function AdminCampaignsPage() {
                           key={idx}
                           className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
                         >
-                          <div className="sm:col-span-4">
+                          <div className="sm:col-span-6 min-w-0">
                             {it.displayName ? (
-                              <p className="mb-1 text-[11px] font-semibold text-slate-900 truncate" title={it.displayName}>
-                                {it.displayName}
-                              </p>
+                              <div>
+                                <p className="text-xs font-semibold text-slate-900 truncate" title={it.displayName}>
+                                  {it.displayName}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-mono truncate">
+                                  ID: {it.productId}{it.variantId ? ` · SKU: ${it.variantId}` : ' · Bản gốc'}
+                                </p>
+                              </div>
                             ) : (
-                              <span className="block text-[10px] text-slate-400 mb-0.5 sm:hidden font-semibold">Sản phẩm:</span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                <input
+                                  type="text"
+                                  value={it.productId}
+                                  onChange={(e) => handleItemChange(idx, "productId", e.target.value)}
+                                  placeholder="Product ID (UUID)"
+                                  aria-label="Product ID"
+                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
+                                />
+                                <input
+                                  type="text"
+                                  value={it.variantId || ""}
+                                  onChange={(e) => handleItemChange(idx, "variantId", e.target.value)}
+                                  placeholder="Variant ID (trống = bản gốc)"
+                                  aria-label="Variant ID"
+                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
+                                />
+                              </div>
                             )}
-                            <input
-                              type="text"
-                              value={it.productId}
-                              onChange={(e) => handleItemChange(idx, "productId", e.target.value)}
-                              placeholder="Product ID (UUID)"
-                              aria-label="Product ID"
-                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
-                            />
                           </div>
 
                           <div className="sm:col-span-3">
-                            <span className="block text-[10px] text-slate-400 mb-0.5 sm:hidden font-semibold">Biến thể:</span>
-                            <input
-                              type="text"
-                              value={it.variantId || ""}
-                              onChange={(e) => handleItemChange(idx, "variantId", e.target.value)}
-                              placeholder="Variant ID (trống = bản gốc)"
-                              aria-label="Variant ID"
-                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2">
                             <span className="block text-[10px] text-slate-400 mb-0.5 sm:hidden font-semibold">Giá sale (₫):</span>
                             <input
                               type="number"

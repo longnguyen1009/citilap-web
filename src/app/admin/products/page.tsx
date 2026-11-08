@@ -288,110 +288,111 @@ export default function UnifiedProductsPage() {
       {/* 3. Unified Card: Tabs + Inline Filter Bar + Table + Pagination */}
       <AdminCard bodyClassName="p-0 overflow-hidden" className="relative">
         {/* Top Row: Status Tabs + Kind Segmented Filter */}
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 border-b border-slate-200 bg-slate-50/50">
-          <div className="admin-status-tabs" role="group" aria-label="Lọc trạng thái sản phẩm">
-            <button
-              type="button"
-              aria-pressed={publicationStatus === "ALL" && availability === "ALL"}
-              onClick={() => updateUrlParams({ publicationStatus: "ALL", availability: "ALL", page: 1 })}
-            >
-              Tất cả
-            </button>
-            <button
-              type="button"
-              aria-pressed={publicationStatus === "PUBLISHED" && availability === "ALL"}
-              onClick={() => updateUrlParams({ publicationStatus: "PUBLISHED", availability: "ALL", page: 1 })}
-            >
-              Đang bán
-            </button>
-            <button
-              type="button"
-              aria-pressed={publicationStatus === "DRAFT" && availability === "ALL"}
-              onClick={() => updateUrlParams({ publicationStatus: "DRAFT", availability: "ALL", page: 1 })}
-            >
-              Nháp
-            </button>
-            <button
-              type="button"
-              aria-pressed={availability === "UNAVAILABLE"}
-              onClick={() => updateUrlParams({ publicationStatus: "ALL", availability: "UNAVAILABLE", page: 1 })}
-            >
-              Ngừng đơn
-            </button>
-            <button
-              type="button"
-              aria-pressed={publicationStatus === "ARCHIVED" && availability === "ALL"}
-              onClick={() => updateUrlParams({ publicationStatus: "ARCHIVED", availability: "ALL", page: 1 })}
-            >
-              Lưu trữ
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-slate-200 bg-slate-50/50">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="admin-status-tabs" role="group" aria-label="Lọc trạng thái sản phẩm">
+              <button
+                type="button"
+                aria-pressed={publicationStatus === "ALL" && availability === "ALL"}
+                onClick={() => updateUrlParams({ publicationStatus: "ALL", availability: "ALL", page: 1 })}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                aria-pressed={publicationStatus === "PUBLISHED" && availability === "ALL"}
+                onClick={() => updateUrlParams({ publicationStatus: "PUBLISHED", availability: "ALL", page: 1 })}
+              >
+                Đang bán
+              </button>
+              <button
+                type="button"
+                aria-pressed={publicationStatus === "DRAFT" && availability === "ALL"}
+                onClick={() => updateUrlParams({ publicationStatus: "DRAFT", availability: "ALL", page: 1 })}
+              >
+                Nháp
+              </button>
+              <button
+                type="button"
+                aria-pressed={availability === "UNAVAILABLE"}
+                onClick={() => updateUrlParams({ publicationStatus: "ALL", availability: "UNAVAILABLE", page: 1 })}
+              >
+                Ngừng đơn
+              </button>
+              <button
+                type="button"
+                aria-pressed={publicationStatus === "ARCHIVED" && availability === "ALL"}
+                onClick={() => updateUrlParams({ publicationStatus: "ARCHIVED", availability: "ALL", page: 1 })}
+              >
+                Lưu trữ
+              </button>
+            </div>
+
+            <div className="inline-flex rounded-md border border-slate-200 p-0.5 bg-white text-xs">
+              <button
+                type="button"
+                aria-pressed={kind === "ALL"}
+                onClick={() => updateUrlParams({ kind: "ALL", page: 1 })}
+                className={`px-2.5 py-1 rounded transition cursor-pointer ${
+                  kind === "ALL" ? "bg-blue-600 text-white font-semibold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                aria-pressed={kind === "LAPTOP"}
+                onClick={() => updateUrlParams({ kind: "LAPTOP", page: 1 })}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded transition cursor-pointer ${
+                  kind === "LAPTOP" ? "bg-blue-600 text-white font-semibold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Laptop className="w-3 h-3" />
+                <span>Laptop</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={kind === "ACCESSORY"}
+                onClick={() => updateUrlParams({ kind: "ACCESSORY", page: 1 })}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded transition cursor-pointer ${
+                  kind === "ACCESSORY" ? "bg-blue-600 text-white font-semibold" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Headphones className="w-3 h-3" />
+                <span>Phụ kiện</span>
+              </button>
+            </div>
           </div>
 
-          <div className="inline-flex rounded-md border border-slate-200 p-0.5 bg-white text-xs my-1.5">
-            <button
-              type="button"
-              aria-pressed={kind === "ALL"}
-              onClick={() => updateUrlParams({ kind: "ALL", page: 1 })}
-              className={`px-2.5 py-1 rounded transition cursor-pointer ${
-                kind === "ALL" ? "bg-blue-600 text-white font-semibold" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Tất cả
-            </button>
-            <button
-              type="button"
-              aria-pressed={kind === "LAPTOP"}
-              onClick={() => updateUrlParams({ kind: "LAPTOP", page: 1 })}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded transition cursor-pointer ${
-                kind === "LAPTOP" ? "bg-blue-600 text-white font-semibold" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Laptop className="w-3 h-3" />
-              <span>Laptop</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={kind === "ACCESSORY"}
-              onClick={() => updateUrlParams({ kind: "ACCESSORY", page: 1 })}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded transition cursor-pointer ${
-                kind === "ACCESSORY" ? "bg-blue-600 text-white font-semibold" : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Headphones className="w-3 h-3" />
-              <span>Phụ kiện</span>
-            </button>
+          <div
+            aria-label="Tìm kiếm và bộ lọc sản phẩm"
+            className="flex items-center gap-2 text-xs flex-1 max-w-sm justify-end"
+          >
+            <form role="search" aria-label="Tìm sản phẩm" onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[200px]">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="search"
+                aria-label="Từ khóa sản phẩm"
+                placeholder="Tìm tên, mã SKU, model..."
+                name="q"
+                key={q}
+                defaultValue={q}
+                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+              />
+            </form>
+
+            {hasAnyFilter && (
+              <button
+                type="button"
+                onClick={() => startTransition(() => router.push(pathname))}
+                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer shrink-0"
+                title="Xóa tất cả bộ lọc"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Xóa lọc</span>
+              </button>
+            )}
           </div>
-        </div>
-
-        {/* Second Row: Inline Search + Selects */}
-        <div
-          aria-label="Tìm kiếm và bộ lọc sản phẩm"
-          className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-slate-200 bg-white text-xs"
-        >
-          <form role="search" aria-label="Tìm sản phẩm" onSubmit={handleSearchSubmit} className="relative flex-1 min-w-[220px]">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="search"
-              aria-label="Từ khóa sản phẩm"
-              placeholder="Tìm tên, mã SKU, model..."
-              name="q"
-              key={q}
-              defaultValue={q}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-200 bg-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-            />
-          </form>
-
-          {hasAnyFilter && (
-            <button
-              type="button"
-              onClick={() => startTransition(() => router.push(pathname))}
-              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
-              title="Xóa tất cả bộ lọc"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Xóa lọc</span>
-            </button>
-          )}
         </div>
 
         <details className="admin-filter-details" open={Boolean(categoryId || brand || availability !== "ALL" || sort !== "updatedAt" || order !== "desc")}>
