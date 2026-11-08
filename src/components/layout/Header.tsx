@@ -66,9 +66,17 @@ export default function Header({ categories = [], brands = [], navigation, setti
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const [hoveredNav, setHoveredNav] = useState<number | null>(null);
   const pathname = usePathname();
+  const [prevPath, setPrevPath] = useState(pathname);
   const headerRef = useRef<HTMLElement>(null);
   const [menuTop, setMenuTop] = useState(0);
   const { wishlistCount } = useWishlist();
+
+  if (prevPath !== pathname) {
+    setPrevPath(pathname);
+    setMenuOpen(false);
+    setHoveredItem(null);
+    setHoveredNav(null);
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -154,10 +162,13 @@ export default function Header({ categories = [], brands = [], navigation, setti
     { name: "Nâng cấp RAM & SSD", href: "/phu-kien?type=hardware" },
   ];
 
-  // 2. Về CitiLap dropdown items (gộp Cửa hàng và Giới thiệu)
+  // 2. Về CitiLap dropdown items (gộp Cửa hàng, Giới thiệu và Hỗ trợ)
   const aboutNavChildren = [
     { name: "Giới thiệu CitiLap", href: "/gioi-thieu" },
     { name: "Hệ thống cửa hàng", href: "/he-thong-cua-hang" },
+    { name: "Tư vấn chọn Laptop", href: "/chon-laptop" },
+    { name: "Câu hỏi thường gặp", href: "/cau-hoi-thuong-gap" },
+    { name: "Liên hệ & Hỗ trợ", href: "/lien-he" },
   ];
 
   // 3. Lọc bỏ "Laptop Like New" (slug: laptop-cu), "Linh kiện", và test temp khỏi danh sách laptop chính
@@ -210,8 +221,8 @@ export default function Header({ categories = [], brands = [], navigation, setti
       {menuOpen && <button type="button" aria-label="Đóng danh mục" onClick={() => setMenuOpen(false)} className="fixed inset-0 z-[49] hidden bg-black/50 backdrop-blur-sm md:block" />}
       <header ref={headerRef} className="w-full sticky top-0 z-50 shadow-md">
       {/* Top Header */}
-      <div className="bg-[#0b1221] text-white py-3">
-        <div className="container mx-auto px-4 flex items-center justify-between gap-4 max-w-[1370px]">
+      <div className="bg-[#0b1221] text-white py-2.5 sm:py-3">
+        <div className="container mx-auto px-3 sm:px-4 flex items-center justify-between gap-2 sm:gap-4 max-w-[1370px]">
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -220,13 +231,13 @@ export default function Header({ categories = [], brands = [], navigation, setti
               <img
                 src={settings.logoUrl}
                 alt={settings.storeName || "CitiLap"}
-                className="h-auto w-[156px] sm:w-[210px] xl:w-[260px] object-contain"
+                className="h-auto w-[124px] min-[375px]:w-[144px] sm:w-[210px] xl:w-[260px] object-contain"
               />
             ) : (
               <>
-                <Monitor className="w-8 h-8 sm:w-10 sm:h-10 text-blue-400" />
+                <Monitor className="w-7 h-7 sm:w-10 sm:h-10 text-blue-400" />
                 <div className="flex flex-col">
-                  <span className="text-xl sm:text-2xl font-black leading-none tracking-wider text-white">
+                  <span className="text-lg sm:text-2xl font-black leading-none tracking-wider text-white">
                     {settings?.storeName || "CITILAP.VN"}
                   </span>
                   <span className="text-[8px] sm:text-[9px] tracking-[0.2em] text-blue-400 font-medium uppercase mt-0.5 sm:mt-1 hidden sm:block">
@@ -238,7 +249,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
           </Link>
 
           {/* Danh mục & Search */}
-          <div className="flex flex-grow max-w-3xl items-center gap-2 sm:gap-4 ml-2 sm:ml-4">
+          <div className="flex flex-grow min-w-0 max-w-3xl items-center gap-2 sm:gap-4 ml-1 sm:ml-4">
             <div className="relative hidden md:block">
               {/* Button Danh mục - Click to toggle */}
               <button
@@ -269,16 +280,16 @@ export default function Header({ categories = [], brands = [], navigation, setti
                   <div className="overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
                     {dynamicCategoryMenu.map((item, idx) => {
                       const IconComponent = (item.slug && categoryIcons[item.slug]) || Laptop;
-                      return <Link key={item.href} href={item.href} onMouseEnter={() => setHoveredItem(idx)} onFocus={() => setHoveredItem(idx)} onClick={() => setMenuOpen(false)} className={'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ' + (hoveredItem === idx ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50')}><IconComponent className="h-5 w-5 shrink-0" /><span className="min-w-0 flex-1">{item.name}</span><ChevronRight className="h-4 w-4" /></Link>;
+                      return <Link key={`${item.href}-${idx}`} href={item.href} onMouseEnter={() => setHoveredItem(idx)} onFocus={() => setHoveredItem(idx)} onClick={() => setMenuOpen(false)} className={'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ' + (hoveredItem === idx ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50')}><IconComponent className="h-5 w-5 shrink-0" /><span className="min-w-0 flex-1">{item.name}</span><ChevronRight className="h-4 w-4" /></Link>;
                     })}
                   </div>
                   <div className="overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
                     {(() => {
                       const item = dynamicCategoryMenu[hoveredItem ?? 0];
                       if (!item) return null;
-                      return <><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-extrabold">{item.name}</h2><Link href={item.href} onClick={() => setMenuOpen(false)} className="text-xs font-bold text-blue-700">Xem tất cả</Link></div><div className="grid grid-cols-2 gap-3 xl:grid-cols-3">{(item.children?.length ? item.children : [item]).map(sub => {
+                      return <><div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-lg font-extrabold">{item.name}</h2><Link href={item.href} onClick={() => setMenuOpen(false)} className="text-xs font-bold text-blue-700">Xem tất cả</Link></div><div className="grid grid-cols-2 gap-3 xl:grid-cols-3">{(item.children?.length ? item.children : [item]).map((sub, subIdx) => {
                         const image = navigation?.collections.find(c => c.href === sub.href)?.image || navigation?.categories.find(c => c.href === sub.href)?.image;
-                        return <Link key={sub.href} href={sub.href} onClick={() => setMenuOpen(false)} className="flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold hover:border-blue-300 hover:bg-blue-50">{image && <Image src={image} alt="" width={56} height={48} className="h-12 w-14 shrink-0 rounded object-contain" />}<span>{sub.name}</span></Link>;
+                        return <Link key={`${sub.href}-${subIdx}`} href={sub.href} onClick={() => setMenuOpen(false)} className="flex min-h-16 items-center gap-3 rounded-xl border border-slate-200 p-3 text-sm font-semibold hover:border-blue-300 hover:bg-blue-50">{image && <Image src={image} alt="" width={56} height={48} className="h-12 w-14 shrink-0 rounded object-contain" />}<span>{sub.name}</span></Link>;
                       })}</div></>;
                     })()}
                   </div>

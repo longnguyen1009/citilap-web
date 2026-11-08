@@ -26,7 +26,7 @@ export const CONDITION_METAS: Record<ConditionCode, ConditionMeta> = {
   },
   LIKE_NEW: {
     code: "LIKE_NEW",
-    label: "Like New 99%",
+    label: "LikeNew 99%",
     variant: "condition-like-new",
     description: "Máy như mới, ngoại hình đẹp 99%",
   },
@@ -76,10 +76,10 @@ export function resolveConditionMeta(
       return CONDITION_METAS[normalized];
     }
     // Check known keywords in legacy string
-    if (condition.includes("99%") || condition.toLowerCase().includes("like new")) {
+    if (condition.includes("99%") || condition.toLowerCase().includes("like new") || condition.toLowerCase().includes("likenew")) {
       return CONDITION_METAS.LIKE_NEW;
     }
-    if (condition.includes("100%") || condition.toLowerCase().includes("mới")) {
+    if (condition.includes("100%") || condition.toLowerCase().includes("mới") || condition.toLowerCase().includes("new")) {
       return CONDITION_METAS.NEW;
     }
     if (condition.toLowerCase().includes("cũ") || condition.toLowerCase().includes("used")) {
@@ -96,13 +96,13 @@ export function resolveConditionMeta(
   // Isolated legacy fallback for unmigrated mock items
   if (fallbackName) {
     const lower = fallbackName.toLowerCase();
-    if (lower.includes("like new") || lower.includes("99%") || lower.includes("lướt")) {
+    if (lower.includes("like new") || lower.includes("likenew") || lower.includes("99%") || lower.includes("lướt")) {
       return CONDITION_METAS.LIKE_NEW;
     }
     if (lower.includes("98%")) {
       return {
         code: "LIKE_NEW",
-        label: "Like New 98%",
+        label: "LikeNew 98%",
         variant: "condition-like-new",
       };
     }

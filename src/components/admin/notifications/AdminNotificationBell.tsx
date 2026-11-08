@@ -152,15 +152,15 @@ export default function AdminNotificationBell() {
           setOpen((prev) => !prev);
           if (!open) fetchNotifications();
         }}
-        className="relative p-2 rounded-lg text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+        className="relative inline-grid place-items-center w-8 h-8 rounded-md text-slate-300 hover:text-white hover:bg-slate-800 transition focus:outline-hidden"
         aria-label={`Thông báo (${unreadCount} chưa đọc)`}
         aria-expanded={open}
       >
-        <Bell className="w-5 h-5" aria-hidden="true" />
+        <Bell className="w-4 h-4" aria-hidden="true" />
         {unreadCount > 0 && (
           <span
             id="admin-notification-unread-badge"
-            className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse"
+            className="absolute -top-1 -right-1 min-w-[16px] h-[15px] px-1 bg-red-600 text-white text-[9px] leading-none font-bold rounded-full flex items-center justify-center shadow-2xs ring-1 ring-slate-900"
           >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>

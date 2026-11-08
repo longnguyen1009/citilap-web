@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { mediaEnvironment } from '@/server/media-http';
 import { lookupPublicInspectionByCode } from '@/server/services/inspection.service';
+import { getClientIp, hashIp, checkInMemoryRateLimit, rateLimitExceededResponse } from '@/lib/rate-limiter';
 
 export async function GET(request: Request) {
+  // Chống dò mã kiểm định: 20 lượt / phút / IP
+  const rl = checkInMemoryRateLimit(`rl:inspection:${hashIp(getClientIp(request))}`, 20, 60);
+  if (!rl.allowed) return rateLimitExceededResponse(rl.retryAfter);
   try {
     const { searchParams } = new URL(request.url);
     const code = (searchParams.get('code') || '').trim();

@@ -3,6 +3,7 @@ import PolicyLayout from "@/components/policy/PolicyLayout";
 import { businessProfile } from "@/config/business-profile";
 import { mediaEnvironment } from "@/server/media-http";
 import { getSystemPageResolution } from "@/server/services/page.service";
+import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,8 +44,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ShippingPolicyPage() {
-  const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
-  const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
+  const settings = await getStorefrontSettings();
+  const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const baseBacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
+  const hanoi = {
+    ...baseHanoi,
+    address: settings?.addressHanoi || baseHanoi.address,
+    displayPhone: settings?.storePhone || baseHanoi.displayPhone,
+  };
+  const bacNinh = {
+    ...baseBacNinh,
+    address: settings?.addressBacNinh || baseBacNinh.address,
+  };
+  const displayPhone = settings?.storePhone || businessProfile.displayPhone;
 
   // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors as static content)
   const env = await mediaEnvironment();
@@ -82,7 +94,7 @@ export default async function ShippingPolicyPage() {
           <p className="font-bold text-base">Chính sách vận chuyển hiện đang tạm ẩn</p>
           <p className="text-xs text-amber-700">
             Nội dung đang được cập nhật để phù hợp với quy định mới. Quý khách vui lòng liên hệ hotline{" "}
-            <strong>{businessProfile.displayPhone}</strong> để được hỗ trợ thông tin chi tiết.
+            <strong>{displayPhone}</strong> để được hỗ trợ thông tin chi tiết.
           </p>
         </div>
       </PolicyLayout>
@@ -144,7 +156,7 @@ export default async function ShippingPolicyPage() {
         <div>
           <h2 className="text-lg font-bold text-gray-900 mb-3">4. Đồng kiểm và kiểm tra máy khi nhận</h2>
           <p className="text-sm leading-relaxed">
-            Để đảm bảo quyền lợi tối đa, quý khách được quyền <strong>mở hộp kiểm tra ngoại hình máy, phụ kiện đi kèm và tem bảo hành</strong> trước khi thanh toán tiền mặt cho nhân viên giao hàng (Ship COD). Nếu phát hiện móp méo, nứt vỡ hoặc thiếu phụ kiện, quý khách vui lòng từ chối nhận và gọi ngay hotline <strong>{businessProfile.displayPhone}</strong>.
+            Để đảm bảo quyền lợi tối đa, quý khách được quyền <strong>mở hộp kiểm tra ngoại hình máy, phụ kiện đi kèm và tem bảo hành</strong> trước khi thanh toán tiền mặt cho nhân viên giao hàng (Ship COD). Nếu phát hiện móp méo, nứt vỡ hoặc thiếu phụ kiện, quý khách vui lòng từ chối nhận và gọi ngay hotline <strong>{displayPhone}</strong>.
           </p>
         </div>
 

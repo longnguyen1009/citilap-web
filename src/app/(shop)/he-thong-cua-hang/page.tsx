@@ -300,7 +300,7 @@ export default async function StoresPage() {
 
             <p className="text-sm text-gray-600 mb-2">{hcm.address}</p>
             <p className="text-xs text-gray-500 italic">
-              {hcm.statusNotice} Khách hàng khu vực phía Nam có nhu cầu đặt mua máy vui lòng chọn hình thức giao hàng toàn quốc hoặc liên hệ hotline <strong className="text-gray-700">{businessProfile.displayPhone}</strong>.
+              {hcm.statusNotice} Khách hàng khu vực phía Nam có nhu cầu đặt mua máy vui lòng chọn hình thức giao hàng toàn quốc hoặc liên hệ hotline <strong className="text-gray-700">{hanoi.displayPhone}</strong>.
             </p>
           </div>
         </div>

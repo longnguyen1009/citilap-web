@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import { AlertTriangle, RotateCcw, Home } from "lucide-react";
 
 export default function Error({
   error,
@@ -15,27 +16,30 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="bg-[#f1f5f9] min-h-[60vh] flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md w-full">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-2xl">&#9888;</span>
+    <div className="bg-slate-50 min-h-[60vh] flex flex-col items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl border border-slate-200/80 shadow-xs text-center max-w-md w-full">
+        <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">Đã có lỗi xảy ra</h2>
-        <p className="text-gray-500 mb-6">
-          Xin lỗi, có vẻ như đã có vấn đề kỹ thuật. Vui lòng thử lại sau.
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">Đã có lỗi xảy ra</h2>
+        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+          Xin lỗi, trang này gặp sự cố kỹ thuật tạm thời. Vui lòng tải lại hoặc quay về trang chủ.
         </p>
-        <div className="flex gap-3 justify-center">
+        <div className="flex flex-wrap gap-3 justify-center">
           <button
+            type="button"
             onClick={() => reset()}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm py-2.5 px-5 rounded-xl transition cursor-pointer"
           >
-            Thử lại
+            <RotateCcw className="w-4 h-4" />
+            <span>Thử lại</span>
           </button>
           <Link
             href="/"
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-6 rounded-lg transition"
+            className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm py-2.5 px-5 rounded-xl transition"
           >
-            Về trang chủ
+            <Home className="w-4 h-4" />
+            <span>Về trang chủ</span>
           </Link>
         </div>
       </div>

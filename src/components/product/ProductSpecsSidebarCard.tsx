@@ -83,14 +83,14 @@ export function ProductSpecsSidebarCard({
             {specs.map((row, idx) => (
               <div
                 key={`${row.label}-${idx}`}
-                className="py-2.5 flex justify-between gap-4"
+                className="py-2.5 grid grid-cols-12 gap-3 items-start"
               >
-                <span className="text-slate-500 font-medium shrink-0 max-w-[40%]">
+                <span className="col-span-4 text-slate-500 font-medium break-words">
                   {row.label}
                 </span>
                 <span
                   data-spec-key={row.label}
-                  className="font-semibold text-slate-800 text-right break-words"
+                  className="col-span-8 font-semibold text-slate-800 text-left break-words leading-snug"
                 >
                   {row.value}
                 </span>

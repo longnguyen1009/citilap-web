@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import { getStorefrontPricingContext } from '@/server/services/pricing.service';
 import { serializeJsonLd } from '@/lib/seo-helpers';
 import { Suspense } from "react";
@@ -17,6 +18,7 @@ import CategoryGridSection from "@/components/home/CategoryGridSection";
 import FlashSaleSection from "@/components/home/FlashSaleSection";
 import ProductSection from "@/components/home/ProductSection";
 import MediaSection from "@/components/home/MediaSection";
+import VideoReviews from "@/components/home/VideoReviews";
 import TestimonialSection from "@/components/home/TestimonialSection";
 import ContactSection from "@/components/home/ContactSection";
 import BrandSection from "@/components/home/BrandSection";
@@ -32,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const defaults=await seoDefaults((await mediaEnvironment()).DB);
   const home=await getPublishedHomepage();
   const title=home?.seo.title || defaults.title,description=home?.seo.description || defaults.description;
-  return {title,description,alternates:{canonical:'https://citilap.vn'},openGraph:{title,description,url:'https://citilap.vn'}};
+  return {title,description,alternates:{canonical:`${businessProfile.canonicalSiteUrl}`},openGraph:{title,description,url:`${businessProfile.canonicalSiteUrl}`}};
 }
 
 // Reusable standard skeleton for section suspense boundaries
@@ -62,10 +64,10 @@ export default async function Home() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: settings?.storeName || "CitiLap",
-    url: "https://citilap.vn",
+    url: `${businessProfile.canonicalSiteUrl}`,
     potentialAction: {
       "@type": "SearchAction",
-      target: "https://citilap.vn/search?q={search_term_string}",
+      target: `${businessProfile.canonicalSiteUrl}/search?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };
@@ -87,6 +89,7 @@ export default async function Home() {
           testimonials={settings?.testimonials ?? []}
           sourceUrl={settings?.testimonialsSourceUrl}
         />
+        <ContactSection settings={settings} />
       </div>
     );
   }
@@ -126,7 +129,7 @@ export default async function Home() {
             { label: "Apple M3", href: "/macbook" },
             { label: "Đồ Hoạ Mới", href: "/laptop-workstation?sort=newest" },
           ]}
-          slug="laptop-gaming"
+          slug="laptop-moi"
           sectionKey="new"
           badgeColor="bg-indigo-600 text-white shadow-xs"
         />
@@ -179,7 +182,7 @@ export default async function Home() {
             { label: "HP ZBook", href: "/laptop-workstation?brand=hp" },
             { label: "GPU Chuyên Dụng", href: "/laptop-workstation" },
           ]}
-          slug="laptop-do-hoa"
+          slug="laptop-workstation"
           sectionKey="workstation"
           badgeColor="bg-gray-800 text-white shadow-xs"
         />
@@ -197,7 +200,7 @@ export default async function Home() {
             { label: "Củ Sạc GaN & Cáp", href: "/phu-kien?type=charger" },
             { label: "Hub Type-C", href: "/phu-kien?type=hub" },
           ]}
-          slug="linh-kien"
+          slug="phu-kien"
           sectionKey="accessories"
           badgeColor="bg-emerald-600 text-white shadow-xs"
         />
@@ -215,7 +218,7 @@ export default async function Home() {
             { label: "Top Đồ Hoạ", href: "/laptop-workstation?sort=best-selling" },
             { label: "MacBook Hot", href: "/macbook?sort=best-selling" },
           ]}
-          slug="laptop-gaming"
+          slug="search?sort=best-selling"
           sectionKey="best-selling"
           badgeColor="bg-orange-600 text-white shadow-xs"
           rank={true}
@@ -225,7 +228,17 @@ export default async function Home() {
       {/* 11. GÓC CITILAP MEDIA */}
       <MediaSection />
 
-      {/* 12. ĐÁNH GIÁ KHÁCH HÀNG */}
+      {/* 12. GÓC REVIEW & TRẢI NGHIỆM VIDEO */}
+      <VideoReviews
+        title="Góc Review & Đánh Giá Thực Tế"
+        subtitle="Tổng hợp video đánh giá chi tiết, test hiệu năng & quy trình kiểm định laptop từ YouTube và TikTok"
+        videos={settings?.reviewVideos ?? []}
+        fallbackVideos={settings?.reviewVideos}
+        youtubeChannelUrl={settings?.youtubeUrl}
+        tiktokChannelUrl={settings?.tiktokUrl}
+      />
+
+      {/* 13. ĐÁNH GIÁ KHÁCH HÀNG */}
       <TestimonialSection testimonials={settings?.testimonials ?? []} sourceUrl={settings?.testimonialsSourceUrl} />
 
       {/* 13. TƯ VẤN CHỌN MÁY */}

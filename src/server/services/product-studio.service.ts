@@ -1,7 +1,7 @@
 import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
-import { blankProduct, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
+import { blankProduct, formatShortWarrantyBadge, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
 import { sanitizeHtml } from '../../lib/sanitize-html';
 import { MediaError, mediaDetail, getAsset, resolveMediaPresentation, type MediaEnvironment } from './media-library.service';
 
@@ -9,6 +9,7 @@ export type ProductKind = 'LAPTOP' | 'ACCESSORY' | 'MOUSE' | 'TECH' | 'OTHER';
 
 export interface CatalogListOptions {
   q?: string;
+  ids?: string[];
   kind?: string;
   categoryId?: string;
   brand?: string;
@@ -182,6 +183,14 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
 
   const whereClauses: string[] = ['p.deletedAt IS NULL'];
   const params: (string | number)[] = [];
+
+  if (opts.ids?.length) {
+    const cleanIds = opts.ids.map(s => String(s).trim()).filter(Boolean).slice(0, 100);
+    if (cleanIds.length > 0) {
+      whereClauses.push(`p.id IN (${cleanIds.map(() => '?').join(', ')})`);
+      params.push(...cleanIds);
+    }
+  }
 
   // Search filter (name, slug, id, model, draft name, or variant SKU)
   if (q) {
@@ -423,13 +432,25 @@ export async function studioList(db: D1Database, q = '') {
   };
 }
 
-function normalizeStudioDocument(rawDoc: ProductDocument): ProductDocument {
+function normalizeStudioDocument(rawDoc: ProductDocument, legacyStock?: number | null, legacyWarranty?: string | null): ProductDocument {
   const d = rawDoc;
   if (['STAND', 'HARDWARE'].includes(d.template as string)) {
     d.template = 'ACCESSORY';
   }
   if ((d.availability as string) === 'IN_STOCK') {
     d.availability = 'AVAILABLE';
+  }
+  if (d.warrantyType !== 'SHOP' && d.warrantyType !== 'BRAND') {
+    const rawW = String(legacyWarranty || d.warranties?.[0]?.name || '');
+    d.warrantyType = /hãng|brand|manufacturer/i.test(rawW) ? 'BRAND' : 'SHOP';
+  }
+  if (!Number.isInteger(d.warrantyMonths) || d.warrantyMonths < 1) {
+    const rawW = String(legacyWarranty || d.warranties?.[0]?.name || '');
+    const m = rawW.match(/(\d+)\s*(?:tháng|t\b)/i);
+    d.warrantyMonths = m ? Math.min(60, Math.max(1, parseInt(m[1], 10))) : 12;
+  }
+  if (!Number.isInteger(d.stock) || d.stock < 0) {
+    d.stock = typeof legacyStock === 'number' && legacyStock >= 0 ? legacyStock : 1;
   }
   if (!Array.isArray(d.specs)) {
     if (d.specs && typeof d.specs === 'object') {
@@ -445,6 +466,8 @@ function normalizeStudioDocument(rawDoc: ProductDocument): ProductDocument {
     d.variants = d.variants.map((v) => ({
       ...v,
       availability: ((v.availability as string) === 'IN_STOCK' ? 'AVAILABLE' : v.availability) || 'AVAILABLE',
+      stock: typeof v.stock === 'number' && v.stock >= 0 ? v.stock : (typeof v.options?.stock === 'string' ? parseInt(v.options.stock, 10) || 0 : undefined),
+      tag: v.tag ?? v.options?.tag ?? undefined,
     }));
   } else {
     d.variants = [];
@@ -462,9 +485,9 @@ function normalizeStudioDocument(rawDoc: ProductDocument): ProductDocument {
  * Adopts legacy products into standard ProductDocument on-read without mutating DB.
  */
 export async function studioDetail(db: D1Database, id: string) {
-  const row = await db.prepare('SELECT s.*,p.tags legacyTags FROM ProductStudio s JOIN Product p ON p.id=s.productId WHERE productId=? AND p.deletedAt IS NULL').bind(id).first<Studio & { legacyTags: string | null }>();
+  const row = await db.prepare('SELECT s.*,p.tags legacyTags,p.stock legacyStock,p.warranty legacyWarranty FROM ProductStudio s JOIN Product p ON p.id=s.productId WHERE productId=? AND p.deletedAt IS NULL').bind(id).first<Studio & { legacyTags: string | null; legacyStock: number | null; legacyWarranty: string | null }>();
   if (row) {
-    const document = normalizeStudioDocument(JSON.parse(row.draft) as ProductDocument);
+    const document = normalizeStudioDocument(JSON.parse(row.draft) as ProductDocument, row.legacyStock, row.legacyWarranty);
     if (!document.tags) {
       try { document.tags = row.legacyTags?.startsWith('[') ? JSON.parse(row.legacyTags) : (row.legacyTags || '').split(',').map(tag => tag.trim()).filter(Boolean); }
       catch { document.tags = []; }
@@ -473,7 +496,7 @@ export async function studioDetail(db: D1Database, id: string) {
       document.isFlashSale = false;
     }
     return { id, revision: row.revision, document, published: !!row.published,
-      publishedSummary: publicationSummary(row.published ? normalizeStudioDocument(JSON.parse(row.published)) : null),
+      publishedSummary: publicationSummary(row.published ? normalizeStudioDocument(JSON.parse(row.published), row.legacyStock, row.legacyWarranty) : null),
       hasUnpublishedDraft: !!row.published && row.draft !== row.published };
   }
 
@@ -486,6 +509,11 @@ export async function studioDetail(db: D1Database, id: string) {
   }
   d.price = Number(p.price);
   d.originalPrice = p.originalPrice == null ? null : Number(p.originalPrice);
+  d.stock = typeof p.stock === 'number' && p.stock >= 0 ? Number(p.stock) : 1;
+  const rawW = String(p.warranty || '');
+  d.warrantyType = /hãng|brand|manufacturer/i.test(rawW) ? 'BRAND' : 'SHOP';
+  const wMonthsMatch = rawW.match(/(\d+)\s*(?:tháng|t\b)/i);
+  d.warrantyMonths = wMonthsMatch ? Math.min(60, Math.max(1, parseInt(wMonthsMatch[1], 10))) : 12;
   try { d.tags = String(p.tags || '').startsWith('[') ? JSON.parse(String(p.tags)) : String(p.tags || '').split(',').map(tag => tag.trim()).filter(Boolean); } catch { d.tags = []; }
 
   // Determine template from category or specs
@@ -529,12 +557,14 @@ export async function studioDetail(db: D1Database, id: string) {
       if (typeof v.options === 'string' && v.options.startsWith('{')) {
         try { optionsObj = JSON.parse(v.options); } catch { optionsObj = {}; }
       }
-      const { condition, ...options } = optionsObj;
+      const { condition, tag, ...options } = optionsObj;
       return {
         id: String(v.id),
         sku: String(v.sku),
         name: String(v.name),
         price: Number(v.price),
+        stock: typeof v.stock === 'number' && v.stock >= 0 ? Number(v.stock) : undefined,
+        tag: tag || undefined,
         condition: (['NEW', 'LIKE_NEW', 'USED', 'REFURBISHED'].includes(condition) ? condition : 'NEW') as ProductDocument['variants'][number]['condition'],
         originalPrice: v.originalPrice != null ? Number(v.originalPrice) : null,
         availability: 'AVAILABLE',
@@ -662,6 +692,15 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     const effectiveStorage = (primaryVar?.storage || primaryVar?.options?.SSD || primaryVar?.options?.['Ổ cứng'] || primaryVar?.options?.storage || specs.SSD || specs['Ổ cứng'] || specs.storage || '').trim() || null;
     const effectiveDisplay = (primaryVar?.options?.['Màn hình'] || primaryVar?.options?.display || specs['Màn hình'] || specs.display || '').trim() || null;
     const effectiveCondition = primaryVar?.condition || d.condition || 'NEW';
+    const effectiveWarrantyBadge = formatShortWarrantyBadge(
+      d.warrantyType,
+      d.warrantyMonths,
+      d.warranties.find(w => w.recommended)?.name || d.warranties[0]?.name || null
+    );
+    const totalVariantStock = d.variants.reduce((sum, v) => sum + (typeof v.stock === 'number' && v.stock >= 0 ? v.stock : 0), 0);
+    const effectiveProductStock = d.variants.length > 0 && d.variants.some(v => typeof v.stock === 'number')
+      ? totalVariantStock
+      : (typeof d.stock === 'number' && d.stock >= 0 ? d.stock : 1);
 
     const { cpuSeries, gpuSeries, ramGb, storageGb, screenSize, refreshRate } = parseSpecMetrics({
       ...specs,
@@ -681,6 +720,8 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         brand = ?,
         brandId = ?,
         condition = ?,
+        warranty = ?,
+        stock = ?,
         isNewArrival = ?,
         isBestSeller = ?,
         isFeatured = ?,
@@ -709,7 +750,8 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
       WHERE id = ?
     `).bind(
       d.name, d.slug, d.description, d.contentHtml, d.brand, d.brandId || null,
-      effectiveCondition, d.isNewArrival ? 1 : 0, d.isBestSeller ? 1 : 0, d.isFeatured ? 1 : 0, d.isFlashSale ? 1 : 0,
+      effectiveCondition, effectiveWarrantyBadge, effectiveProductStock,
+      d.isNewArrival ? 1 : 0, d.isBestSeller ? 1 : 0, d.isFeatured ? 1 : 0, d.isFlashSale ? 1 : 0,
       JSON.stringify(d.tags),
       d.categoryId,
       d.price, d.originalPrice, d.seoTitle, d.seoDescription,
@@ -729,15 +771,17 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
       const vRam = (v.ram || v.options?.RAM || v.options?.ram || specs.RAM || specs.ram || '').trim() || null;
       const vStorage = (v.storage || v.options?.SSD || v.options?.['Ổ cứng'] || v.options?.storage || specs.SSD || specs['Ổ cứng'] || '').trim() || null;
       const vGpu = (v.gpu || v.options?.GPU || v.options?.gpu || specs.GPU || specs.gpu || '').trim() || null;
+      const vStock = typeof v.stock === 'number' && v.stock >= 0 ? v.stock : (typeof d.stock === 'number' && d.stock >= 0 ? d.stock : 1);
       statements.push(db.prepare(`
-        INSERT INTO ProductVariant(id,productId,sku,name,options,price,originalPrice,status,cpu,display,ram,storage,gpu,updatedAt)
-        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+        INSERT INTO ProductVariant(id,productId,sku,name,options,price,originalPrice,stock,status,cpu,display,ram,storage,gpu,updatedAt)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
         ON CONFLICT(id) DO UPDATE SET
           sku = excluded.sku,
           name = excluded.name,
           options = excluded.options,
           price = excluded.price,
           originalPrice = excluded.originalPrice,
+          stock = excluded.stock,
           status = excluded.status,
           cpu = excluded.cpu,
           display = excluded.display,
@@ -750,9 +794,10 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         productId,
         v.sku,
         v.name,
-        JSON.stringify({ condition: v.condition || d.condition || 'NEW', ...(v.options || {}) }),
+        JSON.stringify({ condition: v.condition || d.condition || 'NEW', ...(v.tag ? { tag: v.tag } : {}), ...(v.options || {}) }),
         v.price,
         v.originalPrice ?? null,
+        vStock,
         vStatus,
         vCpu,
         vDisplay,
@@ -820,10 +865,11 @@ export async function listProductRevisions(db: D1Database, productId: string) {
   `).bind(productId).all<{ revision: number; action: string; createdAt: string; document: string }>();
 
   const logs = await db.prepare(`
-    SELECT action, actorName, createdAt
-    FROM ProductEditLog
-    WHERE productId=?
-    ORDER BY createdAt DESC
+    SELECT l.action, COALESCE(u.name, u.email, l.actorName) AS actorName, l.createdAt
+    FROM ProductEditLog l
+    LEFT JOIN User u ON u.id = l.actorName
+    WHERE l.productId=?
+    ORDER BY l.createdAt DESC
   `).bind(productId).all<{ action: string; actorName: string; createdAt: string }>();
 
   const currentRevision = studio?.revision ?? 0;
@@ -928,7 +974,7 @@ export async function publicStudio(db: D1Database, slug: string) {
     d.media.map(async (m) => {
       const assetRow = await getAsset(db, m.assetId);
       const pres = resolveMediaPresentation(assetRow);
-      return { url: pres.url, kind: assetRow.kind, alt: m.alt, variantId: m.variantId };
+      return { assetId: m.assetId, url: pres.url, kind: assetRow.kind, alt: m.alt, variantId: m.variantId };
     })
   );
   return { ...d, faqs: d.faqs || [], gifts: d.gifts || [], accessoryProductIds: d.accessoryProductIds || [], tags: d.tags || [], media, canOrder: ['AVAILABLE', 'PREORDER'].includes(d.availability) };

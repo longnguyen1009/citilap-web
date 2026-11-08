@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import type { Metadata } from 'next';
 import { advisorSchema } from '@/contracts/catalog/advisor';
 import { adviseLaptops } from '@/server/services/advisor.service';
@@ -15,7 +16,7 @@ export async function generateMetadata({
   return {
     title: 'Chọn laptop theo nhu cầu & ngân sách | CitiLap',
     description: 'Công cụ cố vấn cấu hình thông minh của CitiLap giúp bạn tìm kiếm chiếc laptop tối ưu nhất cho học tập, văn phòng, gaming và đồ họa.',
-    alternates: { canonical: 'https://citilap.vn/chon-laptop' },
+    alternates: { canonical: `${businessProfile.canonicalSiteUrl}/chon-laptop` },
     robots: {
       index: !hasCustomFilters,
       follow: true,
@@ -23,7 +24,7 @@ export async function generateMetadata({
     openGraph: {
       title: 'Chọn laptop theo nhu cầu & ngân sách | CitiLap',
       description: 'Công cụ cố vấn cấu hình thông minh của CitiLap giúp bạn tìm kiếm chiếc laptop tối ưu nhất cho học tập, văn phòng, gaming và đồ họa.',
-      url: 'https://citilap.vn/chon-laptop',
+      url: `${businessProfile.canonicalSiteUrl}/chon-laptop`,
       images: ['/brand/marketing-banner.webp'],
     },
   };

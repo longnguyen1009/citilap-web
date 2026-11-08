@@ -24,6 +24,7 @@ const conditionNames: Record<ProductDocument["variants"][number]["condition"], s
   LIKE_NEW: "Like New",
   USED: "Đã qua sử dụng",
   REFURBISHED: "Tân trang",
+  LIQUIDATION: "Thanh lý",
 };
 
 export default function StudioPurchaseSection({

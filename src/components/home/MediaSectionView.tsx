@@ -8,7 +8,17 @@ import type { publicPostList } from '@/server/services/post.service';
 
 type MediaPost = Awaited<ReturnType<typeof publicPostList>>['items'][number];
 
-export default function MediaSectionView({ posts, title = 'TIN TỨC CÔNG NGHỆ' }: { posts: MediaPost[]; title?: string }) {
+export default function MediaSectionView({
+  posts,
+  title = 'TIN TỨC CÔNG NGHỆ',
+  subtitle,
+  viewAllLink = '/news',
+}: {
+  posts: MediaPost[];
+  title?: string;
+  subtitle?: string;
+  viewAllLink?: string;
+}) {
   const rail = useRef<HTMLDivElement>(null);
   const [bounds, setBounds] = useState({ start: true, end: false });
 
@@ -46,19 +56,24 @@ export default function MediaSectionView({ posts, title = 'TIN TỨC CÔNG NGH�
           {/* Header */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs shrink-0">
                 <Flame className="h-4 w-4" aria-hidden="true" />
               </span>
-              <h2 className="text-base font-black uppercase tracking-tight text-slate-900 sm:text-xl">
-                {title}
-              </h2>
-              <span className="h-4 w-px bg-slate-300" aria-hidden="true" />
-              <Link
-                href="/news"
-                className="inline-flex items-center gap-0.5 text-xs sm:text-sm font-bold text-blue-600 hover:text-blue-700 transition"
-              >
-                Xem tất cả <ChevronRight className="h-4 w-4" />
-              </Link>
+              <div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-base font-black uppercase tracking-tight text-slate-900 sm:text-xl">
+                    {title}
+                  </h2>
+                  <span className="h-4 w-px bg-slate-300" aria-hidden="true" />
+                  <Link
+                    href={viewAllLink || '/news'}
+                    className="inline-flex items-center gap-0.5 text-xs sm:text-sm font-bold text-blue-600 hover:text-blue-700 transition"
+                  >
+                    Xem tất cả <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </div>
+                {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+              </div>
             </div>
 
             {/* Header Quick Scroll Buttons */}

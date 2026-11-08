@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { readdirSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -17,14 +17,16 @@ const files = readdirSync(root).filter(f => f.endsWith('.sqlite')).filter(f => {
 assert.equal(files.length, 1, 'Local CMS database ambiguous');
 const sqlite = new DatabaseSync(`${root}/${files[0]}`, { readOnly: mode === '--check' });
 sqlite.exec('PRAGMA busy_timeout=10000');
-const DB = { prepare(sql) {
-  let args = [];
-  return { bind(...values) { args = values; return this; }, async first() { return sqlite.prepare(sql).get(...args) ?? null; }, async all() { return { results: sqlite.prepare(sql).all(...args) }; }, async run() { const r = sqlite.prepare(sql).run(...args); return { success: true, meta: { changes: Number(r.changes) } }; } };
-}, async batch(statements) {
-  sqlite.exec('BEGIN IMMEDIATE');
-  try { const result = []; for (const s of statements) result.push(await s.run()); sqlite.exec('COMMIT'); return result; }
-  catch (error) { sqlite.exec('ROLLBACK'); throw error; }
-} };
+const DB = {
+  prepare(sql) {
+    let args = [];
+    return { bind(...values) { args = values; return this; }, async first() { return sqlite.prepare(sql).get(...args) ?? null; }, async all() { return { results: sqlite.prepare(sql).all(...args) }; }, async run() { const r = sqlite.prepare(sql).run(...args); return { success: true, meta: { changes: Number(r.changes) } }; } };
+  }, async batch(statements) {
+    sqlite.exec('BEGIN IMMEDIATE');
+    try { const result = []; for (const s of statements) result.push(await s.run()); sqlite.exec('COMMIT'); return result; }
+    catch (error) { sqlite.exec('ROLLBACK'); throw error; }
+  }
+};
 // ponytail: manual CMS collections cover current catalog; refresh with this script when models change.
 const lines = [
   ['cat-gaming', 'lenovo-legion', 'Lenovo Legion', /legion/i, 'Gaming đa dụng, ưu tiên tản nhiệt và màn hình. Đối chiếu GPU, công suất và độ phân giải trên từng cấu hình.'],
@@ -105,12 +107,16 @@ try {
       ...nav.document.menus.main.filter(i => i.target.kind !== 'path' || i.target.path !== '/hot-sale'),
     ];
     nav.document.menus.footer = [
-      { ...pathItem('footer-policies', 'Chính sách khách hàng', '/chinh-sach-bao-hanh'), children: [
-        ['warranty', 'Chính sách bảo hành', '/chinh-sach-bao-hanh'], ['returns', 'Đổi trả & hoàn tiền', '/chinh-sach-doi-tra'], ['shipping', 'Vận chuyển & giao nhận', '/chinh-sach-van-chuyen'], ['privacy', 'Bảo vệ thông tin cá nhân', '/chinh-sach-bao-mat'], ['terms', 'Điều khoản mua hàng', '/dieu-khoan-mua-hang'],
-      ].map(([id, label, path]) => pathItem('footer-' + id, label, path)) },
-      { ...pathItem('footer-about', 'Về CitiLap', '/gioi-thieu'), children: [
-        ['intro', 'Giới thiệu CitiLap', '/gioi-thieu'], ['stores', 'Hệ thống cửa hàng', '/he-thong-cua-hang'], ['contact', 'Liên hệ CitiLap', '/lien-he'], ['guide', 'Hướng dẫn đặt hàng', '/huong-dan-mua-hang'], ['tracking', 'Tra cứu đơn hàng', '/order-tracking'], ['faq', 'Câu hỏi thường gặp', '/cau-hoi-thuong-gap'],
-      ].map(([id, label, path]) => pathItem('footer-' + id, label, path)) },
+      {
+        ...pathItem('footer-policies', 'Chính sách khách hàng', '/chinh-sach-bao-hanh'), children: [
+          ['warranty', 'Chính sách bảo hành', '/chinh-sach-bao-hanh'], ['returns', 'Đổi trả & hoàn tiền', '/chinh-sach-doi-tra'], ['shipping', 'Vận chuyển & giao nhận', '/chinh-sach-van-chuyen'], ['privacy', 'Bảo vệ thông tin cá nhân', '/chinh-sach-bao-mat'], ['terms', 'Điều khoản mua hàng', '/dieu-khoan-mua-hang'],
+        ].map(([id, label, path]) => pathItem('footer-' + id, label, path))
+      },
+      {
+        ...pathItem('footer-about', 'Về CitiLap', '/gioi-thieu'), children: [
+          ['intro', 'Giới thiệu CitiLap', '/gioi-thieu'], ['stores', 'Hệ thống cửa hàng', '/he-thong-cua-hang'], ['contact', 'Liên hệ CitiLap', '/lien-he'], ['guide', 'Hướng dẫn đặt hàng', '/huong-dan-mua-hang'], ['tracking', 'Tra cứu đơn hàng', '/order-tracking'], ['faq', 'Câu hỏi thường gặp', '/cau-hoi-thuong-gap'],
+        ].map(([id, label, path]) => pathItem('footer-' + id, label, path))
+      },
     ];
     for (const item of nav.document.menus.main) {
       if (item.target.kind !== 'category') continue;
@@ -188,29 +194,33 @@ try {
       return section;
     };
     const doc = p => JSON.parse(p.published);
-    const laptops = products.filter(p => doc(p).template === 'LAPTOP');
+    const laptops = products.filter(p => doc(p).template === 'LAPTOP' && p.categoryId !== 'cat-phu-kien' && !String(p.categoryId || '').startsWith('ref-accessory-'));
     const sale = laptops.filter(p => { const d = doc(p); return d.isFlashSale || (d.price > 0 && d.originalPrice > d.price); });
     const clearance = laptops.filter(p => { const d = doc(p); return d.price > 0 && d.originalPrice > d.price; });
     const hot = structuredClone(base); hot.id = 'sec-hot-sale'; hot.name = 'HOT SALE'; delete hot.data.tabs;
     Object.assign(hot.data, { title: 'HOT SALE', colorTheme: 'red', manualProductIds: sale.slice(0, 10).map(p => p.id), links: [{ label: 'Tất cả ưu đãi', href: '/hot-sale' }], viewAllLink: '/hot-sale' });
     const combined = structuredClone(base); combined.id = 'sec-discover'; combined.name = 'Khám phá laptop';
-    Object.assign(combined.data, { title: 'Khám phá laptop', manualProductIds: [], links: [], viewAllLink: '/search', tabs: [
-      { id: 'new-arrivals', label: 'Laptop mới về', productIds: laptops.slice(0, 15).map(p => p.id), href: '/search?sort=newest' },
-      { id: 'new', label: 'Laptop Mới', productIds: laptops.filter(p => doc(p).condition === 'NEW').slice(0, 15).map(p => p.id), href: '/search?condition=NEW' },
-      { id: 'like-new', label: 'Laptop LikeNew', productIds: laptops.filter(p => ['LIKE_NEW', 'USED'].includes(doc(p).condition)).slice(0, 15).map(p => p.id), href: '/search?condition=LIKE_NEW' },
-      { id: 'clearance', label: 'Xả hàng giá sốc', productIds: clearance.slice(0, 15).map(p => p.id), href: '/hot-sale' },
-    ] });
+    Object.assign(combined.data, {
+      title: 'Khám phá laptop', manualProductIds: [], links: [], viewAllLink: '/search?category=laptop&sort=newest', tabs: [
+        { id: 'new-arrivals', label: 'Laptop mới về', productIds: laptops.slice(0, 15).map(p => p.id), href: '/search?category=laptop&sort=newest' },
+        { id: 'new', label: 'Laptop Mới', productIds: laptops.filter(p => doc(p).condition === 'NEW').slice(0, 15).map(p => p.id), href: '/search?category=laptop-moi' },
+        { id: 'like-new', label: 'Laptop LikeNew', productIds: laptops.filter(p => ['LIKE_NEW', 'USED'].includes(doc(p).condition)).slice(0, 15).map(p => p.id), href: '/search?category=laptop-likenew' },
+        { id: 'clearance', label: 'Xả hàng giá sốc', productIds: clearance.slice(0, 15).map(p => p.id), href: '/hot-sale' },
+      ]
+    });
     const categories = home.sections.find(s => s.id === 'sec-cats');
     const topCategories = ['cat-gaming', 'cat-van-phong', 'cat-do-hoa', 'cat-macbook', 'cat-phu-kien', 'ref-accessory-mouse-keyboard', 'ref-accessory-bag', 'ref-accessory-hub', 'ref-accessory-stand', 'ref-accessory-hardware'];
     Object.assign(categories.data, { title: '', subtitle: '', layout: 'cards', categoryIds: topCategories, items: topCategories.map(id => { const c = nav.document.categories.find(c => c.id === id); return { categoryId: id, customName: c.name, customImage: c.image, href: '/category/' + c.slug }; }) });
     const accessories = structuredClone(categories); accessories.id = 'sec-accessory-categories'; accessories.name = 'Phân loại phụ kiện';
-    Object.assign(accessories.data, { title: 'Phụ kiện cho góc làm việc', layout: 'board', items: [
-      ['ref-accessory-mouse-keyboard', 'Chuột không dây', /chuột/i, 'Chuột'], ['ref-accessory-mouse-keyboard', 'Bàn phím cơ', /bàn phím/i, 'Bàn phím'],
-      ['ref-accessory-hardware', 'RAM laptop', /ram/i, 'RAM'], ['ref-accessory-hardware', 'Nâng cấp bộ nhớ', /ram/i, 'RAM'],
-      ['ref-accessory-hub', 'Hub USB-C', /xd71/i, 'XD71'], ['ref-accessory-hub', 'Bộ chuyển đổi', /xd61/i, 'XD61'],
-      ['ref-accessory-stand', 'Đế tản nhiệt', /cf300/i, 'CF300'], ['ref-accessory-stand', 'Tản nhiệt di động', /cf100/i, 'CF100'],
-      ['ref-accessory-bag', 'Balo laptop Legion', /legion/i, 'Legion'], ['ref-accessory-bag', 'Balo laptop Acer', /acer/i, 'Acer'],
-    ].map(([id, label, match, q]) => { const c = nav.document.categories.find(c => c.id === id); return { categoryId: id, customName: label, customImage: image(products.find(p => p.categoryId === id && match.test(p.name))), href: '/search?' + new URLSearchParams({ q }) }; }) });
+    Object.assign(accessories.data, {
+      title: 'Phụ kiện cho góc làm việc', layout: 'board', items: [
+        ['ref-accessory-mouse-keyboard', 'Chuột không dây', /chuột/i, 'Chuột'], ['ref-accessory-mouse-keyboard', 'Bàn phím cơ', /bàn phím/i, 'Bàn phím'],
+        ['ref-accessory-hardware', 'RAM laptop', /ram/i, 'RAM'], ['ref-accessory-hardware', 'Nâng cấp bộ nhớ', /ram/i, 'RAM'],
+        ['ref-accessory-hub', 'Hub USB-C', /xd71/i, 'XD71'], ['ref-accessory-hub', 'Bộ chuyển đổi', /xd61/i, 'XD61'],
+        ['ref-accessory-stand', 'Đế tản nhiệt', /cf300/i, 'CF300'], ['ref-accessory-stand', 'Tản nhiệt di động', /cf100/i, 'CF100'],
+        ['ref-accessory-bag', 'Balo laptop Legion', /legion/i, 'Legion'], ['ref-accessory-bag', 'Balo laptop Acer', /acer/i, 'Acer'],
+      ].map(([id, label, match, q]) => { const c = nav.document.categories.find(c => c.id === id); return { categoryId: id, customName: label, customImage: image(products.find(p => p.categoryId === id && match.test(p.name))), href: '/search?' + new URLSearchParams({ q }) }; })
+    });
     const media = home.sections.find(s => s.type === 'news_reviews');
     Object.assign(media.data, { title: 'Tin tức công nghệ mới', layout: 'grid', limit: 5, postIds: [...ids, existingPosts.find(p => p.slug === 'chon-laptop-gaming-gpu-tan-nhiet').id] });
     // Public examples read from https://www.youtube.com/@CellphoneSOfficial/videos on 2026-10-22.

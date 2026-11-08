@@ -1,19 +1,43 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { trackStorefront } from '@/lib/storefront-metrics';
+import { trackStorefront } from "@/lib/storefront-metrics";
 import Link from "next/link";
+import Form from "next/form";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Filter, Inbox, Sparkles } from "lucide-react";
+import {
+  Cable,
+  Calendar,
+  Check,
+  ChevronDown,
+  Cpu,
+  Filter,
+  HardDrive,
+  Headphones,
+  Inbox,
+  Laptop,
+  LayoutGrid,
+  MemoryStick,
+  Monitor,
+  PackageCheck,
+  RefreshCw,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+  Wifi,
+  X,
+  Zap,
+} from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import EmptyState from "@/components/ui/EmptyState";
-import CategoryFilterSidebar from "@/components/category/CategoryFilterSidebar";
-import ActiveFilterChips from "@/components/category/ActiveFilterChips";
 import CategorySortSelect, { type SortOptionItem } from "@/components/category/CategorySortSelect";
 import CategoryPagination from "@/components/category/CategoryPagination";
 import MobileFilterDrawer from "@/components/category/MobileFilterDrawer";
 import SearchAutocomplete from "./SearchAutocomplete";
 import type { SearchResult } from "@/server/services/search.service";
+import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
+import { NEED_LABELS, catalogNeedTag } from "@/lib/catalog-needs";
 
 interface SearchListingContainerProps {
   initialData: SearchResult;
@@ -21,20 +45,51 @@ interface SearchListingContainerProps {
 
 const SEARCH_SORT_OPTIONS: SortOptionItem[] = [
   { value: "relevance", label: "Phù hợp nhất" },
-  { value: "price-asc", label: "Giá: Thấp đến cao" },
-  { value: "price-desc", label: "Giá: Cao đến thấp" },
   { value: "newest", label: "Mới nhất" },
+  { value: "price-asc", label: "Giá thấp → cao" },
+  { value: "price-desc", label: "Giá cao → thấp" },
 ];
 
-const POPULAR_KEYWORDS = [
-  "Lenovo Legion",
-  "RTX 4060",
-  "Dell XPS",
-  "MacBook Air",
-  "Laptop Gaming",
-  "32GB RAM",
-  "Asus ROG",
+const BRAND_LOGOS: Record<string, { label: string; logo: string }> = {
+  lenovo: { label: "Lenovo", logo: "/brands/lenovo.svg" },
+  dell: { label: "Dell", logo: "/brands/dell.svg" },
+  asus: { label: "Asus", logo: "/brands/asus.svg" },
+  hp: { label: "HP", logo: "/brands/hp.svg" },
+  apple: { label: "Apple", logo: "/brands/apple.svg" },
+  acer: { label: "Acer", logo: "/brands/acer.svg" },
+  msi: { label: "MSI", logo: "/brands/msi.svg" },
+  gigabyte: { label: "Gigabyte", logo: "/brands/gigabyte.svg" },
+};
+
+const NEED_CARDS = [
+  { value: "van-phong", label: "Văn phòng", icon: "/needs/van-phong.svg" },
+  { value: "gaming", label: "Gaming", icon: "/needs/gaming.svg" },
+  { value: "mong-nhe", label: "Mỏng nhẹ", icon: "/needs/mong-nhe.svg" },
+  { value: "do-hoa", label: "Đồ họa", icon: "/needs/do-hoa.svg" },
+  { value: "sinh-vien", label: "Sinh viên", icon: "/needs/sinh-vien.svg" },
+  { value: "cam-ung", label: "Cảm ứng", icon: "/needs/cam-ung.svg" },
+  { value: "laptop-ai", label: "Laptop AI", icon: "/needs/laptop-ai.svg" },
+  { value: "doanh-nhan", label: "Doanh nhân", icon: "/needs/doanh-nhan.svg" },
 ];
+
+const LAPTOP_PRICE_PRESETS = [
+  { value: "under-15", label: "Dưới 15 triệu", min: 0, max: 15_000_000 },
+  { value: "15-20", label: "15 - 20 triệu", min: 15_000_000, max: 20_000_000 },
+  { value: "20-30", label: "20 - 30 triệu", min: 20_000_000, max: 30_000_000 },
+  { value: "over-30", label: "Trên 30 triệu", min: 30_000_000, max: 150_000_000 },
+];
+
+type FilterGroupKey =
+  | "price"
+  | "condition"
+  | "cpu"
+  | "gpu"
+  | "ram"
+  | "storage"
+  | "year"
+  | "accessoryType"
+  | "connection"
+  | "power";
 
 export default function SearchListingContainer({
   initialData,
@@ -43,27 +98,62 @@ export default function SearchListingContainer({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [openFilterGroup, setOpenFilterGroup] = useState<FilterGroupKey | null>(null);
+  const filterBarRef = useRef<HTMLDivElement>(null);
 
   const query = initialData.query;
-  const lastSearch = useRef('');
+  const lastSearch = useRef("");
   useEffect(() => {
     if (!query || query === lastSearch.current) return;
     lastSearch.current = query;
-    trackStorefront('search');
-    if (initialData.totalCount === 0) trackStorefront('search_empty');
+    trackStorefront("search");
+    if (initialData.totalCount === 0) trackStorefront("search_empty");
   }, [query, initialData.totalCount]);
+
+  useEffect(() => {
+    if (!openFilterGroup) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      if (filterBarRef.current && !filterBarRef.current.contains(e.target as Node)) {
+        setOpenFilterGroup(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpenFilterGroup(null);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openFilterGroup]);
+
   const activeCategories = searchParams.getAll("category");
   const activeBrands = searchParams.getAll("brand");
-  const activePricePreset = searchParams.get("pricePreset");
+  const activePricePreset = searchParams.get("pricePreset") || "";
   const activeConditions = searchParams.getAll("condition");
   const activeRams = searchParams.getAll("ram");
   const activeStorage = searchParams.getAll("storage");
   const activeCpus = searchParams.getAll("cpu");
   const activeGpus = searchParams.getAll("gpu");
+  const activeTags = searchParams.getAll("tag");
+  const activeYears = searchParams.getAll("year");
+  const activeType = searchParams.get("type") || "";
+  const activeConnections = searchParams.getAll("connection");
+  const activePowers = searchParams.getAll("power");
+  const activeInStock = searchParams.get("inStock") === "1";
+
+  const isAccessoryScope =
+    activeCategories.includes("phu-kien") ||
+    activeCategories.includes("linh-kien") ||
+    activeCategories.some((c) => c.startsWith("ref-accessory-"));
+  const currentPricePresets = isAccessoryScope ? ACCESSORY_PRICE_PRESETS : LAPTOP_PRICE_PRESETS;
+  const hasCustomPrice = !activePricePreset && (searchParams.has("minPrice") || searchParams.has("maxPrice"));
 
   const totalActiveFilters =
-    searchParams.getAll("tag").length +
-    (!activePricePreset && (searchParams.has("minPrice") || searchParams.has("maxPrice")) ? 1 : 0) +
+    activeTags.length +
+    (activeInStock ? 1 : 0) +
+    (hasCustomPrice ? 1 : 0) +
     activeCategories.length +
     activeBrands.length +
     (activePricePreset ? 1 : 0) +
@@ -71,24 +161,55 @@ export default function SearchListingContainer({
     activeRams.length +
     activeStorage.length +
     activeCpus.length +
-    activeGpus.length;
+    activeGpus.length +
+    activeYears.length +
+    (activeType ? 1 : 0) +
+    activeConnections.length +
+    activePowers.length;
 
-  const toggleConditionPill = (val: string) => {
-    const params = new URLSearchParams(searchParams.toString());
+  const pushParams = (params: URLSearchParams) => {
     params.delete("page");
-    const curr = params.getAll("condition");
-    params.delete("condition");
-    if (curr.includes(val)) {
-      curr.filter((c) => c !== val).forEach((c) => params.append("condition", c));
-    } else {
-      [...curr, val].forEach((c) => params.append("condition", c));
-    }
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const toggleMultiParam = (key: string, val: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const curr = params.getAll(key);
+    params.delete(key);
+    if (curr.includes(val)) {
+      curr.filter((item) => item !== val).forEach((item) => params.append(key, item));
+    } else {
+      [...curr, val].forEach((item) => params.append(key, item));
+    }
+    pushParams(params);
+  };
+
+  const toggleSingleParam = (key: string, val: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (params.get(key) === val) params.delete(key);
+    else params.set(key, val);
+    pushParams(params);
+  };
+
+  const setScopeCategory = (scopeSlug: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("category");
+    params.delete("condition");
+    if (scopeSlug) {
+      params.set("category", scopeSlug);
+    }
+    pushParams(params);
+  };
+
+  const toggleInStockPill = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (activeInStock) params.delete("inStock");
+    else params.set("inStock", "1");
+    pushParams(params);
   };
 
   const togglePricePill = (preset: { value: string; min: number; max: number }) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.delete("page");
     if (activePricePreset === preset.value) {
       params.delete("pricePreset");
       params.delete("minPrice");
@@ -97,237 +218,883 @@ export default function SearchListingContainer({
       params.set("pricePreset", preset.value);
       if (preset.min > 0) params.set("minPrice", String(preset.min));
       else params.delete("minPrice");
-      params.set("maxPrice", String(preset.max));
+      const maxThreshold = isAccessoryScope ? 50_000_000 : 150_000_000;
+      if (preset.max < maxThreshold) params.set("maxPrice", String(preset.max));
+      else params.delete("maxPrice");
     }
-    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+    pushParams(params);
+    setOpenFilterGroup(null);
+  };
+
+  const currentScope =
+    activeCategories.length === 1 && ["laptop", "laptop-moi", "laptop-likenew", "phu-kien"].includes(activeCategories[0])
+      ? activeCategories[0]
+      : activeCategories.length === 0
+        ? "all"
+        : "";
+
+  const scopeCards = [
+    { id: "all", slug: null, label: "Tất cả", icon: LayoutGrid },
+    { id: "laptop", slug: "laptop", label: "Laptop", icon: Laptop },
+    { id: "laptop-moi", slug: "laptop-moi", label: "Laptop Mới", icon: Sparkles },
+    { id: "laptop-likenew", slug: "laptop-likenew", label: "Laptop Like New", icon: RefreshCw },
+    { id: "phu-kien", slug: "phu-kien", label: "Phụ kiện Tech", icon: Headphones },
+  ];
+
+  // Deduplicate brand items so reference brands like 'Lenovo (reference)' merge cleanly into standard logo cards
+  const brandItems = (() => {
+    const map = new Map<string, { value: string; label: string; logo?: string; count: number }>();
+    for (const [slug, info] of Object.entries(BRAND_LOGOS)) {
+      map.set(slug, {
+        value: slug,
+        label: info.label,
+        logo: info.logo,
+        count: 0,
+      });
+    }
+    for (const b of initialData.facets.brands) {
+      const lowerVal = b.value.toLowerCase();
+      const lowerLabel = b.label.toLowerCase();
+      const matchedStandard = Object.keys(BRAND_LOGOS).find(
+        (std) => lowerVal === std || lowerVal === `ref-brand-${std}` || lowerLabel.startsWith(std)
+      );
+      if (matchedStandard) {
+        const entry = map.get(matchedStandard)!;
+        entry.count += b.count || 0;
+        if (lowerVal === matchedStandard) entry.value = b.value;
+      } else {
+        map.set(lowerVal, { value: b.value, label: b.label, count: b.count || 0 });
+      }
+    }
+    return [...map.values()];
+  })();
+
+  const priceSummaryLabel = activePricePreset
+    ? currentPricePresets.find((p) => p.value === activePricePreset)?.label
+    : hasCustomPrice
+      ? "Tùy chỉnh"
+      : undefined;
+
+  const filterGroups: Array<{
+    key: FilterGroupKey;
+    label: string;
+    summary?: string;
+    icon: typeof Tag;
+    activeCount: number;
+    visible: boolean;
+  }> = [
+    {
+      key: "price",
+      label: "Mức giá",
+      summary: priceSummaryLabel,
+      icon: Tag,
+      activeCount: (activePricePreset ? 1 : 0) + (hasCustomPrice ? 1 : 0),
+      visible: true,
+    },
+    {
+      key: "condition",
+      label: "Tình trạng",
+      summary:
+        activeConditions.length === 1
+          ? { NEW: "Mới 100%", LIKE_NEW: "LikeNew 99%", USED: "Đã qua SD", REFURBISHED: "Refurbished" }[activeConditions[0]] || activeConditions[0]
+          : undefined,
+      icon: ShieldCheck,
+      activeCount: activeConditions.length,
+      visible: initialData.facets.conditions.length > 0 && !["laptop-moi", "laptop-likenew"].includes(currentScope),
+    },
+    {
+      key: "cpu",
+      label: "CPU",
+      summary: activeCpus.length === 1 ? activeCpus[0] : undefined,
+      icon: Cpu,
+      activeCount: activeCpus.length,
+      visible: !isAccessoryScope && initialData.facets.cpuSeries.length > 0,
+    },
+    {
+      key: "gpu",
+      label: "Card đồ họa",
+      summary: activeGpus.length === 1 ? activeGpus[0] : undefined,
+      icon: Monitor,
+      activeCount: activeGpus.length,
+      visible: !isAccessoryScope && initialData.facets.gpuSeries.length > 0,
+    },
+    {
+      key: "ram",
+      label: "RAM",
+      summary: activeRams.length === 1 ? `${activeRams[0]}GB` : undefined,
+      icon: MemoryStick,
+      activeCount: activeRams.length,
+      visible: !isAccessoryScope && initialData.facets.ramOptions.length > 0,
+    },
+    {
+      key: "storage",
+      label: "Ổ cứng",
+      summary:
+        activeStorage.length === 1
+          ? Number(activeStorage[0]) >= 1024
+            ? `${Number(activeStorage[0]) / 1024}TB`
+            : `${activeStorage[0]}GB`
+          : undefined,
+      icon: HardDrive,
+      activeCount: activeStorage.length,
+      visible: !isAccessoryScope && initialData.facets.storageOptions.length > 0,
+    },
+    {
+      key: "year",
+      label: "Năm SX",
+      summary: activeYears.length === 1 ? activeYears[0] : undefined,
+      icon: Calendar,
+      activeCount: activeYears.length,
+      visible: !isAccessoryScope && Boolean(initialData.facets.years && initialData.facets.years.length > 0),
+    },
+    {
+      key: "accessoryType",
+      label: "Loại phụ kiện",
+      summary: activeType ? getAccessoryTypeBySlug(activeType)?.shortName || activeType : undefined,
+      icon: Cable,
+      activeCount: activeType ? 1 : 0,
+      visible: isAccessoryScope,
+    },
+    {
+      key: "connection",
+      label: "Kết nối",
+      summary: activeConnections.length === 1 ? activeConnections[0] : undefined,
+      icon: Wifi,
+      activeCount: activeConnections.length,
+      visible: Boolean(initialData.facets.connections && initialData.facets.connections.length > 0),
+    },
+    {
+      key: "power",
+      label: "Công suất",
+      summary: activePowers.length === 1 ? activePowers[0] : undefined,
+      icon: Zap,
+      activeCount: activePowers.length,
+      visible: Boolean(initialData.facets.powers && initialData.facets.powers.length > 0),
+    },
+  ];
+
+  // Build concise active chips (excluding the primary scope tab if it's already highlighted in the segmented bar)
+  const chips: Array<{ key: string; value: string; label: string }> = [];
+  if (activeInStock) chips.push({ key: "inStock", value: "1", label: "Sẵn hàng" });
+  activeCategories
+    .filter((c) => c !== currentScope)
+    .forEach((c) => {
+      const catObj = (initialData.facets.categories || []).find((item) => item.value === c);
+      chips.push({ key: "category", value: c, label: catObj ? catObj.label : c });
+    });
+  activeBrands.forEach((b) => {
+    const brandObj = brandItems.find((item) => item.value === b) || initialData.facets.brands.find((item) => item.value === b);
+    chips.push({ key: "brand", value: b, label: `Hãng: ${brandObj ? brandObj.label : b}` });
+  });
+  activeTags.forEach((tag) => {
+    chips.push({ key: "tag", value: tag, label: `Nhu cầu: ${NEED_LABELS[catalogNeedTag(tag)] || tag}` });
+  });
+  if (activePricePreset) {
+    const pr = currentPricePresets.find((p) => p.value === activePricePreset);
+    chips.push({ key: "pricePreset", value: activePricePreset, label: `Giá: ${pr ? pr.label : activePricePreset}` });
+  } else if (hasCustomPrice) {
+    const min = searchParams.get("minPrice");
+    const max = searchParams.get("maxPrice");
+    if (min) chips.push({ key: "minPrice", value: min, label: `Từ: ${Number(min).toLocaleString("vi-VN")} ₫` });
+    if (max) chips.push({ key: "maxPrice", value: max, label: `Đến: ${Number(max).toLocaleString("vi-VN")} ₫` });
+  }
+  activeConditions.forEach((c) => {
+    const condMap: Record<string, string> = {
+      NEW: "Mới 100%",
+      LIKE_NEW: "LikeNew 99%",
+      USED: "Đã qua sử dụng",
+      REFURBISHED: "Refurbished",
+    };
+    chips.push({ key: "condition", value: c, label: `Tình trạng: ${condMap[c] || c}` });
+  });
+  activeCpus.forEach((cpu) => chips.push({ key: "cpu", value: cpu, label: `CPU: ${cpu}` }));
+  activeGpus.forEach((gpu) => chips.push({ key: "gpu", value: gpu, label: `GPU: ${gpu}` }));
+  activeRams.forEach((r) => chips.push({ key: "ram", value: r, label: `RAM: ${r}GB` }));
+  activeStorage.forEach((s) => {
+    const num = Number(s);
+    chips.push({ key: "storage", value: s, label: `Ổ cứng: ${num >= 1024 ? `${num / 1024}TB` : `${num}GB`}` });
+  });
+  activeYears.forEach((yr) => chips.push({ key: "year", value: yr, label: `Năm: ${yr}` }));
+  if (activeType) {
+    const accType = getAccessoryTypeBySlug(activeType);
+    chips.push({ key: "type", value: activeType, label: `Loại: ${accType ? accType.shortName : activeType}` });
+  }
+  activeConnections.forEach((conn) => chips.push({ key: "connection", value: conn, label: `Kết nối: ${conn}` }));
+  activePowers.forEach((pow) => chips.push({ key: "power", value: pow, label: `Công suất: ${pow}` }));
+
+  const removeChip = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (key === "pricePreset") {
+      params.delete("pricePreset");
+      params.delete("minPrice");
+      params.delete("maxPrice");
+    } else if (key === "type" || key === "inStock" || key === "minPrice" || key === "maxPrice") {
+      params.delete(key);
+    } else {
+      const currentValues = params.getAll(key);
+      params.delete(key);
+      currentValues.filter((v) => v !== value).forEach((v) => params.append(key, v));
+    }
+    pushParams(params);
+  };
+
+  const clearAllFilters = () => {
+    const params = new URLSearchParams();
+    const q = searchParams.get("q");
+    if (q) params.set("q", q);
+    const sort = searchParams.get("sort");
+    if (sort) params.set("sort", sort);
+    pushParams(params);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Top Search Input Box */}
-      <div className="bg-surface-card border border-border-default rounded-card p-4 sm:p-6 shadow-xs">
-        <div className="max-w-2xl mx-auto space-y-3">
-          <h1 className="text-body-lg sm:text-title font-bold text-text-primary text-center">
-            Tìm kiếm laptop & linh kiện chính hãng
-          </h1>
-
-          <SearchAutocomplete
-            initialQuery={query}
-            placeholder="Nhập tên laptop, CPU, GPU, thương hiệu (VD: Legion 4060)..."
-            size="lg"
-            className="w-full"
-          />
-
-            {/* Quick popular keyword tags */}
-            <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-              <span className="text-caption text-text-muted flex items-center gap-1 mr-1">
-                <Sparkles className="w-3 h-3 text-brand-primary" />
-                <span>Gợi ý:</span>
-              </span>
-              {POPULAR_KEYWORDS.map((kw) => (
+    <div className="space-y-3.5">
+      {/* 1. KHỐI PHÂN LOẠI NHANH: PHẠM VI, THƯƠNG HIỆU & NHU CẦU (1 Card đồng nhất, gọn gàng) */}
+      <section
+        aria-label="Phân loại sản phẩm, thương hiệu và nhu cầu"
+        className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs space-y-3"
+      >
+        {/* Hàng 1: Segmented Scope Tabs + Tổng số kết quả + Link Tư vấn */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+          <div className="inline-flex flex-wrap items-center gap-1 rounded-xl bg-slate-100/90 p-1">
+            {scopeCards.map((sc) => {
+              const Icon = sc.icon;
+              const active = currentScope === sc.id;
+              return (
                 <button
-                  key={kw}
-                  onClick={() => router.push(`/search?q=${encodeURIComponent(kw)}`)}
-                  className="px-2.5 py-1 rounded-pill bg-surface-subtle hover:bg-brand-primary-subtle hover:text-brand-primary text-text-secondary text-caption font-medium transition cursor-pointer border border-border-subtle hover:border-brand-primary/30"
+                  key={sc.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setScopeCategory(sc.slug)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                    active
+                      ? "bg-blue-600 text-white shadow-2xs"
+                      : "text-slate-700 hover:text-blue-600 hover:bg-white/70"
+                  }`}
                 >
-                  {kw}
+                  <Icon className={`w-3.5 h-3.5 ${active ? "text-white" : "text-blue-600"}`} />
+                  <span>{sc.label}</span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            {/* Smart advisor prompt */}
-            <div className="pt-1.5 text-center border-t border-border-subtle/60">
-              <Link
-                href="/chon-laptop"
-                className="inline-flex items-center gap-1.5 text-caption font-semibold text-brand-primary hover:text-brand-primary-hover hover:underline transition"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>Chưa biết máy nào phù hợp với công việc? Dùng công cụ Chọn laptop theo nhu cầu →</span>
-              </Link>
-            </div>
-        </div>
-      </div>
-
-      {/* Active Filter Chips */}
-      <ActiveFilterChips facets={initialData.facets} />
-
-      {/* Main Grid: Left Filters + Right Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-        {/* Desktop Sidebar (1 col) */}
-        <aside className="hidden lg:block lg:col-span-1 bg-surface-card border border-border-default rounded-card p-5 sticky top-24 shadow-xs">
-          <CategoryFilterSidebar facets={initialData.facets} />
-        </aside>
-
-        {/* Right Content Area (3 cols) */}
-        <section aria-label="Kết quả sản phẩm" className="min-w-0 lg:col-span-3">
-          {/* Top Bar: Results Count + Mobile Filter Trigger + Sort Select */}
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-border-subtle">
-            <div role="status" className="text-body-sm text-text-secondary">
+          <div className="flex items-center gap-3 ml-auto">
+            <div role="status" className="text-xs text-slate-600">
               {query ? (
                 <>
-                  Tìm thấy{" "}
-                  <span className="font-bold text-text-primary">{initialData.totalCount}</span> sản
-                  phẩm cho từ khóa &quot;
-                  <span className="font-bold text-brand-primary">{query}</span>&quot;
+                  Tìm thấy <strong className="text-slate-900">{initialData.totalCount}</strong> sản phẩm cho &quot;
+                  <strong className="text-blue-600">{query}</strong>&quot;
                 </>
               ) : (
                 <>
-                  Tìm thấy{" "}
-                  <span className="font-bold text-text-primary">{initialData.totalCount}</span> sản
-                  phẩm trong toàn hệ thống
+                  Tìm thấy <strong className="text-slate-900">{initialData.totalCount}</strong> sản phẩm
                 </>
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Mobile Filter Button */}
+            <Link
+              href="/chon-laptop"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100/80 border border-blue-200/80 text-xs font-bold text-blue-700 transition"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span>Tư vấn chọn máy</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* Hàng 2: Lưới Card Logo Thương hiệu (8 cột cân đối) */}
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+          {brandItems.map((b) => {
+            const active = activeBrands.includes(b.value);
+            return (
               <button
-                onClick={() => setMobileDrawerOpen(true)}
-                className="lg:hidden flex items-center gap-2 px-3.5 py-2 bg-surface-card border border-border-default hover:border-brand-primary text-text-primary rounded-control text-body-sm font-semibold transition cursor-pointer shadow-xs"
-                aria-label="Mở bộ lọc tìm kiếm"
+                key={b.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => toggleMultiParam("brand", b.value)}
+                title={b.count > 0 ? `${b.label} (${b.count} sản phẩm)` : b.label}
+                className={`group relative flex h-12 items-center justify-center overflow-hidden rounded-xl border px-1.5 sm:px-2.5 transition cursor-pointer select-none ${
+                  active
+                    ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-2xs"
+                    : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white"
+                }`}
               >
-                <Filter className="w-4 h-4 text-brand-primary" />
-                <span>Bộ lọc</span>
-                {totalActiveFilters > 0 && (
-                  <span className="w-5 h-5 flex items-center justify-center rounded-full bg-brand-primary text-text-inverse text-[11px] font-bold">
-                    {totalActiveFilters}
+                {b.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={b.logo}
+                    alt={b.label}
+                    className="max-h-4 sm:max-h-5 max-w-full w-auto object-contain transition-transform group-hover:scale-105"
+                  />
+                ) : (
+                  <span className="text-xs font-black uppercase text-slate-700 truncate">{b.label}</span>
+                )}
+                {b.count > 0 && (
+                  <span
+                    className={`absolute right-1.5 top-1 text-[10px] font-bold px-1 rounded-full leading-tight ${
+                      active ? "bg-blue-600 text-white" : "text-slate-400"
+                    }`}
+                  >
+                    {b.count}
                   </span>
                 )}
               </button>
+            );
+          })}
+        </div>
 
-              {/* Sort Select */}
-              <CategorySortSelect
-                options={SEARCH_SORT_OPTIONS}
-                defaultSort={query ? "relevance" : "newest"}
-              />
-            </div>
-          </div>
-
-          {/* Quick Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2 mb-5">
-            <span className="text-xs font-bold text-text-secondary mr-1">Lọc nhanh:</span>
-            {[
-              { val: "NEW", label: "Mới 100% Fullbox" },
-              { val: "LIKE_NEW", label: "Like New 99% Tuyển chọn" },
-            ].map((cond) => {
-              const active = activeConditions.includes(cond.val);
+        {/* Hàng 3: Lưới Card Nhu cầu sử dụng (8 cột đồng bộ với Thương hiệu, ẩn khi chọn Phụ kiện) */}
+        {!isAccessoryScope && (
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 pt-1">
+            {NEED_CARDS.map((need) => {
+              const active = activeTags.some((t) => catalogNeedTag(t) === need.value);
               return (
                 <button
-                  key={cond.val}
+                  key={need.value}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => toggleConditionPill(cond.val)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition cursor-pointer ${
+                  onClick={() => toggleMultiParam("tag", need.value)}
+                  className={`group relative flex flex-col items-center justify-center rounded-xl border py-2 px-1.5 transition cursor-pointer select-none ${
                     active
-                      ? "bg-brand-primary text-text-inverse border-brand-primary"
-                      : "bg-surface-card hover:bg-brand-primary-subtle text-text-secondary border-border-default"
+                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/50 text-blue-900 ring-2 ring-blue-500/20 shadow-2xs"
+                      : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white text-slate-700"
                   }`}
                 >
-                  {cond.label}
-                </button>
-              );
-            })}
-            {[
-              { value: "under-15", label: "Dưới 15 triệu", min: 0, max: 15_000_000 },
-              { value: "15-20", label: "15 - 20 triệu", min: 15_000_000, max: 20_000_000 },
-              { value: "20-30", label: "20 - 30 triệu", min: 20_000_000, max: 30_000_000 },
-              { value: "over-30", label: "Trên 30 triệu", min: 30_000_000, max: 150_000_000 },
-            ].map((pr) => {
-              const active = activePricePreset === pr.value;
-              return (
-                <button
-                  key={pr.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => togglePricePill(pr)}
-                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition cursor-pointer ${
-                    active
-                      ? "bg-brand-primary text-text-inverse border-brand-primary"
-                      : "bg-surface-card hover:bg-brand-primary-subtle text-text-secondary border-border-default"
-                  }`}
-                >
-                  {pr.label}
+                  {active && (
+                    <span className="absolute right-1 top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-black">
+                      ✓
+                    </span>
+                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={need.icon}
+                    alt={need.label}
+                    className="h-6 w-6 object-contain transition-transform group-hover:scale-110"
+                  />
+                  <span className={`mt-1 text-[11px] leading-tight truncate max-w-full ${active ? "font-black text-blue-900" : "font-bold text-slate-700"}`}>
+                    {need.label}
+                  </span>
                 </button>
               );
             })}
           </div>
+        )}
+      </section>
 
-          {/* Products Grid or Empty State */}
-          {initialData.products.length === 0 ? (
-            <div className="bg-surface-card border border-border-default rounded-card p-8 sm:p-12 text-center">
-              <EmptyState
-                icon={<Inbox className="w-8 h-8 stroke-1.5" aria-hidden="true" />}
-                title="Không tìm thấy sản phẩm phù hợp"
-                description={
-                  query
-                    ? `Rất tiếc, không có sản phẩm nào khớp với từ khóa "${query}". Bạn có thể thử tìm kiếm bằng từ khóa ngắn hơn hoặc kiểm tra lỗi chính tả.`
-                    : "Không tìm thấy sản phẩm nào với các bộ lọc bạn đã chọn."
-                }
-                action={
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4 flex-wrap">
-                    {totalActiveFilters > 0 && (
-                      <Link
-                        href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
-                        className="px-5 py-2.5 rounded-control bg-brand-primary text-text-inverse font-bold text-body-sm hover:bg-brand-primary-hover transition"
-                      >
-                        Xóa tất cả bộ lọc
-                      </Link>
+      {/* 2. THANH CÔNG CỤ LỌC CHI TIẾT, TÌM KIẾM TỪ KHÓA & SẮP XẾP (Floating Popover, không đẩy trang) */}
+      <section
+        ref={filterBarRef}
+        aria-label="Bộ lọc chi tiết và sắp xếp"
+        className="rounded-2xl border border-slate-200/90 bg-white px-3.5 py-2.5 shadow-xs space-y-2.5"
+      >
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Nút mở toàn bộ Bộ lọc (<dialog>) */}
+          <button
+            type="button"
+            onClick={() => setMobileDrawerOpen(true)}
+            aria-label="Mở bộ lọc tìm kiếm"
+            className={`inline-flex min-h-10.5 items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer shrink-0 ${
+              totalActiveFilters > 0
+                ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
+                : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border-slate-200"
+            }`}
+          >
+            <Filter className={`w-3.5 h-3.5 ${totalActiveFilters > 0 ? "text-white" : "text-blue-600"}`} />
+            <span>Bộ lọc</span>
+            {totalActiveFilters > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-white text-blue-600 text-[10px] font-extrabold">
+                {totalActiveFilters}
+              </span>
+            )}
+          </button>
+
+          {/* Nút Sẵn hàng */}
+          <button
+            type="button"
+            aria-pressed={activeInStock}
+            onClick={toggleInStockPill}
+            className={`inline-flex min-h-10.5 items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer shrink-0 ${
+              activeInStock
+                ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-600/20 font-bold"
+                : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+            }`}
+          >
+            <PackageCheck className={`w-3.5 h-3.5 ${activeInStock ? "text-emerald-600" : "text-slate-500"}`} />
+            <span>Sẵn hàng</span>
+          </button>
+
+          {/* Các nút lọc chia nhỏ có Floating Popover riêng */}
+          {filterGroups
+            .filter((g) => g.visible)
+            .map((g) => {
+              const Icon = g.icon;
+              const isOpen = openFilterGroup === g.key;
+              const hasActive = g.activeCount > 0;
+              return (
+                <div key={g.key} className="relative">
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    onClick={() => setOpenFilterGroup(isOpen ? null : g.key)}
+                    className={`inline-flex min-h-10.5 items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer shrink-0 ${
+                      isOpen || hasActive
+                        ? "border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-600/20 font-bold"
+                        : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isOpen || hasActive ? "text-blue-600" : "text-slate-500"}`} />
+                    <span className="max-w-36 truncate">
+                      {g.summary ? (
+                        <>
+                          {g.label}: <strong>{g.summary}</strong>
+                        </>
+                      ) : (
+                        g.label
+                      )}
+                    </span>
+                    {g.activeCount > 1 && (
+                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-extrabold">
+                        {g.activeCount}
+                      </span>
                     )}
-                    <Link
-                      href="/chon-laptop"
-                      className="px-5 py-2.5 rounded-control bg-blue-50 border border-blue-200 text-blue-700 font-bold text-body-sm hover:bg-blue-100 transition inline-flex items-center gap-1.5"
-                    >
-                      <Sparkles className="w-4 h-4 text-blue-600" />
-                      <span>Tư vấn chọn laptop phù hợp</span>
-                    </Link>
-                    <Link
-                      href="/phan-loai"
-                      className="px-5 py-2.5 rounded-control border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
-                    >
-                      Khám phá tất cả danh mục
-                    </Link>
-                  </div>
-                }
-              />
+                    <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                  </button>
 
-              {/* Suggestions keywords */}
-              <div className="mt-8 pt-6 border-t border-border-subtle max-w-md mx-auto">
-                <p className="text-body-sm font-semibold text-text-secondary mb-3">
-                  Từ khóa tìm kiếm phổ biến:
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  {POPULAR_KEYWORDS.map((k) => (
-                    <button
-                      key={k}
-                      onClick={() => router.push(`/search?q=${encodeURIComponent(k)}`)}
-                      className="px-3 py-1.5 bg-surface-subtle hover:bg-brand-primary-subtle hover:text-brand-primary text-text-secondary text-caption font-semibold rounded-pill transition border border-border-subtle cursor-pointer"
-                    >
-                      {k}
-                    </button>
-                  ))}
+                  {/* Floating Popover Dropdown */}
+                  {isOpen && (
+                    <div className="fixed inset-x-4 top-1/2 z-40 max-h-[75vh] -translate-y-1/2 overflow-y-auto sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-80 sm:translate-y-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xl">
+                      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
+                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                          <Icon className="w-3.5 h-3.5 text-blue-600" />
+                          <span>{g.label}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setOpenFilterGroup(null)}
+                          className="p-0.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                          aria-label="Đóng"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {g.key === "price" && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {currentPricePresets.map((pr) => {
+                              const active = activePricePreset === pr.value;
+                              return (
+                                <button
+                                  key={pr.value}
+                                  type="button"
+                                  aria-pressed={active}
+                                  onClick={() => togglePricePill(pr)}
+                                  className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                    active
+                                      ? "border-blue-600 bg-blue-50 text-blue-700 font-bold"
+                                      : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-blue-300"
+                                  }`}
+                                >
+                                  <span>{pr.label}</span>
+                                  {active && <Check className="w-3.5 h-3.5 shrink-0 text-blue-600 stroke-[3]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <Form
+                            action={pathname}
+                            className="space-y-2 pt-2.5 border-t border-slate-100"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              const params = new URLSearchParams();
+                              new FormData(event.currentTarget).forEach((value, key) => {
+                                if (typeof value === "string" && value.trim()) params.append(key, value);
+                              });
+                              pushParams(params);
+                              setOpenFilterGroup(null);
+                            }}
+                          >
+                            {[...searchParams.entries()]
+                              .filter(([key]) => !["minPrice", "maxPrice", "pricePreset", "page"].includes(key))
+                              .map(([key, value], i) => (
+                                <input key={i} type="hidden" name={key} value={value} />
+                              ))}
+                            <div className="grid grid-cols-2 gap-2">
+                              <label className="text-[11px] font-semibold text-slate-600">
+                                Giá từ (₫)
+                                <input
+                                  key={`min-${searchParams.get("minPrice")}`}
+                                  name="minPrice"
+                                  type="number"
+                                  min={0}
+                                  max={1000000000}
+                                  step="any"
+                                  placeholder="0"
+                                  defaultValue={searchParams.get("minPrice") || ""}
+                                  className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-900"
+                                />
+                              </label>
+                              <label className="text-[11px] font-semibold text-slate-600">
+                                Giá đến (₫)
+                                <input
+                                  key={`max-${searchParams.get("maxPrice")}`}
+                                  name="maxPrice"
+                                  type="number"
+                                  min={0}
+                                  max={1000000000}
+                                  step="any"
+                                  placeholder="50000000"
+                                  defaultValue={searchParams.get("maxPrice") || ""}
+                                  className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-900"
+                                />
+                              </label>
+                            </div>
+                            <button
+                              type="submit"
+                              className="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition cursor-pointer"
+                            >
+                              Áp dụng khoảng giá
+                            </button>
+                          </Form>
+                        </div>
+                      )}
+
+                      {g.key === "condition" && (
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {initialData.facets.conditions.map((c) => {
+                            const isSelected = activeConditions.includes(c.value);
+                            const condFallbackMap: Record<string, string> = {
+                              NEW: "Mới 100% Fullbox",
+                              LIKE_NEW: "LikeNew 99%",
+                              USED: "Đã qua sử dụng",
+                              REFURBISHED: "Refurbished",
+                            };
+                            const label = condFallbackMap[c.value] || c.label;
+                            return (
+                              <button
+                                key={c.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("condition", c.value)}
+                                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-100 bg-slate-50/70 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span>{label}</span>
+                                <span className="text-[10px] text-slate-400">({c.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "cpu" && (
+                        <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-0.5">
+                          {initialData.facets.cpuSeries.map((c) => {
+                            const isSelected = activeCpus.includes(c.value);
+                            return (
+                              <button
+                                key={c.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("cpu", c.value)}
+                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span className="truncate">{c.label}</span>
+                                <span className="text-[10px] text-slate-400">({c.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "gpu" && (
+                        <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-0.5">
+                          {initialData.facets.gpuSeries.map((gpu) => {
+                            const isSelected = activeGpus.includes(gpu.value);
+                            return (
+                              <button
+                                key={gpu.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("gpu", gpu.value)}
+                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span className="truncate">{gpu.label}</span>
+                                <span className="text-[10px] text-slate-400">({gpu.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "ram" && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {initialData.facets.ramOptions.map((r) => {
+                            const isSelected = activeRams.includes(String(r.value));
+                            return (
+                              <button
+                                key={r.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("ram", String(r.value))}
+                                className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span>{r.label}</span>
+                                <span className="text-[10px] text-slate-400">({r.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "storage" && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {initialData.facets.storageOptions.map((s) => {
+                            const isSelected = activeStorage.includes(String(s.value));
+                            return (
+                              <button
+                                key={s.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("storage", String(s.value))}
+                                className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span>{s.label}</span>
+                                <span className="text-[10px] text-slate-400">({s.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "year" && initialData.facets.years && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {initialData.facets.years.map((y) => {
+                            const isSelected = activeYears.includes(y.value);
+                            return (
+                              <button
+                                key={y.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("year", y.value)}
+                                className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span>Năm {y.label}</span>
+                                <span className="text-[10px] text-slate-400">({y.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "accessoryType" && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {ACCESSORY_TYPES.map((t) => {
+                            const isSelected = activeType === t.slug;
+                            return (
+                              <button
+                                key={t.slug}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleSingleParam("type", t.slug)}
+                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span className="truncate">{t.shortName}</span>
+                                {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-blue-600" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "connection" && initialData.facets.connections && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {initialData.facets.connections.map((c) => {
+                            const isSelected = activeConnections.includes(c.value);
+                            return (
+                              <button
+                                key={c.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("connection", c.value)}
+                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span className="truncate">{c.label}</span>
+                                <span className="text-[10px] text-slate-400">({c.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {g.key === "power" && initialData.facets.powers && (
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {initialData.facets.powers.map((p) => {
+                            const isSelected = activePowers.includes(p.value);
+                            return (
+                              <button
+                                key={p.value}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => toggleMultiParam("power", p.value)}
+                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                                  isSelected
+                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <span className="truncate">{p.label}</span>
+                                <span className="text-[10px] text-slate-400">({p.count})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Product Grid: 2 cols mobile, 3 cols desktop */}
-              <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-                {initialData.products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              );
+            })}
 
-              {/* Server-side Pagination */}
-              <CategoryPagination
-                currentPage={initialData.page}
-                totalPages={initialData.totalPages}
+          {/* Bên phải cùng hàng: Ô lọc từ khóa nhanh + Sắp xếp */}
+          <div className="flex items-center gap-2 ml-auto w-full lg:w-auto pt-1 lg:pt-0">
+            <div className="flex-1 lg:w-56 xl:w-64">
+              <SearchAutocomplete
+                initialQuery={query}
+                placeholder="Tìm tên máy, CPU, GPU..."
+                size="sm"
+                className="w-full"
               />
-            </>
-          )}
-        </section>
-      </div>
+            </div>
 
-      {/* Mobile Filter Drawer */}
+            <CategorySortSelect
+              options={SEARCH_SORT_OPTIONS}
+              defaultSort={query ? "relevance" : "newest"}
+            />
+          </div>
+        </div>
+
+        {/* Thanh Chips tiêu chí đang chọn (Gộp gọn bên trong cùng khối, chỉ hiện khi có tiêu chí lọc phụ) */}
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+            <span className="text-[11px] font-bold text-slate-500 mr-1">Đang chọn:</span>
+            {chips.map((chip, idx) => (
+              <span
+                key={`${chip.key}-${chip.value}-${idx}`}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 border border-blue-200/80 text-blue-700 text-xs rounded-lg font-semibold"
+              >
+                <span>{chip.label}</span>
+                <button
+                  type="button"
+                  onClick={() => removeChip(chip.key, chip.value)}
+                  className="hover:text-rose-600 text-blue-500 transition cursor-pointer p-0.5 rounded"
+                  aria-label={`Xóa lọc ${chip.label}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer px-2 py-0.5"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Xóa tất cả</span>
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* 3. LƯỚI KẾT QUẢ SẢN PHẨM (Full-Width 5 cột) */}
+      <section aria-label="Kết quả sản phẩm" className="min-w-0">
+        {initialData.products.length === 0 ? (
+          <div className="bg-surface-card border border-border-default rounded-2xl p-8 sm:p-10 text-center">
+            <EmptyState
+              icon={<Inbox className="w-8 h-8 stroke-1.5" aria-hidden="true" />}
+              title="Không tìm thấy sản phẩm phù hợp"
+              description={
+                query
+                  ? `Rất tiếc, không có sản phẩm nào khớp với từ khóa "${query}". Bạn có thể thử tìm kiếm bằng từ khóa ngắn hơn hoặc kiểm tra lỗi chính tả.`
+                  : "Không tìm thấy sản phẩm nào với các bộ lọc bạn đã chọn."
+              }
+              action={
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4 flex-wrap">
+                  {totalActiveFilters > 0 && (
+                    <Link
+                      href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
+                      className="px-5 py-2.5 rounded-xl bg-brand-primary text-text-inverse font-bold text-body-sm hover:bg-brand-primary-hover transition"
+                    >
+                      Xóa tất cả bộ lọc
+                    </Link>
+                  )}
+                  <Link
+                    href="/chon-laptop"
+                    className="px-5 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-body-sm hover:bg-blue-100 transition inline-flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-4 h-4 text-blue-600" />
+                    <span>Tư vấn chọn laptop phù hợp</span>
+                  </Link>
+                  <Link
+                    href="/phan-loai"
+                    className="px-5 py-2.5 rounded-xl border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
+                  >
+                    Khám phá tất cả danh mục
+                  </Link>
+                </div>
+              }
+            />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+              {initialData.products.map((product) => (
+                <ProductCard key={`${product.id}:${product.variantId || ""}`} product={product} />
+              ))}
+            </div>
+
+            <CategoryPagination
+              currentPage={initialData.page}
+              totalPages={initialData.totalPages}
+            />
+          </>
+        )}
+      </section>
+
+      {/* Full Filter Drawer Modal */}
       <MobileFilterDrawer
         isOpen={mobileDrawerOpen}
         onClose={() => setMobileDrawerOpen(false)}

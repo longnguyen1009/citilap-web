@@ -45,6 +45,9 @@ import {
   Check,
   Copy,
   Sparkles,
+  ShieldCheck,
+  Package,
+  Info,
 } from 'lucide-react';
 import {
   AdminCard,
@@ -59,10 +62,15 @@ import {
   attributeTemplateDefinitions,
   availabilityLabels,
   conditionLabels,
+  warrantyTypeLabels,
+  warrantyMonthsOptions,
+  formatShortWarrantyBadge,
+  formatSpecKeyLabel,
   blankProduct,
   productDocumentSchema,
   type ProductDocument,
   type ProductTemplate,
+  type WarrantyType,
 } from '@/contracts/cms/product-studio';
 import MediaBrowser, { mediaRequest } from '../media/MediaBrowser';
 import MediaDialog from '../media/MediaDialog';
@@ -119,6 +127,24 @@ interface SnapshotDetail {
 
 const money = (n: number) => new Intl.NumberFormat('vi-VN').format(n) + 'đ';
 
+const formatNumberDots = (n: number | null | undefined): string => {
+  if (n === null || n === undefined || Number.isNaN(n)) return '';
+  if (n < 0) return '-' + new Intl.NumberFormat('vi-VN').format(Math.abs(n));
+  return new Intl.NumberFormat('vi-VN').format(n);
+};
+
+const parseNumberDots = (raw: string, allowNegative = false): number | null => {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === '-') return null;
+  const isNeg = allowNegative && trimmed.startsWith('-');
+  const digits = trimmed.replace(/\D/g, '');
+  if (!digits) return null;
+  const parsed = Math.min(2000000000, parseInt(digits, 10) || 0);
+  return isNeg ? -parsed : parsed;
+};
+
+const VARIANT_TAG_PRESETS = ['Đa nhiệm mượt', 'Bán chạy', 'Đáng mua', 'Khuyên dùng', 'Giá tốt'];
+
 export default function ProductEditor({ id }: ProductEditorProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>('info');
@@ -141,6 +167,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   // Media picker & Preview states
   const [pickerOpen, setPickerOpen] = useState<boolean>(false);
   const [contentMediaPickerOpen, setContentMediaPickerOpen] = useState<boolean>(false);
+  const [variantImagePickerId, setVariantImagePickerId] = useState<string | null>(null);
   const [mediaRefresh, setMediaRefresh] = useState<number>(0);
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
 
@@ -156,7 +183,13 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [relatedSearch, setRelatedSearch] = useState<string>('');
   const [relatedCandidates, setRelatedCandidates] = useState<{ id: string; name: string; sku?: string; image?: string; price: number }[]>([]);
   const [loadingRelated, setLoadingRelated] = useState<boolean>(false);
+  const [relatedProductDetails, setRelatedProductDetails] = useState<Record<string, { id: string; name: string; sku?: string; image?: string; price: number }>>({});
   const relatedRequest = useRef(0);
+
+  // Inline custom spec state
+  const [newSpecKey, setNewSpecKey] = useState<string>('');
+  const [newSpecValue, setNewSpecValue] = useState<string>('');
+  const [historyOpen, setHistoryOpen] = useState<boolean>(false);
 
   const isDirty = !!doc && JSON.stringify(doc) !== baseline;
 
@@ -215,6 +248,47 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     });
   };
 
+  const handleAssignVariantImage = (variantId: string, assetId: string | null, assetFallbackAlt?: string) => {
+    setDoc(prev => {
+      if (!prev) return prev;
+      const targetVariant = prev.variants.find(v => v.id === variantId);
+      const defaultAlt = assetFallbackAlt || `${prev.name || 'Sản phẩm'} - ${targetVariant?.name || 'Cấu hình'}`;
+
+      let nextMedia = prev.media.map(m => {
+        if (m.variantId === variantId && m.assetId !== assetId) {
+          return { ...m, variantId: '' };
+        }
+        return m;
+      });
+
+      if (assetId) {
+        const existingIdx = nextMedia.findIndex(m => m.assetId === assetId);
+        if (existingIdx >= 0) {
+          nextMedia = nextMedia.map((m, idx) => (idx === existingIdx ? { ...m, variantId } : m));
+        } else if (nextMedia.length < 30) {
+          nextMedia = [
+            ...nextMedia,
+            {
+              assetId,
+              alt: defaultAlt,
+              variantId,
+            },
+          ];
+        }
+      }
+
+      const nextVariants = prev.variants.map(v =>
+        v.id === variantId ? { ...v, image: assetId || '' } : v
+      );
+
+      return {
+        ...prev,
+        media: nextMedia,
+        variants: nextVariants,
+      };
+    });
+  };
+
   // Matrix Generator & Quick Add states
   const [showMatrixGen, setShowMatrixGen] = useState<boolean>(false);
   const [matrixRAMs, setMatrixRAMs] = useState<string[]>(['16GB DDR5', '32GB DDR5']);
@@ -224,6 +298,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [matrixStepPrice, setMatrixStepPrice] = useState<number>(2000000);
 
   const [quickAddName, setQuickAddName] = useState<string>('');
+  const [quickAddTag, setQuickAddTag] = useState<string>('');
   const [quickAddRam, setQuickAddRam] = useState<string>('');
   const [quickAddStorage, setQuickAddStorage] = useState<string>('');
   const [quickAddGpu, setQuickAddGpu] = useState<string>('');
@@ -231,16 +306,19 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [quickAddSku, setQuickAddSku] = useState<string>('');
   const [quickAddPrice, setQuickAddPrice] = useState<string>('');
   const [quickAddOriginalPrice, setQuickAddOriginalPrice] = useState<string>('');
+  const [quickAddStock, setQuickAddStock] = useState<string>('1');
   const [quickAddAvail, setQuickAddAvail] = useState<'' | 'AVAILABLE' | 'PREORDER' | 'CONTACT' | 'UNAVAILABLE'>('');
 
   const handleAddQuickVariant = () => {
     if (!doc) return;
     const name = quickAddName.trim();
-    const priceNum = parseInt(quickAddPrice, 10);
-    const price = !isNaN(priceNum) && priceNum >= 0 ? priceNum : doc.price;
+    const priceNum = parseNumberDots(quickAddPrice);
+    const price = priceNum !== null && priceNum >= 0 ? priceNum : doc.price;
     const sku = (quickAddSku.trim() || `${doc.slug || 'SP'}-${doc.variants.length + 1}`).toUpperCase();
-    const origPriceNum = parseInt(quickAddOriginalPrice, 10);
-    const originalPrice = !isNaN(origPriceNum) && origPriceNum >= 0 ? origPriceNum : null;
+    const origPriceNum = parseNumberDots(quickAddOriginalPrice);
+    const originalPrice = origPriceNum !== null && origPriceNum >= 0 ? origPriceNum : null;
+    const stockNum = parseInt(quickAddStock, 10);
+    const stock = !Number.isNaN(stockNum) && stockNum >= 0 ? stockNum : 1;
 
     const autoName = name || (doc.template === 'LAPTOP' 
       ? [quickAddRam, quickAddStorage, quickAddGpu].filter(Boolean).join(' / ') || `Cấu hình ${doc.variants.length + 1}`
@@ -253,6 +331,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       condition: quickAddCondition,
       price,
       originalPrice,
+      stock,
+      tag: quickAddTag.trim() || undefined,
       availability: quickAddAvail || undefined,
       ram: quickAddRam.trim() || undefined,
       storage: quickAddStorage.trim() || undefined,
@@ -263,12 +343,14 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
     updateDoc('variants', [...doc.variants, newVariant]);
     setQuickAddName('');
+    setQuickAddTag('');
     setQuickAddRam('');
     setQuickAddStorage('');
     setQuickAddGpu('');
     setQuickAddSku('');
     setQuickAddPrice('');
     setQuickAddOriginalPrice('');
+    setQuickAddStock('1');
     setQuickAddAvail('');
   };
 
@@ -316,6 +398,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
           condition: 'NEW' as const,
           price: variantPrice,
           originalPrice: null,
+          stock: 1,
           availability: 'AVAILABLE' as const,
           ram: r,
           storage: s,
@@ -520,11 +603,33 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   }, [id]);
 
   useEffect(() => {
-    if (activeTab === 'history' && id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- on-demand fetch when switching to history tab
+    if ((activeTab === 'history' || historyOpen) && id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- on-demand fetch when opening history
       void fetchRevisions();
     }
-  }, [activeTab, id, fetchRevisions]);
+  }, [activeTab, historyOpen, id, fetchRevisions]);
+
+  useEffect(() => {
+    const relIds = doc?.relatedProductIds || [];
+    const missing = relIds.filter(rid => !relatedProductDetails[rid]);
+    if (missing.length === 0) return;
+    let ignore = false;
+    mediaRequest<{ items: { id: string; name: string; sku?: string; image?: string; price: number }[] }>(
+      `/api/admin/products?ids=${encodeURIComponent(missing.join(','))}&limit=${Math.min(100, Math.max(20, missing.length))}`
+    )
+      .then(res => {
+        if (ignore) return;
+        const map: Record<string, { id: string; name: string; sku?: string; image?: string; price: number }> = {};
+        for (const item of res.items || []) {
+          map[item.id] = item;
+        }
+        setRelatedProductDetails(prev => ({ ...prev, ...map }));
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, [doc?.relatedProductIds, relatedProductDetails]);
 
   const handleRestore = async (targetRev: number) => {
     if (!id || saveLock.current) return;
@@ -592,19 +697,18 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
   const tabs: { key: TabKey; label: string; icon: typeof Layers; count?: number }[] = [
     { key: 'info', label: 'Thông tin', icon: Layers },
-    { key: 'specs', label: 'Thông số', icon: Cpu, count: doc.specs.filter(s => s.value?.trim()).length },
     { key: 'pricing', label: 'Giá & Cấu hình', icon: DollarSign, count: doc.variants.length },
-    { key: 'media', label: 'Ảnh', icon: ImageIcon, count: doc.media.length },
+    { key: 'specs', label: 'Thông số', icon: Cpu, count: doc.specs.filter(s => s.value?.trim()).length },
+    { key: 'media', label: 'Ảnh & Video', icon: ImageIcon, count: doc.media.length },
     { key: 'content', label: 'Mô tả', icon: FileText },
     { key: 'extras', label: 'Quà & FAQ', icon: Plus, count: doc.warranties.length + (doc.gifts?.length || 0) },
     { key: 'inspection', label: 'Kiểm định', icon: Cpu },
     { key: 'seo', label: 'SEO', icon: Globe },
-    ...(id ? [{ key: 'history' as TabKey, label: 'Lịch sử', icon: History }] : []),
   ];
 
   return (
     <div className="product-editor space-y-4 pb-12">
-      {/* Compact header: back · title · status | view on web */}
+      {/* Compact header: back · title · status | history & view on web */}
       <header className="product-editor-header">
         <Link href="/admin/products" className="product-editor-back" aria-label="Về danh sách sản phẩm" title="Về danh sách sản phẩm">
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
@@ -616,17 +720,29 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         />
         {isDirty && <span className="product-editor-dirty">Chưa lưu</span>}
         {revision > 0 && <span className="product-editor-rev" title="Phiên bản">#{revision}</span>}
-        {id && isPublished && (
-          <a
-            href={productHref(publishedSummary || doc)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="product-editor-viewlink"
-          >
-            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Xem trên web</span>
-          </a>
-        )}
+        <div className="product-editor-header-actions">
+          {id && (
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="product-editor-viewlink"
+            >
+              <History className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Lịch sử ({revision})</span>
+            </button>
+          )}
+          {id && isPublished && (
+            <a
+              href={productHref(publishedSummary || doc)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="product-editor-viewlink"
+            >
+              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Xem trên web</span>
+            </a>
+          )}
+        </div>
       </header>
 
       {/* Alert banner if any */}
@@ -730,7 +846,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       <div id={'product-panel-' + activeTab} role="tabpanel" aria-labelledby={'product-tab-' + activeTab} tabIndex={0} className="product-editor-panel">
       {/* TAB 1: THÔNG TIN CHUNG */}
       {activeTab === 'info' && (
-        <AdminCard title="Phân loại">
+        <AdminCard title="Phân loại & Trạng thái">
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
@@ -796,10 +912,11 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tình trạng
-
+                <label htmlFor="product-condition" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tình trạng chung (Thẻ SP)
+                </label>
                 <select
+                  id="product-condition"
                   value={doc.condition || 'NEW'}
                   onChange={e => updateDoc('condition', e.target.value as ProductDocument['condition'])}
                   className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white cursor-pointer"
@@ -809,12 +926,24 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                       {label}
                     </option>
                   ))}
-                </select></label>
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                  Hiển thị nhãn ở góc trên thẻ SP ngoài danh sách.{' '}
+                  {doc.variants.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('pricing')}
+                      className="text-blue-600 hover:underline font-medium cursor-pointer"
+                    >
+                      Từng cấu hình có tình trạng riêng ở Giá & Cấu hình →
+                    </button>
+                  )}
+                </p>
               </div>
 
               <div>
                 <label htmlFor="product-availability" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nhận đơn
+                  Trạng thái bán hàng
                 </label>
                 <select
                   id="product-availability"
@@ -828,6 +957,126 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     </option>
                   ))}
                 </select>
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                  Hiển thị trên thẻ SP: <strong>{availabilityLabels[doc.availability]}</strong> (hoặc Tạm hết hàng nếu tồn kho = 0).
+                </p>
+              </div>
+            </div>
+
+            {/* Tồn kho & Bảo hành hiển thị trên Card sản phẩm */}
+            <div className="p-3.5 bg-slate-50/80 border border-slate-200 rounded-xl space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <ShieldCheck className="w-4 h-4 text-blue-600" />
+                  <span>Bảo hành mặc định & Tồn kho</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500">Hiển thị trên Card sản phẩm:</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 font-semibold text-slate-700 shadow-2xs">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    {formatShortWarrantyBadge(doc.warrantyType || 'SHOP', doc.warrantyMonths || 12)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 font-semibold text-emerald-700 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {doc.availability === 'AVAILABLE'
+                      ? (doc.variants.length > 0
+                          ? doc.variants.reduce((sum, v) => sum + (v.stock ?? 1), 0)
+                          : (doc.stock ?? 1)) <= 0
+                        ? 'Tạm hết hàng'
+                        : 'Sẵn hàng'
+                      : availabilityLabels[doc.availability]}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="product-warranty-type" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Loại bảo hành
+                  </label>
+                  <select
+                    id="product-warranty-type"
+                    value={doc.warrantyType || 'SHOP'}
+                    onChange={e => updateDoc('warrantyType', e.target.value as WarrantyType)}
+                    className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
+                  >
+                    {Object.entries(warrantyTypeLabels).map(([k, label]) => (
+                      <option key={k} value={k}>
+                        {label} ({k === 'BRAND' ? 'BH Hãng...' : 'BH...'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="product-warranty-months" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Thời hạn bảo hành (tháng)
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      id="product-warranty-months"
+                      value={warrantyMonthsOptions.includes((doc.warrantyMonths || 12) as (typeof warrantyMonthsOptions)[number]) ? String(doc.warrantyMonths || 12) : '__custom__'}
+                      onChange={e => {
+                        if (e.target.value !== '__custom__') {
+                          updateDoc('warrantyMonths', parseInt(e.target.value, 10) || 12);
+                        }
+                      }}
+                      className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
+                    >
+                      {warrantyMonthsOptions.map(m => (
+                        <option key={m} value={m}>
+                          {m} tháng ({formatShortWarrantyBadge(doc.warrantyType || 'SHOP', m)})
+                        </option>
+                      ))}
+                      <option value="__custom__">Số tháng khác...</option>
+                    </select>
+                    <input
+                      type="number"
+                      min={1}
+                      max={120}
+                      aria-label="Số tháng bảo hành"
+                      value={doc.warrantyMonths ?? 12}
+                      onChange={e => updateDoc('warrantyMonths', Math.min(120, Math.max(1, parseInt(e.target.value, 10) || 12)))}
+                      className="w-20 text-sm text-center font-semibold border border-slate-300 rounded-lg px-2 py-2 bg-white"
+                      title="Nhập số tháng bảo hành"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="product-stock-info" className="block text-xs font-semibold text-slate-700 mb-1">
+                    Số lượng tồn kho
+                  </label>
+                  {doc.variants.length > 0 ? (
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm">
+                      <div>
+                        <strong className="text-blue-700 font-bold">
+                          {doc.variants.reduce((sum, v) => sum + (v.stock ?? 1), 0)}
+                        </strong>{' '}
+                        <span className="text-xs text-slate-500">máy ({doc.variants.length} cấu hình)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('pricing')}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      >
+                        Sửa theo cấu hình →
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="product-stock-info"
+                        type="number"
+                        min={0}
+                        max={999999}
+                        value={doc.stock ?? 1}
+                        onChange={e => updateDoc('stock', Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="w-full text-sm font-semibold text-slate-900 border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -982,15 +1231,33 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
               {(doc.relatedProductIds || []).length > 0 && (
                 <div className="space-y-1.5">
-                  {(doc.relatedProductIds || []).map((relId, rIdx) => (
+                  {(doc.relatedProductIds || []).map((relId, rIdx) => {
+                    const relInfo = relatedProductDetails[relId];
+                    return (
                     <div key={relId} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-[10px]">
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-[10px] shrink-0">
                           {rIdx + 1}
                         </span>
-                        <span className="font-mono font-medium text-slate-800">{relId}</span>
+                        {relInfo?.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={relInfo.image} alt="" className="w-8 h-8 rounded object-cover border border-slate-200 shrink-0" />
+                        ) : null}
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-800 truncate">
+                            {relInfo?.name || relId}
+                          </div>
+                          {relInfo ? (
+                            <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                              <span className="text-blue-600 font-medium">{money(relInfo.price)}</span>
+                              <span className="font-mono text-[10px] text-slate-400">#{relId.slice(0, 8)}</span>
+                            </div>
+                          ) : (
+                            <span className="font-mono text-[10px] text-slate-400">{relId}</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           disabled={rIdx === 0}
@@ -1033,7 +1300,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                         </button>
                       </div>
                     </div>
-                  ))}
+                  );})}
                 </div>
               )}
             </div></details>
@@ -1044,25 +1311,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       {/* TAB 2: THÔNG SỐ KỸ THUẬT */}
       {activeTab === 'specs' && (
         <AdminCard
-          title="Thông số"
+          title="Thông số kỹ thuật"
           action={
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex flex-wrap gap-1">
-                {ALL_TEMPLATES.map(t => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => handleSwitchTemplate(t.key)}
-                    className={`px-2 py-1 text-xs font-medium rounded-md border transition cursor-pointer ${
-                      doc.template === t.key
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
               {!doc.specs.some(spec => spec.key === 'Năm ra mắt') && (
                 <AdminButton variant="secondary" size="sm" onClick={() => updateDoc('specs', [...doc.specs, { key: 'Năm ra mắt', value: '' }])}>
                   + Năm ra mắt
@@ -1078,42 +1329,50 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   + Hạn chế (Tư vấn)
                 </AdminButton>
               )}
-              <AdminButton
-                variant="secondary"
-                size="sm"
-                icon={<Plus className="w-3.5 h-3.5" />}
-                onClick={() => {
-                  const keyName = prompt('Nhập tên thông số mới:');
-                  if (keyName && keyName.trim()) {
-                    updateDoc('specs', [...doc.specs, { key: keyName.trim(), value: '' }]);
-                  }
-                }}
-              >
-                + Thông số
-              </AdminButton>
             </div>
           }
         >
+          <div className="mb-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-semibold text-slate-600 mr-1">Mẫu thông số:</span>
+            {ALL_TEMPLATES.map(t => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => handleSwitchTemplate(t.key)}
+                className={`px-2.5 py-1 text-xs font-medium rounded-md border transition cursor-pointer ${
+                  doc.template === t.key
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <div className="variant-matrix-wrapper">
             <table className="compact-matrix-table">
               <thead>
                 <tr>
                   <th style={{ width: '36px', textAlign: 'center' }}>#</th>
-                  <th style={{ width: '200px' }}>Thông số</th>
+                  <th style={{ width: '210px' }}>Thông số</th>
                   <th>Giá trị & Gợi ý</th>
-                  <th style={{ width: '44px' }}></th>
+                  <th style={{ width: '64px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {doc.specs.map((spec, idx) => {
                   const def = attributeTemplateDefinitions[doc.template]?.find(d => d.key === spec.key);
                   const isCustom = !(attributeTemplates[doc.template] as readonly string[])?.includes(spec.key);
+                  const displayLabel = formatSpecKeyLabel(spec.key);
                   return (
                     <tr key={spec.key || idx}>
                       <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>{idx + 1}</td>
                       <td>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-semibold text-slate-800">{spec.key}</span>
+                          <span className="text-xs font-semibold text-slate-800">{displayLabel}</span>
+                          {displayLabel !== spec.key && (
+                            <span className="text-[10px] px-1 py-0.2 bg-slate-100 text-slate-500 rounded font-mono">{spec.key}</span>
+                          )}
                           {def?.unit && <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">{def.unit}</span>}
                           {isCustom && <span className="text-[10px] px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded">Tùy chỉnh</span>}
                         </div>
@@ -1122,7 +1381,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                         <div className="space-y-1">
                           <input
                             type="text"
-                            aria-label={spec.key}
+                            aria-label={displayLabel}
                             value={spec.value}
                             onChange={e =>
                               updateDoc(
@@ -1130,7 +1389,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                                 doc.specs.map((s, i) => (i === idx ? { ...s, value: e.target.value } : s))
                               )
                             }
-                            placeholder={def ? `${def.label}...` : 'Nhập giá trị...'}
+                            placeholder={def ? `${def.label}...` : `Nhập ${displayLabel.toLowerCase()}...`}
                             className="matrix-input-cell"
                           />
                           {def?.options && def.options.length > 0 && (
@@ -1164,7 +1423,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                           onClick={() => updateDoc('specs', doc.specs.filter((_, i) => i !== idx))}
                           className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
                           title="Xóa thông số"
-                          aria-label={`Xóa ${spec.key}`}
+                          aria-label={`Xóa ${displayLabel}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1173,6 +1432,73 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   );
                 })}
               </tbody>
+              <tfoot>
+                <tr className="matrix-quick-add-tr">
+                  <td style={{ textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>+</td>
+                  <td>
+                    <input
+                      type="text"
+                      aria-label="Tên thông số mới"
+                      value={newSpecKey}
+                      onChange={e => setNewSpecKey(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newSpecKey.trim()) {
+                          e.preventDefault();
+                          const k = newSpecKey.trim();
+                          if (!doc.specs.some(s => s.key.toLowerCase() === k.toLowerCase())) {
+                            updateDoc('specs', [...doc.specs, { key: k, value: newSpecValue.trim() }]);
+                            setNewSpecKey('');
+                            setNewSpecValue('');
+                          }
+                        }
+                      }}
+                      placeholder="Tên thông số mới (VD: Chất liệu)..."
+                      className="matrix-input-cell font-semibold"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      aria-label="Giá trị thông số mới"
+                      value={newSpecValue}
+                      onChange={e => setNewSpecValue(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && newSpecKey.trim()) {
+                          e.preventDefault();
+                          const k = newSpecKey.trim();
+                          if (!doc.specs.some(s => s.key.toLowerCase() === k.toLowerCase())) {
+                            updateDoc('specs', [...doc.specs, { key: k, value: newSpecValue.trim() }]);
+                            setNewSpecKey('');
+                            setNewSpecValue('');
+                          }
+                        }
+                      }}
+                      placeholder="Giá trị thông số..."
+                      className="matrix-input-cell"
+                    />
+                  </td>
+                  <td style={{ textAlign: 'center' }}>
+                    <AdminButton
+                      variant="primary"
+                      size="sm"
+                      disabled={!newSpecKey.trim()}
+                      onClick={() => {
+                        const k = newSpecKey.trim();
+                        if (!k) return;
+                        if (doc.specs.some(s => s.key.toLowerCase() === k.toLowerCase())) {
+                          setStatusMessage({ type: 'warning', text: `Thông số "${k}" đã tồn tại.` });
+                          return;
+                        }
+                        updateDoc('specs', [...doc.specs, { key: k, value: newSpecValue.trim() }]);
+                        setNewSpecKey('');
+                        setNewSpecValue('');
+                      }}
+                    >
+                      + Thêm
+                    </AdminButton>
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </AdminCard>
@@ -1181,7 +1507,79 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       {/* TAB 3: CẤU HÌNH & GIÁ */}
       {activeTab === 'pricing' && (
         <div className="space-y-6">
-
+          <AdminCard title="Giá niêm yết & Tồn kho cơ bản">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="product-base-price-tab" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Giá bán mặc định (VNĐ) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    id="product-base-price-tab"
+                    value={formatNumberDots(doc.price)}
+                    onChange={e => updateDoc('price', Math.max(0, parseNumberDots(e.target.value) ?? 0))}
+                    placeholder="28.900.000"
+                    className="w-full text-sm font-bold text-blue-600 border border-slate-300 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">đ</span>
+                </div>
+                <span className="text-xs text-slate-500 mt-1 block">Hiển thị: {money(doc.price)}</span>
+              </div>
+              <div>
+                <label htmlFor="product-orig-price-tab" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Giá gốc niêm yết <span className="font-normal text-slate-500">(nếu giảm giá)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    id="product-orig-price-tab"
+                    value={formatNumberDots(doc.originalPrice)}
+                    placeholder="Không giảm giá"
+                    onChange={e => updateDoc('originalPrice', parseNumberDots(e.target.value))}
+                    className="w-full text-sm border border-slate-300 rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">đ</span>
+                </div>
+                {doc.originalPrice != null && doc.originalPrice > doc.price ? (
+                  <span className="text-xs text-emerald-600 mt-1 block font-medium">
+                    Tiết kiệm {money(doc.originalPrice - doc.price)} (-
+                    {Math.round(((doc.originalPrice - doc.price) / doc.originalPrice) * 100)}%)
+                  </span>
+                ) : (
+                  <span className="text-xs text-slate-400 mt-1 block">Áp dụng khi sản phẩm không chia biến thể riêng</span>
+                )}
+              </div>
+              <div>
+                <label htmlFor="product-stock-tab" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Tồn kho {doc.variants.length > 0 ? '(Tổng các cấu hình)' : 'cơ bản'}
+                </label>
+                {doc.variants.length > 0 ? (
+                  <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm flex items-center justify-between">
+                    <span>
+                      Tổng: <strong className="text-blue-700 font-bold">{doc.variants.reduce((sum, v) => sum + (v.stock ?? 1), 0)}</strong> máy
+                    </span>
+                    <span className="text-[11px] text-slate-500">Nhập ở bảng cấu hình bên dưới</span>
+                  </div>
+                ) : (
+                  <input
+                    id="product-stock-tab"
+                    type="number"
+                    min={0}
+                    max={999999}
+                    value={doc.stock ?? 1}
+                    onChange={e => updateDoc('stock', Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="w-full text-sm font-semibold text-slate-900 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                )}
+                <span className="text-xs text-slate-400 mt-1 block">
+                  Khi tồn kho = 0, web tự hiển thị &quot;Tạm hết hàng&quot;
+                </span>
+              </div>
+            </div>
+          </AdminCard>
 
           {(() => {
             const variantPrices = doc.variants.map(v => v.price).filter(p => p > 0);
@@ -1191,7 +1589,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
             return (
               <AdminCard
                 title={
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 flex-wrap">
                     <span className="text-sm font-bold text-slate-900">Cấu hình</span>
                     <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-semibold">
                       {doc.variants.length}
@@ -1227,8 +1625,10 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                             id: crypto.randomUUID(),
                             name: '',
                             sku: newSku,
-                            condition: 'NEW',
+                            condition: doc.condition || 'NEW',
                             price: doc.price,
+                            stock: 1,
+                            tag: '',
                             ram: '',
                             storage: '',
                             gpu: '',
@@ -1244,6 +1644,25 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   </div>
                 }
               >
+                {/* Giải thích rõ sự khác nhau giữa Tình trạng chung & Tình trạng từng cấu hình + Nhãn nổi bật */}
+                <div className="mb-3 p-2.5 bg-blue-50/60 border border-blue-200/70 rounded-lg flex items-center justify-between flex-wrap gap-2 text-xs text-slate-700">
+                  <div className="flex items-center gap-2">
+                    <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>
+                      Mỗi cấu hình có <strong>Tình trạng (New / Like New)</strong>, <strong>Tồn kho</strong> và <strong>Nhãn nổi bật</strong> (VD: <em>Đa nhiệm mượt, Bán chạy...</em>) riêng khi khách chọn trên trang chi tiết.
+                    </span>
+                  </div>
+                  {doc.variants.length > 0 && doc.variants[0] && doc.condition !== doc.variants[0].condition && (
+                    <button
+                      type="button"
+                      onClick={() => updateDoc('condition', doc.variants[0].condition)}
+                      className="px-2 py-1 rounded bg-white border border-blue-300 text-blue-700 font-semibold hover:bg-blue-50 cursor-pointer shrink-0"
+                    >
+                      Đồng bộ Tình trạng thẻ SP theo Cấu hình #1 ({conditionLabels[doc.variants[0].condition]})
+                    </button>
+                  )}
+                </div>
+
                 {/* Collapsible Matrix Generator */}
                 {showMatrixGen && (
                   <div className="matrix-generator-panel mb-4">
@@ -1312,18 +1731,20 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                           <div className="flex-1">
                             <label className="text-[10px] text-slate-500 block">Giá từ</label>
                             <input
-                              type="number"
-                              value={matrixBasePrice}
-                              onChange={e => setMatrixBasePrice(Number(e.target.value) || 0)}
+                              type="text"
+                              inputMode="numeric"
+                              value={formatNumberDots(matrixBasePrice)}
+                              onChange={e => setMatrixBasePrice(parseNumberDots(e.target.value) ?? 0)}
                               className="w-full text-xs font-bold text-blue-700 border border-slate-300 rounded px-2 py-1"
                             />
                           </div>
                           <div className="flex-1">
                             <label className="text-[10px] text-slate-500 block">Bước giá (+)</label>
                             <input
-                              type="number"
-                              value={matrixStepPrice}
-                              onChange={e => setMatrixStepPrice(Number(e.target.value) || 0)}
+                              type="text"
+                              inputMode="numeric"
+                              value={formatNumberDots(matrixStepPrice)}
+                              onChange={e => setMatrixStepPrice(parseNumberDots(e.target.value) ?? 0)}
                               className="w-full text-xs border border-slate-300 rounded px-2 py-1"
                             />
                           </div>
@@ -1356,20 +1777,22 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   <table className="compact-matrix-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '32px', textAlign: 'center' }}>#</th>
-                        <th style={{ minWidth: '150px' }}>Tên cấu hình</th>
-                        <th style={{ minWidth: '190px' }}>Thông số</th>
-                        <th style={{ width: '110px' }}>SKU</th>
-                        <th style={{ width: '105px', textAlign: 'right' }}>Giá bán</th>
-                        <th style={{ width: '100px', textAlign: 'right' }}>Giá gốc</th>
-                        <th style={{ width: '115px' }}>Nhận đơn</th>
-                        <th style={{ width: '60px', textAlign: 'center' }}></th>
+                        <th style={{ width: '28px', textAlign: 'center' }}>#</th>
+                        <th style={{ width: '56px', textAlign: 'center' }} title="Ảnh riêng của cấu hình (bấm để chọn)">Ảnh</th>
+                        <th style={{ minWidth: '175px' }}>Tên cấu hình & Nhãn nổi bật</th>
+                        <th style={{ minWidth: '165px' }}>Thông số & Tình trạng</th>
+                        <th style={{ width: '96px' }}>SKU</th>
+                        <th style={{ width: '115px', textAlign: 'right' }}>Giá bán (đ)</th>
+                        <th style={{ width: '110px', textAlign: 'right' }}>Giá gốc (đ)</th>
+                        <th style={{ width: '68px', textAlign: 'center' }}>Tồn kho</th>
+                        <th style={{ width: '104px' }}>Nhận đơn</th>
+                        <th style={{ width: '64px', textAlign: 'center' }}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {doc.variants.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-8 text-center text-slate-500">
+                          <td colSpan={10} className="py-8 text-center text-slate-500">
                             <p className="text-xs mb-2">Chưa có biến thể hoặc cấu hình nào.</p>
                             <AdminButton
                               variant="secondary"
@@ -1382,8 +1805,10 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                                     id: crypto.randomUUID(),
                                     name: 'Bản Tiêu chuẩn',
                                     sku: newSku,
-                                    condition: 'NEW',
+                                    condition: doc.condition || 'NEW',
                                     price: doc.price,
+                                    stock: doc.stock ?? 1,
+                                    tag: '',
                                     ram: '',
                                     storage: '',
                                     gpu: '',
@@ -1398,33 +1823,129 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                           </td>
                         </tr>
                       ) : (
-                        doc.variants.map((variant, idx) => (
+                        doc.variants.map((variant, idx) => {
+                          const assignedAssetId =
+                            doc.media.find(m => m.variantId === variant.id)?.assetId ||
+                            (variant.image && doc.media.some(m => m.assetId === variant.image) ? variant.image : '');
+                          return (
                           <tr key={variant.id}>
                             <td style={{ textAlign: 'center', color: '#64748b', fontWeight: 600 }}>
                               {idx + 1}
                             </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <div className="relative inline-flex items-center justify-center">
+                                <button
+                                  type="button"
+                                  title={
+                                    assignedAssetId
+                                      ? 'Đổi ảnh đại diện riêng cho cấu hình này'
+                                      : 'Chọn ảnh riêng cho cấu hình này (khách bấm chọn cấu hình sẽ nhảy sang ảnh này)'
+                                  }
+                                  onClick={() => setVariantImagePickerId(variant.id)}
+                                  className={`w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center transition cursor-pointer ${
+                                    assignedAssetId
+                                      ? 'border-2 border-blue-500 bg-slate-50 shadow-xs hover:border-blue-600'
+                                      : 'border border-dashed border-slate-300 bg-slate-50/70 text-slate-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/40'
+                                  }`}
+                                >
+                                  {assignedAssetId ? (
+                                    <StudioAsset key={assignedAssetId} id={assignedAssetId} />
+                                  ) : (
+                                    <ImageIcon className="w-4 h-4" />
+                                  )}
+                                </button>
+                                {assignedAssetId && (
+                                  <button
+                                    type="button"
+                                    title="Gỡ ảnh riêng của cấu hình này"
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      handleAssignVariantImage(variant.id, null);
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[10px] leading-none flex items-center justify-center shadow hover:bg-rose-600 cursor-pointer"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+                            </td>
                             <td>
-                              <input
-                                type="text"
-                                aria-label={`Tên cấu hình ${idx + 1}`}
-                                value={variant.name}
-                                onChange={e =>
-                                  updateDoc(
-                                    'variants',
-                                    doc.variants.map((v, i) => (i === idx ? { ...v, name: e.target.value } : v))
-                                  )
-                                }
-                                placeholder={
-                                  doc.template === 'LAPTOP'
-                                    ? '16GB / 512GB / RTX 4060'
-                                    : doc.template === 'KEYBOARD'
-                                    ? 'Red Switch - Màu Trắng'
-                                    : doc.template === 'CHARGER'
-                                    ? '65W GaN - Đen'
-                                    : 'Màu Đen / Bản Tiêu chuẩn'
-                                }
-                                className="matrix-input-cell font-semibold"
-                              />
+                              <div className="space-y-1">
+                                <input
+                                  type="text"
+                                  aria-label={`Tên cấu hình ${idx + 1}`}
+                                  value={variant.name}
+                                  onChange={e =>
+                                    updateDoc(
+                                      'variants',
+                                      doc.variants.map((v, i) => (i === idx ? { ...v, name: e.target.value } : v))
+                                    )
+                                  }
+                                  placeholder={
+                                    doc.template === 'LAPTOP'
+                                      ? 'Core Ultra 7 255H'
+                                      : doc.template === 'KEYBOARD'
+                                      ? 'Red Switch - Màu Trắng'
+                                      : doc.template === 'CHARGER'
+                                      ? '65W GaN - Đen'
+                                      : 'Màu Đen / Bản Tiêu chuẩn'
+                                  }
+                                  className="matrix-input-cell font-semibold"
+                                />
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    aria-label={`Nhãn nổi bật cấu hình ${idx + 1}`}
+                                    value={variant.tag || ''}
+                                    onChange={e =>
+                                      updateDoc(
+                                        'variants',
+                                        doc.variants.map((v, i) => (i === idx ? { ...v, tag: e.target.value } : v))
+                                      )
+                                    }
+                                    placeholder="Nhãn nổi bật (VD: Đa nhiệm mượt, Bán chạy...)"
+                                    className="matrix-mini-input flex-1 text-[11px] bg-amber-50/50 border-amber-200/80 text-amber-900 placeholder:text-slate-400"
+                                  />
+                                  {variant.tag && (
+                                    <button
+                                      type="button"
+                                      title="Xóa nhãn nổi bật"
+                                      onClick={() =>
+                                        updateDoc(
+                                          'variants',
+                                          doc.variants.map((v, i) => (i === idx ? { ...v, tag: '' } : v))
+                                        )
+                                      }
+                                      className="px-1.5 py-0.5 text-[10px] text-slate-400 hover:text-rose-600 cursor-pointer"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {VARIANT_TAG_PRESETS.map(preset => (
+                                    <button
+                                      key={preset}
+                                      type="button"
+                                      onClick={() =>
+                                        updateDoc(
+                                          'variants',
+                                          doc.variants.map((v, i) =>
+                                            i === idx ? { ...v, tag: v.tag === preset ? '' : preset } : v
+                                          )
+                                        )
+                                      }
+                                      className={`text-[10px] px-1.5 py-0.2 rounded border transition cursor-pointer ${
+                                        variant.tag === preset
+                                          ? 'bg-amber-400/90 text-slate-950 border-amber-500 font-bold'
+                                          : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-amber-50 hover:text-amber-800'
+                                      }`}
+                                    >
+                                      {preset}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
                             </td>
                             <td>
                               {doc.template === 'LAPTOP' ? (
@@ -1438,7 +1959,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                                         doc.variants.map((v, i) => (i === idx ? { ...v, ram: e.target.value } : v))
                                       )
                                     }
-                                    placeholder="RAM (16GB)"
+                                    placeholder="RAM (32GB)"
                                     title="Dung lượng RAM"
                                     className="matrix-mini-input"
                                   />
@@ -1451,7 +1972,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                                         doc.variants.map((v, i) => (i === idx ? { ...v, storage: e.target.value } : v))
                                       )
                                     }
-                                    placeholder="SSD (512GB)"
+                                    placeholder="SSD (1TB)"
                                     title="Ổ cứng SSD"
                                     className="matrix-mini-input"
                                   />
@@ -1464,7 +1985,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                                         doc.variants.map((v, i) => (i === idx ? { ...v, gpu: e.target.value } : v))
                                       )
                                     }
-                                    placeholder="GPU (RTX 4060)"
+                                    placeholder="GPU (Arc 140T)"
                                     title="Card đồ họa GPU"
                                     className="matrix-mini-input"
                                   />
@@ -1478,7 +1999,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                                         )
                                       )
                                     }
-                                    title="Tình trạng máy"
+                                    title="Tình trạng riêng của cấu hình này"
                                     className="matrix-mini-select"
                                   >
                                     <option value="NEW">Mới 100%</option>
@@ -1548,40 +2069,55 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                             </td>
                             <td>
                               <input
-                                type="number"
-                                min="0"
-                                step="1"
-                                max="2000000000"
+                                type="text"
+                                inputMode="numeric"
                                 aria-label={`Giá bán cấu hình ${idx + 1}`}
-                                value={variant.price}
+                                value={formatNumberDots(variant.price)}
                                 onChange={e =>
                                   updateDoc(
                                     'variants',
                                     doc.variants.map((v, i) =>
-                                      i === idx ? { ...v, price: parseInt(e.target.value, 10) || 0 } : v
+                                      i === idx ? { ...v, price: parseNumberDots(e.target.value) ?? 0 } : v
                                     )
                                   )
                                 }
+                                placeholder="28.900.000"
                                 className="matrix-input-cell matrix-input-price"
                               />
                             </td>
                             <td>
                               <input
-                                type="number"
-                                min="0"
-                                max="2000000000"
-                                step="1"
-                                value={variant.originalPrice ?? ''}
+                                type="text"
+                                inputMode="numeric"
+                                value={formatNumberDots(variant.originalPrice)}
                                 placeholder="Không giảm"
                                 onChange={e =>
                                   updateDoc(
                                     'variants',
                                     doc.variants.map((v, i) =>
-                                      i === idx ? { ...v, originalPrice: e.target.value === '' ? null : Number(e.target.value) } : v
+                                      i === idx ? { ...v, originalPrice: parseNumberDots(e.target.value) } : v
                                     )
                                   )
                                 }
                                 className="matrix-input-cell text-slate-500 text-right"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="number"
+                                min={0}
+                                max={999999}
+                                aria-label={`Tồn kho cấu hình ${idx + 1}`}
+                                value={variant.stock ?? 1}
+                                onChange={e =>
+                                  updateDoc(
+                                    'variants',
+                                    doc.variants.map((v, i) =>
+                                      i === idx ? { ...v, stock: Math.max(0, parseInt(e.target.value, 10) || 0) } : v
+                                    )
+                                  )
+                                }
+                                className="matrix-input-cell text-center font-semibold"
                               />
                             </td>
                             <td>
@@ -1628,7 +2164,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                               </div>
                             </td>
                           </tr>
-                        ))
+                          );
+                        })
                       )}
                     </tbody>
 
@@ -1636,17 +2173,30 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                     <tfoot>
                       <tr className="matrix-quick-add-tr">
                         <td style={{ textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>+</td>
+                        <td style={{ textAlign: 'center', color: '#cbd5e1', fontSize: '10px' }} title="Gắn ảnh sau khi thêm dòng">—</td>
                         <td>
-                          <input
-                            type="text"
-                            value={quickAddName}
-                            onChange={e => setQuickAddName(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') handleAddQuickVariant();
-                            }}
-                            placeholder="Tên cấu hình mới..."
-                            className="matrix-input-cell"
-                          />
+                          <div className="space-y-1">
+                            <input
+                              type="text"
+                              value={quickAddName}
+                              onChange={e => setQuickAddName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleAddQuickVariant();
+                              }}
+                              placeholder="Tên cấu hình mới..."
+                              className="matrix-input-cell"
+                            />
+                            <input
+                              type="text"
+                              value={quickAddTag}
+                              onChange={e => setQuickAddTag(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleAddQuickVariant();
+                              }}
+                              placeholder="Nhãn nổi bật (tùy chọn)..."
+                              className="matrix-mini-input text-[11px]"
+                            />
+                          </div>
                         </td>
                         <td>
                           {doc.template === 'LAPTOP' ? (
@@ -1731,9 +2281,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                         </td>
                         <td>
                           <input
-                            type="number"
-                            min="0"
-                            value={quickAddPrice}
+                            type="text"
+                            inputMode="numeric"
+                            value={quickAddPrice ? formatNumberDots(parseNumberDots(quickAddPrice)) : ''}
                             onChange={e => setQuickAddPrice(e.target.value)}
                             onKeyDown={e => {
                               if (e.key === 'Enter') handleAddQuickVariant();
@@ -1744,15 +2294,28 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                         </td>
                         <td>
                           <input
-                            type="number"
-                            min="0"
-                            value={quickAddOriginalPrice}
+                            type="text"
+                            inputMode="numeric"
+                            value={quickAddOriginalPrice ? formatNumberDots(parseNumberDots(quickAddOriginalPrice)) : ''}
                             onChange={e => setQuickAddOriginalPrice(e.target.value)}
                             onKeyDown={e => {
                               if (e.key === 'Enter') handleAddQuickVariant();
                             }}
                             placeholder="Giá gốc"
                             className="matrix-input-cell text-slate-500 text-right"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min={0}
+                            value={quickAddStock}
+                            onChange={e => setQuickAddStock(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddQuickVariant();
+                            }}
+                            placeholder="SL"
+                            className="matrix-input-cell text-center"
                           />
                         </td>
                         <td>
@@ -1765,7 +2328,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                             <option value="AVAILABLE">Sẵn hàng</option>
                             <option value="PREORDER">Đặt trước</option>
                             <option value="CONTACT">Liên hệ</option>
-                            <option value="UNAVAILABLE">Tạm ngưng</option>
+                            <option value="UNAVAILABLE">Tạm hết hàng</option>
                           </select>
                         </td>
                         <td style={{ textAlign: 'center' }}>
@@ -1783,11 +2346,14 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
           <AdminCard
             title={
-              <div className="flex items-center gap-2">
-                <span>Gói bảo hành</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span>Chính sách & Gói bảo hành</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-xs font-semibold">
+                  Thẻ SP: {formatShortWarrantyBadge(doc.warrantyType || 'SHOP', doc.warrantyMonths || 12)}
+                </span>
                 {doc.warranties.length > 0 && (
                   <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-semibold">
-                    {doc.warranties.length}
+                    {doc.warranties.length} gói tùy chọn
                   </span>
                 )}
               </div>
@@ -1798,11 +2364,15 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                 size="sm"
                 icon={<Plus className="w-3.5 h-3.5" />}
                 onClick={() => {
+                  const isBrand = doc.warrantyType === 'BRAND';
+                  const months = doc.warrantyMonths || 12;
                   updateDoc('warranties', [
                     ...doc.warranties,
                     {
-                      name: 'Bảo hành tiêu chuẩn 12 tháng',
-                      description: 'Bảo hành phần cứng 12 tháng, hỗ trợ phần mềm trọn đời.',
+                      name: isBrand ? `Bảo hành Chính hãng ${months} tháng` : `Bảo hành ${months} tháng tại CitiLap`,
+                      description: isBrand
+                        ? `Bảo hành chính hãng ${months} tháng tại trung tâm ủy quyền, lỗi 1 đổi 1 15 ngày đầu.`
+                        : `Bảo hành phần cứng ${months} tháng tại CitiLap, lỗi 1 đổi 1 15 ngày đầu, hỗ trợ phần mềm trọn đời.`,
                       adjustment: 0,
                       recommended: doc.warranties.length === 0,
                     },
@@ -1813,8 +2383,119 @@ export default function ProductEditor({ id }: ProductEditorProps) {
               </AdminButton>
             }
           >
+            {/* Thiết lập nhanh Bảo hành hiển thị trên Card SP */}
+            <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Loại bảo hành trên Thẻ sản phẩm
+                  </label>
+                  <select
+                    value={doc.warrantyType || 'SHOP'}
+                    onChange={e => updateDoc('warrantyType', e.target.value as WarrantyType)}
+                    className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-2 bg-white font-medium cursor-pointer"
+                  >
+                    <option value="SHOP">Bảo hành tại CitiLap → Hiển thị &quot;BH {doc.warrantyMonths || 12} tháng&quot;</option>
+                    <option value="BRAND">Bảo hành Chính hãng → Hiển thị &quot;BH Hãng {doc.warrantyMonths || 12} tháng&quot;</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Thời gian bảo hành mặc định
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {warrantyMonthsOptions.map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => updateDoc('warrantyMonths', m)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                          (doc.warrantyMonths || 12) === m
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400'
+                        }`}
+                      >
+                        {m} tháng
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-slate-200/70">
+                <span className="text-[11px] font-semibold text-slate-500 mr-1">Chèn nhanh gói bảo hành:</span>
+                {[
+                  {
+                    label: '+ BH CitiLap 6 tháng (0đ)',
+                    type: 'SHOP' as const,
+                    months: 6,
+                    name: 'Bảo hành 6 tháng tại CitiLap',
+                    description: 'Bảo hành phần cứng 6 tháng tại CitiLap, 1 đổi 1 15 ngày đầu.',
+                    adjustment: 0,
+                  },
+                  {
+                    label: '+ BH CitiLap 12 tháng (0đ)',
+                    type: 'SHOP' as const,
+                    months: 12,
+                    name: 'Bảo hành 12 tháng tại CitiLap',
+                    description: 'Bảo hành phần cứng 12 tháng tại CitiLap, 1 đổi 1 15 ngày đầu, hỗ trợ phần mềm trọn đời.',
+                    adjustment: 0,
+                  },
+                  {
+                    label: '+ BH Hãng 12 tháng (0đ)',
+                    type: 'BRAND' as const,
+                    months: 12,
+                    name: 'Bảo hành Chính hãng 12 tháng',
+                    description: 'Bảo hành chính hãng 12 tháng toàn quốc, 1 đổi 1 15 ngày đầu tại CitiLap.',
+                    adjustment: 0,
+                  },
+                  {
+                    label: '+ BH Hãng 24 tháng (0đ)',
+                    type: 'BRAND' as const,
+                    months: 24,
+                    name: 'Bảo hành Chính hãng 24 tháng',
+                    description: 'Bảo hành chính hãng 24 tháng toàn quốc, 1 đổi 1 15 ngày đầu tại CitiLap.',
+                    adjustment: 0,
+                  },
+                  {
+                    label: '+ Gói BH Mở rộng (+900.000đ)',
+                    type: doc.warrantyType || ('SHOP' as const),
+                    months: doc.warrantyMonths || 12,
+                    name: 'Bảo hành Vàng mở rộng (+12 tháng)',
+                    description: 'Cộng thêm 12 tháng bảo hành toàn diện nguồn & màn hình, miễn phí vệ sinh máy.',
+                    adjustment: 900000,
+                  },
+                ].map(preset => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      if (preset.adjustment === 0) {
+                        updateDoc('warrantyType', preset.type);
+                        updateDoc('warrantyMonths', preset.months);
+                      }
+                      updateDoc('warranties', [
+                        ...doc.warranties,
+                        {
+                          name: preset.name,
+                          description: preset.description,
+                          adjustment: preset.adjustment,
+                          recommended: doc.warranties.length === 0,
+                        },
+                      ]);
+                    }}
+                    className="px-2 py-1 text-[11px] font-medium rounded-md bg-white border border-slate-200 text-slate-700 hover:border-blue-400 hover:text-blue-700 transition cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {doc.warranties.length === 0 ? (
-              <p className="text-xs text-slate-500 text-center py-4">Chưa có gói bảo hành.</p>
+              <p className="text-xs text-slate-500 text-center py-4">
+                Đang áp dụng gói mặc định <strong>{formatShortWarrantyBadge(doc.warrantyType || 'SHOP', doc.warrantyMonths || 12)} (0đ)</strong>. Bấm các nút trên nếu muốn thêm gói nâng cấp bảo hành có thu phí.
+              </p>
             ) : (
               <div className="variant-matrix-wrapper">
                 <table className="compact-matrix-table">
@@ -1864,17 +2545,15 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                         </td>
                         <td>
                           <input
-                            type="number"
-                            step="1"
-                            min="-2000000000"
-                            max="2000000000"
+                            type="text"
+                            inputMode="numeric"
                             aria-label={`Phụ thu gói ${idx + 1}`}
-                            value={w.adjustment}
+                            value={formatNumberDots(w.adjustment)}
                             onChange={e =>
                               updateDoc(
                                 'warranties',
                                 doc.warranties.map((item, i) =>
-                                  i === idx ? { ...item, adjustment: parseInt(e.target.value, 10) || 0 } : item
+                                  i === idx ? { ...item, adjustment: parseNumberDots(e.target.value, true) ?? 0 } : item
                                 )
                               )
                             }
@@ -1964,29 +2643,49 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   </div>
 
                   <div className="flex-1 space-y-1.5 min-w-0">
-                    <input
-                      type="text"
-                      aria-label={`ALT ảnh ${idx + 1}`}
-                      value={item.alt}
-                      onChange={e =>
-                        updateDoc(
-                          'media',
-                          doc.media.map((m, i) => (i === idx ? { ...m, alt: e.target.value } : m))
-                        )
-                      }
-                      placeholder="Mô tả ảnh (ALT) *"
-                      className="matrix-input-cell"
-                    />
+                    <div>
+                      <span className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                        Tiêu đề ảnh (hiển thị khi phóng to ảnh & SEO ALT) <span className="text-rose-500">*</span>
+                      </span>
+                      <input
+                        type="text"
+                        aria-label={`ALT ảnh ${idx + 1}`}
+                        value={item.alt}
+                        onChange={e =>
+                          updateDoc(
+                            'media',
+                            doc.media.map((m, i) => (i === idx ? { ...m, alt: e.target.value } : m))
+                          )
+                        }
+                        placeholder="Nhập tiêu đề ảnh hiển thị khi khách bấm xem ảnh lớn..."
+                        className="matrix-input-cell font-medium"
+                      />
+                    </div>
                     <div className="flex items-center gap-1.5">
                       <select
                         aria-label={`Cấu hình ảnh ${idx + 1}`}
                         value={item.variantId}
-                        onChange={e =>
+                        onChange={e => {
+                          const newVariantId = e.target.value;
+                          const prevVariantId = item.variantId;
                           updateDoc(
                             'media',
-                            doc.media.map((m, i) => (i === idx ? { ...m, variantId: e.target.value } : m))
-                          )
-                        }
+                            doc.media.map((m, i) => (i === idx ? { ...m, variantId: newVariantId } : m))
+                          );
+                          if (newVariantId) {
+                            updateDoc(
+                              'variants',
+                              doc.variants.map(v => (v.id === newVariantId ? { ...v, image: item.assetId } : v))
+                            );
+                          } else if (prevVariantId) {
+                            updateDoc(
+                              'variants',
+                              doc.variants.map(v =>
+                                v.id === prevVariantId && v.image === item.assetId ? { ...v, image: '' } : v
+                              )
+                            );
+                          }
+                        }}
                         className="matrix-input-cell flex-1 cursor-pointer"
                       >
                         <option value="">Mọi cấu hình</option>
@@ -2272,7 +2971,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
           <div className="product-editor-status">
             <p
               className="product-publish-note"
-              title="Lưu nháp tự động sau khi ngừng nhập; sản phẩm mới cần lưu lần đầu. Xuất bản áp dụng toàn bộ nội dung nháp."
+              title="Bấm 'Lưu nháp' (hoặc Ctrl+S) để lưu bản nháp. Bấm 'Xuất bản' để áp dụng toàn bộ nội dung lên website."
             >
               {isPublished ? hasUnpublishedDraft || isDirty ? 'Có thay đổi chưa xuất bản' : 'Đã khớp với website' : 'Chưa hiển thị cho khách'}
             </p>
@@ -2285,21 +2984,24 @@ export default function ProductEditor({ id }: ProductEditorProps) {
           </div>
         </AdminCard>
         <fieldset disabled={saving} className="m-0 min-w-0 border-0 p-0">
-          <AdminCard title="Giá">
+          <AdminCard title="Giá & Kho">
             <div className="grid gap-3">
               <div>
                 <label htmlFor="product-price" className="block text-xs font-semibold text-slate-700 mb-1">
                   Giá bán <span className="text-rose-500">*</span>
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1" max="2000000000"
-                  id="product-price"
-                  value={doc.price}
-                  onChange={e => updateDoc('price', Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  className="w-full text-sm font-semibold text-blue-600 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    id="product-price"
+                    value={formatNumberDots(doc.price)}
+                    onChange={e => updateDoc('price', Math.max(0, parseNumberDots(e.target.value) ?? 0))}
+                    placeholder="28.900.000"
+                    className="w-full text-sm font-bold text-blue-600 border border-slate-300 rounded-lg pl-3 pr-7 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">đ</span>
+                </div>
                 <span className="text-xs text-slate-500 mt-1 block">{money(doc.price)}</span>
               </div>
 
@@ -2307,26 +3009,64 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                 <label htmlFor="product-original-price" className="block text-xs font-semibold text-slate-700 mb-1">
                   Giá gốc <span className="font-normal text-slate-500">(nếu giảm)</span>
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1" max="2000000000"
-                  id="product-original-price"
-                  value={doc.originalPrice ?? ''}
-                  onChange={e =>
-                    updateDoc(
-                      'originalPrice',
-                      e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0)
-                    )
-                  }
-                  className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    id="product-original-price"
+                    value={formatNumberDots(doc.originalPrice)}
+                    placeholder="Không giảm"
+                    onChange={e => updateDoc('originalPrice', parseNumberDots(e.target.value))}
+                    className="w-full text-sm border border-slate-300 rounded-lg pl-3 pr-7 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">đ</span>
+                </div>
                 {doc.originalPrice != null && doc.originalPrice > doc.price && (
                   <span className="text-xs text-emerald-600 mt-1 block font-medium">
                     Giảm {money(doc.originalPrice - doc.price)} (-
                     {Math.round(((doc.originalPrice - doc.price) / doc.originalPrice) * 100)}%)
                   </span>
                 )}
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-600 font-semibold flex items-center gap-1">
+                  <Package className="w-3.5 h-3.5 text-slate-400" />
+                  Tồn kho:
+                </span>
+                {doc.variants.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('pricing')}
+                    className="font-bold text-blue-600 hover:underline cursor-pointer"
+                  >
+                    {doc.variants.reduce((sum, v) => sum + (v.stock ?? 1), 0)} máy ({doc.variants.length} cấu hình)
+                  </button>
+                ) : (
+                  <input
+                    type="number"
+                    min={0}
+                    max={999999}
+                    aria-label="Số lượng tồn kho"
+                    value={doc.stock ?? 1}
+                    onChange={e => updateDoc('stock', Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    className="w-20 text-xs font-bold text-right border border-slate-300 rounded-md px-2 py-1"
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-600 font-semibold flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                  Bảo hành:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('info')}
+                  className="font-bold text-slate-800 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 px-2 py-0.5 rounded border border-slate-200 transition cursor-pointer"
+                >
+                  {formatShortWarrantyBadge(doc.warrantyType || 'SHOP', doc.warrantyMonths || 12)}
+                </button>
               </div>
             </div>
           </AdminCard>
@@ -2352,7 +3092,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       {pickerOpen && (
         <MediaDialog title="Chọn ảnh / video từ Thư viện Media" onClose={() => setPickerOpen(false)}>
           <div className="space-y-4">
-            <MediaUpload onUploaded={() => setMediaRefresh(n => n + 1)} />
+            <MediaUpload defaultFolder="products" onUploaded={() => setMediaRefresh(n => n + 1)} />
             <MediaBrowser
               refresh={mediaRefresh}
               picker
@@ -2375,20 +3115,117 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         </MediaDialog>
       )}
 
+      {/* VARIANT IMAGE PICKER MODAL */}
+      {variantImagePickerId && (() => {
+        const targetVariant = doc.variants.find(v => v.id === variantImagePickerId);
+        const currentAssignedAssetId =
+          doc.media.find(m => m.variantId === variantImagePickerId)?.assetId ||
+          (targetVariant?.image && doc.media.some(m => m.assetId === targetVariant.image) ? targetVariant.image : '');
+        return (
+          <MediaDialog
+            title={`Gắn ảnh riêng cho cấu hình: ${targetVariant?.name || targetVariant?.sku || 'Biến thể'}`}
+            onClose={() => setVariantImagePickerId(null)}
+          >
+            <div className="space-y-4">
+              {doc.media.length > 0 && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-800">
+                      1. Chọn nhanh từ các ảnh đã có của sản phẩm này ({doc.media.length} ảnh)
+                    </span>
+                    {currentAssignedAssetId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleAssignVariantImage(variantImagePickerId, null);
+                          setVariantImagePickerId(null);
+                        }}
+                        className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                      >
+                        ✕ Gỡ ảnh riêng (dùng ảnh chung)
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
+                    {doc.media.map((m, idx) => {
+                      const isSelected = currentAssignedAssetId === m.assetId;
+                      return (
+                        <button
+                          key={m.assetId}
+                          type="button"
+                          onClick={() => {
+                            handleAssignVariantImage(variantImagePickerId, m.assetId, m.alt);
+                            setVariantImagePickerId(null);
+                          }}
+                          className={`group relative rounded-lg overflow-hidden border-2 transition cursor-pointer text-left bg-white ${
+                            isSelected
+                              ? 'border-blue-600 ring-2 ring-blue-500/30'
+                              : 'border-slate-200 hover:border-blue-400'
+                          }`}
+                        >
+                          <div className="aspect-square w-full bg-slate-100 relative overflow-hidden">
+                            <StudioAsset key={m.assetId} id={m.assetId} />
+                            <span className="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-white">
+                              {idx === 0 ? 'Bìa' : `#${idx + 1}`}
+                            </span>
+                            {isSelected && (
+                              <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white">
+                                Đang chọn
+                              </span>
+                            )}
+                          </div>
+                          <div className="p-1.5 text-[11px] text-slate-700 truncate font-medium">
+                            {m.alt || `Ảnh #${idx + 1}`}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <span className="block text-xs font-bold text-slate-800">
+                  {doc.media.length > 0
+                    ? '2. Hoặc tải lên / chọn ảnh mới từ Thư viện Media'
+                    : 'Tải lên hoặc chọn ảnh từ Thư viện Media'}
+                </span>
+                <MediaUpload defaultFolder="variants" onUploaded={() => setMediaRefresh(n => n + 1)} />
+                <MediaBrowser
+                  refresh={mediaRefresh}
+                  picker
+                  allowVideo={false}
+                  onSelect={asset => {
+                    handleAssignVariantImage(
+                      variantImagePickerId,
+                      asset.id,
+                      asset.alt || asset.name || `${doc.name} - ${targetVariant?.name || ''}`
+                    );
+                    setVariantImagePickerId(null);
+                  }}
+                />
+              </div>
+            </div>
+          </MediaDialog>
+        );
+      })()}
+
       {/* CONTENT MEDIA PICKER DIALOG */}
       {contentMediaPickerOpen && (
         <MediaDialog title="Chọn ảnh chèn vào bài viết" onClose={() => setContentMediaPickerOpen(false)}>
           <div className="space-y-4">
-            <MediaUpload onUploaded={() => setMediaRefresh(n => n + 1)} />
+            <MediaUpload defaultFolder="content" onUploaded={() => setMediaRefresh(n => n + 1)} />
             <MediaBrowser
               refresh={mediaRefresh}
               picker
               allowVideo={false}
               onSelect={asset => {
                 const figure = document.createElement('figure');
+                figure.style.cssText = 'width: 100%; max-width: 100%; margin: 1rem auto; text-align: center;';
                 const image = document.createElement('img');
                 image.src = asset.url || '';
                 image.alt = asset.alt || asset.name || doc.name;
+                image.style.cssText = 'width: 100%; height: auto; border-radius: 8px;';
                 const caption = document.createElement('figcaption');
                 caption.textContent = asset.alt || asset.name;
                 figure.append(image, caption);
@@ -2674,6 +3511,127 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                 Hoàn tất
               </AdminButton>
             </div>
+          </div>
+        </MediaDialog>
+      )}
+
+      {/* REVISION HISTORY MODAL */}
+      {historyOpen && (
+        <MediaDialog
+          title={`Lịch sử phiên bản sản phẩm (#${revision})`}
+          onClose={() => setHistoryOpen(false)}
+        >
+          <div className="p-2 space-y-3">
+            {loadingRevisions ? (
+              <div className="py-12">
+                <AdminLoadingState message="Đang tải lịch sử phiên bản..." />
+              </div>
+            ) : revisions.length === 0 ? (
+              <div className="py-8 text-center text-slate-500 text-xs">
+                Chưa có lịch sử phiên bản cho sản phẩm này.
+              </div>
+            ) : (
+              <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
+                      <th className="py-2.5 px-3">Bản</th>
+                      <th className="py-2.5 px-3">Hành động</th>
+                      <th className="py-2.5 px-3">Thời gian</th>
+                      <th className="py-2.5 px-3">Người thực hiện</th>
+                      <th className="py-2.5 px-3">Ghi chú</th>
+                      <th className="py-2.5 px-3 text-right">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {revisions.map(r => (
+                      <tr
+                        key={r.revision}
+                        className={`hover:bg-slate-50 transition ${
+                          r.isCurrent ? 'bg-blue-50/30 font-medium' : ''
+                        }`}
+                      >
+                        <td className="py-2.5 px-3 font-mono font-bold">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span>#{r.revision}</span>
+                            {r.isCurrent && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-normal">
+                                Hiện tại
+                              </span>
+                            )}
+                            {r.isPublished && (
+                              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-600 text-white rounded font-normal">
+                                Web
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                              r.action === 'publish'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : r.action === 'unpublish'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}
+                          >
+                            {r.action === 'publish'
+                              ? 'Xuất bản'
+                              : r.action === 'unpublish'
+                              ? 'Ẩn khỏi web'
+                              : r.action === 'restore'
+                              ? 'Khôi phục'
+                              : 'Lưu nháp'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                          {new Date(r.createdAt).toLocaleString('vi-VN')}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          <span className="font-medium text-slate-700">{r.actorName || 'Quản trị viên'}</span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate">
+                          {r.summary}
+                        </td>
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const snap = await mediaRequest<SnapshotDetail>(
+                                    `/api/admin/products/${id}/revisions/${r.revision}`
+                                  );
+                                  setHistoryOpen(false);
+                                  setSelectedRevisionSnapshot(snap);
+                                } catch (e) {
+                                  alert((e as Error).message);
+                                }
+                              }}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                            >
+                              Chi tiết
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setHistoryOpen(false);
+                                setRestoreConfirmRev(r);
+                              }}
+                              disabled={saving || restoring}
+                              className="text-xs text-amber-700 hover:text-amber-900 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 cursor-pointer disabled:opacity-50"
+                            >
+                              Khôi phục
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </MediaDialog>
       )}

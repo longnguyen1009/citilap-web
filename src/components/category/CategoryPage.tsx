@@ -18,10 +18,64 @@ type Props = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const VIRTUAL_LAPTOP_CATEGORIES: Record<string, { id: string; name: string; slug: string; href: string; description: string; image: string | null; alt: string; parentId: string | null; sortOrder: number; productCount: number }> = {
+  "/laptop-moi": {
+    id: "laptop-moi",
+    name: "Laptop Mới 100%",
+    slug: "laptop-moi",
+    href: "/laptop-moi",
+    description: "Laptop mới 100% nguyên seal, chính hãng, đầy đủ cấu hình văn phòng, gaming, đồ họa và MacBook tại CitiLap.",
+    image: null,
+    alt: "Laptop Mới 100%",
+    parentId: null,
+    sortOrder: 90,
+    productCount: 0,
+  },
+  "/laptop-likenew": {
+    id: "laptop-likenew",
+    name: "Laptop Like New",
+    slug: "laptop-likenew",
+    href: "/laptop-likenew",
+    description: "Laptop Like New 99% tuyển chọn kỹ lưỡng, ngoại hình đẹp, hiệu năng ổn định và bảo hành uy tín tại CitiLap.",
+    image: null,
+    alt: "Laptop Like New",
+    parentId: null,
+    sortOrder: 91,
+    productCount: 0,
+  },
+  "/laptop-cu": {
+    id: "laptop-cu",
+    name: "Laptop Cũ & Like New",
+    slug: "laptop-cu",
+    href: "/laptop-cu",
+    description: "Laptop đã qua sử dụng và Like New được kiểm định phần cứng nghiêm ngặt, giá tốt tại CitiLap.",
+    image: null,
+    alt: "Laptop Cũ & Like New",
+    parentId: null,
+    sortOrder: 92,
+    productCount: 0,
+  },
+};
+
 const resolveCategory = cache(async (path: string) => {
   const navigation = await getPublishedNavigation();
-  const categories = navigation?.categories ?? (await getActiveCategories()).map(c => ({ ...c, href: c.href!, description: c.description || "" }));
-  const current = categories.find(c => c.href === path);
+  const categories = navigation?.categories
+    ? [...navigation.categories]
+    : (await getActiveCategories()).map(c => ({ ...c, href: c.href!, description: c.description || "", alt: c.name }));
+  let current = categories.find(c => c.href === path);
+  if (!current && navigation?.categories) {
+    const active = (await getActiveCategories()).map(c => ({ ...c, href: c.href!, description: c.description || "", alt: c.name }));
+    const fallback = active.find(c => c.href === path);
+    if (fallback) {
+      categories.push(fallback);
+      current = fallback;
+    }
+  }
+  if (!current && VIRTUAL_LAPTOP_CATEGORIES[path]) {
+    const virtualCat = VIRTUAL_LAPTOP_CATEGORIES[path];
+    categories.push(virtualCat);
+    current = virtualCat;
+  }
   if (!current) notFound();
   return { current, categories };
 });

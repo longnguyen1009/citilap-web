@@ -5,7 +5,7 @@ import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
 export default function ProductSideShowrooms({ settings }: { settings?: PublicStorefrontSettings | null }) {
   const activeLocations = settings ? [
     {id:'hanoi',name:settings.storeName + ' Hà Nội',address:settings.addressHanoi,displayPhone:settings.storePhone,telHref:'tel:'+settings.storePhone.replace(/[^+\d]/g,''),walkInViewingAndPurchaseEnabled:true},
-    {id:'bac-ninh',name:settings.storeName + ' Bắc Ninh',address:settings.addressBacNinh,displayPhone:settings.storePhoneBacNinh,telHref:'tel:'+settings.storePhoneBacNinh.replace(/[^+\d]/g,''),walkInViewingAndPurchaseEnabled:false},
+    {id:'bac-ninh',name:settings.storeName + ' Bắc Ninh',address:settings.addressBacNinh,displayPhone:settings.storePhoneBacNinh,telHref:'tel:'+settings.storePhoneBacNinh.replace(/[^+\d]/g,''),walkInViewingAndPurchaseEnabled:true},
   ].filter(location => location.address.trim()) : businessProfile.locations.filter(loc => loc.status === "ACTIVE");
 
   return (

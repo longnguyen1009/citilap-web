@@ -47,12 +47,15 @@ try {
   await cdp('Network.setCookie', { name: 'admin_session', value: cookie, url: base, httpOnly: true, sameSite: 'Lax' });
   await cdp('Fetch.enable', { patterns: [{ urlPattern: '*/api/*' }] });
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
-  const routes = ['dashboard', 'products', 'products/new', 'orders', 'customers', 'contacts', 'categories', 'brands', 'campaigns', 'media', 'posts', 'posts/new', 'post-categories', 'pages', 'pages/new', 'builder', 'builder/home', 'navigation', 'analytics', 'settings', 'users', 'audit', 'redirects'].map(s => '/admin/' + s);
+  const routes = (process.argv.includes('--flows-only')
+    ? ['dashboard', 'products', 'orders', 'inventory', 'settings']
+    : ['dashboard', 'products', 'products/new', 'orders', 'inventory', 'customers', 'contacts', 'categories', 'brands', 'campaigns', 'media', 'posts', 'posts/new', 'post-categories', 'pages', 'pages/new', 'builder', 'builder/home', 'navigation', 'analytics', 'settings', 'users', 'audit', 'redirects']).map(s => '/admin/' + s);
   for (const route of routes) {
     const nav = await cdp('Page.navigate', { url: base + route });
     await until(async () => (await cdp('Page.getFrameTree')).frameTree.frame.loaderId === nav.loaderId, route);
     await until(() => js(`location.pathname === ${JSON.stringify(route)} && !!document.querySelector('#admin-content h1')`), route + ' content');
-    await pause(700);
+    await until(() => js(`!document.querySelector('#admin-content').innerText.includes('Đang tải') && !document.querySelector('#admin-content [aria-busy="true"]')`), route + ' data loaded');
+    await pause(250);
     // Discover existing records for detail screens without creating sample content.
     if (['/admin/products', '/admin/orders', '/admin/posts', '/admin/pages'].includes(route)) {
       const href = await js(`[...document.querySelectorAll('main a[href]')].map(a => a.getAttribute('href')).find(h => h.startsWith(${JSON.stringify(route + '/')}) && !h.endsWith('/new') && !h.includes('?'))`);
@@ -75,6 +78,38 @@ try {
         assert(await js(`!!document.querySelector('.admin-settings form h2')`), 'Settings panel heading');
       }
     }
+    if (['/admin/products', '/admin/orders'].includes(route)) {
+      assert.equal(await js(`document.querySelector('.admin-filter-details').open`), false, 'Secondary filters collapsed by default');
+      await js(`document.querySelector('.admin-filter-details summary').focus()`);
+      await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+      await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+      assert(await js(`document.querySelector('.admin-filter-details').open`), 'Filters open with keyboard');
+      if (route === '/admin/products') {
+        await js(`(() => { const el = document.querySelector('select[aria-label="Tình trạng nhận đơn"]'); el.value = 'PREORDER'; el.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+        await until(() => js(`location.search.includes('availability=PREORDER') && document.querySelector('select[aria-label="Tình trạng nhận đơn"]').value === 'PREORDER'`), 'Product filter URL');
+        await js(`document.querySelector('.admin-filter-details summary').click()`);
+        assert(await js(`!document.querySelector('.admin-filter-details').open && location.search.includes('availability=PREORDER')`), 'Collapse preserves product filter');
+        await cdp('Page.reload');
+        await until(() => js(`document.readyState === 'complete' && document.querySelector('select[aria-label="Tình trạng nhận đơn"]')?.value === 'PREORDER' && !!document.querySelector('.admin-filter-details')?.open`), 'Active product filters visible after reload');
+      } else {
+        await js(`[...document.querySelectorAll('.admin-filter-details button')].find(el => el.textContent.trim() === '7 ngày').click()`);
+        await until(() => js(`location.search.includes('startDate=') && location.search.includes('endDate=')`), 'Order date URL');
+        await js(`document.querySelector('.admin-filter-details summary').click()`);
+        assert(await js(`!document.querySelector('.admin-filter-details').open && !!document.querySelector('input[aria-label="Từ ngày"]').value`), 'Collapse preserves order dates');
+      }
+    }
+    if (route === '/admin/inventory') {
+      await js(`[...document.querySelectorAll('main button')].find(el => el.textContent.includes('Tồn kho theo SKU')).click()`);
+      assert.equal(await js(`document.querySelector('input[type=search][aria-label="Tìm tồn kho theo SKU"]') !== null`), true, 'SKU search matches active table');
+      assert.equal(await js(`[...document.querySelectorAll('main button')].some(el => el.textContent.trim() === 'Chờ QC')`), false, 'Serial statuses hidden on SKU view');
+      await js(`[...document.querySelectorAll('main button')].find(el => el.textContent.trim() === 'Nhập máy').click()`);
+      assert(await js(`!!document.querySelector('#inventory-intake')`), 'Intake form opens');
+      assert(await js(`document.querySelector('#intake-product').labels.length > 0 && document.querySelector('#intake-serial').required`), 'Intake labels and required fields');
+      await js(`document.querySelector('#intake-serial').focus()`);
+      await cdp('Input.insertText', { text: 'QA-UNSAVED' });
+      await js(`document.querySelector('button[aria-controls="inventory-intake"]').click(); document.querySelector('button[aria-controls="inventory-intake"]').click()`);
+      assert.equal(await js(`document.querySelector('#intake-serial').value`), 'QA-UNSAVED', 'Hiding intake preserves unsaved input');
+    }
     if (await js(`!!document.querySelector('.admin-schedule')`)) {
       await js(`document.querySelector('.admin-schedule summary').focus()`);
       await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
@@ -87,7 +122,7 @@ try {
   assert.deepEqual(errors, [], 'Browser exceptions');
   assert.deepEqual(apiErrors, [], 'API reads');
   assert.deepEqual(blocked, [], 'No automatic writes');
-  await writeFile(directory + '/results.json', JSON.stringify({ results, errors, apiErrors, blocked }, null, 2));
+  await writeFile(directory + (process.argv.includes('--flows-only') ? '/results-flows.json' : '/results.json'), JSON.stringify({ results, errors, apiErrors, blocked }, null, 2));
   console.log(`${routes.length} pages, ${results.length} viewport checks PASS; read-only local data.`);
 } catch (error) {
   if (ws) {

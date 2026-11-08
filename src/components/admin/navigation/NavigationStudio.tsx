@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useDraftAutosave } from '../useDraftAutosave';
 import SchedulePanel from '../SchedulePanel';
 import DraftRecovery from '../DraftRecovery';
@@ -13,6 +14,7 @@ import type {
 import { navigationDocumentSchema } from '@/contracts/cms/navigation';
 import MediaBrowser, { mediaRequest } from '../media/MediaBrowser';
 import MediaDialog from '../media/MediaDialog';
+import MediaUpload from '../media/MediaUpload';
 import StudioAsset from '../products/StudioAsset';
 import './navigation.css';
 import PageHeader from '../ui/PageHeader';
@@ -228,6 +230,7 @@ function TargetEditor({
 }
 
 export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?: Tab }) {
+  const isDedicatedCategories = initialTab === 'categories';
   const [detail, setDetail] = useState<NavigationDetail | null>(null),
     [doc, setDoc] = useState<NavigationDocument | null>(null),
     [baseline, setBaseline] = useState('');
@@ -235,6 +238,10 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
     [location, setLocation] = useState<'main' | 'footer'>('main'),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
+  const [catQuery, setCatQuery] = useState(''),
+    [catFilter, setCatFilter] = useState<'all' | 'root' | 'child'>('all'),
+    [catExpandAll, setCatExpandAll] = useState(false);
+  const [colQuery, setColQuery] = useState('');
   const [imageFor, setImageFor] = useState<string | null>(null),
     [productSelect, setProductSelect] = useState<((p: Product) => void) | null>(null),
     [names, setNames] = useState<Record<string, string>>({});
@@ -427,13 +434,48 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
       ) : (
         <>
           <div className="nav-top-bar">
-            <nav className="nav-tabs" aria-label="Khu vực biên tập">
-              {(['categories', 'menus', 'collections'] as Tab[]).map(t => (
-                <button aria-pressed={tab === t} key={t} onClick={() => setTab(t)}>
-                  {t === 'menus' ? `Menu` : t === 'categories' ? `Danh mục (${doc.categories.length})` : `Bộ sưu tập (${doc.collections.length})`}
+            {isDedicatedCategories ? (
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <input
+                  type="search"
+                  aria-label="Tìm danh mục"
+                  placeholder="Tìm theo tên hoặc slug danh mục..."
+                  value={catQuery}
+                  onChange={e => setCatQuery(e.target.value)}
+                  style={{ maxWidth: '280px' }}
+                />
+                <select
+                  aria-label="Lọc cấp danh mục"
+                  value={catFilter}
+                  onChange={e => setCatFilter(e.target.value as 'all' | 'root' | 'child')}
+                  style={{ width: 'auto' }}
+                >
+                  <option value="all">Tất cả ({doc.categories.length})</option>
+                  <option value="root">Danh mục gốc ({doc.categories.filter(c => !c.parentId).length})</option>
+                  <option value="child">Danh mục con ({doc.categories.filter(c => !!c.parentId).length})</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setCatExpandAll(prev => !prev)}
+                >
+                  {catExpandAll ? 'Thu gọn tất cả' : 'Mở rộng tất cả'}
                 </button>
-              ))}
-            </nav>
+              </div>
+            ) : (
+              <nav className="nav-tabs" aria-label="Khu vực biên tập">
+                {(['menus', 'collections'] as Tab[]).map(t => (
+                  <button aria-pressed={tab === t} key={t} onClick={() => setTab(t)}>
+                    {t === 'menus' ? `Menu điều hướng` : `Bộ sưu tập (${doc.collections.length})`}
+                  </button>
+                ))}
+                <a
+                  href="/admin/categories"
+                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-blue-600"
+                >
+                  Danh mục SP ({doc.categories.length}) ↗
+                </a>
+              </nav>
+            )}
 
             <div className="flex items-center gap-2">
               {tab === 'categories' && (
@@ -461,36 +503,46 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                 </button>
               )}
               {tab === 'collections' && (
-                <button
-                  type="button"
-                  className="nav-primary"
-                  onClick={() =>
-                    update('collections', [
-                      ...doc.collections,
-                      {
-                        id: crypto.randomUUID(),
-                        name: 'Bộ sưu tập mới',
-                        slug: '',
-                        description: '',
-                        visible: true,
-                        mode: 'manual',
-                        productIds: [],
-                        image: '',
-                        rule: {
-                          productType: 'all',
-                          categoryId: null,
-                          brandId: null,
-                          tag: 'all',
-                          availability: 'all',
-                          sort: 'newest',
-                          limit: 12,
+                <>
+                  <input
+                    type="search"
+                    aria-label="Tìm bộ sưu tập"
+                    placeholder="Tìm bộ sưu tập..."
+                    value={colQuery}
+                    onChange={e => setColQuery(e.target.value)}
+                    style={{ width: '200px' }}
+                  />
+                  <button
+                    type="button"
+                    className="nav-primary"
+                    onClick={() =>
+                      update('collections', [
+                        ...doc.collections,
+                        {
+                          id: crypto.randomUUID(),
+                          name: 'Bộ sưu tập mới',
+                          slug: '',
+                          description: '',
+                          visible: true,
+                          mode: 'manual',
+                          productIds: [],
+                          image: '',
+                          rule: {
+                            productType: 'all',
+                            categoryId: null,
+                            brandId: null,
+                            tag: 'all',
+                            availability: 'all',
+                            sort: 'newest',
+                            limit: 12,
+                          },
                         },
-                      },
-                    ])
-                  }
-                >
-                  + Thêm bộ sưu tập
-                </button>
+                      ])
+                    }
+                  >
+                    + Thêm bộ sưu tập
+                  </button>
+                </>
               )}
               {tab === 'menus' && (
                 <>
@@ -546,11 +598,45 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
           <fieldset disabled={busy}>
             {tab === 'categories' && (
               <section>
-                {doc.categories.map((c, i) => (
-                  <details className="nav-card" key={c.id} open={i === 0 || !c.slug}>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">✨ Giao diện mới chuẩn WordPress:</span>
+                    <span>Bạn có thể sử dụng màn hình chuyên sâu để phân loại và sắp xếp trực quan hơn.</span>
+                  </div>
+                  <Link
+                    href="/admin/categories"
+                    className="font-bold text-blue-700 hover:text-blue-900 underline flex items-center gap-1 shrink-0 ml-2"
+                  >
+                    <span>Mở trang Danh mục SP</span>
+                    <span aria-hidden="true">&rarr;</span>
+                  </Link>
+                </div>
+                {doc.categories
+                  .map((c, i) => ({ c, i }))
+                  .filter(({ c }) => {
+                    if (catFilter === 'root' && c.parentId) return false;
+                    if (catFilter === 'child' && !c.parentId) return false;
+                    if (catQuery.trim()) {
+                      const q = catQuery.trim().toLowerCase();
+                      return (
+                        c.name.toLowerCase().includes(q) ||
+                        (c.slug || '').toLowerCase().includes(q)
+                      );
+                    }
+                    return true;
+                  })
+                  .map(({ c, i }) => {
+                    const parentName = c.parentId ? doc.categories.find(p => p.id === c.parentId)?.name : null;
+                    return (
+                  <details className="nav-card" key={c.id} open={catExpandAll || i === 0 || !c.slug || !!catQuery.trim()}>
                     <summary>
                       <span>
                         {i + 1}. {c.name}
+                        {parentName && (
+                          <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-normal">
+                            Thuộc: {parentName}
+                          </span>
+                        )}
                       </span>
                       <small>
                         {c.slug ? `/${c.slug}` : 'Chưa có slug'} · {c.visible ? 'Hiển thị' : 'Đang ẩn'}
@@ -631,14 +717,22 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                       </div>
                     </div>
                   </details>
-                ))}
+                    );
+                  })}
               </section>
             )}
 
             {tab === 'collections' && (
               <section>
                 {!doc.collections.length && <p className="nav-empty">Chưa có bộ sưu tập.</p>}
-                {doc.collections.map((c, i) => {
+                {doc.collections
+                  .map((c, i) => ({ c, i }))
+                  .filter(({ c }) => {
+                    if (!colQuery.trim()) return true;
+                    const q = colQuery.trim().toLowerCase();
+                    return c.name.toLowerCase().includes(q) || (c.slug || '').toLowerCase().includes(q);
+                  })
+                  .map(({ c, i }) => {
                   const baseRule = c.rule || {
                     productType: 'all',
                     categoryId: null,
@@ -895,13 +989,17 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
       )}
       {imageFor && doc && (
         <MediaDialog title="Chọn ảnh danh mục" onClose={() => setImageFor(null)}>
-          <MediaBrowser
-            picker
-            onSelect={a => {
-              changeCategory(imageFor, { assetId: a.id, image: '', alt: a.alt || a.name });
-              setImageFor(null);
-            }}
-          />
+          <div className="space-y-4">
+            <MediaUpload defaultFolder="brands" onUploaded={() => undefined} />
+            <MediaBrowser
+              picker
+              defaultFolder="brands"
+              onSelect={a => {
+                changeCategory(imageFor, { assetId: a.id, image: '', alt: a.alt || a.name });
+                setImageFor(null);
+              }}
+            />
+          </div>
         </MediaDialog>
       )}
       {productSelect && (

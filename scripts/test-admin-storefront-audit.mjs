@@ -53,7 +53,7 @@ try {
   }
   const resolve = async s => (await api.resolveSectionsForStorefront(db, [s]))[0];
   await check('Gallery preserves six configured entries including duplicate URLs', async () => {
-    const s = await resolve(section('customer_gallery', { title: 'Gallery', images: Array.from({ length: 6 }, (_, i) => ({ url: '/brand/store-photo-04.jpg', alt: 'Photo ' + i })) }));
+    const s = await resolve(section('customer_gallery', { title: 'Gallery', images: Array.from({ length: 6 }, (_, i) => ({ url: '/brand/store-photo-04.webp', alt: 'Photo ' + i })) }));
     assert.equal(s.data.images.length, 6);
     assert.equal((html([s]).match(/aria-label="Phóng to ảnh /g) || []).length, 6);
   });
@@ -89,7 +89,7 @@ try {
     assert.equal(s.resolvedPosts.length, 2);
   });
   await check('Featured collection renderer respects admin limit=1', () => {
-    const s = { ...section('featured_collection', { title: '', subtitle: '', collectionId: 'collection-slug', limit: 1 }), resolvedCollection: { name: 'Collection', slug: 'collection-slug', products: [{ id: 'p1', name: 'Fixture One', slug: 'fixture-one', price: 1000000, image: '/brand/store-photo-04.jpg' }, { id: 'p2', name: 'Fixture Two', slug: 'fixture-two', price: 2000000, image: '/brand/store-photo-04.jpg' }] } };
+    const s = { ...section('featured_collection', { title: '', subtitle: '', collectionId: 'collection-slug', limit: 1 }), resolvedCollection: { name: 'Collection', slug: 'collection-slug', products: [{ id: 'p1', name: 'Fixture One', slug: 'fixture-one', price: 1000000, image: '/brand/store-photo-04.webp' }, { id: 'p2', name: 'Fixture Two', slug: 'fixture-two', price: 2000000, image: '/brand/store-photo-04.webp' }] } };
     assert(!html([s]).includes('Fixture Two'), 'Second product renders despite limit=1');
   });
   await check('Builder list returns authored fields and filters before pagination, independently of homepage', async () => {

@@ -50,7 +50,7 @@ export const SHOWCASE_CATEGORIES: ShowcaseCategoryItem[] = [
     href: "/laptop-van-phong",
     icon: Briefcase,
     group: "laptop",
-    description: "Mỏng nhẹ, pin trâu, bàn phím gõ êm",
+    description: "Mỏng nhẹ, pin bền, bàn phím gõ êm",
   },
   {
     id: "laptop-do-hoa",
@@ -83,7 +83,7 @@ export const SHOWCASE_CATEGORIES: ShowcaseCategoryItem[] = [
   },
   {
     id: "balo-tui-chong-soc",
-    name: "Balo & Túi Sốc",
+    name: "Balo & Túi Chống Sốc",
     slug: "linh-kien",
     href: "/phu-kien?type=bag",
     icon: ShoppingBag,
@@ -114,7 +114,7 @@ export const SHOWCASE_CATEGORIES: ShowcaseCategoryItem[] = [
   // --- HÀNG 2: PHỤ KIỆN SETUP, TẢN NHIỆT & ĐỒ CHƠI CÔNG NGHỆ ---
   {
     id: "tan-nhiet-gia-do",
-    name: "Đế Tản Nhiệt & Kê",
+    name: "Đế Tản Nhiệt & Giá Đỡ",
     slug: "linh-kien",
     href: "/phu-kien?type=stand",
     icon: Fan,

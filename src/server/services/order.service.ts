@@ -362,7 +362,7 @@ export async function computeOrderPayloadHash(payload: CreateOrderInput): Promis
   };
 
   // Preserve legacy hashes for retries without the new acknowledgment.
-  const jsonStr = JSON.stringify(payload.checkoutAcknowledgment ? {...normalized, checkoutVersion:1, showroomId:payload.showroomId || null, acknowledgment:payload.checkoutAcknowledgment, prices:payload.items.map(i=>({productId:i.productId,variantId:i.variantId || null,expectedPrice:i.expectedPrice})).sort((a,b)=>(a.productId+':'+a.variantId).localeCompare(b.productId+':'+b.variantId))} : normalized);
+  const jsonStr = JSON.stringify(payload.checkoutAcknowledgment ? { ...normalized, checkoutVersion: 1, showroomId: payload.showroomId || null, acknowledgment: payload.checkoutAcknowledgment, prices: payload.items.map(i => ({ productId: i.productId, variantId: i.variantId || null, expectedPrice: i.expectedPrice })).sort((a, b) => (a.productId + ':' + a.variantId).localeCompare(b.productId + ':' + b.variantId)) } : normalized);
   const enc = new TextEncoder().encode(jsonStr);
   const buf = await crypto.subtle.digest('SHA-256', enc);
   return Array.from(new Uint8Array(buf))
@@ -447,19 +447,19 @@ export async function createOrder(
 
   const selection = checkoutSelectionSchema.safeParse(payload);
   const acknowledgment = checkoutAcknowledgmentSchema.safeParse(payload.checkoutAcknowledgment);
-  if (!selection.success || !acknowledgment.success || !payload.paymentMethod || payload.items.some(i=>!Number.isSafeInteger(i.expectedPrice) || Number(i.expectedPrice)<0)) {
+  if (!selection.success || !acknowledgment.success || !payload.paymentMethod || payload.items.some(i => !Number.isSafeInteger(i.expectedPrice) || Number(i.expectedPrice) < 0)) {
     throw new CheckoutError('INVALID_CHECKOUT', 'Vui lòng kiểm tra và xác nhận tổng tiền trước khi đặt hàng.');
   }
-  const {quote, resolvedItems, campaignNotes, changedItems, expectedSubtotal} = await calculateCheckout(payload, db);
+  const { quote, resolvedItems, campaignNotes, changedItems, expectedSubtotal } = await calculateCheckout(payload, db);
   const now = quote.evaluatedAt.replace('Z', '+00:00');
   const subtotalAmount = quote.subtotal, shippingFee = quote.shippingFee, totalAmount = quote.totalAmount;
   const checkoutSnapshot = JSON.stringify(quote.snapshot);
-  if (quote.snapshot.showroom) shippingAddress = 'Nhận tại showroom: '+quote.snapshot.showroom.name+' ('+quote.snapshot.showroom.address+')';
+  if (quote.snapshot.showroom) shippingAddress = 'Nhận tại showroom: ' + quote.snapshot.showroom.name + ' (' + quote.snapshot.showroom.address + ')';
   else if (!shippingAddress || shippingAddress.length > 500) throw new CheckoutError('INVALID_CHECKOUT', 'Vui lòng nhập địa chỉ giao hàng.');
   if (changedItems.length || acknowledgment.data.shippingFee !== shippingFee || acknowledgment.data.totalAmount !== totalAmount || acknowledgment.data.termsVersion !== quote.termsVersion) {
     throw new CheckoutError(changedItems.length ? 'PRICE_CHANGED' : 'CHECKOUT_CHANGED', 'Giá, phí giao hàng hoặc thông tin nhận/thanh toán đã thay đổi. Vui lòng kiểm tra và xác nhận lại.', 409, {
-      changedItems, oldSubtotal:expectedSubtotal, newSubtotal:subtotalAmount, oldGrandTotal:acknowledgment.data.totalAmount, newGrandTotal:totalAmount,
-      oldShippingFee:acknowledgment.data.shippingFee, newShippingFee:shippingFee, quote,
+      changedItems, oldSubtotal: expectedSubtotal, newSubtotal: subtotalAmount, oldGrandTotal: acknowledgment.data.totalAmount, newGrandTotal: totalAmount,
+      oldShippingFee: acknowledgment.data.shippingFee, newShippingFee: shippingFee, quote,
     });
   }
 
@@ -575,11 +575,11 @@ export async function createOrder(
   } catch (error) {
     // A concurrent retry may commit first. Read its immutable result before live validation.
     if (cleanIdempotencyKey) {
-      const winner = await prisma.order.findUnique({where:{idempotencyKey:cleanIdempotencyKey},include:{items:true}});
+      const winner = await prisma.order.findUnique({ where: { idempotencyKey: cleanIdempotencyKey }, include: { items: true } });
       if (winner) {
-        if (winner.payloadHash !== payloadHash) throw Object.assign(new Error('IDEMPOTENCY_PAYLOAD_MISMATCH'), {code:'IDEMPOTENCY_PAYLOAD_MISMATCH'});
+        if (winner.payloadHash !== payloadHash) throw Object.assign(new Error('IDEMPOTENCY_PAYLOAD_MISMATCH'), { code: 'IDEMPOTENCY_PAYLOAD_MISMATCH' });
         const generated = await generateOrderConfirmationToken(winner.id, cleanIdempotencyKey);
-        return {success:true,order:winner,isIdempotentReplay:true,confirmationToken:generated.token};
+        return { success: true, order: winner, isIdempotentReplay: true, confirmationToken: generated.token };
       }
     }
     throw error;
@@ -649,7 +649,7 @@ export async function createOrder(
  */
 export async function getOrderById(orderId: string, d1Database?: D1Database) {
   const prisma = getPrismaClient(d1Database);
-  return prisma.order.findUnique({
+  const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
       items: {
@@ -679,6 +679,41 @@ export async function getOrderById(orderId: string, d1Database?: D1Database) {
       },
     },
   });
+  if (!order) return null;
+
+  const actorIds = Array.from(
+    new Set(
+      [
+        ...(order.events || []).map((ev) => ev.actor),
+        ...(order.internalNotes || []).map((n) => n.actor),
+      ].filter((a): a is string => Boolean(a && a.trim() && a !== SHARED_ADMIN_ACTOR && a !== 'system' && a !== 'customer'))
+    )
+  );
+
+  if (actorIds.length > 0) {
+    try {
+      const users = await prisma.user.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, name: true, email: true },
+      });
+      const actorMap = new Map(users.map((u) => [u.id, u.name || u.email || u.id]));
+      return {
+        ...order,
+        events: order.events.map((ev) => ({
+          ...ev,
+          actor: actorMap.get(ev.actor) || ev.actor,
+        })),
+        internalNotes: order.internalNotes.map((n) => ({
+          ...n,
+          actor: actorMap.get(n.actor) || n.actor,
+        })),
+      };
+    } catch {
+      // Fallback to raw actor if user lookup fails
+    }
+  }
+
+  return order;
 }
 
 /**
@@ -874,6 +909,10 @@ export async function getAllOrdersForExport(
     } else {
       where.status = filters.status;
     }
+  }
+
+  if (filters.paymentStatus && filters.paymentStatus !== 'ALL') {
+    where.paymentStatus = filters.paymentStatus;
   }
 
   if (filters.search?.trim()) {
@@ -1075,8 +1114,8 @@ export async function transitionOrderStatus(
   const action = targetStatus === 'CANCELLED'
     ? 'CANCELLED'
     : currentStatus === 'CANCELLED'
-    ? 'REOPENED'
-    : 'STATUS_CHANGE';
+      ? 'REOPENED'
+      : 'STATUS_CHANGE';
 
   const updateStmt = db.prepare(
     `UPDATE "Order" SET "status" = ?, "revision" = ?, "completedAt" = ?, "updatedAt" = ? WHERE "id" = ? AND "revision" = ?`
@@ -1167,11 +1206,26 @@ export async function addOrderInternalNote(
 
   await db.batch([noteStmt, eventStmt, ...adminAuditStatements(db, 'order.note', orderId, 'Internal note added')]);
 
+  let resolvedActor = adminActor(SHARED_ADMIN_ACTOR);
+  if (resolvedActor && resolvedActor !== SHARED_ADMIN_ACTOR) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: resolvedActor },
+        select: { name: true, email: true },
+      });
+      if (user) {
+        resolvedActor = user.name || user.email || resolvedActor;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return {
     id: noteId,
     orderId,
     content: cleanContent,
-    actor: adminActor(SHARED_ADMIN_ACTOR),
+    actor: resolvedActor,
     createdAt: now,
   };
 }

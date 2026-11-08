@@ -17,9 +17,9 @@ export async function GET() {
         { status: error.status }
       );
     }
-    const message = error instanceof Error ? error.message : "Lỗi máy chủ";
+    console.error("[api/settings] GET failed:", error);
     return NextResponse.json(
-      { success: false, error: `Không thể đọc cài đặt: ${message}` },
+      { success: false, error: "Không thể đọc cài đặt. Vui lòng thử lại sau." },
       { status: 500 }
     );
   }

@@ -85,7 +85,7 @@ export default function ContactSection({ settings }: { settings?: PublicStorefro
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-4">
                 <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-                Hỗ trợ chuyên sâu 24/7
+                Tư vấn kỹ thuật chuyên sâu
               </div>
               <h2 className="text-3xl md:text-4xl lg:text-5xl font-black uppercase mb-6 flex items-center gap-3.5 drop-shadow-md">
                 <MessageCircle className="w-10 h-10 md:w-12 md:h-12 text-blue-400 shrink-0" />
@@ -200,7 +200,7 @@ export default function ContactSection({ settings }: { settings?: PublicStorefro
                       className="w-full bg-gray-900/70 border border-gray-600/80 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition"
                     >
                       <option value="gaming">Laptop Gaming / Đồ họa hiệu năng cao</option>
-                      <option value="office">Ultrabook / Văn phòng pin trâu, mỏng nhẹ</option>
+                      <option value="office">Ultrabook / Văn phòng mỏng nhẹ, pin bền</option>
                       <option value="workstation">Máy Trạm Workstation chuyên nghiệp</option>
                       <option value="likenew">Laptop Like-New 99% tiết kiệm chi phí</option>
                       <option value="accessory">Nâng cấp RAM, SSD & Phụ kiện công nghệ</option>

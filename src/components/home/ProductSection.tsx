@@ -64,7 +64,7 @@ export default async function ProductSection({
               <ErrorState
                 title="Không thể tải danh sách sản phẩm"
                 message="Đã xảy ra lỗi khi kết nối với cơ sở dữ liệu. Vui lòng thử lại sau."
-                supportHref="/contact"
+                supportHref="/lien-he"
               />
             ) : products.length === 0 ? (
               <EmptyState
@@ -72,7 +72,7 @@ export default async function ProductSection({
                 description="Danh mục này hiện đang được cập nhật sản phẩm mới. Quý khách vui lòng quay lại sau."
                 action={
                   slug ? (
-                    <Link href={`/${slug}`}>
+                    <Link href={slug.startsWith("/") ? slug : `/${slug}`}>
                       <Button variant="outline" size="sm">
                         Xem tất cả danh mục
                       </Button>

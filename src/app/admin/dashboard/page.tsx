@@ -33,6 +33,7 @@ interface DashboardData {
     completedRevenue?: number;
   };
   statusBreakdown?: Record<string, number>;
+  lowStockCount?: number;
   lowStockProducts?: {
     id: string;
     name: string;
@@ -138,7 +139,7 @@ export default function DashboardPage() {
       iconTone: "bg-amber-50 text-amber-600",
     },
     {
-      label: "Đang bán trên web",
+      label: "Đã xuất bản",
       value: summary.publishedStudioCount,
       href: "/admin/products?publicationStatus=PUBLISHED",
       icon: Package,
@@ -146,7 +147,7 @@ export default function DashboardPage() {
       iconTone: "bg-emerald-50 text-emerald-600",
     },
     {
-      label: "Bản nháp",
+      label: "Chưa xuất bản",
       value: summary.draftStudioCount,
       href: "/admin/products?publicationStatus=DRAFT",
       icon: Sparkles,
@@ -164,21 +165,36 @@ export default function DashboardPage() {
   ];
 
   const shortcuts = [
-    { label: "+ Sản phẩm", href: "/admin/products/new", icon: Plus, primary: true },
-    { label: "+ Nhập máy", href: "/admin/inventory", icon: Package },
-    { label: "+ Bài viết", href: "/admin/posts/new", icon: Newspaper },
+    { label: "Thêm sản phẩm", href: "/admin/products/new", icon: Plus, primary: true },
+    { label: "Kho & Kiểm định", href: "/admin/inventory", icon: Package },
+    { label: "Viết bài", href: "/admin/posts/new", icon: Newspaper },
     { label: "Flash Sale", href: "/admin/campaigns", icon: Zap },
-    { label: "Trang chủ", href: "/admin/builder", icon: LayoutTemplate },
+    { label: "Bố cục trang", href: "/admin/builder", icon: LayoutTemplate },
     { label: "Xem web", href: "/", icon: ExternalLink, external: true },
   ];
 
   return (
     <div className="admin-dashboard space-y-5 pb-10">
-      {/* 1. Header with Quick Shortcuts inline */}
+      {/* Page actions and daily shortcuts have separate rows. */}
       <PageHeader
         title="Tổng quan"
+        description="Tiếp nhận đơn hàng, kiểm tra tồn kho và tiếp tục biên tập nội dung."
         actions={
           <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => void loadDashboard()}
+              title="Làm mới"
+              aria-label="Làm mới"
+              className="inline-grid place-items-center size-8 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        }
+      />
+
+      <section aria-label="Thao tác thường dùng" className="flex flex-wrap items-center gap-2">
             {shortcuts.map((s) => {
               const Icon = s.icon;
               return (
@@ -198,18 +214,7 @@ export default function DashboardPage() {
                 </Link>
               );
             })}
-            <button
-              type="button"
-              onClick={() => void loadDashboard()}
-              title="Làm mới"
-              aria-label="Làm mới"
-              className="inline-grid place-items-center size-8 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-            </button>
-          </div>
-        }
-      />
+      </section>
 
       {/* 2. Compact Clickable Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -237,7 +242,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
         <div className="lg:col-span-2 bg-white rounded-lg border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="text-xs font-medium text-slate-500">Doanh thu đơn hoàn tất</div>
+            <div className="text-xs font-medium text-slate-500">Doanh thu đơn hoàn tất · Tất cả thời gian</div>
             <div className="text-xl font-black text-emerald-700 tabular-nums mt-0.5">
               {formatCurrency(summary.completedRevenue || 0)}
             </div>
@@ -265,25 +270,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-slate-200 p-4 flex items-center justify-between gap-3">
+        <div className="bg-white rounded-lg border border-slate-200 p-4 flex flex-col items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs font-medium text-slate-500">Cảnh báo tồn kho thấp (≤ 2)</div>
             <div className="text-sm font-bold text-slate-900 mt-0.5">
-              {(data.lowStockProducts?.length || 0) === 0
-                ? "Tất cả sản phẩm đủ tồn kho"
-                : `${data.lowStockProducts?.length} sản phẩm sắp hết hàng`}
+              {(data.lowStockCount ?? data.lowStockProducts?.length ?? 0) === 0
+                ? "Không có sản phẩm tồn khả dụng ≤ 2"
+                : `${data.lowStockCount ?? data.lowStockProducts?.length} sản phẩm sắp hết / hết hàng`}
             </div>
             {data.lowStockProducts && data.lowStockProducts.length > 0 && (
-              <div className="text-[11px] text-amber-700 truncate mt-0.5">
-                {data.lowStockProducts.map((p) => `${p.name} (SL: ${p.stock})`).join(", ")}
-              </div>
+              <ul className="mt-2 space-y-1 text-xs text-amber-800">
+                {data.lowStockProducts.map((p) => <li key={p.id}><Link href={`/admin/products/${p.id}`} className="hover:underline">{p.name} · Khả dụng: {p.stock}</Link></li>)}
+              </ul>
             )}
           </div>
           <Link
             href="/admin/inventory"
             className="shrink-0 px-2.5 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition"
           >
-            Kho &amp; Serial →
+            Kho &amp; Kiểm định →
           </Link>
         </div>
       </div>
@@ -294,9 +299,9 @@ export default function DashboardPage() {
           <AdminCard
             title={
               <div className="flex items-center gap-2">
-                <span>Đơn hàng mới</span>
+                <h2 className="font-semibold">Đơn hàng gần đây</h2>
                 <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-semibold tabular-nums">
-                  {summary.totalOrders}
+                  {recentOrders.length}
                 </span>
               </div>
             }
@@ -390,7 +395,7 @@ export default function DashboardPage() {
                           <span className="font-mono">#{p.revision}</span>
                           <span>·</span>
                           <span className={isPublished ? "text-emerald-600 font-medium" : "text-slate-500"}>
-                            {isPublished ? "Đang bán" : "Nháp"}
+                            {isPublished ? "Đã xuất bản" : "Chưa xuất bản"}
                           </span>
                         </div>
                       </div>

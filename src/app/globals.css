@@ -255,13 +255,38 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
-/* Hide scrollbar utility */
-.hide-scrollbar {
+/* Hide scrollbar utility & smooth touch momentum */
+.hide-scrollbar,
+.scrollbar-none {
   -ms-overflow-style: none;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
-.hide-scrollbar::-webkit-scrollbar {
+.hide-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+/* Fast mobile tap response (no 300ms delay or gray highlight flash) */
+a,
+button,
+summary,
+input,
+select,
+textarea,
+[role="button"],
+[role="tab"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS Safari automatic viewport zoom when focusing inputs < 16px */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* Accessible focus visible ring */

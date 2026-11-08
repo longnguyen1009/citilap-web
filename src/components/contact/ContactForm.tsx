@@ -55,7 +55,7 @@ export default function ContactForm({ appointment = false, productId = '', unitC
       setEmail("");
       setMessage("");
     } catch {
-      setError("Không thể kết nối đến máy chủ. Vui lòng liên hệ hotline 0899.188.186.");
+      setError(`Không thể kết nối đến máy chủ. Vui lòng liên hệ hotline ${businessProfile.displayPhone}.`);
     } finally {
       turnstile.reset();
       setLoading(false);

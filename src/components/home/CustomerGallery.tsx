@@ -2,29 +2,39 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight, X, ExternalLink } from 'lucide-react';
 
-type GalleryImage = { url: string; alt: string };
+type GalleryImage = { url: string; alt: string; href?: string; enabled?: boolean };
 
-export default function CustomerGallery({ title, images }: { title: string; images: GalleryImage[] }) {
+export default function CustomerGallery({
+  title,
+  subtitle,
+  limit,
+  images,
+}: {
+  title: string;
+  subtitle?: string;
+  limit?: number;
+  images: GalleryImage[];
+}) {
   const rail = useRef<HTMLDivElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const [selected, setSelected] = useState<GalleryImage | null>(null);
   const [bounds, setBounds] = useState({ start: true, end: false });
 
-  // Render exactly what admin configured (skip only empty URLs) so the storefront
-  // count always matches the Site Builder list. Duplicates are flagged in admin instead.
-  const uniqueImages = images.filter((img) => Boolean(img?.url?.trim()));
+  // Render exactly what admin configured (skip disabled or empty URLs)
+  const enabledImages = images.filter((img) => Boolean(img?.url?.trim()) && img.enabled !== false);
+  const uniqueImages = limit && limit > 0 ? enabledImages.slice(0, limit) : enabledImages;
 
   useEffect(() => {
     const el = rail.current;
     if (!el) return;
     const update = () => {
-      setBounds({
-        start: el.scrollLeft <= 1,
-        end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 2,
-      });
+      const start = el.scrollLeft <= 1;
+      const end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+      setBounds((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
     };
     update();
     const observer = new ResizeObserver(update);
@@ -58,10 +68,13 @@ export default function CustomerGallery({ title, images }: { title: string; imag
   return <section className="pb-10" aria-label={title}>
     <div className="container mx-auto max-w-[1370px] px-4">
       <div className="rounded-2xl bg-white p-4 sm:p-5 shadow-xs border border-slate-200/80">
-        <div className="mb-4 flex items-center gap-3">
-          <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
-          <h2 className="max-w-[85%] text-center text-base font-black uppercase tracking-tight text-slate-900 sm:text-xl">{title}</h2>
-          <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
+        <div className="mb-4">
+          <div className="flex items-center gap-3">
+            <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
+            <h2 className="max-w-[85%] text-center text-base font-black uppercase tracking-tight text-slate-900 sm:text-xl">{title}</h2>
+            <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
+          </div>
+          {subtitle && <p className="text-center text-xs sm:text-sm text-slate-500 mt-1">{subtitle}</p>}
         </div>
         <div className="relative">
           <div
@@ -124,7 +137,18 @@ export default function CustomerGallery({ title, images }: { title: string; imag
       className="fixed inset-0 m-auto max-h-[94dvh] w-[min(1100px,94vw)] max-w-none overflow-auto rounded-xl bg-slate-950 p-4 text-white backdrop:bg-black/80"
     >
       <div className="mb-3 flex items-center justify-between gap-4">
-        <p className="text-sm font-semibold">{selected?.alt || title}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm font-semibold">{selected?.alt || title}</p>
+          {selected?.href && (
+            <Link
+              href={selected.href}
+              onClick={close}
+              className="inline-flex items-center gap-1 rounded-lg bg-blue-600 hover:bg-blue-500 px-3 py-1.5 text-xs font-bold text-white transition"
+            >
+              Xem liên kết <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          )}
+        </div>
         <button
           type="button"
           autoFocus

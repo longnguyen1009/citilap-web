@@ -29,6 +29,7 @@ import {
 import { blankPage, PAGE_TYPES, type PageDocument, type PageType } from '@/contracts/cms/page';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
+import MediaUpload from '@/components/admin/media/MediaUpload';
 import RichContentEditor from '@/components/admin/products/RichContentEditor';
 import type { MediaAssetDto } from '@/contracts/cms/media';
 
@@ -553,19 +554,23 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
           title={mediaDialogTarget === 'og' ? 'Chọn ảnh OG mạng xã hội' : 'Chèn ảnh vào nội dung trang'}
           onClose={() => setMediaDialogTarget(null)}
         >
-          <MediaBrowser
-            picker
-            onSelect={(asset: MediaAssetDto) => {
-              if (mediaDialogTarget === 'body') {
-                const imgTag = `<p><img src="/api/library/${asset.id}" alt="${asset.alt || asset.name}" class="rounded-lg shadow my-4 max-w-full" /></p>`;
-                updateDoc('contentHtml', doc.contentHtml + imgTag);
-                setMediaDialogTarget(null);
-              } else if (mediaDialogTarget === 'og') {
-                updateSeo('ogImageAssetId', asset.id);
-                setMediaDialogTarget(null);
-              }
-            }}
-          />
+          <div className="space-y-4">
+            <MediaUpload defaultFolder="content" onUploaded={() => undefined} />
+            <MediaBrowser
+              picker
+              defaultFolder="content"
+              onSelect={(asset: MediaAssetDto) => {
+                if (mediaDialogTarget === 'body') {
+                  const imgTag = `<p><img src="/api/library/${asset.id}" alt="${asset.alt || asset.name}" class="rounded-lg shadow my-4 max-w-full" /></p>`;
+                  updateDoc('contentHtml', doc.contentHtml + imgTag);
+                  setMediaDialogTarget(null);
+                } else if (mediaDialogTarget === 'og') {
+                  updateSeo('ogImageAssetId', asset.id);
+                  setMediaDialogTarget(null);
+                }
+              }}
+            />
+          </div>
         </MediaDialog>
       )}
 

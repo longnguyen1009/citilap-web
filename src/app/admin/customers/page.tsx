@@ -466,13 +466,12 @@ function CustomersContent() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="table-wrapper overflow-x-auto" tabIndex={0} role="region" aria-label="Danh sách khách hàng">
           <table className="admin-table w-full text-left border-collapse text-xs">
             <thead className="bg-slate-50/90 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200">
               <tr>
                 <th className="py-2.5 px-4">Khách hàng</th>
-                <th className="py-2.5 px-4">Nguồn</th>
-                <th className="py-2.5 px-4">Hạng</th>
+                <th className="py-2.5 px-4">Phân loại &amp; Hạng</th>
                 <th className="py-2.5 px-4 text-center">Đơn</th>
                 <th className="py-2.5 px-4 text-right">Tổng chi</th>
                 <th className="py-2.5 px-4 text-right">Đơn cuối</th>
@@ -482,14 +481,14 @@ function CustomersContent() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                  <td colSpan={6} className="py-12 text-center text-slate-500">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" />
                     <span>Đang tải khách hàng...</span>
                   </td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center">
+                  <td colSpan={6} className="py-10 text-center">
                     <div className="max-w-md mx-auto space-y-2.5">
                       <p className="text-xs font-semibold text-red-700">{loadError}</p>
                       <button
@@ -505,12 +504,20 @@ function CustomersContent() {
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-500">
+                  <td colSpan={6} className="py-12 text-center text-slate-500">
                     Không có khách hàng phù hợp.
                   </td>
                 </tr>
               ) : (
-                customers.map((customer) => (
+                (() => {
+                  const phoneFreq = new Map<string, number>();
+                  for (const c of customers) {
+                    const p = (c.phone || "").trim();
+                    if (p) phoneFreq.set(p, (phoneFreq.get(p) || 0) + 1);
+                  }
+                  return customers.map((customer) => {
+                    const phoneCount = customer.phone ? phoneFreq.get(customer.phone.trim()) || 0 : 0;
+                    return (
                   <tr key={customer.id} className="hover:bg-slate-50/70 transition">
                     <td className="py-2.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-2.5">
@@ -524,8 +531,21 @@ function CustomersContent() {
                           {(customer.name || customer.email || "K").charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 truncate">
-                            {customer.name || "Khách hàng"}
+                          <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                            <span>{customer.name || "Khách hàng"}</span>
+                            {phoneCount > 1 && customer.phone && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSearchTerm(customer.phone || "");
+                                  setPage(1);
+                                }}
+                                title="Bấm để lọc toàn bộ hồ sơ/đơn hàng có cùng số điện thoại này"
+                                className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold hover:bg-amber-200 transition cursor-pointer"
+                              >
+                                Trùng SĐT ({phoneCount})
+                              </button>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-500 flex items-center gap-2 font-mono">
                             {customer.phone && (
@@ -546,7 +566,7 @@ function CustomersContent() {
                     </td>
 
                     <td className="py-2.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
                             customer.source === "REGISTERED"
@@ -556,22 +576,21 @@ function CustomersContent() {
                         >
                           {customer.sourceLabel}
                         </span>
+                        {customer.tier && customer.tier !== customer.sourceLabel && (
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                              tierBadge[customer.tier] || "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}
+                          >
+                            Hạng {customer.tier}
+                          </span>
+                        )}
                         {customer.orderNumber && (
                           <span className="text-[10px] text-slate-500 font-mono">
                             #{customer.orderNumber}
                           </span>
                         )}
                       </div>
-                    </td>
-
-                    <td className="py-2.5 px-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                          tierBadge[customer.tier] || "bg-slate-100 text-slate-600 border-slate-200"
-                        }`}
-                      >
-                        {customer.tier}
-                      </span>
                     </td>
 
                     <td className="py-2.5 px-4 whitespace-nowrap text-center font-bold text-slate-900 tabular-nums">
@@ -599,7 +618,9 @@ function CustomersContent() {
                       </button>
                     </td>
                   </tr>
-                ))
+                    );
+                  });
+                })()
               )}
             </tbody>
           </table>

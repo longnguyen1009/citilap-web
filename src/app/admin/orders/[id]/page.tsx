@@ -1,4 +1,5 @@
 "use client";
+import { businessProfile } from "@/config/business-profile";
 
 import Link from "next/link";
 import { use, useEffect, useState, useCallback, useRef } from "react";
@@ -62,6 +63,7 @@ type OrderItem = {
     name: string;
     slug: string;
     images?: string;
+    kind?: string | null;
   } | null;
 };
 
@@ -721,13 +723,23 @@ export default function OrderDetailPage({
 
                     <div className="flex-grow min-w-0">
                       <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                        <span className="truncate">{itemName}</span>
+                        <Link
+                          href={`/admin/products/${item.productId}`}
+                          className="truncate hover:text-blue-600 hover:underline"
+                          title="Mở sản phẩm trong Admin"
+                        >
+                          {itemName}
+                        </Link>
                         {item.product && (
                           <Link
-                            href={`/laptop/${item.product.slug}`}
+                            href={
+                              item.product.kind === "ACCESSORY"
+                                ? `/accessories/${item.product.slug}`
+                                : `/laptop/${item.product.slug}`
+                            }
                             target="_blank"
                             className="text-slate-400 hover:text-blue-600 transition shrink-0"
-                            title="Xem trên web"
+                            title="Xem trên Storefront"
                           >
                             <ExternalLink className="w-3 h-3" />
                           </Link>
@@ -889,7 +901,18 @@ export default function OrderDetailPage({
             </h2>
 
             <div className="space-y-1">
-              <div className="font-bold text-slate-900 text-sm">{order.customerName}</div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-bold text-slate-900 text-sm">{order.customerName}</div>
+                {order.customerPhone && (
+                  <Link
+                    href={`/admin/customers?search=${encodeURIComponent(order.customerPhone)}`}
+                    className="text-[11px] font-semibold text-blue-600 hover:underline print:hidden"
+                    title="Xem lịch sử mua hàng & liên hệ của khách này"
+                  >
+                    Hồ sơ khách ↗
+                  </Link>
+                )}
+              </div>
               <div className="flex flex-wrap items-center gap-3 text-slate-600 font-mono">
                 <a href={`tel:${order.customerPhone}`} className="inline-flex items-center gap-1 text-blue-600 font-bold hover:underline">
                   <Phone className="w-3 h-3" />
@@ -1065,7 +1088,7 @@ export default function OrderDetailPage({
             <div className="text-[11px] text-slate-600">
               Showroom HN: Số 23/40 Tạ Quang Bửu, Bạch Mai, Hà Nội | Showroom BN: Số 40 Trần Hưng Đạo, TP. Bắc Ninh
             </div>
-            <div className="text-[11px] text-slate-600">Hotline bảo hành &amp; kỹ thuật: 0988.343.005 — Website: https://citilap.vn</div>
+            <div className="text-[11px] text-slate-600">Hotline bảo hành &amp; kỹ thuật: {businessProfile.displayPhone} — Website: {businessProfile.canonicalSiteUrl}</div>
           </div>
           <div className="text-right">
             <div className="font-bold text-sm">PHIẾU GIAO HÀNG &amp; BẢO HÀNH</div>
@@ -1142,7 +1165,6 @@ export default function OrderDetailPage({
         <dialog
           ref={reasonDialogRef}
           id="order-reason-dialog"
-          aria-modal="true"
           aria-labelledby="reason-modal-title"
           onCancel={(e) => {
             e.preventDefault();

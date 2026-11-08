@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Star } from 'lucide-react';
 import ReviewForm from './ReviewForm';
 import type { ApprovedProductReview } from '@/server/services/contact.service';
 
@@ -50,7 +51,8 @@ export function ProductReviewsSection({
     <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/80 shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-3 border-b border-slate-100">
         <h2 className="text-base sm:text-lg font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
-          <span className="text-amber-500">⭐</span> KHÁCH HÀNG ĐÁNH GIÁ &amp; NHẬN XÉT
+          <Star className="w-5 h-5 text-amber-500 fill-amber-400 shrink-0" />
+          <span>KHÁCH HÀNG ĐÁNH GIÁ &amp; NHẬN XÉT</span>
         </h2>
         <button
           type="button"

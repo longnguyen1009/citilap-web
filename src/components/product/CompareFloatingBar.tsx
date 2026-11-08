@@ -1,20 +1,57 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { X, Scale, Trash2 } from "lucide-react";
+import { X, Scale, Trash2, AlertCircle } from "lucide-react";
 import { useCompare } from "@/context/CompareContext";
 import { MAX_COMPARE_PRODUCTS } from "@/contracts/catalog/compare";
 
 export default function CompareFloatingBar() {
-  const { items, removeFromCompare, clearCompare, openCompare } = useCompare();
+  const { items, compareNotice, removeFromCompare, clearCompare, openCompare, clearCompareNotice } = useCompare();
+  const [pdpBarVisible, setPdpBarVisible] = useState(false);
+
+  useEffect(() => {
+    const sync = (e?: Event) => {
+      const custom = e as CustomEvent<{ visible?: boolean }>;
+      if (custom?.detail && typeof custom.detail.visible === "boolean") {
+        setPdpBarVisible(custom.detail.visible);
+      } else {
+        setPdpBarVisible(document.documentElement.dataset.pdpBar === "visible");
+      }
+    };
+    sync();
+    window.addEventListener("citilap:pdp-bar", sync);
+    return () => window.removeEventListener("citilap:pdp-bar", sync);
+  }, []);
 
   if (items.length === 0) return null;
 
   return (
     <aside
       aria-label="Thanh so sánh sản phẩm"
-      className="fixed bottom-28 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border border-slate-700/80 p-3 sm:p-4 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4"
+      className={`fixed left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border border-slate-700/80 p-3 sm:p-4 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 ${
+        pdpBarVisible ? "bottom-36 lg:bottom-20" : "bottom-20 lg:bottom-6"
+      }`}
     >
+      {compareNotice && (
+        <div
+          role="status"
+          className="mb-2.5 flex items-center justify-between gap-2 rounded-xl bg-amber-500/20 border border-amber-400/40 px-3 py-1.5 text-xs text-amber-200"
+        >
+          <span className="flex items-center gap-1.5 font-semibold">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+            <span>{compareNotice}</span>
+          </span>
+          <button
+            type="button"
+            onClick={clearCompareNotice}
+            aria-label="Đóng thông báo"
+            className="text-amber-200 hover:text-white p-0.5 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-3">
         {/* Left: Product Slots */}
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">

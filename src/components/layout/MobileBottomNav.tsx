@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useLayoutEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -18,6 +18,12 @@ import {
   RefreshCw,
   Cpu,
   ArrowRight,
+  Keyboard,
+  Zap,
+  Cable,
+  SunMedium,
+  Headphones,
+  Phone,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import type { CategorySummary } from "@/server/services/catalog.service";
@@ -46,6 +52,19 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
   const { cartCount } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [prevPath, setPrevPath] = useState(pathname);
+  const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const restoreFocusRef = useRef(true);
+
+  const closeDrawer = useCallback((restoreFocus = true) => {
+    restoreFocusRef.current = restoreFocus;
+    const dialog = dialogRef.current;
+    if (dialog?.open) {
+      dialog.close();
+    }
+    setDrawerOpen(false);
+  }, []);
 
   // Close drawer on route change
   if (prevPath !== pathname) {
@@ -53,28 +72,43 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
     setDrawerOpen(false);
   }
 
-  // Lock body scroll when drawer is open
-  useEffect(() => {
-    if (drawerOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
+  // Open native modal dialog, lock body scroll, manage focus, and close across md breakpoint
+  useLayoutEffect(() => {
+    if (!drawerOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const dialog = dialogRef.current;
+    const trigger = triggerButtonRef.current;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [drawerOpen]);
+    closeButtonRef.current?.focus();
 
-  // Handle Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && drawerOpen) {
-        setDrawerOpen(false);
+    const mq = window.matchMedia("(min-width: 768px)");
+    const handleViewportChange = () => {
+      if (mq.matches || window.innerWidth >= 768) {
+        closeDrawer(false);
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen]);
+    mq.addEventListener("change", handleViewportChange);
+    window.addEventListener("resize", handleViewportChange);
+
+    return () => {
+      mq.removeEventListener("change", handleViewportChange);
+      window.removeEventListener("resize", handleViewportChange);
+      if (dialog?.open) {
+        dialog.close();
+      }
+      document.body.style.overflow = previousOverflow;
+      if (
+        restoreFocusRef.current &&
+        trigger &&
+        window.getComputedStyle(trigger).display !== "none"
+      ) {
+        trigger.focus();
+      }
+    };
+  }, [drawerOpen, closeDrawer]);
 
   const isCategoryActive = pathname.startsWith("/phan-loai") || !!navigation?.categories.some(c => c.href === pathname);
   const isProductPage = /^\/(?:laptop|phu-kien|san-pham)\/[^/]+$/.test(pathname);
@@ -106,12 +140,18 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
 
           {/* 2. Danh mục Button (Mở drawer) */}
           <button
-            onClick={() => setDrawerOpen(true)}
+            ref={triggerButtonRef}
+            type="button"
+            onClick={() => {
+              restoreFocusRef.current = true;
+              setDrawerOpen(true);
+            }}
             className={`flex flex-col items-center justify-center gap-0.5 transition cursor-pointer ${
               isCategoryActive || drawerOpen ? "text-brand-primary" : "text-text-secondary"
             }`}
             aria-label="Mở danh mục sản phẩm"
             aria-expanded={drawerOpen}
+            aria-haspopup="dialog"
           >
             <Grid3X3
               className="w-5 h-5"
@@ -164,29 +204,46 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
 
       {/* Mobile Category Drawer */}
       {drawerOpen && (
-        <div
-          role="dialog"
+        <dialog
+          ref={dialogRef}
           aria-modal="true"
           aria-label="Danh mục sản phẩm"
-          className="fixed inset-0 z-50 flex md:hidden"
+          onCancel={(e) => {
+            e.preventDefault();
+            closeDrawer(true);
+          }}
+          onClose={() => {
+            if (drawerOpen) {
+              closeDrawer(restoreFocusRef.current);
+            }
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closeDrawer(true);
+            }
+          }}
+          className="fixed inset-0 z-50 m-0 flex h-dvh max-h-none w-screen max-w-none bg-transparent p-0 overscroll-contain backdrop:bg-black/60 backdrop:backdrop-blur-xs md:hidden"
         >
-          {/* Backdrop */}
+          {/* Backdrop click target inside dialog */}
           <div
-            onClick={() => setDrawerOpen(false)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in"
+            onClick={() => closeDrawer(true)}
+            aria-hidden="true"
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
           />
 
           {/* Drawer Slide-in Panel */}
-          <div className="relative mr-auto w-full max-w-xs h-full bg-surface-card shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-250">
+          <div className="relative mr-auto w-full max-w-xs h-full bg-surface-card shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-250 motion-reduce:animate-none">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border-default bg-surface">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-surface">
               <div className="flex items-center gap-2">
-                <Grid3X3 className="w-5 h-5 text-brand-primary" />
+                <Grid3X3 className="w-5 h-5 text-brand-primary shrink-0" />
                 <h2 className="text-title font-bold text-text-primary">Danh mục sản phẩm</h2>
               </div>
               <button
-                onClick={() => setDrawerOpen(false)}
-                className="p-1.5 rounded-control text-text-secondary hover:text-text-primary hover:bg-surface-subtle transition cursor-pointer"
+                ref={closeButtonRef}
+                type="button"
+                onClick={() => closeDrawer(true)}
+                className="w-11 h-11 flex items-center justify-center rounded-control text-text-secondary hover:text-text-primary hover:bg-surface-subtle transition cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-primary focus-visible:outline-hidden"
                 aria-label="Đóng danh mục"
               >
                 <X className="w-5 h-5" />
@@ -194,12 +251,12 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
             </div>
 
             {/* Content List */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-2">
               {/* Direct link to All Categories */}
               <Link
                 href="/phan-loai"
-                onClick={() => setDrawerOpen(false)}
-                className="flex items-center justify-between p-3 rounded-control bg-brand-primary-subtle text-brand-primary font-bold text-body-sm mb-3 border border-brand-primary/20"
+                onClick={() => closeDrawer(false)}
+                className="min-h-11 flex items-center justify-between p-3 rounded-control bg-brand-primary-subtle text-brand-primary font-bold text-body-sm mb-3 border border-brand-primary/20"
               >
                 <span>Xem tất cả danh mục</span>
                 <ArrowRight className="w-4 h-4" />
@@ -209,14 +266,14 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
               {navigation?.menus.main && navigation.menus.main.length > 0 ? (
                 navigation.menus.main.map((item) => (
                   <div key={item.id} className="rounded-lg border border-border-default overflow-hidden">
-                    <Link href={item.href} onClick={() => setDrawerOpen(false)}
-                      className="flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle">
+                    <Link href={item.href} onClick={() => closeDrawer(false)}
+                      className="min-h-11 flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle">
                       {item.label}<ChevronRight className="w-4 h-4" />
                     </Link>
                     {item.children.length > 0 && <div className="border-t border-border-default bg-surface-subtle px-3 py-1">
                       {item.children.map((child) => (
-                        <Link key={child.id} href={child.href} onClick={() => setDrawerOpen(false)}
-                          className="block pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary">{child.label}</Link>
+                        <Link key={child.id} href={child.href} onClick={() => closeDrawer(false)}
+                          className="min-h-10 flex items-center pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary">{child.label}</Link>
                       ))}
                     </div>}
                   </div>
@@ -230,8 +287,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
                     <Link
                       key={cat.id}
                       href={cat.href || `/${cat.slug}`}
-                      onClick={() => setDrawerOpen(false)}
-                      className={`flex items-center justify-between p-3 rounded-control transition border ${
+                      onClick={() => closeDrawer(false)}
+                      className={`min-h-11 flex items-center justify-between p-3 rounded-control transition border ${
                         isSelected
                           ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
                           : "bg-surface-card hover:bg-surface-subtle text-text-primary border-border-default hover:border-brand-primary"
@@ -275,58 +332,69 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
                 <div className="grid grid-cols-2 gap-2">
                   <Link
                     href="/phu-kien?type=mouse-keyboard"
-                    onClick={() => setDrawerOpen(false)}
-                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                    onClick={() => closeDrawer(false)}
+                    className="min-h-11 p-2.5 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-2"
                   >
-                    <span>⌨️ Chuột & Phím</span>
+                    <Keyboard className="w-3.5 h-3.5 text-brand-primary shrink-0" />
+                    <span>Chuột & Phím</span>
                   </Link>
                   <Link
                     href="/phu-kien?type=bag"
-                    onClick={() => setDrawerOpen(false)}
-                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                    onClick={() => closeDrawer(false)}
+                    className="min-h-11 p-2.5 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-2"
                   >
-                    <span>🎒 Balo & Túi sốc</span>
+                    <Briefcase className="w-3.5 h-3.5 text-brand-primary shrink-0" />
+                    <span>Balo & Túi chống sốc</span>
                   </Link>
                   <Link
                     href="/phu-kien?type=charger"
-                    onClick={() => setDrawerOpen(false)}
-                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                    onClick={() => closeDrawer(false)}
+                    className="min-h-11 p-2.5 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-2"
                   >
-                    <span>⚡ Sạc GaN & Cáp</span>
+                    <Zap className="w-3.5 h-3.5 text-brand-primary shrink-0" />
+                    <span>Sạc GaN & Cáp</span>
                   </Link>
                   <Link
                     href="/phu-kien?type=hub"
-                    onClick={() => setDrawerOpen(false)}
-                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                    onClick={() => closeDrawer(false)}
+                    className="min-h-11 p-2.5 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-2"
                   >
-                    <span>🔌 Hub Type-C</span>
+                    <Cable className="w-3.5 h-3.5 text-brand-primary shrink-0" />
+                    <span>Hub Type-C</span>
                   </Link>
                   <Link
                     href="/phu-kien?type=screenbar"
-                    onClick={() => setDrawerOpen(false)}
-                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                    onClick={() => closeDrawer(false)}
+                    className="min-h-11 p-2.5 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-2"
                   >
-                    <span>💡 Đèn màn hình</span>
+                    <SunMedium className="w-3.5 h-3.5 text-brand-primary shrink-0" />
+                    <span>Đèn màn hình</span>
                   </Link>
                   <Link
                     href="/phu-kien?type=audio"
-                    onClick={() => setDrawerOpen(false)}
-                    className="p-2 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-1.5"
+                    onClick={() => closeDrawer(false)}
+                    className="min-h-11 p-2.5 rounded-lg bg-surface-subtle text-text-primary text-xs font-semibold hover:bg-brand-primary-subtle hover:text-brand-primary transition flex items-center gap-2"
                   >
-                    <span>🎧 Tai nghe & Loa</span>
+                    <Headphones className="w-3.5 h-3.5 text-brand-primary shrink-0" />
+                    <span>Tai nghe & Loa</span>
                   </Link>
                 </div>
               </div>}
             </div>
 
             {/* Bottom Support Call */}
-            <div className="p-4 border-t border-border-default bg-surface-subtle">
-              <div className="text-caption text-text-muted text-center">
-                Hotline tư vấn: <span className="font-bold text-brand-primary">{settings?.storePhone || businessProfile.displayPhone}</span>
-              </div>
+            <div className="p-3 border-t border-border-default bg-surface-subtle">
+              <a
+                href={`tel:${(settings?.storePhone || businessProfile.displayPhone).replace(/\s+/g, "")}`}
+                className="min-h-11 flex items-center justify-center gap-1.5 text-caption text-text-muted hover:text-brand-primary transition"
+              >
+                <Phone className="w-3.5 h-3.5 text-brand-primary" />
+                <span>Hotline tư vấn:</span>
+                <span className="font-bold text-brand-primary">{settings?.storePhone || businessProfile.displayPhone}</span>
+              </a>
             </div>
           </div>
-        </div>
+        </dialog>
       )}
     </>
   );

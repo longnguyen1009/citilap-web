@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Trash2, ShoppingCart, ArrowRight, Minus, Plus, Tag, ShieldCheck, Truck, Headphones, Sparkles } from "lucide-react";
+import { Trash2, ShoppingCart, ArrowRight, ArrowLeft, Minus, Plus, Tag, ShieldCheck, Truck, Headphones, Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useCart } from "@/context/CartContext";
 import CartValidationStatus from '@/components/cart/CartValidationStatus';
@@ -101,8 +101,10 @@ export default function CartPage() {
                           </div>
                         )}
                         <button
+                          type="button"
                           onClick={() => removeFromCart(item.id)}
-                          className="text-red-500 text-xs font-medium hover:text-red-700 mt-2 w-fit flex items-center gap-1 transition"
+                          aria-label={`Xoá ${item.name} khỏi giỏ hàng`}
+                          className="text-red-500 text-xs font-medium hover:text-red-700 mt-2 w-fit flex items-center gap-1 transition cursor-pointer"
                         >
                           <Trash2 className="w-3 h-3" /> Xoá
                         </button>
@@ -114,14 +116,21 @@ export default function CartPage() {
                       <span className="font-bold text-red-600 text-sm">{item.displayPrice}</span>
                       <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden h-8">
                         <button
+                          type="button"
+                          aria-label={`Giảm số lượng ${item.name}`}
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           disabled={item.quantity <= 1}
-                          className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center disabled:opacity-40"
+                          className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center disabled:opacity-40 cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="w-8 text-center text-sm font-bold">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center">
+                        <button
+                          type="button"
+                          aria-label={`Tăng số lượng ${item.name}`}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center cursor-pointer"
+                        >
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
@@ -136,14 +145,21 @@ export default function CartPage() {
                     <div className="col-span-2 flex justify-center hidden md:flex">
                       <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden h-9">
                         <button
+                          type="button"
+                          aria-label={`Giảm số lượng ${item.name}`}
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           disabled={item.quantity <= 1}
-                          className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center disabled:opacity-40"
+                          className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center disabled:opacity-40 cursor-pointer"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="w-10 text-center text-sm font-bold">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.id, item.quantity + 1)} className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center">
+                        <button
+                          type="button"
+                          aria-label={`Tăng số lượng ${item.name}`}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="w-8 h-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold transition flex items-center justify-center cursor-pointer"
+                        >
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
@@ -158,8 +174,9 @@ export default function CartPage() {
             </div>
 
             <div className="mt-4 flex justify-between items-center">
-              <Link href="/" className="text-blue-600 font-bold hover:underline flex items-center gap-1 text-sm">
-                Tiếp tục mua sắm
+              <Link href="/" className="text-blue-600 font-bold hover:underline inline-flex items-center gap-1.5 text-sm transition">
+                <ArrowLeft className="w-4 h-4" />
+                <span>Tiếp tục mua sắm</span>
               </Link>
             </div>
 
@@ -171,7 +188,7 @@ export default function CartPage() {
                     <Sparkles className="w-4 h-4 text-blue-600" />
                     <span>Phụ kiện & Nâng cấp mua kèm ưu đãi</span>
                   </h3>
-                  <Link href="/linh-kien" className="text-xs font-semibold text-blue-600 hover:underline">
+                  <Link href="/phu-kien" className="text-xs font-semibold text-blue-600 hover:underline">
                     Xem tất cả phụ kiện →
                   </Link>
                 </div>
@@ -238,9 +255,14 @@ export default function CartPage() {
               <h3 className="text-lg font-bold text-gray-900 border-b border-gray-100 pb-3 mb-4 uppercase">Tóm tắt đơn hàng</h3>
 
               {/* Promotions are priced server-side via campaigns; no client-side coupon until a real voucher system exists. */}
-              <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800">
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-xs text-emerald-800">
                 <Tag className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
                 <span>Giá hiển thị đã bao gồm khuyến mãi đang áp dụng. Tổng tiền cuối cùng được kiểm tra lại ở bước đặt hàng.</span>
+              </div>
+
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50/60 px-3 py-2 text-xs text-blue-900">
+                <Truck className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
+                <span>Miễn phí giao hàng bán kính 10km quanh trụ sở CitiLap Hà Nội • Giao toàn quốc đồng kiểm máy trước khi thanh toán.</span>
               </div>
 
               <div className="space-y-3 text-sm text-gray-600 mb-4">
@@ -256,10 +278,10 @@ export default function CartPage() {
 
               <div className="border-t border-gray-100 pt-4 mb-6">
                 <div className="flex justify-between items-end mb-1">
-                  <span className="font-bold text-gray-800 uppercase text-sm">Tạm tính dự kiến:</span>
+                  <span className="font-bold text-gray-800 uppercase text-sm">Tổng thanh toán dự kiến:</span>
                   <span className="text-2xl md:text-3xl font-black text-red-600 tracking-tight">{cartTotal.toLocaleString("vi-VN")}đ</span>
                 </div>
-                <p className="text-[11px] text-gray-500 text-right italic">(Chưa bao gồm phí vận chuyển nếu có, nhân viên sẽ xác nhận)</p>
+                <p className="text-[11px] text-gray-500 text-right italic">(Đã gồm VAT & ưu đãi; cước ship sẽ chốt khi tư vấn)</p>
               </div>
 
               <Link
@@ -267,9 +289,15 @@ export default function CartPage() {
                 aria-disabled={!checkoutReady}
                 tabIndex={checkoutReady ? undefined : -1}
                 onClick={e=>{if(!checkoutReady)e.preventDefault();}}
-                className="w-full bg-red-600 hover:bg-red-700 text-white rounded-lg p-4 flex flex-col items-center justify-center transition shadow-lg shadow-red-600/30 mb-3"
+                className={`w-full rounded-lg p-4 flex flex-col items-center justify-center transition mb-3 ${
+                  checkoutReady
+                    ? "bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/30 cursor-pointer"
+                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                }`}
               >
-                <span className="font-black text-lg uppercase">TIẾN HÀNH ĐẶT HÀNG</span>
+                <span className="font-black text-lg uppercase">
+                  {checkoutReady ? "TIẾN HÀNH ĐẶT HÀNG" : "ĐANG KIỂM TRA GIỎ HÀNG..."}
+                </span>
               </Link>
 
               {/* Trust badges */}

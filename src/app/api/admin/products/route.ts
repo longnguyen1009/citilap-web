@@ -5,6 +5,14 @@ import { catalogList, writeStudio, type CatalogListOptions } from '@/server/serv
 async function GETHandler(request: Request) {
   const url = new URL(request.url);
   const q = url.searchParams.get('q') || '';
+  const rawIds = url.searchParams.get('ids') || '';
+  const ids = rawIds
+    ? rawIds
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+        .slice(0, 100)
+    : undefined;
   const kind = url.searchParams.get('kind') || 'ALL';
   const categoryId = url.searchParams.get('categoryId') || '';
   const brand = url.searchParams.get('brand') || '';
@@ -20,6 +28,7 @@ async function GETHandler(request: Request) {
   return mediaAdmin(request, false, env =>
     catalogList(env.DB, {
       q,
+      ids,
       kind,
       categoryId,
       brand,

@@ -1,2 +1,5 @@
-﻿import NavigationStudio from '@/components/admin/navigation/NavigationStudio';
-export default function Page() { return <NavigationStudio initialTab="categories"/>; }
+import CategoriesStudio from '@/components/admin/categories/CategoriesStudio';
+
+export default function Page() {
+  return <CategoriesStudio />;
+}

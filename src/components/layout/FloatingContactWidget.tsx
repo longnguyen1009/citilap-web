@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   PhoneCall,
@@ -17,6 +17,8 @@ import type { PublicStorefrontSettings } from "@/contracts/cms/settings";
 import { businessProfile } from "@/config/business-profile";
 import { useTurnstile } from "@/components/Turnstile";
 import { trackStorefront } from "@/lib/storefront-metrics";
+import { useCompare } from "@/context/CompareContext";
+import ScrollToTop from "./ScrollToTop";
 
 const CALLBACK_TOPICS = [
   "Tư vấn chọn mua Laptop",
@@ -32,17 +34,44 @@ export default function FloatingContactWidget({
   settings?: PublicStorefrontSettings | null;
 }) {
   const pathname = usePathname();
+  const { items: compareItems } = useCompare();
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(false);
+  const [pdpBarVisible, setPdpBarVisible] = useState(false);
+  const isProductOrCartRoute =
+    pathname.startsWith("/laptop/") ||
+    pathname.startsWith("/phu-kien/") ||
+    pathname.startsWith("/product/") ||
+    pathname.startsWith("/san-pham/") ||
+    pathname.startsWith("/cart") ||
+    pathname.startsWith("/checkout");
+  const hasPrimaryMobileBar = !isProductOrCartRoute || pdpBarVisible;
+  const hasCompareBar = compareItems.length > 0;
+  const desktopElevated = pdpBarVisible || hasCompareBar;
+  const mobileBottomClass =
+    hasPrimaryMobileBar && hasCompareBar
+      ? "bottom-36"
+      : hasPrimaryMobileBar || hasCompareBar
+        ? "bottom-20"
+        : "bottom-5";
 
-  if (settings && settings.floatingContactEnabled === false) {
-    return null;
-  }
+  useEffect(() => {
+    const sync = (e?: Event) => {
+      const custom = e as CustomEvent<{ visible?: boolean }>;
+      if (custom?.detail && typeof custom.detail.visible === "boolean") {
+        setPdpBarVisible(custom.detail.visible);
+      } else {
+        setPdpBarVisible(document.documentElement.dataset.pdpBar === "visible");
+      }
+    };
+    sync();
+    window.addEventListener("citilap:pdp-bar", sync);
+    return () => window.removeEventListener("citilap:pdp-bar", sync);
+  }, []);
 
-  // Keep checkout flow distraction-free
-  if (pathname.startsWith("/checkout")) {
-    return null;
-  }
+  const showContact =
+    (!settings || settings.floatingContactEnabled !== false) &&
+    !pathname.startsWith("/checkout");
 
   const phone = settings?.storePhone || businessProfile.displayPhone;
   const telHref = settings?.storePhone
@@ -57,106 +86,114 @@ export default function FloatingContactWidget({
   return (
     <>
       <aside
-        aria-label="Kênh liên hệ nhanh"
-        className="fixed right-3.5 bottom-36 md:right-4 md:bottom-24 z-30 flex flex-col items-end gap-2.5"
+        aria-label="Kênh liên hệ nhanh và điều hướng trang"
+        className={`fixed right-3.5 md:right-4 z-30 flex flex-col items-end gap-2.5 transition-all duration-300 ${mobileBottomClass} ${
+          desktopElevated ? "lg:bottom-24" : "lg:bottom-6"
+        }`}
       >
-        {/* Action buttons: always visible on desktop, expandable on mobile */}
-        <div
-          className={`flex flex-col items-end gap-2.5 transition-all ${
-            mobileExpanded ? "flex" : "hidden md:flex"
-          }`}
-        >
-          {/* 1. Callback Request */}
-          <button
-            type="button"
-            onClick={() => {
-              setCallbackOpen(true);
-              setMobileExpanded(false);
-            }}
-            title="Yêu cầu CitiLap gọi lại"
-            className="group flex items-center gap-2.5 bg-white hover:bg-emerald-50 text-slate-800 border border-slate-200/90 hover:border-emerald-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all cursor-pointer"
-          >
-            <span className="text-xs font-bold text-slate-700 group-hover:text-emerald-800 whitespace-nowrap md:hidden md:group-hover:inline">
-              Yêu cầu gọi lại
-            </span>
-            <span className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <PhoneIncoming className="w-4 h-4" />
-            </span>
-          </button>
+        <ScrollToTop inline />
 
-          {/* 2. Messenger */}
-          {messengerUrl && (
-            <a
-              href={messengerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => trackStorefront("contact_click")}
-              className="group flex items-center gap-2.5 bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/90 hover:border-indigo-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all"
-              title="Chat qua Facebook Messenger"
+        {showContact && (
+          <>
+            {/* Action buttons: always visible on desktop, expandable on mobile */}
+            <div
+              className={`flex flex-col items-end gap-2.5 transition-all ${
+                mobileExpanded ? "flex" : "hidden md:flex"
+              }`}
             >
-              <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 whitespace-nowrap md:hidden md:group-hover:inline">
-                Chat Messenger
-              </span>
-              <span
-                className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center shrink-0 shadow-xs"
-                aria-hidden="true"
+              {/* 1. Callback Request */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCallbackOpen(true);
+                  setMobileExpanded(false);
+                }}
+                title="Yêu cầu CitiLap gọi lại"
+                className="group flex items-center gap-2.5 bg-white hover:bg-emerald-50 text-slate-800 border border-slate-200/90 hover:border-emerald-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all cursor-pointer"
               >
-                <MessageCircle className="w-4 h-4 fill-current" />
-              </span>
-            </a>
-          )}
+                <span className="text-xs font-bold text-slate-700 group-hover:text-emerald-800 whitespace-nowrap md:hidden md:group-hover:inline">
+                  Yêu cầu gọi lại
+                </span>
+                <span className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <PhoneIncoming className="w-4 h-4" />
+                </span>
+              </button>
 
-          {/* 3. Zalo */}
-          {zaloUrl && (
-            <a
-              href={zaloUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group flex items-center gap-2.5 bg-white hover:bg-sky-50 text-slate-800 border border-slate-200/90 hover:border-sky-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all"
-              title="Chat Zalo tư vấn trực tiếp"
-            >
-              <span className="text-xs font-bold text-slate-700 group-hover:text-sky-700 whitespace-nowrap md:hidden md:group-hover:inline">
-                Chat Zalo
-              </span>
-              <span className="w-9 h-9 rounded-full bg-[#0068ff] text-white font-black text-[11px] tracking-tight flex items-center justify-center shrink-0 shadow-xs">
-                Zalo
-              </span>
-            </a>
-          )}
+              {/* 2. Messenger */}
+              {messengerUrl && (
+                <a
+                  href={messengerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackStorefront("contact_click")}
+                  className="group flex items-center gap-2.5 bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/90 hover:border-indigo-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all"
+                  title="Chat qua Facebook Messenger"
+                >
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-indigo-700 whitespace-nowrap md:hidden md:group-hover:inline">
+                    Chat Messenger
+                  </span>
+                  <span
+                    className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-pink-500 text-white flex items-center justify-center shrink-0 shadow-xs"
+                    aria-hidden="true"
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current" />
+                  </span>
+                </a>
+              )}
 
-          {/* 4. Direct Hotline */}
-          <a
-            href={telHref}
-            className="group flex items-center gap-2.5 bg-white hover:bg-rose-50 text-slate-800 border border-slate-200/90 hover:border-rose-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all"
-            title={`Gọi ngay Hotline ${phone}`}
-          >
-            <div className="text-right leading-tight md:hidden md:group-hover:block">
-              <div className="text-[10px] font-semibold text-slate-400">Hotline</div>
-              <div className="text-xs font-black text-rose-600 whitespace-nowrap">{phone}</div>
+              {/* 3. Zalo */}
+              {zaloUrl && (
+                <a
+                  href={zaloUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-2.5 bg-white hover:bg-sky-50 text-slate-800 border border-slate-200/90 hover:border-sky-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all"
+                  title="Chat Zalo tư vấn trực tiếp"
+                >
+                  <span className="text-xs font-bold text-slate-700 group-hover:text-sky-700 whitespace-nowrap md:hidden md:group-hover:inline">
+                    Chat Zalo
+                  </span>
+                  <span className="w-9 h-9 rounded-full bg-[#0068ff] text-white font-black text-[11px] tracking-tight flex items-center justify-center shrink-0 shadow-xs">
+                    Zalo
+                  </span>
+                </a>
+              )}
+
+              {/* 4. Direct Hotline */}
+              <a
+                href={telHref}
+                className="group flex items-center gap-2.5 bg-white hover:bg-rose-50 text-slate-800 border border-slate-200/90 hover:border-rose-400 rounded-full pl-3.5 pr-1.5 py-1.5 md:p-1 md:hover:pl-3.5 md:hover:pr-1.5 shadow-lg transition-all"
+                title={`Gọi ngay Hotline ${phone}`}
+              >
+                <div className="text-right leading-tight md:hidden md:group-hover:block">
+                  <div className="text-[10px] font-semibold text-slate-400">Hotline</div>
+                  <div className="text-xs font-black text-rose-600 whitespace-nowrap">{phone}</div>
+                </div>
+                <span className="w-9 h-9 rounded-full bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <PhoneCall className="w-4 h-4" />
+                </span>
+              </a>
             </div>
-            <span className="w-9 h-9 rounded-full bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <PhoneCall className="w-4 h-4" />
-            </span>
-          </a>
-        </div>
 
-        {/* Mobile launcher toggle */}
-        <button
-          type="button"
-          onClick={() => setMobileExpanded((v) => !v)}
-          aria-expanded={mobileExpanded}
-          aria-label={mobileExpanded ? "Đóng menu liên hệ nhanh" : "Mở menu liên hệ nhanh Zalo, Messenger, Hotline"}
-          className="md:hidden w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl flex flex-col items-center justify-center gap-0.5 ring-4 ring-blue-500/20 cursor-pointer"
-        >
-          {mobileExpanded ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <>
-              <Headphones className="w-4 h-4" />
-              <span className="text-[8px] font-extrabold leading-none">Hỗ trợ</span>
-            </>
-          )}
-        </button>
+            {/* Mobile launcher toggle */}
+            <button
+              type="button"
+              onClick={() => setMobileExpanded((v) => !v)}
+              aria-expanded={mobileExpanded}
+              aria-label={mobileExpanded ? "Đóng menu liên hệ nhanh" : "Mở menu liên hệ nhanh Zalo, Messenger, Hotline"}
+              className="md:hidden w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-xl flex flex-col items-center justify-center gap-0.5 ring-4 ring-blue-500/20 cursor-pointer"
+            >
+              {mobileExpanded ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <>
+                  <Headphones className="w-4 h-4" />
+                  <span className="text-[8px] font-extrabold leading-none">Hỗ trợ</span>
+                </>
+              )}
+            </button>
+          </>
+        )}
       </aside>
 
       {callbackOpen && (
@@ -187,6 +224,22 @@ function CallbackRequestModal({
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -238,7 +291,10 @@ function CallbackRequestModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="callback-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overscroll-contain"
     >
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
@@ -259,7 +315,7 @@ function CallbackRequestModal({
             type="button"
             onClick={onClose}
             aria-label="Đóng hộp thoại"
-            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>

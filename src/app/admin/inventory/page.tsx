@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
-  Boxes,
   Store,
   Plus,
   Search,
@@ -78,25 +77,40 @@ interface ProductOption {
   condition: string;
 }
 
+interface VariantOption {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  price: number;
+}
+
+const serialStatusLabels: Record<string, string> = {
+  AVAILABLE: "Sẵn sàng", RESERVED: "Đang giữ", SOLD: "Đã bán", QC_HOLD: "Chờ QC", REPAIR: "Đang sửa",
+};
+
 export default function AdminInventoryPage() {
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const [serialUnits, setSerialUnits] = useState<SerialUnitItem[]>([]);
   const [balances, setBalances] = useState<BalanceItem[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
+  const [variants, setVariants] = useState<VariantOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"serials" | "balances" | "warehouses">("serials");
+  const [activeTab, setActiveTab] = useState<"serials" | "balances">("serials");
   const [warehouseFilter, setWarehouseFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [productFilterText, setProductFilterText] = useState("");
 
   // New Serial Modal / Form
   const [showAddForm, setShowAddForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [newSerial, setNewSerial] = useState({
     productId: "",
+    variantId: "",
     warehouseId: "",
     serialNumber: "",
     publicCode: "",
@@ -127,10 +141,14 @@ export default function AdminInventoryPage() {
       setSerialUnits(json.data.serialUnits || []);
       setBalances(json.data.balances || []);
       setProducts(json.data.products || []);
+      setVariants(json.data.variants || []);
       if (!newSerial.productId && json.data.products?.[0]?.id) {
+        const firstProdId = json.data.products[0].id;
+        const firstVarId = (json.data.variants || []).find((v: VariantOption) => v.productId === firstProdId)?.id || "";
         setNewSerial((prev) => ({
           ...prev,
-          productId: json.data.products[0].id,
+          productId: firstProdId,
+          variantId: firstVarId,
           warehouseId: json.data.warehouses?.[0]?.id || "",
         }));
       }
@@ -142,7 +160,8 @@ export default function AdminInventoryPage() {
   }, [warehouseFilter, statusFilter, searchQuery, newSerial.productId]);
 
   useEffect(() => {
-    void loadInventory();
+    const timer = setTimeout(() => void loadInventory(), 200);
+    return () => clearTimeout(timer);
   }, [loadInventory]);
 
   const handleCreateSerial = async (e: React.FormEvent) => {
@@ -202,6 +221,11 @@ export default function AdminInventoryPage() {
     }
   };
 
+  const filteredBalances = balances.filter(b =>
+    (warehouseFilter === "ALL" || b.warehouseId === warehouseFilter) &&
+    (!searchQuery.trim() || [b.productName, b.variantSku, b.variantName].some(value => value?.toLocaleLowerCase("vi").includes(searchQuery.trim().toLocaleLowerCase("vi"))))
+  );
+
   if (loading && warehouses.length === 0) {
     return <AdminLoadingState message="Đang tải dữ liệu kho hàng, Serial & hồ sơ kiểm định..." />;
   }
@@ -219,23 +243,26 @@ export default function AdminInventoryPage() {
   return (
     <div className="space-y-5 pb-12">
       <PageHeader
-        title="Kho hàng, Serial & Hồ sơ Kiểm định"
-        description="Quản lý tồn kho tại Showroom Hà Nội & Bắc Ninh, theo dõi từng mã Serial/Service Tag và chứng thư kiểm định công khai (Public Code)."
+        title="Kho & Kiểm định"
+        description="Theo dõi từng máy theo Serial hoặc kiểm tra tồn khả dụng theo SKU. Nhập máy để ghi nhận kho và cấp mã kiểm định khi cần."
         actions={
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowAddForm((prev) => !prev)}
+              aria-expanded={showAddForm}
+              aria-controls="inventory-intake"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Nhập máy / Tạo mã Kiểm định</span>
+              <span>{showAddForm ? "Ẩn phiếu nhập" : "Nhập máy"}</span>
             </button>
             <button
               type="button"
               onClick={() => void loadInventory()}
               className="inline-grid place-items-center size-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 cursor-pointer"
               title="Làm mới"
+              aria-label="Làm mới kho"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -249,47 +276,13 @@ export default function AdminInventoryPage() {
         </InlineAlert>
       )}
 
-      {/* Showroom / Warehouse Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {warehouses.map((w) => (
-          <div
-            key={w.id}
-            className={`bg-white rounded-xl border p-4 shadow-2xs flex flex-col justify-between gap-3 ${
-              w.status === "ACTIVE" ? "border-slate-200" : "border-slate-200 opacity-65 bg-slate-50"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                  <Store className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">{w.name}</div>
-                  <div className="text-[11px] font-mono text-slate-400">Mã kho: {w.code}</div>
-                </div>
-              </div>
-              <StatusBadge status={w.status} />
-            </div>
-            <div className="text-xs text-slate-600 flex items-start gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-              <span>{w.address || "Chưa cập nhật địa chỉ"}</span>
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500">
-                Serial sẵn sàng: <strong className="text-emerald-700">{w.availableSerials}</strong> / {w.totalSerials}
-              </span>
-              <span className="text-slate-500">
-                Tồn kho SL: <strong className="text-slate-900">{w.totalOnHand}</strong>
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+      {error && <InlineAlert variant="error">{error}</InlineAlert>}
 
       {/* Quick Add Serial + Inspection Form */}
       {showAddForm && (
         <AdminCard
-          title="Nhập kho máy mới & Phát hành Mã kiểm định công khai (Public Code)"
+          title="Phiếu nhập máy"
+          subtitle="Chọn sản phẩm, cấu hình và kho trước; nhập Serial rồi bổ sung kiểm định."
           action={
             <button
               type="button"
@@ -300,25 +293,75 @@ export default function AdminInventoryPage() {
             </button>
           }
         >
-          <form onSubmit={handleCreateSerial} className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
-            <div>
-              <label className="block font-bold text-slate-700 mb-1">Sản phẩm *</label>
+          <form id="inventory-intake" onSubmit={handleCreateSerial} className="admin-inventory-form grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
+            <h3 className="md:col-span-3 font-semibold text-slate-800">1. Máy & kho nhận</h3>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <label htmlFor="intake-product" className="block font-bold text-slate-700">Sản phẩm *</label>
+                <input
+                  type="search"
+                  aria-label="Lọc sản phẩm nhập kho"
+                  value={productFilterText}
+                  onChange={(e) => setProductFilterText(e.target.value)}
+                  placeholder="Lọc nhanh tên máy..."
+                  className="px-2 py-0.5 border border-slate-200 rounded text-[11px] w-36 bg-slate-50"
+                />
+              </div>
               <select
+                id="intake-product"
                 value={newSerial.productId}
-                onChange={(e) => setNewSerial({ ...newSerial, productId: e.target.value })}
+                onChange={(e) => {
+                  const nextProdId = e.target.value;
+                  const firstVar = variants.find((v) => v.productId === nextProdId);
+                  setNewSerial({
+                    ...newSerial,
+                    productId: nextProdId,
+                    variantId: firstVar?.id || "",
+                  });
+                }}
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white"
                 required
               >
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.condition})
-                  </option>
-                ))}
+                {products
+                  .filter(
+                    (p) =>
+                      !productFilterText.trim() ||
+                      p.name.toLowerCase().includes(productFilterText.trim().toLowerCase()) ||
+                      p.slug.toLowerCase().includes(productFilterText.trim().toLowerCase()) ||
+                      p.id === newSerial.productId
+                  )
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.condition})
+                    </option>
+                  ))}
               </select>
+              {variants.some((v) => v.productId === newSerial.productId) && (
+                <div>
+                  <label htmlFor="intake-variant" className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                    Cấu hình / Phiên bản (SKU)
+                  </label>
+                  <select
+                    id="intake-variant"
+                value={newSerial.variantId}
+                    onChange={(e) => setNewSerial({ ...newSerial, variantId: e.target.value })}
+                    className="w-full p-1.5 border border-slate-200 rounded-lg bg-slate-50 text-[11px]"
+                  >
+                    {variants
+                      .filter((v) => v.productId === newSerial.productId)
+                      .map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name} ({v.sku}) — {v.price.toLocaleString("vi-VN")}đ
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Showroom / Kho lưu trữ *</label>
+              <label htmlFor="intake-warehouse" className="block font-bold text-slate-700 mb-1">Showroom / Kho lưu trữ *</label>
               <select
+                id="intake-warehouse"
                 value={newSerial.warehouseId}
                 onChange={(e) => setNewSerial({ ...newSerial, warehouseId: e.target.value })}
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white"
@@ -334,20 +377,22 @@ export default function AdminInventoryPage() {
               </select>
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Số Serial / Service Tag *</label>
+              <label htmlFor="intake-serial" className="block font-bold text-slate-700 mb-1">Số Serial / Service Tag *</label>
               <input
                 type="text"
                 placeholder="VD: PF4X9L21"
+                id="intake-serial"
                 value={newSerial.serialNumber}
                 onChange={(e) => setNewSerial({ ...newSerial, serialNumber: e.target.value })}
                 className="w-full p-2 border border-slate-300 rounded-lg font-mono uppercase"
                 required
               />
             </div>
+            <h3 className="md:col-span-3 border-t border-slate-200 pt-3 font-semibold text-slate-800">2. Kiểm định & bảo hành</h3>
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="font-bold text-slate-700">
-                  Mã kiểm định công khai (Public Code)
+                <label htmlFor="intake-code" className="font-bold text-slate-700">
+                  Mã kiểm định công khai (không bắt buộc)
                 </label>
                 <button
                   type="button"
@@ -380,16 +425,18 @@ export default function AdminInventoryPage() {
               <input
                 type="text"
                 placeholder="VD: CTL-X1G11-02 (Khách tra cứu trên web)"
+                id="intake-code"
                 value={newSerial.publicCode}
                 onChange={(e) => setNewSerial({ ...newSerial, publicCode: e.target.value })}
                 className="w-full p-2 border border-slate-300 rounded-lg font-mono uppercase"
               />
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Tình trạng &amp; Bảo hành (tháng)</label>
+              <label htmlFor="intake-condition" className="block font-bold text-slate-700 mb-1">Tình trạng &amp; Bảo hành (tháng)</label>
               <div className="flex gap-2">
                 <select
-                  value={newSerial.condition}
+                  id="intake-condition"
+                value={newSerial.condition}
                   onChange={(e) => setNewSerial({ ...newSerial, condition: e.target.value })}
                   className="flex-1 p-2 border border-slate-300 rounded-lg bg-white"
                 >
@@ -401,6 +448,7 @@ export default function AdminInventoryPage() {
                   type="number"
                   min={1}
                   max={36}
+                  aria-label="Bảo hành (tháng)"
                   value={newSerial.warrantyMonths}
                   onChange={(e) => setNewSerial({ ...newSerial, warrantyMonths: Number(e.target.value) || 12 })}
                   className="w-20 p-2 border border-slate-300 rounded-lg text-center"
@@ -408,20 +456,22 @@ export default function AdminInventoryPage() {
               </div>
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Dung lượng Pin % (0 - 100)</label>
+              <label htmlFor="intake-battery" className="block font-bold text-slate-700 mb-1">Dung lượng Pin % (0 - 100)</label>
               <input
                 type="number"
                 min={0}
                 max={100}
+                id="intake-battery"
                 value={newSerial.batteryHealth}
                 onChange={(e) => setNewSerial({ ...newSerial, batteryHealth: Number(e.target.value) || 95 })}
                 className="w-full p-2 border border-slate-300 rounded-lg"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block font-bold text-slate-700 mb-1">Ngoại hình &amp; Ghi chú kiểm định</label>
+              <label htmlFor="intake-appearance" className="block font-bold text-slate-700 mb-1">Ngoại hình &amp; Ghi chú kiểm định</label>
               <input
                 type="text"
+                id="intake-appearance"
                 value={newSerial.appearance}
                 onChange={(e) => setNewSerial({ ...newSerial, appearance: e.target.value })}
                 className="w-full p-2 border border-slate-300 rounded-lg"
@@ -433,7 +483,7 @@ export default function AdminInventoryPage() {
                 disabled={submitting}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition cursor-pointer disabled:opacity-50"
               >
-                {submitting ? "Đang lưu..." : "Lưu Serial & Xuất bản Kiểm định"}
+                {submitting ? "Đang lưu..." : newSerial.publicCode.trim() ? "Nhập máy & Công khai kiểm định" : "Nhập máy vào kho"}
               </button>
             </div>
           </form>
@@ -441,29 +491,31 @@ export default function AdminInventoryPage() {
       )}
 
       {/* Tabs & Filters */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+      <div className="admin-inventory-workspace gap-3 bg-white p-3 rounded-lg border border-slate-200">
         <div className="flex items-center gap-1.5 flex-wrap">
           <button
             type="button"
             onClick={() => setActiveTab("serials")}
+            aria-pressed={activeTab === "serials"}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === "serials"
                 ? "bg-blue-600 text-white shadow-2xs"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            Danh sách Serial &amp; Mã Kiểm định ({serialUnits.length})
+            Máy theo Serial ({serialUnits.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("balances")}
+            aria-pressed={activeTab === "balances"}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeTab === "balances"
                 ? "bg-blue-600 text-white shadow-2xs"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >
-            Tồn kho theo SKU ({balances.length})
+            Tồn kho theo SKU ({filteredBalances.length})
           </button>
         </div>
 
@@ -481,6 +533,7 @@ export default function AdminInventoryPage() {
                   key={s.key}
                   type="button"
                   onClick={() => setStatusFilter(s.key)}
+                  aria-pressed={statusFilter === s.key}
                   className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
                     statusFilter === s.key
                       ? "bg-slate-900 text-white"
@@ -497,13 +550,15 @@ export default function AdminInventoryPage() {
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="search"
-              placeholder="Tìm Serial, Public Code, tên máy..."
+              placeholder={activeTab === "serials" ? "Tìm Serial, mã kiểm định, tên máy..." : "Tìm tên sản phẩm, SKU..."}
+              aria-label={activeTab === "serials" ? "Tìm máy theo Serial" : "Tìm tồn kho theo SKU"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs w-56 bg-white"
             />
           </div>
           <select
+            aria-label="Lọc kho"
             value={warehouseFilter}
             onChange={(e) => setWarehouseFilter(e.target.value)}
             className="px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs cursor-pointer"
@@ -520,7 +575,7 @@ export default function AdminInventoryPage() {
 
       {/* Tab Content */}
       {activeTab === "serials" ? (
-        <AdminCard title="Đơn vị máy theo Serial / Service Tag & Hồ sơ kiểm định" bodyClassName="p-0 overflow-x-auto">
+        <AdminCard title="Danh sách máy & Kiểm định" subtitle="Hiển thị tối đa 100 máy khớp bộ lọc." bodyClassName="p-0 overflow-x-auto">
           {serialUnits.length === 0 ? (
             <div className="p-10 text-center text-xs text-slate-500">
               Không có Serial nào khớp bộ lọc.
@@ -586,21 +641,30 @@ export default function AdminInventoryPage() {
                       )}
                     </td>
                     <td className="text-center">
-                      <StatusBadge status={u.status} />
+                      <StatusBadge status={u.status} customLabel={serialStatusLabels[u.status]} className="whitespace-nowrap" />
                     </td>
                     <td className="text-right">
-                      <select
-                        aria-label={`Đổi trạng thái serial ${u.serialNumber}`}
-                        value={u.status}
-                        onChange={(e) => void handleStatusChange(u.id, e.target.value)}
-                        className="px-2 py-1 border border-slate-200 rounded bg-white text-xs font-medium cursor-pointer"
-                      >
-                        <option value="AVAILABLE">Sẵn sàng (AVAILABLE)</option>
-                        <option value="RESERVED">Giữ hàng (RESERVED)</option>
-                        <option value="SOLD">Đã bán (SOLD)</option>
-                        <option value="QC_HOLD">Chờ QC (QC_HOLD)</option>
-                        <option value="REPAIR">Bảo hành (REPAIR)</option>
-                      </select>
+                      <div className="inline-flex items-center gap-1.5">
+                        <Link
+                          href={`/admin/products/${u.productId}`}
+                          className="px-2 py-1 border border-slate-200 rounded bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[11px] font-semibold transition whitespace-nowrap"
+                          title="Mở trình biên tập sản phẩm để sửa chi tiết Hồ sơ kiểm định (QC)"
+                        >
+                          Sửa QC
+                        </Link>
+                        <select
+                          aria-label={`Đổi trạng thái serial ${u.serialNumber}`}
+                          value={u.status}
+                          onChange={(e) => void handleStatusChange(u.id, e.target.value)}
+                          className="px-2 py-1 border border-slate-200 rounded bg-white text-xs font-medium cursor-pointer"
+                        >
+                          <option value="AVAILABLE">Sẵn sàng (AVAILABLE)</option>
+                          <option value="RESERVED">Giữ hàng (RESERVED)</option>
+                          <option value="SOLD">Đã bán (SOLD)</option>
+                          <option value="QC_HOLD">Chờ QC (QC_HOLD)</option>
+                          <option value="REPAIR">Bảo hành (REPAIR)</option>
+                        </select>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -609,9 +673,9 @@ export default function AdminInventoryPage() {
           )}
         </AdminCard>
       ) : (
-        <AdminCard title="Bảng cân đối tồn kho theo SKU & Showroom" bodyClassName="p-0 overflow-x-auto">
-          {balances.length === 0 ? (
-            <div className="p-10 text-center text-xs text-slate-500">Chưa có dữ liệu cân đối tồn kho.</div>
+        <AdminCard title="Tồn kho theo SKU & Showroom" subtitle="Khả dụng = Tồn thực tế − Đang giữ. Lọc trên tối đa 100 dòng đã tải." bodyClassName="p-0 overflow-x-auto">
+          {filteredBalances.length === 0 ? (
+            <div className="p-10 text-center text-xs text-slate-500">Không có dòng tồn kho khớp bộ lọc.</div>
           ) : (
             <table className="admin-table w-full text-left border-collapse text-xs">
               <thead>
@@ -626,7 +690,7 @@ export default function AdminInventoryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {balances.map((b) => {
+                {filteredBalances.map((b) => {
                   const available = Math.max(0, b.onHand - b.reserved);
                   return (
                     <tr key={b.id} className="hover:bg-slate-50/70 transition">
@@ -663,6 +727,7 @@ export default function AdminInventoryPage() {
                             setNewSerial((prev) => ({
                               ...prev,
                               productId: b.productId,
+                              variantId: b.variantId || "",
                               warehouseId: b.warehouseId,
                             }));
                             setShowAddForm(true);
@@ -683,6 +748,48 @@ export default function AdminInventoryPage() {
           )}
         </AdminCard>
       )}
+      <details className="rounded-lg border border-slate-200 bg-white">
+        <summary className="px-4 py-3 font-semibold text-slate-700">Thông tin kho & Showroom ({warehouses.length})</summary>
+        <div className="p-4 pt-0">
+      {/* Showroom / Warehouse Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        {warehouses.map((w) => (
+          <div
+            key={w.id}
+            className={`bg-white rounded-xl border p-4 shadow-2xs flex flex-col justify-between gap-3 ${
+              w.status === "ACTIVE" ? "border-slate-200" : "border-slate-200 opacity-65 bg-slate-50"
+            }`}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                  <Store className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900">{w.name}</div>
+                  <div className="text-[11px] font-mono text-slate-400">Mã kho: {w.code}</div>
+                </div>
+              </div>
+              <StatusBadge status={w.status} />
+            </div>
+            <div className="text-xs text-slate-600 flex items-start gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+              <span>{w.address || "Chưa cập nhật địa chỉ"}</span>
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500">
+                Serial sẵn sàng: <strong className="text-emerald-700">{w.availableSerials}</strong> / {w.totalSerials}
+              </span>
+              <span className="text-slate-500">
+                Tồn kho SL: <strong className="text-slate-900">{w.totalOnHand}</strong>
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+        </div>
+      </details>
     </div>
   );
 }

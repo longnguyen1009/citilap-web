@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import { notFound } from "next/navigation";
 import { type Metadata } from "next";
 import Link from "next/link";
@@ -27,7 +28,7 @@ export async function generateMetadata({ params }: BrandPageProps): Promise<Meta
       title,
       description,
       alternates: {
-        canonical: `https://citilap.vn/brand/${brand.slug}`,
+        canonical: `${businessProfile.canonicalSiteUrl}/brand/${brand.slug}`,
       },
       openGraph: {
         title,

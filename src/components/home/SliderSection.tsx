@@ -92,9 +92,35 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
 
   if (total === 0) return null;
 
+  const resetGesture = (target?: HTMLDivElement, pointerId = activePointerId.current) => {
+    dragStartX.current = null;
+    dragStartY.current = null;
+    dragDistance.current = 0;
+    isHorizontalDrag.current = false;
+    activePointerId.current = null;
+    setIsDragging(false);
+
+    if (target && pointerId !== null) {
+      try {
+        if (target.hasPointerCapture(pointerId)) {
+          target.releasePointerCapture(pointerId);
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    // Keep click suppression active briefly to prevent synthetic click from opening links
+    if (suppressClick.current) {
+      setTimeout(() => {
+        suppressClick.current = false;
+      }, 150);
+    }
+  };
+
   // Pointer drag gestures with pointer capture and mobile scroll protection
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0 && e.pointerType === 'mouse') return; // only primary mouse button
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
 
     dragStartX.current = e.clientX;
     dragStartY.current = e.clientY;
@@ -112,23 +138,13 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (dragStartX.current === null) return;
+    if (!e.isPrimary || activePointerId.current !== e.pointerId || dragStartX.current === null) return;
     const dx = e.clientX - dragStartX.current;
     const dy = e.clientY - (dragStartY.current ?? e.clientY);
 
     // If gesture is predominantly vertical, cancel drag immediately to let mobile scroll smoothly
     if (!isHorizontalDrag.current && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 6) {
-      if (activePointerId.current !== null) {
-        try {
-          e.currentTarget.releasePointerCapture(activePointerId.current);
-        } catch {
-          // Ignore
-        }
-      }
-      dragStartX.current = null;
-      dragStartY.current = null;
-      activePointerId.current = null;
-      setIsDragging(false);
+      resetGesture(e.currentTarget, e.pointerId);
       return;
     }
 
@@ -140,36 +156,24 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
   };
 
   const handlePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (activePointerId.current !== null) {
-      try {
-        if (e.currentTarget.hasPointerCapture(activePointerId.current)) {
-          e.currentTarget.releasePointerCapture(activePointerId.current);
-        }
-      } catch {
-        // Ignore
-      }
-    }
+    if (!e.isPrimary || activePointerId.current !== e.pointerId || dragStartX.current === null) return;
+    const distance = dragDistance.current;
+    const shouldAdvance = isHorizontalDrag.current && Math.abs(distance) > 40;
 
-    if (dragStartX.current !== null && isHorizontalDrag.current && Math.abs(dragDistance.current) > 40) {
-      if (dragDistance.current > 0) {
+    resetGesture(e.currentTarget, e.pointerId);
+
+    if (shouldAdvance) {
+      if (distance > 0) {
         prevSlide();
       } else {
         nextSlide();
       }
     }
+  };
 
-    dragStartX.current = null;
-    dragStartY.current = null;
-    activePointerId.current = null;
-    isHorizontalDrag.current = false;
-    setIsDragging(false);
-
-    // Keep click suppression active briefly to prevent synthetic click from opening links
-    if (suppressClick.current) {
-      setTimeout(() => {
-        suppressClick.current = false;
-      }, 150);
-    }
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointerId.current === null || e.pointerId !== activePointerId.current) return;
+    resetGesture(e.currentTarget, e.pointerId);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
@@ -216,9 +220,9 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
           onPointerDown={total > 1 ? handlePointerDown : undefined}
           onPointerMove={total > 1 ? handlePointerMove : undefined}
           onPointerUp={total > 1 ? handlePointerEnd : undefined}
-          onPointerCancel={total > 1 ? handlePointerEnd : undefined}
-          onLostPointerCapture={total > 1 ? handlePointerEnd : undefined}
-          style={{ touchAction: 'pan-y' }}
+          onPointerCancel={total > 1 ? handlePointerCancel : undefined}
+          onLostPointerCapture={total > 1 ? handlePointerCancel : undefined}
+          style={{ touchAction: 'pan-y pinch-zoom' }}
         >
           {/* Slides track */}
           <div className="relative h-56 sm:h-72 md:h-88 lg:h-96 w-full">

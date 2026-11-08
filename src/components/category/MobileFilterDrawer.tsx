@@ -18,34 +18,48 @@ export default function MobileFilterDrawer({
   categorySlug,
 }: MobileFilterDrawerProps) {
   const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(()=>{
-    const node=dialog.current;
-    const opener=document.activeElement as HTMLElement | null;
-    if(isOpen) node?.showModal();
-    else node?.close();
-    return ()=>{node?.close();if(isOpen) opener?.focus();};
-  },[isOpen]);
-  // Lock body scroll when drawer is open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Handle Escape key
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+    const node = dialog.current;
+    if (!isOpen) {
+      if (node?.open) node.close();
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const active = document.activeElement as HTMLElement | null;
+    const opener =
+      active && active !== document.body && !node?.contains(active)
+        ? active
+        : document.querySelector<HTMLElement>('button[aria-label="Mở bộ lọc tìm kiếm"]');
+
+    if (node && !node.open) {
+      node.showModal();
+    }
+    if (!node?.contains(document.activeElement)) {
+      closeButtonRef.current?.focus();
+    }
+
+    let closedByResize = false;
+    const handleResize = () => {
+      if (opener && window.getComputedStyle(opener).display === "none") {
+        closedByResize = true;
         onClose();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (node?.open) node.close();
+      document.body.style.overflow = previousOverflow;
+      if (!closedByResize && opener && window.getComputedStyle(opener).display !== "none") {
+        opener.focus();
+      }
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -53,10 +67,21 @@ export default function MobileFilterDrawer({
   return (
     <dialog
       ref={dialog}
-      onCancel={onClose}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClose={() => {
+        if (isOpen) onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       aria-modal="true"
       aria-label="Bộ lọc sản phẩm"
-      className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 open:flex lg:hidden"
+      className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 overscroll-contain open:flex"
     >
       {/* Backdrop */}
       <div
@@ -78,8 +103,10 @@ export default function MobileFilterDrawer({
             )}
           </div>
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-control text-text-secondary hover:text-text-primary hover:bg-surface-subtle transition cursor-pointer"
+            className="w-11 h-11 flex items-center justify-center rounded-control text-text-secondary hover:text-text-primary hover:bg-surface-subtle transition cursor-pointer"
             aria-label="Đóng bộ lọc"
           >
             <X className="w-5 h-5" />
@@ -87,7 +114,7 @@ export default function MobileFilterDrawer({
         </div>
 
         {/* Scrollable Filters */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5">
           <CategoryFilterSidebar
             categorySlug={categorySlug}
             facets={facets}

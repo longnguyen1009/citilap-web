@@ -50,3 +50,5 @@ scripts/verify-cf.mjs
 /.claude/settings.local.json
 /backups/
 *.sql.gz
+*.log
+/output/

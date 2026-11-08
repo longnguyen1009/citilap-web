@@ -24,10 +24,12 @@ const DEFAULT_BRANDS: BrandItem[] = [
 export default function BrandSection({
   title,
   subtitle,
+  viewAllLink,
   brands: customBrands,
 }: {
   title?: string;
   subtitle?: string;
+  viewAllLink?: string;
   brands?: BrandItem[];
 } = {}) {
   const displayBrands = customBrands && customBrands.length > 0 ? customBrands : DEFAULT_BRANDS;
@@ -53,7 +55,7 @@ export default function BrandSection({
               </div>
             </div>
             <Link
-              href="/phan-loai"
+              href={viewAllLink || "/phan-loai"}
               className="text-xs sm:text-sm font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 transition"
             >
               <span>Xem tất cả danh mục</span>

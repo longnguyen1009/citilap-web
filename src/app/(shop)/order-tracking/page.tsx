@@ -19,10 +19,10 @@ export default function OrderTrackingPage() {
             / <span className="text-slate-700 font-medium">Tra cứu Đơn hàng & Kiểm định</span>
           </nav>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Cổng Tra cứu Đơn hàng & Hồ sơ Kiểm định
+            Cổng Tra cứu Đơn hàng &amp; Hồ sơ Kiểm định
           </h1>
           <p className="text-xs sm:text-sm text-slate-600 mt-1">
-            Kiểm tra chứng thư test máy công khai theo Mã công khai (Public Code) hoặc theo dõi tiến độ xử lý đơn hàng bằng liên kết xác nhận.
+            Tra cứu tiến độ xử lý đơn hàng bằng Mã đơn hàng &amp; Số điện thoại nhận hàng, hoặc kiểm tra biên bản kiểm định kỹ thuật theo Mã máy.
           </p>
         </div>
 

@@ -179,7 +179,7 @@ export async function submitContactMessage(
     console.error('[ContactService] Error saving contact submission to D1:', error);
     return {
       success: false,
-      error: 'Hệ thống đang bận. Quý khách vui lòng thử lại sau hoặc gọi hotline 0899.188.186 để được hỗ trợ ngay.',
+      error: `Hệ thống đang bận. Quý khách vui lòng thử lại sau hoặc gọi hotline ${businessProfile.displayPhone} để được hỗ trợ ngay.`,
     };
   }
 }
@@ -237,8 +237,41 @@ export async function listContactSubmissions(
     take: limit,
   });
 
+  // Resolve UUID actor IDs (handledBy & event.actor) to human-readable User names/emails
+  const actorIds = new Set<string>();
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  for (const c of contacts) {
+    if (c.handledBy && uuidRegex.test(c.handledBy)) actorIds.add(c.handledBy);
+    for (const evt of c.events || []) {
+      if (evt.actor && uuidRegex.test(evt.actor)) actorIds.add(evt.actor);
+    }
+  }
+  const actorMap = new Map<string, string>();
+  if (actorIds.size > 0) {
+    try {
+      const users = await prisma.user.findMany({
+        where: { id: { in: Array.from(actorIds) } },
+        select: { id: true, name: true, email: true },
+      });
+      for (const u of users) {
+        actorMap.set(u.id, u.name || u.email || u.id);
+      }
+    } catch {
+      // Fallback to raw ID if user lookup fails
+    }
+  }
+
+  const resolvedContacts = contacts.map((c) => ({
+    ...c,
+    handledBy: c.handledBy && actorMap.has(c.handledBy) ? actorMap.get(c.handledBy)! : c.handledBy,
+    events: (c.events || []).map((evt) => ({
+      ...evt,
+      actor: evt.actor && actorMap.has(evt.actor) ? actorMap.get(evt.actor)! : evt.actor,
+    })),
+  }));
+
   return {
-    contacts,
+    contacts: resolvedContacts,
     pagination: {
       total,
       page,

@@ -1,5 +1,7 @@
+import { businessProfile } from "@/config/business-profile";
 import { categoryAncestors } from '@/lib/category-paths';
 import { productHref } from '@/lib/product-paths';
+import { formatShortWarrantyBadge } from '@/contracts/cms/product-studio';
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -18,7 +20,6 @@ import InspectionReports from "@/components/product/InspectionReports";
 import { ProductReviewsSection } from "@/components/product/ProductReviewsSection";
 import { ProductSpecsSidebarCard } from "@/components/product/ProductSpecsSidebarCard";
 import { listApprovedProductReviews } from "@/server/services/contact.service";
-import { DEMO_LENOVO_LOQ } from "@/data/demo-product-loq";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
   generateBreadcrumbJsonLd,
@@ -54,13 +55,6 @@ export async function generateMetadata({
 }: ProductPageProps): Promise<Metadata> {
   const { id } = await params;
   const query = await searchParams;
-
-  if (id === "demo-lenovo-loq") {
-    return {
-      title: `${DEMO_LENOVO_LOQ.fullTitle} | CITILAP.VN`,
-      description: `Xem chi tiết ${DEMO_LENOVO_LOQ.name} chính hãng tại CITILAP.VN. Core 7 230H, RTX 3050 6GB, Màn hình 165Hz chuẩn màu 100% sRGB.`,
-    };
-  }
 
   const skuParam =
     typeof query.sku === "string"
@@ -101,7 +95,7 @@ export async function generateMetadata({
     product.shortDescription ||
     `Xem thông số chi tiết, cấu hình ${product.name} chính hãng tại CITILAP.VN. Giá ${product.price.toLocaleString("vi-VN")}đ, ${product.conditionLabel}, bảo hành ${product.warranty}.`;
 
-  const canonicalUrl = 'https://citilap.vn' + productHref({ slug: product.canonicalSlug, template: studio?.template, kind: /phu-kien|linh-kien/.test(product.categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' });
+  const canonicalUrl = `${businessProfile.canonicalSiteUrl}` + productHref({ slug: product.canonicalSlug, template: studio?.template, kind: /phu-kien|linh-kien/.test(product.categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' });
 
   return {
     title,
@@ -132,7 +126,6 @@ export default async function ProductDetailPage({
 }: ProductPageProps) {
   const { id } = await params;
   const query = await searchParams;
-  const isDemoLoq = id === "demo-lenovo-loq";
 
   const skuParam =
     typeof query.sku === "string"
@@ -145,204 +138,6 @@ export default async function ProductDetailPage({
   const settings = await getStorefrontSettings();
   const evaluatedAt = new Date();
   const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);
-
-  // =========================================================================
-  // CASE 1: DEMO LENOVO LOQ (ĐẦY ĐỦ MỌI CẤU HÌNH, MÀU SẮC, GÓI BẢO HÀNH)
-  // =========================================================================
-  if (isDemoLoq) {
-    const demo = DEMO_LENOVO_LOQ;
-    const activeSku = skuParam || demo.variants.find(v => v.isDefault)?.sku || demo.variants[0].sku;
-    const currentVariant = demo.variants.find(v => v.sku === activeSku) || demo.variants[0];
-
-    // Fetch related products for bottom section
-    const rawRelated = await getRelatedProducts(
-      "demo-related-seed",
-      null,
-      null,
-      4,
-      [],
-      undefined,
-      pricingContext,
-      evaluatedAt
-    );
-    const relatedProducts = applyPricingToHomepageProducts(rawRelated, pricingContext, evaluatedAt);
-    const demoBreadcrumbJsonLd = generateBreadcrumbJsonLd([
-      { name: "Trang chủ", href: "/" },
-      { name: "Laptop Gaming", href: "/laptop" },
-      { name: demo.name, href: `/laptop/${demo.slug}` },
-    ]);
-    const demoFaqJsonLd = generateFaqJsonLd(demo.faqs);
-    const demoProductJsonLd = generateProductJsonLd({
-      id: demo.id,
-      name: demo.name,
-      description: demo.fullTitle,
-      canonicalPath: `/laptop/${demo.slug}`,
-      images: demo.images.map((img) => img.url),
-      sku: currentVariant.sku,
-      modelCode: demo.modelCode,
-      brand: demo.brand,
-      categoryName: "Laptop Gaming",
-      condition: demo.conditionLabel,
-      price: currentVariant.price,
-      canOrder: false,
-      specs: demo.specs.map(([key, value]) => ({ key, value })),
-    });
-
-    return (
-      <div className="bg-[#f8fafc] min-h-screen pb-20">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoBreadcrumbJsonLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoProductJsonLd) }}
-        />
-        {demoFaqJsonLd && (
-          <script
-            type="application/ld+json"
-            dangerouslySetInnerHTML={{ __html: serializeJsonLd(demoFaqJsonLd) }}
-          />
-        )}
-
-        {/* Breadcrumb Navigation */}
-        <nav aria-label="Đường dẫn trang" className="bg-white border-b border-gray-200">
-          <div className="container mx-auto px-4 max-w-[1370px]">
-            <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-2.5 font-medium flex-wrap gap-y-1">
-              <li>
-                <Link href="/" className="hover:text-blue-600 transition">
-                  Trang chủ
-                </Link>
-              </li>
-              <li className="flex items-center">
-                <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
-                <Link href="/laptop" className="hover:text-blue-600 transition">
-                  Laptop Gaming
-                </Link>
-              </li>
-              <li className="flex items-center">
-                <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
-                <span className="hover:text-blue-600 transition">
-                  Lenovo LOQ Series
-                </span>
-              </li>
-              <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
-              <li className="text-gray-900 font-semibold truncate max-w-xs sm:max-w-md" aria-current="page">
-                {demo.name}
-              </li>
-            </ol>
-          </div>
-        </nav>
-
-        {/* Main Container */}
-        <div className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
-          {/* 1. TOP HERO SECTION: GALLERY + TRUST + DEAL COMBO + PURCHASING */}
-          <ProductHeroSection
-            canOrder={false}
-            productId={demo.id}
-            productSlug={demo.slug}
-            productName={demo.name}
-            modelCode={demo.modelCode}
-            brandName={demo.brand}
-            images={demo.images}
-            coverImage={demo.images[0].url}
-            discountBadge="Giảm 17%"
-            conditionLabel={demo.conditionLabel}
-            basePrice={currentVariant.price}
-            baseOriginalPrice={currentVariant.originalPrice}
-            variants={demo.variants}
-            selectedSku={currentVariant.sku}
-            colors={demo.colors}
-            warranties={demo.warranties}
-            phone={settings?.storePhone}
-          />
-
-          {/* 2. MIDDLE SECTION: 2 CỘT CHUẨN */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10" aria-label="Chi tiết sản phẩm">
-            {/* Cột trái (Col 8): Đánh giá chi tiết -> FAQ -> Đánh giá từ khách hàng */}
-            <div className="lg:col-span-8 space-y-6">
-              {/* Đánh giá chi tiết */}
-              <ProductDescriptionArticle
-                safeDescription={demo.reviewHtml}
-                productName={demo.name}
-              />
-
-              {/* Câu hỏi thường gặp FAQ */}
-              <ProductFaqAccordion faqs={demo.faqs} productName={demo.name} />
-
-              {/* Đánh giá từ khách hàng */}
-              <div id="danh-gia-khach-hang">
-                <ProductReviewsSection
-                  productName={demo.name}
-                  approvedReviews={[]}
-                  defaultVariantLabel={`Đã mua bản ${currentVariant.name}`}
-                />
-              </div>
-            </div>
-
-            {/* Cột phải (Col 4): Thông số kỹ thuật -> Showroom -> Vận chuyển -> Banners */}
-            <div className="lg:col-span-4 space-y-6">
-              {/* Thông số kỹ thuật */}
-              <section id="thong-so-ky-thuat">
-                <ProductSpecsSidebarCard
-                  productName={demo.name}
-                  specs={demo.specs.map(([key, value]) => ({ label: key, value }))}
-                  sku={demo.modelCode}
-                />
-              </section>
-
-              {/* Hệ thống cửa hàng */}
-              <ProductSideShowrooms settings={settings} />
-
-              {/* Chính sách vận chuyển & cam kết */}
-              <ProductShippingCommitment items={settings?.productShippingItems} />
-
-              {/* Banner ưu đãi */}
-              <ProductPromoBanners banners={settings?.productBanners} />
-            </div>
-          </section>
-
-          {/* 3. NỘI DUNG DƯỚI CÙNG: SẢN PHẨM TƯƠNG TỰ */}
-          {relatedProducts.length > 0 && (
-            <section className="mt-12" aria-label="Sản phẩm tương tự">
-              <div className="flex items-center justify-between gap-3 mb-6">
-                <div className="min-w-0">
-                  <h2 className="text-lg sm:text-xl font-black text-gray-900 uppercase tracking-tight">
-                    Sản phẩm tương tự
-                  </h2>
-                  <p className="text-xs text-gray-500 line-clamp-1 sm:line-clamp-none">
-                    Các mẫu laptop gaming cùng phân khúc được quan tâm nhiều
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {relatedProducts.map((p) => (
-                  <ProductCard key={p.id} product={p} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <RecentlyViewedSection
-            currentProduct={{
-              id: demo.id,
-              slug: demo.slug,
-              href: `/laptop/${demo.slug}`,
-              name: demo.name,
-              price: currentVariant.price,
-              originalPrice: currentVariant.originalPrice,
-              image: demo.images[0]?.url,
-              brand: demo.brand,
-              condition: demo.conditionLabel,
-              availability: "OUT_OF_STOCK",
-              stock: 0,
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
 
   // =========================================================================
   // CASE 2: CATALOG / STUDIO PRODUCT THỰC TẾ
@@ -390,7 +185,7 @@ export default async function ProductDetailPage({
   const galleryImages = [...rawGalleryImages, ...extraProductImages];
 
   const cover = studio
-    ? (studioImages.find((m) => m.variantId && m.variantId === studioVariant?.id)?.url || studioImages[0]?.url || "")
+    ? (studioImages.find((m) => (m.variantId && m.variantId === studioVariant?.id) || (studioVariant?.image && m.assetId === studioVariant.image))?.url || studioImages[0]?.url || "")
     : (product.primaryImageUrl || "");
 
   const displayName = studio?.name || product.name;
@@ -449,6 +244,9 @@ export default async function ProductDetailPage({
         const vCond = v.condition || studio.condition || product.condition || "NEW";
         const vCpu = v.options?.CPU || v.options?.cpu || studio.specs.find((s) => /^cpu$/i.test(s.key))?.value || product.specs.cpu || null;
         const vDisplay = v.options?.['Màn hình'] || v.options?.display || studio.specs.find((s) => /^(màn hình|display)$/i.test(s.key))?.value || product.specs.display || null;
+        const vImg =
+          studioImages.find((m) => (m.variantId && m.variantId === v.id) || (v.image && m.assetId === v.image))?.url ||
+          (v.image && (v.image.startsWith('/') || v.image.startsWith('http')) ? v.image : undefined);
         return {
           id: v.id,
           sku: v.sku,
@@ -465,8 +263,9 @@ export default async function ProductDetailPage({
           display: vDisplay,
           color: v.options?.['Màu sắc'] || v.options?.color,
           colorHex: /^#[0-9a-fA-F]{6}$/.test(v.options?.['Mã màu'] || '') ? v.options?.['Mã màu'] : undefined,
-          canOrder: ['AVAILABLE', 'PREORDER'].includes(v.availability || studio.availability),
-          tag: v.ram?.includes("32") ? "Đa nhiệm mượt" : undefined,
+          canOrder: ['AVAILABLE', 'PREORDER'].includes(v.availability || studio.availability) && (v.stock === undefined || v.stock === null || v.stock > 0),
+          tag: (v.tag || v.options?.tag || '').trim() || undefined,
+          image: vImg,
         };
       })
     : product.variants.map((v) => {
@@ -500,12 +299,25 @@ export default async function ProductDetailPage({
           gpu: v.gpu || null,
           display: v.display || product.specs.display || null,
           color: v.options?.['Màu sắc'] || v.options?.color,
+          tag: v.options?.tag || undefined,
         };
       });
 
   // Color is part of each authored SKU; pricing comes from that variant.
   const heroColors: never[] = [];
-  const heroWarranties = (studio?.warranties || []).map(w => ({id:w.name,name:w.name,desc:w.description,priceDiff:w.adjustment,isDefault:w.recommended}));
+  const defaultWarrantyName = studio
+    ? (studio.warrantyType === 'BRAND'
+        ? `Bảo hành Chính hãng ${studio.warrantyMonths || 12} tháng`
+        : `Bảo hành ${studio.warrantyMonths || 12} tháng tại CitiLap`)
+    : (product.warranty || 'Bảo hành 12 tháng tại CitiLap');
+  const heroWarranties = (studio?.warranties?.length ? studio.warranties : [{
+    name: defaultWarrantyName,
+    description: studio?.warrantyType === 'BRAND'
+      ? `Bảo hành chính hãng ${studio?.warrantyMonths || 12} tháng trên toàn quốc, hỗ trợ phần mềm trọn đời tại CitiLap.`
+      : `Bảo hành phần cứng ${studio?.warrantyMonths || 12} tháng tại CitiLap, lỗi 1 đổi 1 trong 7 ngày đầu tiên.`,
+    adjustment: 0,
+    recommended: true,
+  }]).map(w => ({id:w.name,name:w.name,desc:w.description,priceDiff:w.adjustment,isDefault:w.recommended}));
   const accessories = [];
   for (const accessoryId of studio?.accessoryProductIds || []) {
     const publication = await classifyProductPublication(accessoryId, {lookupType:'id'});
@@ -637,11 +449,14 @@ export default async function ProductDetailPage({
     image: cover || "/images/placeholder-laptop.svg",
     brand: studio?.brand || product.brand || undefined,
     condition: activeConditionCode,
-    warranty:
+    warranty: formatShortWarrantyBadge(
+      studio?.warrantyType,
+      studio?.warrantyMonths,
       heroWarranties.find((w) => w.isDefault)?.name ||
-      heroWarranties[0]?.name ||
-      product.warranty ||
-      undefined,
+        heroWarranties[0]?.name ||
+        product.warranty ||
+        null
+    ),
     availability: activeAvailability,
     stock: product.stock ?? 0,
     specs: {
@@ -697,7 +512,7 @@ export default async function ProductDetailPage({
       <div className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
         {/* 1. TOP HERO SECTION: GALLERY, BADGES, DEAL COMBO, PURCHASING, CARDS 365 */}
         <ProductHeroSection
-          key={product.id + (skuParam || '')}
+          key={product.id}
           productId={product.id}
           productSlug={product.slug}
           productName={displayName}

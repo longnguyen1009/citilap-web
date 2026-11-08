@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import type { Metadata } from 'next';
 import ComparePageClient from '@/components/product/ComparePageClient';
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   title: 'So sánh laptop & thiết bị công nghệ chính hãng | CitiLap',
   description: 'Bảng đối chiếu chi tiết thông số kỹ thuật, cấu hình, màn hình, hiệu năng và mức giá giữa các dòng laptop tại CitiLap.',
   alternates: {
-    canonical: 'https://citilap.vn/so-sanh',
+    canonical: `${businessProfile.canonicalSiteUrl}/so-sanh`,
   },
   robots: {
     index: false,
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'So sánh laptop & cấu hình chi tiết | CitiLap',
     description: 'Đối chiếu thông số kỹ thuật, màn hình và giá bán giữa các mẫu máy tại CitiLap.',
-    url: 'https://citilap.vn/so-sanh',
+    url: `${businessProfile.canonicalSiteUrl}/so-sanh`,
     images: ['/brand/marketing-banner.webp'],
   },
 };

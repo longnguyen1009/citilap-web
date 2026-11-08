@@ -23,6 +23,7 @@ interface SearchResultItem {
 
 const STATIC_NAV_COMMANDS: SearchResultItem[] = [
   { id: "nav-dash", title: "Bảng tin Tổng quan", subtitle: "Thống kê vận hành thời gian thực", category: "navigation", href: "/admin/dashboard" },
+  { id: "nav-analytics", title: "Phân tích hành vi & Lưu lượng", subtitle: "Lượt xem trang, sản phẩm xem nhiều và từ khóa tìm kiếm", category: "navigation", href: "/admin/analytics" },
   { id: "nav-prods", title: "Tất cả sản phẩm", subtitle: "Quản lý danh sách laptop và phụ kiện", category: "navigation", href: "/admin/products" },
   { id: "nav-inventory", title: "Kho hàng, Serial & Kiểm định", subtitle: "Quản lý tồn kho showroom, mã Serial/IMEI và hồ sơ kiểm định 12 điểm", category: "navigation", href: "/admin/inventory" },
   { id: "nav-new-prod", title: "Thêm sản phẩm mới", subtitle: "Biên tập sản phẩm máy tính mới", category: "navigation", href: "/admin/products/new", badge: "Tạo mới" },
@@ -34,8 +35,12 @@ const STATIC_NAV_COMMANDS: SearchResultItem[] = [
   { id: "nav-brands", title: "Thương hiệu & Hãng", subtitle: "Quản lý Asus, Dell, Lenovo, Apple...", category: "navigation", href: "/admin/brands" },
   { id: "nav-media", title: "Thư viện Media", subtitle: "Kho ảnh và video tập trung", category: "navigation", href: "/admin/media" },
   { id: "nav-posts", title: "Bài viết & Tin tức Review", subtitle: "Đánh giá laptop và mẹo công nghệ", category: "navigation", href: "/admin/posts" },
+  { id: "nav-post-cats", title: "Chuyên mục bài viết", subtitle: "Phân loại bài viết tin tức và đánh giá", category: "navigation", href: "/admin/post-categories" },
   { id: "nav-pages", title: "Trang chính sách tĩnh", subtitle: "Bảo hành, đổi trả, showroom", category: "navigation", href: "/admin/pages" },
+  { id: "nav-navigation", title: "Menu & Bộ sưu tập (Navigation)", subtitle: "Cấu trúc thanh điều hướng Header, Footer và Mega Menu", category: "navigation", href: "/admin/navigation" },
   { id: "nav-builder", title: "Builder Trang chủ & Landing", subtitle: "Bố cục các khối ngoài Storefront", category: "navigation", href: "/admin/builder" },
+  { id: "nav-redirects", title: "Chuyển hướng URL (Redirects 301)", subtitle: "Quản lý chuyển hướng đường dẫn SEO cũ sang mới", category: "navigation", href: "/admin/redirects" },
+  { id: "nav-audit", title: "Nhật ký hệ thống (Audit Log)", subtitle: "Lịch sử thao tác của quản trị viên", category: "navigation", href: "/admin/audit" },
   { id: "nav-settings", title: "Cài đặt hệ thống", subtitle: "Logo, hotline, VietQR, phí ship", category: "navigation", href: "/admin/settings" },
   { id: "nav-users", title: "Tài khoản & Phân quyền", subtitle: "Quản lý nhân viên Owner, Editor, Sales", category: "navigation", href: "/admin/users" },
 ];
@@ -162,14 +167,33 @@ export default function AdminCommandPalette({
           const custData = await custRes.json();
           const customers = Array.isArray(custData?.data) ? custData.data : [];
           for (const cust of customers) {
+            const count = cust.totalOrders ?? cust.ordersCount ?? 0;
             dynamicResults.push({
               id: `cust-${cust.id}`,
               title: `Khách: ${cust.name || cust.phone || "Khách hàng"}`,
               subtitle: `${cust.phone || ""} ${cust.email ? `· ${cust.email}` : ""}`,
               category: "customers",
               href: `/admin/customers?search=${encodeURIComponent(cust.phone || cust.name || q)}`,
-              badge: `${cust.ordersCount ?? 0} đơn`,
+              badge: `${count} đơn`,
               badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+            });
+          }
+        }
+
+        // Query inventory Serial / Public Code API
+        const invRes = canAdmin(principal, 'content') ? await fetch(`/api/admin/inventory?q=${encodeURIComponent(q)}`, { cache: 'no-store', signal: controller.signal }) : null;
+        if (invRes?.ok) {
+          const invData = await invRes.json();
+          const serialUnits = Array.isArray(invData?.data?.serialUnits) ? invData.data.serialUnits.slice(0, 3) : [];
+          for (const su of serialUnits) {
+            dynamicResults.push({
+              id: `serial-${su.id}`,
+              title: `Serial #${su.serialNumber}${su.publicCode ? ` (QC: ${su.publicCode})` : ""}`,
+              subtitle: `${su.productName || "Máy tính"} · ${su.warehouseName || "Kho CitiLap"}`,
+              category: "products",
+              href: `/admin/inventory?q=${encodeURIComponent(su.serialNumber)}`,
+              badge: su.status === "AVAILABLE" ? "Sẵn kho" : su.status,
+              badgeColor: "bg-indigo-50 text-indigo-700 border-indigo-200",
             });
           }
         }

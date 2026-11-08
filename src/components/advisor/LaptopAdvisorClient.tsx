@@ -19,7 +19,6 @@ import {
   RotateCcw,
   Info,
   CheckCircle2,
-  ExternalLink,
   Search,
 } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
@@ -92,9 +91,9 @@ export default function LaptopAdvisorClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const effectiveZaloBase = (zaloUrl || businessProfile.socialProfiles.zalo || 'https://zalo.me/0899188186').replace(/\/$/, '');
-  const hotline = businessProfile.displayPhone || '0899.188.186';
-  const hotlineTel = `tel:${businessProfile.phone || '0899188186'}`;
+  const effectiveZaloBase = (zaloUrl || businessProfile.socialProfiles.zalo).replace(/\/$/, '');
+  const hotline = businessProfile.displayPhone;
+  const hotlineTel = `tel:${businessProfile.phone}`;
 
   const [budget, setBudget] = useState<number>(initialInput.budget);
   const [need, setNeed] = useState<"office" | "gaming" | "creator">(initialInput.need);
@@ -105,13 +104,21 @@ export default function LaptopAdvisorClient({
 
   const formatCurrency = (val: number) => `${val.toLocaleString("vi-VN")}₫`;
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = (
+    e?: React.FormEvent,
+    overrides?: {
+      budget?: number;
+      need?: "office" | "gaming" | "creator";
+      condition?: "any" | "NEW" | "USED";
+      portable?: "any" | "yes";
+    }
+  ) => {
     if (e) e.preventDefault();
     const params = new URLSearchParams();
-    params.set("budget", String(budget));
-    params.set("need", need);
-    params.set("condition", condition);
-    params.set("portable", portable);
+    params.set("budget", String(overrides?.budget ?? budget));
+    params.set("need", overrides?.need ?? need);
+    params.set("condition", overrides?.condition ?? condition);
+    params.set("portable", overrides?.portable ?? portable);
 
     startTransition(() => {
       router.push(`/chon-laptop?${params.toString()}`);
@@ -156,14 +163,14 @@ export default function LaptopAdvisorClient({
 
             <p className="text-sm sm:text-base text-blue-100/90 leading-relaxed">
               Hệ thống tự động phân tích hàng trăm mẫu máy đang có sẵn tại CitiLap để đề xuất tối đa 3 chiếc laptop
-              tối ưu nhất cho công việc của bạn. Tất cả máy đều có RAM từ 16GB và qua 24 bước kiểm định khắt khe.
+              tối ưu nhất cho công việc của bạn. Tất cả máy đều có RAM từ 16GB và qua quy trình kiểm định kỹ thuật nghiêm ngặt.
             </p>
 
             {/* Trust chips */}
             <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-semibold text-blue-200">
               <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Kiểm định 24 bước độc quyền
+                Kiểm định kỹ thuật minh bạch
               </span>
               <span className="flex items-center gap-1.5 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
                 <CheckCircle2 className="w-4 h-4 text-sky-400" />
@@ -554,11 +561,12 @@ export default function LaptopAdvisorClient({
                 <button
                   type="button"
                   onClick={() => {
+                    const nextBudget = Math.min(80_000_000, budget + 5_000_000);
                     setCondition("any");
-                    setBudget((b) => Math.min(80_000_000, b + 5_000_000));
-                    handleSubmit();
+                    setBudget(nextBudget);
+                    handleSubmit(undefined, { budget: nextBudget, condition: "any" });
                   }}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition"
+                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
                 >
                   Nâng ngân sách +5 triệu & Xem lại
                 </button>
@@ -582,8 +590,8 @@ export default function LaptopAdvisorClient({
                 <ShieldCheck className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="font-bold text-slate-900 mb-0.5">Kiểm định độc quyền</h4>
-                <p className="text-slate-500">Mỗi máy có chứng thư kiểm định 24 bước minh bạch từng linh kiện.</p>
+                <h4 className="font-bold text-slate-900 mb-0.5">Kiểm định kỹ thuật minh bạch</h4>
+                <p className="text-slate-500">Mỗi máy đều có biên bản kiểm định kỹ thuật minh bạch từng linh kiện.</p>
               </div>
             </div>
 

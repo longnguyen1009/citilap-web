@@ -50,6 +50,8 @@ export default function AdminPagesPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'DRAFT'>('ALL');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [page, setPage] = useState(1);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -60,6 +62,8 @@ export default function AdminPagesPage() {
       try {
         const params = new URLSearchParams();
         if (query.trim()) params.set('q', query.trim());
+        if (statusFilter !== 'ALL') params.set('status', statusFilter);
+        if (typeFilter !== 'ALL') params.set('pageType', typeFilter);
         params.set('page', String(page));
         params.set('limit', '20');
 
@@ -77,7 +81,7 @@ export default function AdminPagesPage() {
     }
     void fetchPages();
     return () => { ignore = true; };
-  }, [query, page, refreshTrigger]);
+  }, [query, statusFilter, typeFilter, page, refreshTrigger]);
 
   const handleRefresh = () => {
     setLoading(true);
@@ -115,33 +119,82 @@ export default function AdminPagesPage() {
       />
 
       <AdminCard bodyClassName="p-0 overflow-hidden">
-        {/* Top Bar: Search */}
-        <div className="px-4 py-2.5 border-b border-slate-200 flex items-center justify-between gap-3 bg-slate-50/60">
-          <div className="relative flex-1 max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={query}
+        {/* Top Bar: Tabs + Type Filter + Search */}
+        <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
+          <div className="flex items-center gap-1" role="tablist" aria-label="Trạng thái trang">
+            {([
+              { key: 'ALL', label: 'Tất cả' },
+              { key: 'PUBLISHED', label: 'Đang hiển thị' },
+              { key: 'DRAFT', label: 'Bản nháp' },
+            ] as const).map((t) => {
+              const active = statusFilter === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => {
+                    setStatusFilter(t.key);
+                    setPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 flex-1 justify-end">
+            <select
+              aria-label="Lọc loại trang"
+              value={typeFilter}
               onChange={(e) => {
-                setQuery(e.target.value);
+                setTypeFilter(e.target.value);
                 setPage(1);
               }}
-              placeholder="Tìm tiêu đề, slug..."
-              className="w-full text-xs pl-8 pr-7 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery('');
+              className="text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-slate-700 cursor-pointer"
+            >
+              <option value="ALL">Mọi loại trang</option>
+              <option value="WARRANTY">Bảo hành</option>
+              <option value="RETURNS">Đổi trả</option>
+              <option value="SHIPPING">Vận chuyển</option>
+              <option value="ABOUT">Giới thiệu</option>
+              <option value="STORES">Showroom</option>
+              <option value="CUSTOM">Tùy chỉnh</option>
+            </select>
+
+            <div className="relative flex-1 max-w-xs">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
                   setPage(1);
                 }}
-                aria-label="Xóa tìm kiếm"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X size={13} />
-              </button>
-            )}
+                placeholder="Tìm tiêu đề, slug..."
+                className="w-full text-xs pl-8 pr-7 py-1.5 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    setPage(1);
+                  }}
+                  aria-label="Xóa tìm kiếm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -166,7 +219,7 @@ export default function AdminPagesPage() {
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="table-wrapper overflow-x-auto" tabIndex={0} role="region" aria-label="Danh sách trang và chính sách">
               <table className="admin-table w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50/90 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-200">
                   <tr>

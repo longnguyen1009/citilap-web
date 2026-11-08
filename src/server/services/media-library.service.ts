@@ -1,15 +1,20 @@
 import { adminAuditStatements } from '../admin-context';
 import type { D1Database, R2Bucket, ImagesBinding } from '@cloudflare/workers-types';
 import {
+  DEFAULT_MEDIA_FOLDERS,
   googleDriveFileId,
+  mediaBulkMoveSchema,
   mediaEditSchema,
+  mediaFolderCreateSchema,
   mediaQuerySchema,
+  slugifyMediaFolder,
   tiktokVideoId,
   videoSchema,
   youtubeId,
   type MediaAssetDto,
   type MediaAssetType,
   type MediaFilterKind,
+  type MediaFolderDto,
   type MediaUsageDto,
 } from '../../contracts/cms/media';
 import { detectImageSignature, extractImageDimensions } from '../../infra/cloudflare/r2/storage';
@@ -28,9 +33,176 @@ export class MediaError extends Error {
 type Row = Omit<MediaAssetDto, 'url' | 'usageCount' | 'assetType' | 'embedUrl' | 'thumbnailUrl'> & {
   storageKey: string | null;
   externalId: string | null;
+  folder?: string;
 };
 export const PAGE_SIZE = 24;
 const fields = 'a.*,(SELECT count(*) FROM MediaUsage u WHERE u.assetId=a.id) AS usageCount';
+
+const schemaReadyByDb = new WeakMap<D1Database, Promise<void>>();
+
+export async function ensureMediaFolderSchema(db: D1Database): Promise<void> {
+  const existing = schemaReadyByDb.get(db);
+  if (existing) return existing;
+
+  const task = (async () => {
+    let addedColumn = false;
+    try {
+      await db.prepare("ALTER TABLE MediaAsset ADD COLUMN folder TEXT NOT NULL DEFAULT 'general'").run();
+      addedColumn = true;
+    } catch {
+      // Column `folder` already exists on MediaAsset
+    }
+
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS MediaFolder (
+          slug TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          sortOrder INTEGER NOT NULL DEFAULT 100,
+          isSystem INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+        )`,
+      )
+      .run();
+
+    await db
+      .prepare('CREATE INDEX IF NOT EXISTS MediaAsset_folder_idx ON MediaAsset(state, folder, createdAt DESC)')
+      .run()
+      .catch(() => undefined);
+
+    await db.batch(
+      DEFAULT_MEDIA_FOLDERS.map((f) =>
+        db
+          .prepare('INSERT OR IGNORE INTO MediaFolder(slug, name, sortOrder, isSystem) VALUES(?, ?, ?, ?)')
+          .bind(f.slug, f.name, f.sortOrder, f.isSystem ? 1 : 0),
+      ),
+    );
+
+    if (addedColumn) {
+      await db
+        .batch([
+          db.prepare("UPDATE MediaAsset SET folder = 'brands' WHERE folder = 'general' AND storageKey LIKE 'brand/%'"),
+          db.prepare(
+            "UPDATE MediaAsset SET folder = 'videos-docs' WHERE folder = 'general' AND (kind = 'VIDEO' OR mimeType = 'application/pdf')",
+          ),
+          db.prepare(
+            "UPDATE MediaAsset SET folder = 'products' WHERE folder = 'general' AND (storageKey LIKE 'products/%' OR EXISTS (SELECT 1 FROM MediaUsage u WHERE u.assetId = MediaAsset.id AND u.ownerType = 'PRODUCT'))",
+          ),
+        ])
+        .catch(() => undefined);
+    }
+  })().catch((err) => {
+    schemaReadyByDb.delete(db);
+    throw err;
+  });
+
+  schemaReadyByDb.set(db, task);
+  return task;
+}
+
+export async function listMediaFolders(
+  db: D1Database,
+  state: 'READY' | 'ARCHIVED' = 'READY',
+): Promise<{ folders: MediaFolderDto[]; totalAllFolders: number }> {
+  await ensureMediaFolderSchema(db);
+  const [folderRows, countRows] = await Promise.all([
+    db
+      .prepare('SELECT slug, name, isSystem FROM MediaFolder ORDER BY sortOrder ASC, name ASC')
+      .all<{ slug: string; name: string; isSystem: number }>(),
+    db
+      .prepare("SELECT coalesce(folder, 'general') AS folder, count(*) AS cnt FROM MediaAsset WHERE state = ? GROUP BY coalesce(folder, 'general')")
+      .bind(state)
+      .all<{ folder: string; cnt: number }>(),
+  ]);
+
+  const counts = new Map<string, number>();
+  let totalAllFolders = 0;
+  for (const r of countRows.results) {
+    const slug = r.folder || 'general';
+    counts.set(slug, (counts.get(slug) || 0) + (r.cnt || 0));
+    totalAllFolders += r.cnt || 0;
+  }
+
+  const folders: MediaFolderDto[] = folderRows.results.map((f) => ({
+    slug: f.slug,
+    name: f.name,
+    isSystem: Boolean(f.isSystem),
+    count: counts.get(f.slug) || 0,
+  }));
+
+  const knownSlugs = new Set(folders.map((f) => f.slug));
+  for (const [slug, count] of counts.entries()) {
+    if (!knownSlugs.has(slug)) {
+      folders.push({
+        slug,
+        name: slug,
+        isSystem: false,
+        count,
+      });
+    }
+  }
+
+  return { folders, totalAllFolders };
+}
+
+export async function createMediaFolder(db: D1Database, input: unknown) {
+  await ensureMediaFolderSchema(db);
+  const data = mediaFolderCreateSchema.parse(input);
+  const slug = slugifyMediaFolder(data.slug || data.name);
+  if (slug === 'all') {
+    throw new MediaError('Tên thư mục không hợp lệ.');
+  }
+  const existing = await db.prepare('SELECT slug FROM MediaFolder WHERE slug = ?').bind(slug).first<{ slug: string }>();
+  if (existing) {
+    throw new MediaError('Thư mục này đã tồn tại.', 409);
+  }
+  await db.batch([
+    db
+      .prepare('INSERT INTO MediaFolder(slug, name, sortOrder, isSystem) VALUES(?, ?, 55, 0)')
+      .bind(slug, data.name.trim()),
+    ...adminAuditStatements(db, 'media.folder.create', slug, `Created media folder ${data.name.trim()}`),
+  ]);
+  const { folders } = await listMediaFolders(db, 'READY');
+  return { slug, name: data.name.trim(), folders };
+}
+
+export async function deleteMediaFolder(db: D1Database, rawSlug: string) {
+  await ensureMediaFolderSchema(db);
+  const slug = rawSlug.trim();
+  const folder = await db
+    .prepare('SELECT slug, name, isSystem FROM MediaFolder WHERE slug = ?')
+    .bind(slug)
+    .first<{ slug: string; name: string; isSystem: number }>();
+  if (!folder) throw new MediaError('Không tìm thấy thư mục.', 404);
+  if (folder.isSystem || DEFAULT_MEDIA_FOLDERS.some((f) => f.slug === slug)) {
+    throw new MediaError('Không thể xóa thư mục mặc định của hệ thống.', 400);
+  }
+  await db.batch([
+    db.prepare("UPDATE MediaAsset SET folder = 'general' WHERE folder = ?").bind(slug),
+    db.prepare('DELETE FROM MediaFolder WHERE slug = ?').bind(slug),
+    ...adminAuditStatements(db, 'media.folder.delete', slug, `Deleted media folder ${folder.name}`),
+  ]);
+  const { folders } = await listMediaFolders(db, 'READY');
+  return { deleted: slug, folders };
+}
+
+export async function bulkMoveMediaAssets(db: D1Database, input: unknown) {
+  await ensureMediaFolderSchema(db);
+  const data = mediaBulkMoveSchema.parse(input);
+  const targetFolder = await db
+    .prepare('SELECT slug FROM MediaFolder WHERE slug = ?')
+    .bind(data.folder)
+    .first<{ slug: string }>();
+  if (!targetFolder) throw new MediaError('Thư mục đích không tồn tại.', 404);
+
+  const placeholders = data.assetIds.map(() => '?').join(',');
+  await db
+    .prepare(`UPDATE MediaAsset SET folder = ?, updatedAt = ? WHERE id IN (${placeholders})`)
+    .bind(data.folder, new Date().toISOString(), ...data.assetIds)
+    .run();
+
+  return { moved: data.assetIds.length, folder: data.folder };
+}
 
 export function resolveMediaPresentation(row: {
   id: string;
@@ -126,7 +298,7 @@ function dto(row: Row & { usageCount: number }): MediaAssetDto {
   void storageKey;
   void externalId;
   const presentation = resolveMediaPresentation(row);
-  return { ...rest, ...presentation };
+  return { ...rest, folder: row.folder || 'general', ...presentation };
 }
 
 function buildKindFilterSql(kind: MediaFilterKind): { clause: string; bindings: string[] } {
@@ -151,21 +323,42 @@ function buildKindFilterSql(kind: MediaFilterKind): { clause: string; bindings: 
 }
 
 export async function getAsset(db: D1Database, id: string) {
+  await ensureMediaFolderSchema(db);
   const row = await db.prepare('SELECT * FROM MediaAsset WHERE id=?').bind(id).first<Row>();
   if (!row) throw new MediaError('Không tìm thấy tệp.', 404);
   return row;
 }
 export async function listMedia(db: D1Database, input: unknown) {
+  await ensureMediaFolderSchema(db);
   const query = mediaQuerySchema.parse(input);
   const kindFilter = buildKindFilterSql(query.kind);
-  const where = `a.state=? AND (${kindFilter.clause}) AND (instr(lower(a.name),lower(?))>0 OR instr(lower(a.alt),lower(?))>0)`;
-  const args = [query.state, ...kindFilter.bindings, query.q, query.q];
-  const count = await db.prepare(`SELECT count(*) AS total FROM MediaAsset a WHERE ${where}`).bind(...args).first<{ total: number }>();
+  const hasFolderFilter = Boolean(query.folder && query.folder !== 'ALL');
+  const folderClause = hasFolderFilter ? " AND coalesce(a.folder, 'general') = ?" : '';
+  const where = `a.state=? AND (${kindFilter.clause})${folderClause} AND (instr(lower(a.name),lower(?))>0 OR instr(lower(a.alt),lower(?))>0 OR instr(lower(a.caption),lower(?))>0)`;
+  const args = [
+    query.state,
+    ...kindFilter.bindings,
+    ...(hasFolderFilter ? [query.folder] : []),
+    query.q,
+    query.q,
+    query.q,
+  ];
+  const [count, folderSummary] = await Promise.all([
+    db.prepare(`SELECT count(*) AS total FROM MediaAsset a WHERE ${where}`).bind(...args).first<{ total: number }>(),
+    listMediaFolders(db, query.state),
+  ]);
   const total = count?.total || 0;
   const page = Math.min(query.page, Math.max(1, Math.ceil(total / PAGE_SIZE)));
   const rows = await db.prepare(`SELECT ${fields} FROM MediaAsset a WHERE ${where} ORDER BY a.createdAt DESC,a.id DESC LIMIT ? OFFSET ?`)
     .bind(...args, PAGE_SIZE, (page - 1) * PAGE_SIZE).all<Row & { usageCount: number }>();
-  return { items: rows.results.map(dto), total, page, pageSize: PAGE_SIZE };
+  return {
+    items: rows.results.map(dto),
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    folders: folderSummary.folders,
+    totalAllFolders: folderSummary.totalAllFolders,
+  };
 }
 export async function mediaDetail(db: D1Database, id: string) {
   const row = await getAsset(db, id);
@@ -174,12 +367,14 @@ export async function mediaDetail(db: D1Database, id: string) {
   return { asset: dto({ ...row, usageCount: count?.n || 0 }), usages: usages.results };
 }
 export async function editMedia(db: D1Database, id: string, input: unknown) {
+  await ensureMediaFolderSchema(db);
   const data = mediaEditSchema.parse(input);
-  await getAsset(db, id);
+  const existing = await getAsset(db, id);
+  const nextFolder = data.folder ? slugifyMediaFolder(data.folder) : existing.folder || 'general';
   // Atomic compare-and-swap; DB trigger also protects simultaneous usage creation.
   try {
-    const [result] = await db.batch([db.prepare(`UPDATE MediaAsset SET name=?,alt=?,caption=?,state=?,revision=revision+1,updatedAt=?
-      WHERE id=? AND revision=?`).bind(data.name, data.alt, data.caption, data.state, new Date().toISOString(), id, data.revision), ...adminAuditStatements(db, 'media.update', id, 'Media metadata updated', null, 'order', { changed: true, before: data.revision, after: data.revision + 1 })]);
+    const [result] = await db.batch([db.prepare(`UPDATE MediaAsset SET name=?,alt=?,caption=?,folder=?,state=?,revision=revision+1,updatedAt=?
+      WHERE id=? AND revision=?`).bind(data.name, data.alt, data.caption, nextFolder, data.state, new Date().toISOString(), id, data.revision), ...adminAuditStatements(db, 'media.update', id, 'Media metadata updated', null, 'order', { changed: true, before: data.revision, after: data.revision + 1 })]);
     if (!result.meta.changes) throw new MediaError('Tệp đã được sửa ở nơi khác. Tải lại trước khi lưu.', 409);
   } catch (error) {
     if (error instanceof Error && error.message.includes('MEDIA_IN_USE')) throw new MediaError('Tệp đang được sử dụng, không thể ẩn khỏi thư viện.', 409);
@@ -236,10 +431,19 @@ function detectVideoSignature(buffer: Buffer, mimeType: string): { mime: string;
   return null;
 }
 
-export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
+export async function uploadLibraryImage(
+  env: MediaEnvironment,
+  file: File,
+  options?: { folder?: string; clientThumb?: File | null; originalName?: string },
+) {
+  await ensureMediaFolderSchema(env.DB);
   if (!file.size) throw new MediaError('Tệp tải lên không được rỗng.', 413);
   const buffer = Buffer.from(await file.arrayBuffer());
   const id = crypto.randomUUID();
+  const isVideoOrPdf =
+    file.type === 'application/pdf' || ['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type);
+  const rawFolder = options?.folder?.trim() || (isVideoOrPdf ? 'videos-docs' : 'products');
+  const folder = slugifyMediaFolder(rawFolder);
 
   let kind: 'IMAGE' | 'VIDEO' = 'IMAGE';
   let key = '';
@@ -260,7 +464,7 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
     width = svg.width;
     height = svg.height;
     mime = 'image/svg+xml';
-    key = `library/${id}.svg`;
+    key = `library/${folder}/${id}.svg`;
   } else if (file.type === 'application/pdf') {
     if (file.size > 20 * 1024 * 1024) throw new MediaError('Tệp PDF tối đa 20 MB.', 413);
     const isPdf =
@@ -272,16 +476,16 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
       buffer[4] === 0x2d;
     if (!isPdf) throw new MediaError('Chỉ nhận tệp PDF hợp lệ.', 415);
     mime = 'application/pdf';
-    key = `library/${id}.pdf`;
+    key = `library/${folder}/${id}.pdf`;
   } else if (['video/mp4', 'video/webm', 'video/quicktime'].includes(file.type)) {
     if (file.size > 50 * 1024 * 1024) throw new MediaError('Video tải lên tối đa 50 MB.', 413);
     const detectedVideo = detectVideoSignature(buffer, file.type);
     if (!detectedVideo) throw new MediaError('Chỉ nhận video MP4, WebM, MOV có nội dung hợp lệ.', 415);
     kind = 'VIDEO';
     mime = detectedVideo.mime;
-    key = `library/${id}.${detectedVideo.ext}`;
+    key = `library/${folder}/${id}.${detectedVideo.ext}`;
   } else {
-    if (file.size > 5 * 1024 * 1024) throw new MediaError('Ảnh phải có dung lượng từ 1 byte đến 5 MB.', 413);
+    if (file.size > 15 * 1024 * 1024) throw new MediaError('Ảnh sau nén phải có dung lượng tối đa 15 MB.', 413);
     const detected = detectImageSignature(buffer);
     if (!detected || (file.type && file.type !== detected.mime)) {
       throw new MediaError('Chỉ nhận JPEG, PNG, WebP, SVG, Video (MP4/WebM/MOV) hoặc PDF hợp lệ.', 415);
@@ -293,17 +497,13 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
     width = dim?.width ?? null;
     height = dim?.height ?? null;
     mime = detected.mime;
-    key = `library/${id}.${detected.ext}`;
-    // No full-size "thumbnail" copy: a missing v2 thumbnail is reported as PENDING
-    // and can be regenerated lazily or from the admin library.
+    key = `library/${folder}/${id}.${detected.ext}`;
     thumbnailStatus = 'PENDING';
 
     // Standardize uploaded product / post images into 2 versions:
     // + detail: max width 1600px, quality 90% (for PDP, zoom)
     // + thumbnail: width 480px, quality 75% (for product grid, listings)
-    if (!env.IMAGES || typeof env.IMAGES.input !== 'function') {
-      thumbnailError = 'Dịch vụ tối ưu ảnh chưa sẵn sàng.';
-    } else {
+    if (env.IMAGES && typeof env.IMAGES.input === 'function') {
       try {
         const detailResult = await env.IMAGES.input(new Blob([new Uint8Array(buffer)]).stream() as Parameters<ImagesBinding['input']>[0])
           .transform({ width: 1600, fit: 'scale-down' })
@@ -313,7 +513,7 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
         if (detailResp.ok && detectImageSignature(detailBuf)?.mime === 'image/webp') {
           uploadBuffer = detailBuf;
           mime = 'image/webp';
-          key = `library/${id}.webp`;
+          key = `library/${folder}/${id}.webp`;
           const newDim = extractImageDimensions(detailBuf, 'webp');
           if (newDim) {
             width = newDim.width;
@@ -329,7 +529,6 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
         console.warn('Worker IMAGES detail transformation fallback to original buffer:', err);
       }
 
-      // Independent of the detail step so one failure does not silently skip the other.
       try {
         const thumbResult = await env.IMAGES.input(new Blob([new Uint8Array(buffer)]).stream() as Parameters<ImagesBinding['input']>[0])
           .transform({ width: 480, fit: 'scale-down' })
@@ -340,13 +539,24 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
           thumbBuffer = thumbBuf;
           thumbMime = 'image/webp';
           thumbKey = `library/${id}_thumb-v2.webp`;
-        } else {
-          thumbnailError = 'Không thể tạo ảnh thu nhỏ.';
         }
       } catch (err) {
         console.warn('Worker IMAGES thumbnail transformation failed:', err);
-        thumbnailError = 'Không thể tạo ảnh thu nhỏ.';
       }
+    }
+
+    // Fallback to client-generated 480px WebP thumbnail when Worker IMAGES is unavailable (e.g. local dev)
+    if (!thumbBuffer && options?.clientThumb && options.clientThumb.size > 0 && options.clientThumb.size <= 1024 * 1024) {
+      const clientThumbBuf = Buffer.from(await options.clientThumb.arrayBuffer());
+      if (detectImageSignature(clientThumbBuf)?.mime === 'image/webp') {
+        thumbBuffer = clientThumbBuf;
+        thumbMime = 'image/webp';
+        thumbKey = `library/${id}_thumb-v2.webp`;
+      }
+    }
+
+    if (!thumbBuffer) {
+      thumbnailError = 'Ảnh thu nhỏ sẽ được tạo khi có dịch vụ tối ưu ảnh.';
     }
   }
 
@@ -362,23 +572,25 @@ export async function uploadLibraryImage(env: MediaEnvironment, file: File) {
     else thumbnailError = 'Không thể lưu ảnh thu nhỏ vào bộ lưu trữ.';
   }
 
+  const displayName = (options?.originalName || file.name || 'Tệp mới').slice(0, 180);
+
   try {
     await env.DB.batch([
-      env.DB.prepare(`INSERT INTO MediaAsset(id,kind,provider,storageKey,name,mimeType,size,width,height)
-      VALUES(?,?,'R2',?,?,?,?,?,?)`).bind(
+      env.DB.prepare(`INSERT INTO MediaAsset(id,kind,provider,storageKey,folder,name,mimeType,size,width,height)
+      VALUES(?,?,'R2',?,?,?,?,?,?,?)`).bind(
         id,
         kind,
         key,
-        file.name.slice(0, 180) || 'Tệp mới',
+        folder,
+        displayName,
         mime,
         uploadBuffer.length,
         width,
         height,
       ),
-      ...adminAuditStatements(env.DB, 'media.upload', id, 'Media uploaded'),
+      ...adminAuditStatements(env.DB, 'media.upload', id, `Media uploaded to folder ${folder}`),
     ]);
   } catch (error) {
-    // R2/D1 cannot share a transaction. Compensate only our newly generated object(s).
     await Promise.allSettled([
       env.PRODUCT_MEDIA.delete(key),
       thumbKey ? env.PRODUCT_MEDIA.delete(thumbKey) : Promise.resolve(),
@@ -398,8 +610,10 @@ function isSafeHttpsUrl(input: string): boolean {
 }
 
 export async function addVideo(db: D1Database, input: unknown) {
+  await ensureMediaFolderSchema(db);
   const data = videoSchema.parse(input);
   const mediaKind = data.mediaKind || 'AUTO';
+  const folder = slugifyMediaFolder(data.folder || 'videos-docs');
 
   let kind: 'IMAGE' | 'VIDEO' = 'VIDEO';
   let provider: 'YOUTUBE' | 'LEGACY' = 'YOUTUBE';
@@ -456,8 +670,8 @@ export async function addVideo(db: D1Database, input: unknown) {
   const id = crypto.randomUUID();
   await db.batch([
     db.prepare(
-      'INSERT OR IGNORE INTO MediaAsset(id,kind,provider,externalId,name,mimeType) VALUES(?,?,?,?,?,?)',
-    ).bind(id, kind, provider, externalId, data.name, mimeType),
+      'INSERT OR IGNORE INTO MediaAsset(id,kind,provider,externalId,folder,name,mimeType) VALUES(?,?,?,?,?,?,?)',
+    ).bind(id, kind, provider, externalId, folder, data.name, mimeType),
     ...adminAuditStatements(db, 'media.create', id, 'External media added', null, 'order', { changed: true }),
   ]);
   const row = await db

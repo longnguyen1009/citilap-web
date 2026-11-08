@@ -21,15 +21,32 @@ import {
   Video,
   Plus,
   Trash2,
+  Gift,
+  ShoppingBag,
 } from "lucide-react";
 import { VIETQR_BANKS, findVietQrBank } from "@/lib/vietqr";
 import { PageHeader, InlineAlert, AdminCard } from "@/components/admin/ui";
 import type { AdminSettingsDocument as StorefrontSettings } from "@/contracts/cms/settings";
-import { DEFAULT_ADMIN_SETTINGS as DEFAULT_SETTINGS } from "@/contracts/cms/settings";
+import {
+  DEFAULT_ADMIN_SETTINGS as DEFAULT_SETTINGS,
+  DEFAULT_GIFT_BUNDLES,
+  DEFAULT_ACCESSORY_BUNDLES,
+} from "@/contracts/cms/settings";
 
 const STORAGE_KEY = "citilap_admin_settings_v2_draft";
 
 type TabId = "store" | "flashsale" | "banners" | "features" | "shipping" | "product";
+
+const formatDots = (n: number | null | undefined): string => {
+  if (n === null || n === undefined || Number.isNaN(n)) return "";
+  return new Intl.NumberFormat("vi-VN").format(n);
+};
+
+const parseDots = (raw: string): number => {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return 0;
+  return Math.min(2000000000, parseInt(digits, 10) || 0);
+};
 
 const inputCls =
   "w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none";
@@ -72,6 +89,30 @@ export default function SettingsPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [quickVideoUrl, setQuickVideoUrl] = useState("");
   const [fetchingVideos, setFetchingVideos] = useState(false);
+  const [catalogProducts, setCatalogProducts] = useState<Array<{ id: string; name: string; sku: string; price: number }>>([]);
+  const [bundleProductSearch, setBundleProductSearch] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const tabParam = new URLSearchParams(window.location.search).get("tab");
+      if (tabParam && ["store", "flashsale", "banners", "features", "shipping", "product"].includes(tabParam)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- sync initial tab from URL query
+        setActiveTab(tabParam as TabId);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "product" || catalogProducts.length > 0) return;
+    fetch("/api/admin/products?limit=100", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json?.success && Array.isArray(json.data?.items)) {
+          setCatalogProducts(json.data.items);
+        }
+      })
+      .catch(() => {});
+  }, [activeTab, catalogProducts.length]);
 
   const loadSettingsData = useCallback(async (isMounted?: () => boolean) => {
     try {
@@ -146,6 +187,31 @@ export default function SettingsPage() {
     setFetchingVideos(true);
     setMessage(null);
     try {
+      const urls = raw.split(/[\n,\s]+/).map((u) => u.trim()).filter(Boolean);
+      if (urls.length > 1) {
+        const res = await fetch("/api/admin/fetch-videos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ urls }),
+          credentials: "same-origin",
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.success || !Array.isArray(json.data)) {
+          throw new Error(json.error || "Không thể lấy thông tin danh sách video.");
+        }
+        const current = settings.reviewVideos || [];
+        const mergedMap = new Map<string, (typeof current)[number]>();
+        for (const item of [...json.data, ...current]) {
+          if (item?.url && !mergedMap.has(item.url)) {
+            mergedMap.set(item.url, item);
+          }
+        }
+        update("reviewVideos", Array.from(mergedMap.values()).slice(0, 12));
+        setQuickVideoUrl("");
+        setMessage({ type: "success", text: `Đã thêm thành công ${json.data.length} video mới.` });
+        return;
+      }
+
       const res = await fetch(`/api/admin/fetch-videos?videoUrl=${encodeURIComponent(raw)}`, {
         credentials: "same-origin",
       });
@@ -326,13 +392,13 @@ export default function SettingsPage() {
     );
   }
 
-  const tabs: Array<{ id: TabId; label: string; icon: React.ElementType }> = [
-    { id: "store", label: "Cửa hàng", icon: Store },
-    { id: "flashsale", label: "Flash Sale", icon: Flame },
-    { id: "banners", label: "Banners", icon: LayoutTemplate },
-    { id: "features", label: "Cam kết & Đánh giá", icon: ShieldCheck },
-    { id: "shipping", label: "Vận chuyển & TT", icon: Truck },
-    { id: "product", label: "Trang sản phẩm", icon: CreditCard },
+  const tabs: Array<{ id: TabId; label: string; icon: React.ElementType; description: string }> = [
+    { id: "store", label: "Cửa hàng & Liên hệ", icon: Store, description: "Thông tin dùng chung cho cửa hàng, hotline và các điểm bán." },
+    { id: "shipping", label: "Giao hàng & Thanh toán", icon: Truck, description: "Phí giao hàng và phương thức thanh toán khách có thể chọn khi đặt đơn." },
+    { id: "product", label: "Trang sản phẩm", icon: CreditCard, description: "Nội dung dùng chung trên trang sản phẩm. Giá, cấu hình và tồn kho được quản lý riêng tại Sản phẩm và Kho & Kiểm định." },
+    { id: "banners", label: "Banner & Kênh video", icon: LayoutTemplate, description: "Quản lý banner, kênh mạng xã hội và danh sách video. Chọn vị trí, thứ tự các khối tại Bố cục trang." },
+    { id: "features", label: "Cam kết & Đánh giá", icon: ShieldCheck, description: "Nội dung cam kết dịch vụ và đánh giá khách hàng hiển thị trên website." },
+    { id: "flashsale", label: "Flash Sale dự phòng", icon: Flame, description: "Cấu hình hiển thị dự phòng khi không có chiến dịch riêng. Quản lý lịch chạy và giá khuyến mãi tại Flash Sale." },
   ];
 
   const handleReloadLatest = () => {
@@ -350,7 +416,8 @@ export default function SettingsPage() {
     <div className="admin-settings max-w-6xl mx-auto pb-16 space-y-3">
       {/* Page Header */}
       <PageHeader
-        title="Cài đặt hệ thống"
+        title="Cài đặt cửa hàng"
+        description="Thiết lập thông tin dùng chung, giao hàng, thanh toán và nội dung website. Lưu cấu hình áp dụng thay đổi ở tất cả mục."
         badge={
           <span
             className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200 font-mono"
@@ -416,7 +483,7 @@ export default function SettingsPage() {
 
       <AdminCard bodyClassName="p-0 overflow-hidden">
         {/* Top Tab Bar inside Card */}
-        <div className="admin-settings-tabs flex flex-wrap items-center gap-1 px-4 py-2 border-b border-slate-200 bg-slate-50/70">
+        <div role="group" aria-label="Nhóm cài đặt" className="admin-settings-tabs flex flex-wrap items-center gap-1 px-4 py-2 border-b border-slate-200 bg-slate-50/70">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -441,6 +508,7 @@ export default function SettingsPage() {
 
         {/* Form Content */}
         <form onSubmit={handleSave} className="p-5 space-y-5 text-xs">
+          <p className="text-slate-600 leading-relaxed">{tabs.find(tab => tab.id === activeTab)?.description}</p>
           {/* TAB 1: CỬA HÀNG & HOTLINE */}
           {activeTab === "store" && (
             <div className="space-y-5">
@@ -567,7 +635,7 @@ export default function SettingsPage() {
                       type="text"
                       value={settings.logoUrl}
                       onChange={(e) => update("logoUrl", e.target.value)}
-                      placeholder="/brand/brand-logo-original.jpg"
+                      placeholder="/brand/citilap-logo.svg"
                       className={inputCls}
                     />
                   </div>
@@ -598,205 +666,6 @@ export default function SettingsPage() {
                       onChange={(e) => update("copyrightText", e.target.value)}
                       className={inputCls}
                     />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-200 pt-4 space-y-3.5">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Share2 className="w-3.5 h-3.5 text-blue-600" /> Mạng xã hội &amp; Kênh Video
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  <div>
-                    <label className={labelCls}>Facebook</label>
-                    <input
-                      type="text"
-                      value={settings.facebookUrl}
-                      onChange={(e) => update("facebookUrl", e.target.value)}
-                      placeholder="https://www.facebook.com/citilap"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Kênh TikTok (@citilapvn)</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={settings.tiktokUrl}
-                        onChange={(e) => update("tiktokUrl", e.target.value)}
-                        placeholder="https://www.tiktok.com/@citilapvn"
-                        className={inputCls}
-                      />
-                      <button
-                        type="button"
-                        disabled={fetchingVideos || !settings.tiktokUrl}
-                        onClick={() => void handleFetchChannelVideos(settings.tiktokUrl)}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
-                        title="Nạp video mẫu từ kênh TikTok"
-                      >
-                        Lấy video
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Kênh YouTube (tạm dùng ThinkView hoặc kênh riêng)</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={settings.youtubeUrl}
-                        onChange={(e) => update("youtubeUrl", e.target.value)}
-                        placeholder="https://www.youtube.com/@thinkview/videos"
-                        className={inputCls}
-                      />
-                      <button
-                        type="button"
-                        disabled={fetchingVideos || !settings.youtubeUrl}
-                        onClick={() => void handleFetchChannelVideos(settings.youtubeUrl)}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
-                        title="Lấy các video mới nhất từ kênh YouTube"
-                      >
-                        Lấy mới nhất
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quản lý danh sách Video Review YouTube & TikTok */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Video className="w-3.5 h-3.5 text-rose-600" /> Danh sách Video Review (YouTube &amp; TikTok)
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        Hiển thị trên Trang chủ và cột bên trang Tin tức. Bạn có thể dán trực tiếp link video YouTube hoặc TikTok để tự động lấy tiêu đề &amp; ảnh thu nhỏ, hoặc tự nhập từng ô.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={(settings.reviewVideos || []).length >= 12}
-                      onClick={() =>
-                        update("reviewVideos", [
-                          ...(settings.reviewVideos || []),
-                          {
-                            title: "Video đánh giá Laptop CitiLap",
-                            url: "https://www.youtube.com/watch?v=KsQTEyLOC6M",
-                            thumbnail: "https://i.ytimg.com/vi/KsQTEyLOC6M/hqdefault.jpg",
-                            platform: "youtube",
-                          },
-                        ])
-                      }
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-40 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Thêm dòng trống
-                    </button>
-                  </div>
-
-                  {/* Quick URL input box */}
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={quickVideoUrl}
-                      onChange={(e) => setQuickVideoUrl(e.target.value)}
-                      placeholder="Dán URL video YouTube (https://www.youtube.com/watch?v=...) hoặc TikTok (https://www.tiktok.com/@citilapvn/video/...)"
-                      className={inputCls}
-                    />
-                    <button
-                      type="button"
-                      disabled={!quickVideoUrl.trim() || fetchingVideos}
-                      onClick={() => void handleAddVideoByUrl()}
-                      className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs cursor-pointer"
-                    >
-                      {fetchingVideos ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Đang lấy...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-3.5 h-3.5" /> Lấy thông tin &amp; Thêm
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Editable video list */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(settings.reviewVideos || []).map((video, idx) => {
-                      const patchVideo = (patch: Partial<typeof video>) => {
-                        const next = (settings.reviewVideos || []).map((v, i) =>
-                          i === idx ? { ...v, ...patch } : v
-                        );
-                        update("reviewVideos", next);
-                      };
-                      return (
-                        <div
-                          key={`${video.url}-${idx}`}
-                          className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                video.url.includes("tiktok.com") || video.platform === "tiktok"
-                                  ? "bg-slate-900 text-white"
-                                  : "bg-rose-600 text-white"
-                              }`}
-                            >
-                              {video.url.includes("tiktok.com") || video.platform === "tiktok"
-                                ? "TikTok"
-                                : "YouTube"}{" "}
-                              #{idx + 1}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                update(
-                                  "reviewVideos",
-                                  (settings.reviewVideos || []).filter((_, i) => i !== idx)
-                                )
-                              }
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:underline cursor-pointer"
-                            >
-                              <Trash2 className="w-3 h-3" /> Xóa
-                            </button>
-                          </div>
-                          <div>
-                            <label className={labelCls}>Tiêu đề video</label>
-                            <input
-                              type="text"
-                              value={video.title}
-                              onChange={(e) => patchVideo({ title: e.target.value })}
-                              placeholder="Nhập tiêu đề hiển thị..."
-                              className={inputCls}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>URL Video (YouTube hoặc TikTok)</label>
-                            <input
-                              type="text"
-                              value={video.url}
-                              onChange={(e) =>
-                                patchVideo({
-                                  url: e.target.value,
-                                  platform: e.target.value.includes("tiktok.com") ? "tiktok" : "youtube",
-                                })
-                              }
-                              placeholder="https://www.youtube.com/watch?v=... hoặc https://www.tiktok.com/@citilapvn/video/..."
-                              className={inputCls}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>URL Ảnh Thumbnail</label>
-                            <input
-                              type="text"
-                              value={video.thumbnail || ""}
-                              onChange={(e) => patchVideo({ thumbnail: e.target.value })}
-                              placeholder="https://i.ytimg.com/vi/.../hqdefault.jpg hoặc /brand/store-photo-01.jpg"
-                              className={inputCls}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
                   </div>
                 </div>
               </div>
@@ -1006,8 +875,22 @@ export default function SettingsPage() {
           {/* TAB 3: BANNERS & TRANG CHỦ */}
           {activeTab === "banners" && (
             <div className="space-y-5">
+              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-950">
+                <div>
+                  <p className="font-bold text-slate-900">Lưu ý: Bố cục Trang chủ hiện được quản lý trực tiếp trong Trình dựng trang</p>
+                  <p className="text-slate-600 mt-0.5">
+                    Các thông số Hero Banner bên dưới đóng vai trò dữ liệu mặc định/dự phòng. Để thay đổi các khối Slider, Banner, Video Review và Lưới sản phẩm đang hiển thị ngoài Trang chủ, hãy mở Trình dựng trang chủ.
+                  </p>
+                </div>
+                <Link
+                  href="/admin/builder/home"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shrink-0 shadow-2xs transition"
+                >
+                  Mở Bố cục Trang chủ →
+                </Link>
+              </div>
               <div className="space-y-3">
-                <h2 className="text-xs font-bold text-slate-800">Hero Banner chính</h2>
+                <h2 className="text-xs font-bold text-slate-800">Hero Banner chính (Dự phòng)</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
                   <div>
                     <label className={labelCls}>Badge nhãn nhỏ</label>
@@ -1166,12 +1049,225 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+              <div className="border-t border-slate-200 pt-4 space-y-3.5">
+                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Share2 className="w-3.5 h-3.5 text-blue-600" /> Mạng xã hội &amp; Kênh Video
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  <div>
+                    <label className={labelCls}>Facebook</label>
+                    <input
+                      type="text"
+                      value={settings.facebookUrl}
+                      onChange={(e) => update("facebookUrl", e.target.value)}
+                      placeholder="https://www.facebook.com/citilap"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Kênh TikTok (@citilapvn)</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={settings.tiktokUrl}
+                        onChange={(e) => update("tiktokUrl", e.target.value)}
+                        placeholder="https://www.tiktok.com/@citilapvn"
+                        className={inputCls}
+                      />
+                      <button
+                        type="button"
+                        disabled={fetchingVideos || !settings.tiktokUrl}
+                        onClick={() => void handleFetchChannelVideos(settings.tiktokUrl)}
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
+                        title="Nạp video mẫu từ kênh TikTok"
+                      >
+                        Lấy video
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Kênh YouTube (tạm dùng ThinkView hoặc kênh riêng)</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={settings.youtubeUrl}
+                        onChange={(e) => update("youtubeUrl", e.target.value)}
+                        placeholder="https://www.youtube.com/@thinkview/videos"
+                        className={inputCls}
+                      />
+                      <button
+                        type="button"
+                        disabled={fetchingVideos || !settings.youtubeUrl}
+                        onClick={() => void handleFetchChannelVideos(settings.youtubeUrl)}
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
+                        title="Lấy các video mới nhất từ kênh YouTube"
+                      >
+                        Lấy mới nhất
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quản lý danh sách Video Review YouTube & TikTok */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                        <Video className="w-3.5 h-3.5 text-rose-600" /> Danh sách Video Review (YouTube &amp; TikTok)
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Hiển thị trên Trang chủ và cột bên trang Tin tức. Bạn có thể dán trực tiếp link video YouTube hoặc TikTok để tự động lấy tiêu đề &amp; ảnh thu nhỏ, hoặc tự nhập từng ô.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={(settings.reviewVideos || []).length >= 12}
+                      onClick={() =>
+                        update("reviewVideos", [
+                          ...(settings.reviewVideos || []),
+                          {
+                            title: "Video đánh giá Laptop CitiLap",
+                            url: "https://www.youtube.com/watch?v=KsQTEyLOC6M",
+                            thumbnail: "https://i.ytimg.com/vi/KsQTEyLOC6M/hqdefault.jpg",
+                            platform: "youtube",
+                          },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-40 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Thêm dòng trống
+                    </button>
+                  </div>
+
+                  {/* Quick URL input box */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={quickVideoUrl}
+                      onChange={(e) => setQuickVideoUrl(e.target.value)}
+                      placeholder="Dán URL video YouTube (https://www.youtube.com/watch?v=...) hoặc TikTok (https://www.tiktok.com/@citilapvn/video/...)"
+                      className={inputCls}
+                    />
+                    <button
+                      type="button"
+                      disabled={!quickVideoUrl.trim() || fetchingVideos}
+                      onClick={() => void handleAddVideoByUrl()}
+                      className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs cursor-pointer"
+                    >
+                      {fetchingVideos ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Đang lấy...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-3.5 h-3.5" /> Lấy thông tin &amp; Thêm
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Editable video list */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {(settings.reviewVideos || []).map((video, idx) => {
+                      const patchVideo = (patch: Partial<typeof video>) => {
+                        const next = (settings.reviewVideos || []).map((v, i) =>
+                          i === idx ? { ...v, ...patch } : v
+                        );
+                        update("reviewVideos", next);
+                      };
+                      return (
+                        <div
+                          key={`${video.url}-${idx}`}
+                          className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                video.url.includes("tiktok.com") || video.platform === "tiktok"
+                                  ? "bg-slate-900 text-white"
+                                  : "bg-rose-600 text-white"
+                              }`}
+                            >
+                              {video.url.includes("tiktok.com") || video.platform === "tiktok"
+                                ? "TikTok"
+                                : "YouTube"}{" "}
+                              #{idx + 1}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update(
+                                  "reviewVideos",
+                                  (settings.reviewVideos || []).filter((_, i) => i !== idx)
+                                )
+                              }
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:underline cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" /> Xóa
+                            </button>
+                          </div>
+                          <div>
+                            <label className={labelCls}>Tiêu đề video</label>
+                            <input
+                              type="text"
+                              value={video.title}
+                              onChange={(e) => patchVideo({ title: e.target.value })}
+                              placeholder="Nhập tiêu đề hiển thị..."
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>URL Video (YouTube hoặc TikTok)</label>
+                            <input
+                              type="text"
+                              value={video.url}
+                              onChange={(e) =>
+                                patchVideo({
+                                  url: e.target.value,
+                                  platform: e.target.value.includes("tiktok.com") ? "tiktok" : "youtube",
+                                })
+                              }
+                              placeholder="https://www.youtube.com/watch?v=... hoặc https://www.tiktok.com/@citilapvn/video/..."
+                              className={inputCls}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>URL Ảnh Thumbnail</label>
+                            <input
+                              type="text"
+                              value={video.thumbnail || ""}
+                              onChange={(e) => patchVideo({ thumbnail: e.target.value })}
+                              placeholder="https://i.ytimg.com/vi/.../hqdefault.jpg hoặc /brand/store-photo-01.webp"
+                              className={inputCls}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
             </div>
           )}
 
           {/* TAB 4: CAM KẾT DỊCH VỤ */}
           {activeTab === "features" && (
             <div className="space-y-3.5">
+              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-950">
+                <div>
+                  <p className="font-bold text-slate-900">Đồng bộ với khối Giới thiệu &amp; Cam kết trên Trang chủ</p>
+                  <p className="text-slate-600 mt-0.5">
+                    Các cam kết và đánh giá khách hàng bên dưới là cấu hình chuẩn toàn hệ thống. Nếu Trang chủ đang dùng khối tùy chỉnh riêng, bạn có thể sửa trực tiếp tại Bố cục Trang chủ.
+                  </p>
+                </div>
+                <Link
+                  href="/admin/builder/home"
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shrink-0 shadow-2xs transition"
+                >
+                  Mở Bố cục Trang chủ →
+                </Link>
+              </div>
               <h2 className="text-xs font-bold text-slate-800">Cam kết dịch vụ trang chủ (4 mục)</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {([1, 2, 3, 4] as const).map((num) => {
@@ -1287,22 +1383,22 @@ export default function SettingsPage() {
                 <div>
                   <label className={labelCls}>Phí giao hàng mặc định (VNĐ)</label>
                   <input
-                    type="number"
-                    value={settings.shippingFee}
-                    onChange={(e) => update("shippingFee", Number(e.target.value))}
-                    min="0"
-                    className={`${inputCls} tabular-nums`}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatDots(settings.shippingFee)}
+                    onChange={(e) => update("shippingFee", parseDots(e.target.value))}
+                    className={`${inputCls} tabular-nums font-semibold`}
                   />
                 </div>
 
                 <div>
                   <label className={labelCls}>Miễn phí giao hàng từ mức (VNĐ, 0 = tắt)</label>
                   <input
-                    type="number"
-                    value={settings.freeShippingThreshold}
-                    onChange={(e) => update("freeShippingThreshold", Number(e.target.value))}
-                    min="0"
-                    className={`${inputCls} tabular-nums`}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatDots(settings.freeShippingThreshold)}
+                    onChange={(e) => update("freeShippingThreshold", parseDots(e.target.value))}
+                    className={`${inputCls} tabular-nums font-semibold`}
                   />
                 </div>
 
@@ -1421,7 +1517,281 @@ export default function SettingsPage() {
 
           {/* TAB 6: TRANG SẢN PHẨM */}
           {activeTab === 'product' && (
-            <div className="space-y-5">
+            <div className="space-y-6">
+              {/* CÁC GÓI QUÀ TẶNG MẶC ĐỊNH */}
+              <section className="space-y-3 bg-rose-50/40 p-4 rounded-xl border border-rose-200/80">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h2 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <Gift className="w-4 h-4 text-rose-600" />
+                      Các gói Quà tặng mặc định (Chọn nhanh khi sửa sản phẩm)
+                    </h2>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Thiết lập sẵn các gói quà theo dòng máy (VD: Laptop Văn phòng, Laptop Gaming, MacBook...). Khi sửa sản phẩm, Admin chỉ cần bấm 1 nút để áp dụng gói quà tương ứng.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => update('giftBundles', DEFAULT_GIFT_BUNDLES)}
+                      className="text-[11px] font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-pointer"
+                    >
+                      Khôi phục mẫu mặc định
+                    </button>
+                    <button
+                      type="button"
+                      disabled={(settings.giftBundles || []).length >= 12}
+                      onClick={() =>
+                        update('giftBundles', [
+                          ...(settings.giftBundles || []),
+                          {
+                            id: `gift-${Date.now()}`,
+                            name: `Gói quà tặng mới #${(settings.giftBundles || []).length + 1}`,
+                            gifts: ['Balo chống sốc CitiLap cao cấp', 'Chuột không dây chính hãng'],
+                          },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-40 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Thêm gói quà
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {(settings.giftBundles || []).map((bundle, bIdx) => {
+                    const patchBundle = (patch: Partial<typeof bundle>) => {
+                      update(
+                        'giftBundles',
+                        (settings.giftBundles || []).map((item, i) => (i === bIdx ? { ...item, ...patch } : item))
+                      );
+                    };
+                    return (
+                      <div key={bundle.id || bIdx} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-2xs flex flex-col justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                              Gói #{bIdx + 1} ({bundle.gifts.length} món)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update(
+                                  'giftBundles',
+                                  (settings.giftBundles || []).filter((_, i) => i !== bIdx)
+                                )
+                              }
+                              className="text-[11px] text-rose-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" /> Xóa gói
+                            </button>
+                          </div>
+
+                          <div>
+                            <label className={labelCls}>Tên gói quà tặng</label>
+                            <input
+                              type="text"
+                              value={bundle.name}
+                              onChange={e => patchBundle({ name: e.target.value })}
+                              placeholder="VD: Gói quà Laptop Văn phòng"
+                              className={`${inputCls} font-semibold`}
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-semibold text-slate-600">Danh sách món quà</label>
+                              <button
+                                type="button"
+                                disabled={bundle.gifts.length >= 10}
+                                onClick={() => patchBundle({ gifts: [...bundle.gifts, ''] })}
+                                className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer"
+                              >
+                                + Thêm món
+                              </button>
+                            </div>
+                            {bundle.gifts.map((giftItem, gIdx) => (
+                              <div key={gIdx} className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={giftItem}
+                                  onChange={e => {
+                                    const nextItems = [...bundle.gifts];
+                                    nextItems[gIdx] = e.target.value;
+                                    patchBundle({ gifts: nextItems });
+                                  }}
+                                  placeholder={`Quà tặng #${gIdx + 1}...`}
+                                  className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    patchBundle({
+                                      gifts: bundle.gifts.filter((_, i) => i !== gIdx),
+                                    })
+                                  }
+                                  className="text-slate-400 hover:text-rose-600 px-1 cursor-pointer"
+                                  title="Xóa món quà"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
+              {/* CÁC GÓI MUA KÈM / PHỤ KIỆN MẶC ĐỊNH */}
+              <section className="space-y-3 bg-blue-50/40 p-4 rounded-xl border border-blue-200/80">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h2 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <ShoppingBag className="w-4 h-4 text-blue-600" />
+                      Các gói Mua kèm / Phụ kiện mặc định
+                    </h2>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Tạo sẵn các nhóm sản phẩm phụ kiện mua kèm (Chuột, Phím, Hub, Màn hình...) để chọn nhanh 1 chạm khi biên tập sản phẩm.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => update('accessoryBundles', DEFAULT_ACCESSORY_BUNDLES)}
+                      className="text-[11px] font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-pointer"
+                    >
+                      Khôi phục mẫu mặc định
+                    </button>
+                    <button
+                      type="button"
+                      disabled={(settings.accessoryBundles || []).length >= 12}
+                      onClick={() =>
+                        update('accessoryBundles', [
+                          ...(settings.accessoryBundles || []),
+                          {
+                            id: `acc-${Date.now()}`,
+                            name: `Gói phụ kiện mua kèm #${(settings.accessoryBundles || []).length + 1}`,
+                            productIds: [],
+                          },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-40 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Thêm gói mua kèm
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {(settings.accessoryBundles || []).map((bundle, bIdx) => {
+                    const patchBundle = (patch: Partial<typeof bundle>) => {
+                      update(
+                        'accessoryBundles',
+                        (settings.accessoryBundles || []).map((item, i) => (i === bIdx ? { ...item, ...patch } : item))
+                      );
+                    };
+                    const q = (bundleProductSearch[bundle.id] || '').trim().toLowerCase();
+                    const candidates = catalogProducts
+                      .filter(p => !bundle.productIds.includes(p.id))
+                      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q))
+                      .slice(0, 6);
+
+                    return (
+                      <div key={bundle.id || bIdx} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-2xs flex flex-col justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                              Gói #{bIdx + 1} ({bundle.productIds.length}/8 SP)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                update(
+                                  'accessoryBundles',
+                                  (settings.accessoryBundles || []).filter((_, i) => i !== bIdx)
+                                )
+                              }
+                              className="text-[11px] text-rose-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" /> Xóa gói
+                            </button>
+                          </div>
+
+                          <div>
+                            <label className={labelCls}>Tên gói mua kèm</label>
+                            <input
+                              type="text"
+                              value={bundle.name}
+                              onChange={e => patchBundle({ name: e.target.value })}
+                              placeholder="VD: Gói Phụ kiện Gaming"
+                              className={`${inputCls} font-semibold`}
+                            />
+                          </div>
+
+                          {/* Selected products in this bundle */}
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-semibold text-slate-600 block">
+                              Sản phẩm trong gói ({bundle.productIds.length})
+                            </label>
+                            {bundle.productIds.length === 0 ? (
+                              <p className="text-[11px] text-slate-400 italic py-1">Chưa chọn sản phẩm nào. Tìm &amp; bấm thêm bên dưới.</p>
+                            ) : (
+                              <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                                {bundle.productIds.map(pid => {
+                                  const prod = catalogProducts.find(item => item.id === pid);
+                                  return (
+                                    <div key={pid} className="flex items-center justify-between gap-1.5 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[11px]">
+                                      <span className="truncate font-medium text-slate-700">{prod ? prod.name : pid}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => patchBundle({ productIds: bundle.productIds.filter(id => id !== pid) })}
+                                        className="text-rose-500 hover:text-rose-700 font-bold shrink-0 cursor-pointer"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quick product search to add to bundle */}
+                          {bundle.productIds.length < 8 && (
+                            <div className="pt-1 border-t border-slate-100 space-y-1">
+                              <input
+                                type="text"
+                                value={bundleProductSearch[bundle.id] || ''}
+                                onChange={e => setBundleProductSearch(prev => ({ ...prev, [bundle.id]: e.target.value }))}
+                                placeholder="Tìm sản phẩm thêm vào gói..."
+                                className="w-full border border-slate-200 rounded px-2 py-1 text-[11px]"
+                              />
+                              <div className="max-h-28 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded bg-slate-50/50">
+                                {candidates.map(c => (
+                                  <div key={c.id} className="flex items-center justify-between gap-1.5 px-2 py-1 text-[11px]">
+                                    <span className="truncate text-slate-700" title={c.name}>{c.name}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => patchBundle({ productIds: [...bundle.productIds, c.id] })}
+                                      className="text-blue-600 hover:underline font-semibold shrink-0 cursor-pointer"
+                                    >
+                                      + Thêm
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {(['productTrustItems', 'productShippingItems'] as const).map(key => (
                   <section key={key} className="space-y-2 bg-slate-50/60 p-3.5 rounded-xl border border-slate-200">
@@ -1502,7 +1872,10 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="admin-settings-save pt-3 border-t border-slate-200 flex justify-end">
+          <div className="admin-settings-save pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
+            <span role="status" className={isDirty ? "text-amber-800" : "text-slate-500"}>
+              {saving ? "Đang lưu cấu hình…" : isDirty ? "Có thay đổi chưa lưu · Lưu áp dụng tất cả mục" : "Không có thay đổi chưa lưu"}
+            </span>
             <button
               type="submit"
               disabled={saving}

@@ -30,7 +30,7 @@ export default async function ProfilePage() {
   const quickActions = [
     {
       title: "Tra cứu đơn hàng & Hồ sơ kiểm định",
-      description: "Xem chi tiết đơn hàng qua liên kết xác nhận bảo mật hoặc tra cứu biên bản kiểm định 12 điểm bằng mã máy.",
+      description: "Tra cứu trạng thái đơn hàng bằng Mã đơn + Số điện thoại, hoặc xem biên bản kiểm định kỹ thuật bằng Mã máy.",
       href: "/order-tracking",
       icon: ClipboardCheck,
       cta: "Mở trang tra cứu",
@@ -79,7 +79,7 @@ export default async function ProfilePage() {
               Trung tâm Hỗ trợ &amp; Tiện ích Khách hàng
             </h1>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Tại CitiLap, bạn có thể đặt hàng nhanh, xem trạng thái đơn qua liên kết xác nhận bảo mật, tra cứu hồ sơ kiểm định kỹ thuật theo mã máy và nhận hỗ trợ lỗi 1 đổi 1 trong 7 ngày đầu tiên mà không cần đăng ký tài khoản.
+              Tại CitiLap, bạn có thể đặt hàng nhanh, tra cứu trạng thái đơn hàng bằng mã đơn và số điện thoại, kiểm tra hồ sơ kiểm định kỹ thuật theo mã máy và nhận hỗ trợ lỗi 1 đổi 1 trong 7 ngày đầu tiên mà không cần đăng ký tài khoản.
             </p>
           </div>
 

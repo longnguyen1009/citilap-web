@@ -297,15 +297,15 @@ export default function SearchAutocomplete({
 
   // Height and font styling by size with mobile optimization
   const sizeStyles = {
-    sm: "h-8 sm:h-9 text-[11px] sm:text-xs pl-6 sm:pl-9 pr-5 sm:pr-8",
-    md: "h-8.5 sm:h-10 text-[11.5px] sm:text-sm pl-6.5 sm:pl-10 pr-6 sm:pr-9",
-    lg: "h-10 sm:h-12 text-xs sm:text-base pl-8 sm:pl-12 pr-7 sm:pr-10",
+    sm: "h-9 sm:h-9 text-xs sm:text-xs pl-7 sm:pl-9 pr-6 sm:pr-8",
+    md: "h-10 sm:h-10 text-xs sm:text-sm pl-7.5 sm:pl-10 pr-7 sm:pr-9",
+    lg: "h-11 sm:h-12 text-xs sm:text-base pl-8.5 sm:pl-12 pr-8 sm:pr-10",
   }[size];
 
   const iconSizes = {
-    sm: "w-3.5 h-3.5 left-2 sm:left-2.5",
-    md: "w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 left-2 sm:left-3",
-    lg: "w-4 h-4 sm:w-5 sm:h-5 left-2.5 sm:left-3.5",
+    sm: "w-3.5 h-3.5 left-2.5 sm:left-2.5",
+    md: "w-4 h-4 sm:w-4.5 sm:h-4.5 left-2.5 sm:left-3",
+    lg: "w-4 h-4 sm:w-5 sm:h-5 left-3 sm:left-3.5",
   }[size];
 
   return (

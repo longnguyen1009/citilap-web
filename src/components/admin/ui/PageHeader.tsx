@@ -42,8 +42,8 @@ export default function PageHeader({
       </div>}
 
       {/* Main row: Title, Badge and Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-80">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-semibold text-slate-900 tracking-tight leading-tight" title={description}>
               {title}
@@ -58,7 +58,7 @@ export default function PageHeader({
         </div>
 
         {actions && (
-          <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto flex-wrap">
+          <div className="admin-page-actions flex items-center gap-2.5 flex-wrap">
             {actions}
           </div>
         )}

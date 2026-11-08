@@ -223,8 +223,11 @@ export const unpublishPost = archivePost;
 export async function listPostRevisions(db: D1Database, postId: string) {
   const studio = await db.prepare('SELECT revision, published, publishedRevision FROM PostStudio WHERE postId=?').bind(postId).first<{ revision: number; published: string | null; publishedRevision: number | null }>();
   const revs = await db.prepare(`
-    SELECT revision, action, actor, createdAt, document
-    FROM PostStudioRevision WHERE postId=? ORDER BY revision DESC
+    SELECT r.revision, r.action, COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(u.email), ''), r.actor) AS actor, r.createdAt, r.document
+    FROM PostStudioRevision r
+    LEFT JOIN "User" u ON u.id = r.actor
+    WHERE r.postId = ?
+    ORDER BY r.revision DESC
   `).bind(postId).all<{ revision: number; action: string; actor: string; createdAt: string; document: string }>();
 
   const currentRevision = studio?.revision ?? 0;

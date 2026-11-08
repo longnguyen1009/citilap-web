@@ -3,6 +3,7 @@ import PolicyLayout from "@/components/policy/PolicyLayout";
 import { businessProfile } from "@/config/business-profile";
 import { mediaEnvironment } from "@/server/media-http";
 import { getSystemPageResolution } from "@/server/services/page.service";
+import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,7 +44,13 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function WarrantyPolicyPage() {
-  const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const settings = await getStorefrontSettings();
+  const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const hanoi = {
+    ...baseHanoi,
+    address: settings?.addressHanoi || baseHanoi.address,
+  };
+  const displayPhone = settings?.storePhone || businessProfile.displayPhone;
 
   // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors as static content)
   const env = await mediaEnvironment();
@@ -81,7 +88,7 @@ export default async function WarrantyPolicyPage() {
           <p className="font-bold text-base">Chính sách bảo hành hiện đang tạm ẩn</p>
           <p className="text-xs text-amber-700">
             Nội dung đang được cập nhật để phù hợp với quy định mới. Quý khách vui lòng liên hệ hotline{" "}
-            <strong>{businessProfile.displayPhone}</strong> để được hỗ trợ thông tin chi tiết.
+            <strong>{displayPhone}</strong> để được hỗ trợ thông tin chi tiết.
           </p>
         </div>
       </PolicyLayout>
@@ -165,7 +172,7 @@ export default async function WarrantyPolicyPage() {
               <strong>Trực tiếp tại showroom:</strong> Đến cơ sở chính CitiLap Hà Nội ({hanoi.address}) hoặc cơ sở CitiLap Bắc Ninh để kỹ thuật viên kiểm tra trực tiếp.
             </li>
             <li>
-              <strong>Gửi qua đường bưu điện / chuyển phát nhanh:</strong> Quý khách liên hệ hotline <strong>{businessProfile.displayPhone}</strong> để được hướng dẫn đóng gói an toàn và địa chỉ người nhận.
+              <strong>Gửi qua đường bưu điện / chuyển phát nhanh:</strong> Quý khách liên hệ hotline <strong>{displayPhone}</strong> để được hướng dẫn đóng gói an toàn và địa chỉ người nhận.
             </li>
           </ul>
         </div>

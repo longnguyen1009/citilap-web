@@ -7,11 +7,13 @@ import { getAccessoryTypeBySlug } from '@/config/accessory-taxonomy';
 import { catalogNeedTag } from '../../lib/catalog-needs';
 import { productHref } from '../../lib/product-paths';
 import { searchIntent } from '@/contracts/catalog/search-intent';
+import { formatShortWarrantyBadge } from '@/contracts/cms/product-studio';
 import { getProductImageUrl } from "@/infra/cloudflare/r2/storage";
 import {
   type HomepageProduct,
   type FacetOption,
   categoryProductScope,
+  isAccessoryCategoryNode,
   parseRamGb,
   parseStorageGb,
   normalizeStorageBucket,
@@ -541,9 +543,32 @@ async function computeSearchProducts(
   const categoryList = options.category
     ? (Array.isArray(options.category) ? options.category : [options.category]).filter(Boolean)
     : [];
+  const isLaptopScope =
+    categoryList.length > 0 &&
+    categoryList.some((c) => ["laptop", "laptop-moi", "laptop-likenew", "laptop-cu"].includes(c)) &&
+    !categoryList.some((c) => ["phu-kien", "linh-kien"].includes(c) || c.startsWith("ref-accessory-"));
+  const implicitCategoryConditions = categoryList.includes("laptop-moi")
+    ? ["NEW"]
+    : categoryList.some((c) => ["laptop-cu", "laptop-likenew"].includes(c))
+      ? ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"]
+      : [];
   if (categoryList.length > 0) {
     const tree = await client.category.findMany({ select: { id: true, slug: true, parentId: true } });
-    const scopes = tree.filter(c => categoryList.includes(c.id) || categoryList.includes(c.slug)).map(c => categoryProductScope(c, tree));
+    const virtualSlugs = ["laptop", "laptop-moi", "laptop-likenew", "laptop-cu"];
+    const matchedNodes = tree.filter((c) => categoryList.includes(c.id) || categoryList.includes(c.slug));
+    for (const vSlug of virtualSlugs) {
+      if (categoryList.includes(vSlug) && !matchedNodes.some((n) => n.slug === vSlug)) {
+        matchedNodes.push({ id: vSlug, slug: vSlug, parentId: null });
+      }
+    }
+    if (categoryList.includes("phu-kien")) {
+      for (const node of tree) {
+        if (isAccessoryCategoryNode(node) && !matchedNodes.some((n) => n.id === node.id)) {
+          matchedNodes.push(node);
+        }
+      }
+    }
+    const scopes = matchedNodes.map((c) => categoryProductScope(c, tree));
     andConditions.push(scopes.length ? { OR: scopes } : { categoryId: { in: [] } });
   }
   if (options.type) {
@@ -645,6 +670,18 @@ async function computeSearchProducts(
   }> = rawProducts.flatMap((row) => {
     const original = row as unknown as ProductDbRowWithRelations;
     const published = original.studio?.published ? JSON.parse(original.studio.published) : null;
+    if (
+      isLaptopScope &&
+      (published?.template === "ACCESSORY" ||
+        (original.category &&
+          isAccessoryCategoryNode({
+            id: original.category.id,
+            slug: original.category.slug,
+            parentId: null,
+          })))
+    ) {
+      return [];
+    }
     const specMap = parsePublishedSpecMap(published, original.specs);
     if (options.tag?.length) {
       let tags: string[] = [];
@@ -703,6 +740,7 @@ async function computeSearchProducts(
           matchesCpuFilter(v.cpu, original.cpuSeries, cpuList) &&
           (options.minPrice === undefined || v.price >= options.minPrice) &&
           (options.maxPrice === undefined || v.price <= options.maxPrice) &&
+          (!implicitCategoryConditions.length || implicitCategoryConditions.includes(vCond)) &&
           (!conditionList.length || conditionList.includes(vCond)) &&
           (!connectionList.length || connectionList.some((c) => (v.options || original.specs || "").includes(c))) &&
           (!powerList.length || powerList.some((c) => (v.options || original.specs || "").includes(c))) &&
@@ -726,6 +764,7 @@ async function computeSearchProducts(
         matchesCpuFilter(effectiveCpu, original.cpuSeries, cpuList) &&
         (options.minPrice === undefined || dbRow.price >= options.minPrice) &&
         (options.maxPrice === undefined || dbRow.price <= options.maxPrice) &&
+        (!implicitCategoryConditions.length || implicitCategoryConditions.includes(baseCond)) &&
         (!conditionList.length || conditionList.includes(baseCond)) &&
         (!connectionList.length || connectionList.some((c) => (original.specs || "").includes(c))) &&
         (!powerList.length || powerList.some((c) => (original.specs || "").includes(c))) &&
@@ -738,6 +777,7 @@ async function computeSearchProducts(
         storageList.length ||
         gpuList.length ||
         cpuList.length ||
+        implicitCategoryConditions.length ||
         conditionList.length ||
         connectionList.length ||
         powerList.length ||
@@ -818,7 +858,11 @@ async function computeSearchProducts(
       originalPrice: rep.originalPrice,
       discount: rep.discount,
       stock: rep.stock,
-      warranty: dbRow.warranty || undefined,
+      warranty: formatShortWarrantyBadge(
+        published?.warrantyType,
+        published?.warrantyMonths,
+        dbRow.warranty || published?.warranties?.find((w: { recommended?: boolean }) => w.recommended)?.name || published?.warranties?.[0]?.name || null
+      ),
       primaryImage: resolvedImage,
       image: resolvedImage,
       specs: rep.specs,

@@ -139,7 +139,7 @@ export default async function CategoriesPage() {
               </span>
             </div>
             {/* Background decorative glow */}
-            <div className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+            <div className="absolute right-0 bottom-0 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
           </div>
 
           {/* Banner Phụ Kiện */}
@@ -170,11 +170,11 @@ export default async function CategoriesPage() {
                 <ArrowRight size={16} aria-hidden="true" />
               </Link>
               <span className="text-xs text-slate-400 font-medium">
-                Chính hãng 1 đổi 1 trong 12T
+                Bảo hành 6 tháng • Lỗi 1 đổi 1 trong 7 ngày
               </span>
             </div>
             {/* Background decorative glow */}
-            <div className="absolute -right-12 -bottom-12 w-64 h-64 rounded-full bg-blue-600/10 blur-2xl pointer-events-none" />
+            <div className="absolute right-0 bottom-0 w-48 h-48 rounded-full bg-blue-600/10 blur-2xl pointer-events-none" />
           </div>
         </section>
 
@@ -216,7 +216,7 @@ export default async function CategoriesPage() {
                     <div>
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className={`flex h-12 w-12 items-center justify-center rounded-xl overflow-hidden ${isLikeNew ? "bg-amber-50" : "bg-blue-50"}`}>
-                          {cat.image ? (
+                          {cat.image && cat.image.trim() ? (
                             <Image
                               src={cat.image}
                               alt={cat.name}
@@ -337,8 +337,8 @@ export default async function CategoriesPage() {
                 <RotateCcw size={24} aria-hidden="true" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900">Đổi Mới 30 Ngày</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Lỗi là đổi không phiền hà</p>
+                <h4 className="text-sm font-bold text-slate-900">1 Đổi 1 Trong 7 Ngày</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Nếu phát sinh lỗi phần cứng NSX</p>
               </div>
             </div>
 
@@ -357,8 +357,8 @@ export default async function CategoriesPage() {
                 <Truck size={24} aria-hidden="true" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900">Giao Nhanh 2 Giờ</h4>
-                <p className="text-xs text-slate-500 mt-0.5">Miễn phí ship toàn quốc</p>
+                <h4 className="text-sm font-bold text-slate-900">Giao Hàng Toàn Quốc</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Freeship 10km HN • Đồng kiểm COD</p>
               </div>
             </div>
           </div>

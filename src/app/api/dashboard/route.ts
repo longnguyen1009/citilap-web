@@ -61,13 +61,28 @@ async function GETHandler(request: Request) {
 
     const lowStockResult = await db
       .prepare(
-        `SELECT id, name, slug, stock, price
-         FROM Product
-         WHERE status = 'ACTIVE' AND deletedAt IS NULL AND stock <= 2
-         ORDER BY stock ASC, updatedAt DESC
+        `SELECT p.id, p.name, p.slug,
+                COALESCE((SELECT SUM(ib.onHand - ib.reserved) FROM InventoryBalance ib WHERE ib.productId = p.id), p.stock, 0) as stock,
+                p.price
+         FROM Product p
+         LEFT JOIN ProductStudio s ON s.productId = p.id
+         WHERE p.status = 'ACTIVE' AND p.deletedAt IS NULL AND (s.productId IS NULL OR s.published IS NOT NULL)
+           AND COALESCE((SELECT SUM(ib.onHand - ib.reserved) FROM InventoryBalance ib WHERE ib.productId = p.id), p.stock, 0) <= 2
+         ORDER BY stock ASC, p.updatedAt DESC
          LIMIT 5`
       )
       .all<{ id: string; name: string; slug: string; stock: number; price: number }>();
+
+    const lowStockCountRow = await db
+      .prepare(
+        `SELECT COUNT(*) as count
+         FROM Product p
+         LEFT JOIN ProductStudio s ON s.productId = p.id
+         WHERE p.status = 'ACTIVE' AND p.deletedAt IS NULL AND (s.productId IS NULL OR s.published IS NOT NULL)
+           AND COALESCE((SELECT SUM(ib.onHand - ib.reserved) FROM InventoryBalance ib WHERE ib.productId = p.id), p.stock, 0) <= 2`
+      )
+      .first<{ count: number }>();
+    const lowStockCount = Number(lowStockCountRow?.count ?? 0);
 
     // 6. Danh sách 6 đơn hàng mới nhất cần tiếp nhận & xử lý
     const recentOrdersResult = await db
@@ -120,6 +135,7 @@ async function GETHandler(request: Request) {
             completedRevenue,
           },
           statusBreakdown,
+          lowStockCount,
           lowStockProducts: lowStockResult.results || [],
           recentOrders: recentOrdersResult.results || [],
           recentStudioProducts: recentStudioProductsResult.results || [],

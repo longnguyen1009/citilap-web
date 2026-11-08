@@ -46,6 +46,7 @@ export interface HeroVariantItem {
   canOrder?: boolean;
   color?: string;
   colorHex?: string;
+  image?: string;
 }
 
 export interface HeroColorItem {
@@ -171,8 +172,14 @@ export default function ProductHeroSection({
   const saving = totalOriginalPrice && totalOriginalPrice > totalPrice ? totalOriginalPrice - totalPrice : null;
   const orderable = canOrder && selectedVariant?.canOrder !== false;
 
-  // Display Image (swaps if color has previewImg)
-  const activeImage = selectedColor?.previewImg || images.find(image => image.variantId && image.variantId === selectedVariant?.id)?.url || coverImage || images[0]?.url || "";
+  // Display Image (swaps to variant image or color preview image when variant/color changes)
+  const activeImage =
+    selectedVariant?.image ||
+    selectedColor?.previewImg ||
+    images.find(image => image.variantId && image.variantId === selectedVariant?.id)?.url ||
+    coverImage ||
+    images[0]?.url ||
+    "";
 
   // Switch Variant
   const handleSelectVariant = (v: HeroVariantItem) => {
@@ -223,12 +230,11 @@ export default function ProductHeroSection({
 
   return (
     <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-4 sm:p-6 lg:p-7 mb-8">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:items-start gap-5 lg:gap-x-8 lg:gap-y-4">
         {/* ========================================================= */}
-        {/* CỘT TRÁI (COL 6): GALLERY ẢNH, ĐẶC QUYỀN AN TÂM, DEAL SỐC */}
+        {/* KHỐI 1 (TRÁI TRÊN): GALLERY ẢNH                           */}
         {/* ========================================================= */}
-        <div className="lg:col-span-6 space-y-4">
-          {/* Main Gallery */}
+        <div className="lg:col-span-6">
           <ProductGallery
             images={images}
             productName={productName}
@@ -237,22 +243,13 @@ export default function ProductHeroSection({
             inStock={orderable}
             selectedImage={activeImage}
           />
-
-          {/* Đặc quyền an tâm khi mua tại CitiLap */}
-          <ProductTrustBadges items={settings?.productTrustItems} />
-
-          {/* Mua kèm Deal sốc (Cross-sell combo - TÍNH TIỀN THẬT VÀO TỔNG) */}
-          <ProductAccessoriesCombo
-            accessories={accessories}
-            selectedIds={selectedAccessoryIds}
-            onToggle={toggleAccessory}
-          />
         </div>
 
         {/* ========================================================= */}
-        {/* CỘT PHẢI (COL 6): TIÊU ĐỀ, GIÁ, CARD 365 CẤU HÌNH, MÀU, BH, CTA */}
+        {/* KHỐI 2 (PHẢI): TIÊU ĐỀ, GIÁ, CẤU HÌNH, MÀU, BH, CTA       */}
+        {/* Hiển thị ngay dưới ảnh trên mobile để khách mua nhanh     */}
         {/* ========================================================= */}
-        <div className="lg:col-span-6 flex flex-col space-y-4">
+        <div className="lg:col-span-6 lg:row-span-2 flex flex-col space-y-4">
           {/* 1. TIÊU ĐỀ SẢN PHẨM & METADATA (ĐÁNH GIÁ, MODEL, THƯƠNG HIỆU) */}
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
@@ -264,9 +261,18 @@ export default function ProductHeroSection({
                 href="#danh-gia-khach-hang"
                 className="flex items-center gap-1 text-amber-500 font-bold hover:underline"
               >
-                <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
-                <span className="text-slate-800 ml-0.5">{averageRating}</span>
-                <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
+                {reviewCount > 0 ? (
+                  <>
+                    <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
+                    <span className="text-slate-800 ml-0.5">{averageRating}</span>
+                    <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
+                  </>
+                ) : (
+                  <>
+                    <span aria-hidden="true">★</span>
+                    <span className="text-slate-600 font-medium">Gửi đánh giá</span>
+                  </>
+                )}
               </a>
               <span className="text-slate-300">•</span>
               <span>
@@ -320,14 +326,13 @@ export default function ProductHeroSection({
                     if (isInCompare) {
                       compareCtx.removeFromCompare(productId);
                     } else {
-                      const res = compareCtx.addToCompare({
+                      compareCtx.addToCompare({
                         id: productId,
                         name: productName,
                         slug: productSlug || productId,
                         price: totalPrice,
                         image: activeImage,
                       });
-                      if (!res.success && res.message) alert(res.message);
                     }
                   }}
                   aria-pressed={isInCompare}
@@ -641,6 +646,18 @@ export default function ProductHeroSection({
               </div>
             )}
 
+            {/* Đặt lịch hẹn xem máy trực tiếp tại Showroom */}
+            <Link
+              href={`/lien-he?intent=appointment&product=${encodeURIComponent(productId)}`}
+              className="w-full py-2.5 px-3.5 rounded-xl border border-slate-200 hover:border-blue-300 bg-slate-50/80 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 text-xs sm:text-sm font-semibold transition flex items-center justify-between gap-2"
+            >
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>Đặt lịch hẹn xem & kiểm tra máy trực tiếp tại Showroom (HN / Bắc Ninh)</span>
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+            </Link>
+
             {/* Hotline tư vấn */}
             <div className="flex items-center justify-center gap-2 pt-1 text-xs sm:text-sm text-slate-600">
               <Phone className="w-4 h-4 text-emerald-600" />
@@ -653,6 +670,18 @@ export default function ProductHeroSection({
               </span>
             </div>
           </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* KHỐI 3 (TRÁI DƯỚI): ĐẶC QUYỀN AN TÂM & MUA KÈM DEAL SỐC   */}
+        {/* ========================================================= */}
+        <div className="lg:col-span-6 space-y-4">
+          <ProductTrustBadges items={settings?.productTrustItems} />
+          <ProductAccessoriesCombo
+            accessories={accessories}
+            selectedIds={selectedAccessoryIds}
+            onToggle={toggleAccessory}
+          />
         </div>
       </div>
 

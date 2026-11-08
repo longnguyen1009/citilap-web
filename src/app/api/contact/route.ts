@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import { NextResponse } from 'next/server';
 import { getClientIp, checkRateLimit, rateLimitExceededResponse } from '@/lib/rate-limiter';
 import { submitContactMessage } from '@/server/services/contact.service';
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[ContactAPI] Unexpected error:', error);
     return NextResponse.json(
-      { success: false, error: 'Đã có lỗi xảy ra. Vui lòng liên hệ hotline 0899.188.186.' },
+      { success: false, error: `Đã có lỗi xảy ra. Vui lòng liên hệ hotline ${businessProfile.displayPhone}.` },
       {
         status: 500,
         headers: { 'Cache-Control': 'private, no-store' },

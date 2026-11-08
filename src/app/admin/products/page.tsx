@@ -381,6 +381,23 @@ export default function UnifiedProductsPage() {
             />
           </form>
 
+          {hasAnyFilter && (
+            <button
+              type="button"
+              onClick={() => startTransition(() => router.push(pathname))}
+              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+              title="Xóa tất cả bộ lọc"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Xóa lọc</span>
+            </button>
+          )}
+        </div>
+
+        <details className="admin-filter-details" open={Boolean(categoryId || brand || availability !== "ALL" || sort !== "updatedAt" || order !== "desc")}>
+          <summary>Bộ lọc nâng cao{categoryId || brand || availability !== "ALL" ? " · Đang áp dụng" : ""}</summary>
+          <div className="admin-filter-fields">
+          <label>Danh mục
           <select
             aria-label="Danh mục"
             value={categoryId}
@@ -393,8 +410,9 @@ export default function UnifiedProductsPage() {
                 {cat.name}
               </option>
             ))}
-          </select>
+          </select></label>
 
+          <label>Thương hiệu
           <select
             aria-label="Thương hiệu"
             value={brand}
@@ -407,8 +425,9 @@ export default function UnifiedProductsPage() {
                 {b.name}
               </option>
             ))}
-          </select>
+          </select></label>
 
+          <label>Nhận đơn
           <select
             aria-label="Tình trạng nhận đơn"
             value={availability}
@@ -420,8 +439,9 @@ export default function UnifiedProductsPage() {
             <option value="PREORDER">Đặt trước</option>
             <option value="CONTACT">Liên hệ</option>
             <option value="UNAVAILABLE">Ngừng đơn</option>
-          </select>
+          </select></label>
 
+          <label>Sắp xếp
           <select
             aria-label="Sắp xếp"
             value={`${sort}-${order}`}
@@ -437,20 +457,10 @@ export default function UnifiedProductsPage() {
             <option value="price-asc">Giá ↑</option>
             <option value="name-asc">Tên A–Z</option>
             <option value="name-desc">Tên Z–A</option>
-          </select>
+          </select></label>
 
-          {hasAnyFilter && (
-            <button
-              type="button"
-              onClick={() => startTransition(() => router.push(pathname))}
-              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
-              title="Xóa tất cả bộ lọc"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Xóa lọc</span>
-            </button>
-          )}
-        </div>
+          </div>
+        </details>
 
         {/* Table Content */}
         {loading && !data ? (

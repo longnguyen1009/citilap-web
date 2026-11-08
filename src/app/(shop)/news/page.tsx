@@ -29,7 +29,7 @@ const HOT_TOPICS = [
   { label: "#laptop-gaming", href: "/laptop-gaming" },
   { label: "#macbook", href: "/macbook" },
   { label: "#laptop-van-phong", href: "/laptop-van-phong" },
-  { label: "#workstation-do-hoa", href: "/laptop-do-hoa" },
+  { label: "#workstation-do-hoa", href: "/laptop-workstation" },
   { label: "#rtx-4060", href: "/search?q=rtx+4060" },
   { label: "#lenovo-legion", href: "/search?q=legion" },
   { label: "#thinkpad", href: "/search?q=thinkpad" },

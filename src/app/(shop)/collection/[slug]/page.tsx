@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${collection.name} | CitiLap`,
     description: collection.description || `Khám phá bộ sưu tập ${collection.name} tại CitiLap.`,
-    alternates: { canonical: `https://citilap.vn/collection/${collection.slug}` },
+    alternates: { canonical: `${businessProfile.canonicalSiteUrl}/collection/${collection.slug}` },
   };
 }
 

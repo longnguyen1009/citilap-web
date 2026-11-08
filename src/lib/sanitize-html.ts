@@ -2,7 +2,7 @@ const ALLOWED_TAGS = new Set([
   "p", "br", "hr", "strong", "b", "em", "i", "u", "s", "strike",
   "h1", "h2", "h3", "h4", "h5", "h6",
   "ul", "ol", "li", "a", "blockquote",
-  "img", "table", "thead", "tbody", "tfoot", "tr", "th", "td",
+  "img", "figure", "figcaption", "table", "thead", "tbody", "tfoot", "tr", "th", "td",
   "span", "div", "pre", "code", "details", "summary"
 ]);
 
@@ -71,7 +71,42 @@ export function sanitizeHtml(input: string): string {
         const title = titleMatch[1].replace(/^['"]|['"]$/g, "").trim();
         allowedAttrs.push(`title="${title.replace(/"/g, '&quot;')}"`);
       }
+      const widthMatch = attrs.match(/\swidth\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i);
+      if (widthMatch) {
+        const wVal = widthMatch[1].replace(/^['"]|['"]$/g, "").trim();
+        if (/^\d+(?:%|px)?$/.test(wVal)) allowedAttrs.push(`width="${wVal}"`);
+      }
+      const heightMatch = attrs.match(/\sheight\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/i);
+      if (heightMatch) {
+        const hVal = heightMatch[1].replace(/^['"]|['"]$/g, "").trim();
+        if (/^\d+(?:%|px)?$/.test(hVal)) allowedAttrs.push(`height="${hVal}"`);
+      }
       allowedAttrs.push('loading="lazy"');
+    }
+
+    // Safe inline style for sizing/alignment on img, figure, p, div, span, th, td
+    if (["img", "figure", "figcaption", "p", "div", "span", "th", "td", "h2", "h3", "h4"].includes(tag)) {
+      const styleMatch = attrs.match(/\sstyle\s*=\s*("[^"]*"|'[^']*')/i);
+      if (styleMatch) {
+        const rawStyle = styleMatch[1].replace(/^['"]|['"]$/g, "").trim();
+        const safeRules: string[] = [];
+        for (const decl of rawStyle.split(";")) {
+          const [propRaw, valRaw] = decl.split(":");
+          if (!propRaw || !valRaw) continue;
+          const prop = propRaw.trim().toLowerCase();
+          const val = valRaw.trim();
+          if (
+            ["width", "max-width", "height", "text-align", "margin", "margin-left", "margin-right", "display", "float", "border-radius"].includes(prop) &&
+            /^[a-zA-Z0-9%\s._\-,]+$/.test(val) &&
+            !/url|expression|javascript/i.test(val)
+          ) {
+            safeRules.push(`${prop}: ${val}`);
+          }
+        }
+        if (safeRules.length > 0) {
+          allowedAttrs.push(`style="${safeRules.join("; ")}"`);
+        }
+      }
     }
 
     // colspan, rowspan for <th>, <td>
@@ -82,11 +117,11 @@ export function sanitizeHtml(input: string): string {
       if (rowspan) allowedAttrs.push(`rowspan="${rowspan[1].replace(/^['"]|['"]$/g, "")}"`);
     }
 
-    // class attribute if clean
+    // class attribute if clean (allow Tailwind arbitrary/fraction/slash classes)
     const classMatch = attrs.match(/\sclass\s*=\s*("[^"]*"|'[^']*')/i);
     if (classMatch) {
       const cls = classMatch[1].replace(/^['"]|['"]$/g, "").trim();
-      if (/^[a-zA-Z0-9_\-\s]+$/.test(cls)) {
+      if (/^[a-zA-Z0-9_\-\s/:[\]%]+$/.test(cls)) {
         allowedAttrs.push(`class="${cls}"`);
       }
     }

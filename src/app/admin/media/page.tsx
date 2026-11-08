@@ -37,6 +37,7 @@ function isValidExternalMediaUrl(url: string, mediaKind: ExternalMediaKind): boo
 export default function MediaPage() {
   const [selected, setSelected] = useState<MediaAssetDto | null>(null);
   const [refresh, setRefresh] = useState(0);
+  const [activeFolder, setActiveFolder] = useState<string>('ALL');
   const [videoOpen, setVideoOpen] = useState(false);
   const [video, setVideo] = useState<{ name: string; url: string; mediaKind: ExternalMediaKind }>({
     name: '',
@@ -58,7 +59,10 @@ export default function MediaPage() {
       await mediaRequest('/api/admin/media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(video),
+        body: JSON.stringify({
+          ...video,
+          folder: activeFolder !== 'ALL' ? activeFolder : 'videos-docs',
+        }),
       });
       setVideoOpen(false);
       setVideo({ name: '', url: '', mediaKind: 'AUTO' });
@@ -74,16 +78,16 @@ export default function MediaPage() {
     <div className="media-workspace space-y-3 max-w-7xl mx-auto pb-12">
       <PageHeader
         title="Thư viện ảnh & video"
-        description="Tải ảnh hoặc thêm video vào thư viện, sau đó chọn trong sản phẩm, bài viết hoặc bố cục trang. Tải lên thư viện chưa làm ảnh xuất hiện trên website."
+        description="Phân loại tệp theo thư mục, tự động nén ảnh WebP sắc nét khi tải lên, dễ dàng tìm kiếm và gắn vào sản phẩm, biến thể hoặc bài viết."
         actions={
           <AdminButton type="button" size="sm" icon={<Plus size={15} />} onClick={() => setVideoOpen(true)}>
             Thêm video YouTube / TikTok / Drive
           </AdminButton>
         }
       />
-      <MediaUpload onUploaded={reload} />
+      <MediaUpload onUploaded={reload} defaultFolder="products" activeFolder={activeFolder} />
       {notice ? <p className="text-xs font-medium text-emerald-700" role="status">{notice}</p> : <p className="sr-only" role="status">{notice}</p>}
-      <MediaBrowser onSelect={setSelected} refresh={refresh} />
+      <MediaBrowser onSelect={setSelected} refresh={refresh} onFolderChange={setActiveFolder} />
       {selected && <MediaEditor key={selected.id} asset={selected} onClose={() => setSelected(null)} onSaved={reload} />}
       {videoOpen && (
         <MediaDialog title="Thêm video YouTube, TikTok, Google Drive, PDF/SVG" onClose={() => { if (!busy) setVideoOpen(false); }}>

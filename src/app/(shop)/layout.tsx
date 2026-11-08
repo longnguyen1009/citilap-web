@@ -10,6 +10,7 @@ import {mediaEnvironment} from '@/server/media-http';
 import PublicPriceRefresh from '@/components/product/PublicPriceRefresh';
 import { connection } from 'next/server';
 import StorefrontMetrics from '@/components/layout/StorefrontMetrics';
+import Analytics from '@/components/layout/Analytics';
 
 export default async function ShopLayout({
   children,
@@ -45,6 +46,7 @@ export default async function ShopLayout({
       <main className="flex-grow pb-16 md:pb-0">{children}</main>
       <Footer navigation={navigation} settings={settings} />
       <StorefrontMetrics />
+      <Analytics />
       <FloatingContactWidget settings={settings} />
       <MobileBottomNav categories={categories} navigation={navigation} settings={settings} />
     </div></StorefrontProviders>

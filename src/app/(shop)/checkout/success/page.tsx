@@ -37,12 +37,12 @@ interface OrderDetail {
 }
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  NEW: "Mới tiếp nhận (NEW)",
-  PENDING: "Mới tiếp nhận (PENDING)",
-  CONTACTED: "Đã liên hệ (CONTACTED)",
-  CONFIRMED: "Đã xác nhận (CONFIRMED)",
-  COMPLETED: "Hoàn tất xử lý (COMPLETED)",
-  CANCELLED: "Đã hủy (CANCELLED)",
+  NEW: "Mới tiếp nhận",
+  PENDING: "Mới tiếp nhận",
+  CONTACTED: "Đã liên hệ",
+  CONFIRMED: "Đã xác nhận",
+  COMPLETED: "Hoàn tất xử lý",
+  CANCELLED: "Đã hủy",
 };
 
 function SuccessContent() {

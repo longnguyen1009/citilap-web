@@ -32,6 +32,8 @@ import {
 interface AuditEvent {
   id: string;
   actorId: string;
+  actorName?: string | null;
+  actorEmail?: string | null;
   action: string;
   entityId: string;
   summary: string;
@@ -40,6 +42,34 @@ interface AuditEvent {
   beforeRevision: number | null;
   afterRevision: number | null;
   entityType: string | null;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  'product.save': 'Lưu nháp sản phẩm',
+  'product.publish': 'Xuất bản sản phẩm',
+  'product.unpublish': 'Gỡ xuất bản sản phẩm',
+  'product.restore': 'Khôi phục phiên bản SP',
+  'product.archive': 'Lưu trữ sản phẩm',
+  'post.save': 'Lưu bài viết',
+  'post.publish': 'Xuất bản bài viết',
+  'post.unpublish': 'Gỡ xuất bản bài viết',
+  'page.save': 'Lưu trang tĩnh',
+  'page.publish': 'Xuất bản trang tĩnh',
+  'landing.save': 'Lưu bố cục trang',
+  'landing.publish': 'Xuất bản bố cục trang',
+  'order.STATUS_CHANGE': 'Đổi trạng thái đơn hàng',
+  'contact.STATUS_CHANGE': 'Xử lý yêu cầu liên hệ',
+  'contact.NOTE_ADDED': 'Thêm ghi chú liên hệ',
+  'account.save': 'Cập nhật tài khoản quản trị',
+  'redirect.save': 'Cập nhật chuyển hướng 301',
+};
+
+function formatAuditSummary(summary: string, action: string): string {
+  if (!summary) return ACTION_LABELS[action] || 'Thao tác quản trị';
+  if (summary === 'CMS mutation') return ACTION_LABELS[action] || 'Cập nhật nội dung CMS';
+  if (summary === 'Product archived') return 'Đã lưu trữ sản phẩm';
+  if (summary === 'Contact processed') return 'Đã xử lý liên hệ khách hàng';
+  return summary;
 }
 
 function entityLink(r: AuditEvent): string | null {
@@ -387,9 +417,12 @@ export default function AdminAuditPage() {
 
                       {/* Actor */}
                       <td className="py-2 px-3.5 whitespace-nowrap font-medium text-slate-900">
-                        <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-mono">
+                        <span
+                          className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px]"
+                          title={r.actorId ? `ID: ${r.actorId}${r.actorEmail ? ` (${r.actorEmail})` : ''}` : 'system'}
+                        >
                           <User className="w-3 h-3 text-slate-400" />
-                          {r.actorId || 'system'}
+                          <span>{r.actorName || r.actorId || 'Hệ thống'}</span>
                         </span>
                       </td>
 
@@ -397,8 +430,9 @@ export default function AdminAuditPage() {
                       <td className="py-2 px-3.5 whitespace-nowrap">
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${actionColor}`}
+                          title={r.action}
                         >
-                          {r.action}
+                          {ACTION_LABELS[r.action] ? `${ACTION_LABELS[r.action]} (${r.action})` : r.action}
                         </span>
                       </td>
 
@@ -432,7 +466,7 @@ export default function AdminAuditPage() {
 
                       {/* Summary */}
                       <td className="py-2 px-3.5 text-slate-700 max-w-xs break-words">
-                        {r.summary || <span className="text-slate-300">—</span>}
+                        {formatAuditSummary(r.summary, r.action)}
                       </td>
 
                       {/* Request ID */}

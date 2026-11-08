@@ -162,8 +162,8 @@ export default function ProductQuickCheckoutModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 rounded-t-3xl sticky top-0 z-10 backdrop-blur-xs">
-          <div>
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-2 bg-slate-50/80 rounded-t-3xl sticky top-0 z-10 backdrop-blur-xs">
+          <div className="min-w-0">
             <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-1.5">
               <span className="text-amber-500">⚡</span> Đặt Hàng Nhanh (Chỉ mất 1 phút)
             </h3>
@@ -175,7 +175,7 @@ export default function ProductQuickCheckoutModal({
             type="button"
             onClick={handleResetAndClose}
             disabled={submitting}
-            className="h-8 w-8 rounded-full bg-slate-200/80 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition cursor-pointer"
+            className="h-11 w-11 shrink-0 rounded-full bg-slate-200/80 hover:bg-slate-300 flex items-center justify-center text-slate-600 transition cursor-pointer"
             aria-label="Đóng"
           >
             <X className="w-4 h-4" />
@@ -185,7 +185,7 @@ export default function ProductQuickCheckoutModal({
         {/* Form Body or Success Screen */}
         {!isSubmitted ? (
           <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4">
-            <fieldset disabled={locked} className="space-y-4 disabled:opacity-70">
+            <fieldset disabled={locked} className="min-w-0 space-y-4 disabled:opacity-70">
             {/* Product Recap Box */}
             <div className="p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/80 space-y-2.5">
               <div className="flex items-center gap-3">
@@ -197,7 +197,7 @@ export default function ProductQuickCheckoutModal({
                     className="object-contain"
                   />
                 </div>
-                <div className="min-w-0">
+                <div className="flex-1 min-w-0">
                   <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                     {productInfo.name}
                   </h4>
@@ -209,15 +209,15 @@ export default function ProductQuickCheckoutModal({
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-blue-200/60 flex items-center justify-between text-xs">
+              <div className="pt-2 border-t border-blue-200/60 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="text-slate-600 font-medium">Tổng thanh toán dự kiến:</span>
                 <span className="text-base sm:text-lg font-black text-rose-600">
                   {quote ? quote.totalAmount.toLocaleString("vi-VN") + '₫' : 'Đang tính…'}
                 </span>
               </div>
             </div>
-            {quote && <ul className="text-xs text-slate-600 space-y-1">{quote.lines.map((line,index) => <li key={index}>{line.productName} × {line.quantity}: {line.lineTotal.toLocaleString('vi-VN')}₫</li>)}</ul>}
-            {quote && <p className="text-xs text-slate-600">Tiền hàng: {quote.subtotal.toLocaleString('vi-VN')}₫ · Phí giao hàng: {quote.shippingFee.toLocaleString('vi-VN')}₫</p>}
+            {quote && <ul className="text-xs text-slate-600 space-y-1 break-words">{quote.lines.map((line,index) => <li key={index} className="break-words">{line.productName} × {line.quantity}: {line.lineTotal.toLocaleString('vi-VN')}₫</li>)}</ul>}
+            {quote && <p className="text-xs text-slate-600 break-words">Tiền hàng: {quote.subtotal.toLocaleString('vi-VN')}₫ · Phí giao hàng: {quote.shippingFee.toLocaleString('vi-VN')}₫</p>}
 
             {/* Error Message */}
             {errorMsg && (
@@ -231,18 +231,18 @@ export default function ProductQuickCheckoutModal({
               <label className="text-xs font-bold text-slate-900 block">
                 Hình thức nhận máy:
               </label>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => setDeliveryMode("home")}
                   aria-pressed={deliveryMode === 'home'}
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition cursor-pointer ${
+                  className={`flex min-h-11 items-center gap-2 p-2.5 rounded-xl border-2 transition cursor-pointer ${
                     deliveryMode === "home"
                       ? "border-blue-600 bg-blue-50/50 text-blue-950 font-bold"
                       : "border-slate-200 text-slate-700 hover:border-slate-300"
                   }`}
                 >
-                  <span className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                  <span className={`h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${
                     deliveryMode === "home" ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"
                   }`}>
                     {deliveryMode === "home" && <Check className="w-2.5 h-2.5 stroke-[3]" />}
@@ -254,13 +254,13 @@ export default function ProductQuickCheckoutModal({
                   type="button"
                   onClick={() => setDeliveryMode("store")}
                   aria-pressed={deliveryMode === 'store'}
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition cursor-pointer ${
+                  className={`flex min-h-11 items-center gap-2 p-2.5 rounded-xl border-2 transition cursor-pointer ${
                     deliveryMode === "store"
                       ? "border-blue-600 bg-blue-50/50 text-blue-950 font-bold"
                       : "border-slate-200 text-slate-700 hover:border-slate-300"
                   }`}
                 >
-                  <span className={`h-4 w-4 rounded-full border flex items-center justify-center ${
+                  <span className={`h-4 w-4 shrink-0 rounded-full border flex items-center justify-center ${
                     deliveryMode === "store" ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300"
                   }`}>
                     {deliveryMode === "store" && <Check className="w-2.5 h-2.5 stroke-[3]" />}
@@ -285,7 +285,7 @@ export default function ProductQuickCheckoutModal({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Ví dụ: Nguyễn Văn An"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
+                    className="w-full min-h-11 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
                     required
                   />
                 </div>
@@ -301,7 +301,7 @@ export default function ProductQuickCheckoutModal({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="Ví dụ: 0912 345 678"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
+                    className="w-full min-h-11 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
                     required
                   />
                 </div>
@@ -321,7 +321,7 @@ export default function ProductQuickCheckoutModal({
                     maxLength={500}
                     onChange={(e) => setAddress(e.target.value)}
                     placeholder="Số nhà, tên đường, phường/xã, tỉnh/thành phố"
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
+                    className="w-full min-h-11 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
                     required
                   />
                 </div>
@@ -334,7 +334,7 @@ export default function ProductQuickCheckoutModal({
                     id="quick-showroom"
                     value={selectedShowroom}
                     onChange={(e) => setSelectedShowroom(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
+                    className="w-full min-h-11 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-xs"
                   >
                     {(quoteState.data?.showrooms || []).map(showroom => <option key={showroom.id} value={showroom.id}>{showroom.name}: {showroom.address}</option>)}
                   </select>
@@ -363,7 +363,7 @@ export default function ProductQuickCheckoutModal({
               <label className="text-xs font-bold text-slate-900 block">
                 Phương thức thanh toán:
               </label>
-              <div className="grid grid-cols-3 gap-2 text-[11px]">
+              <div className="grid grid-cols-1 min-[480px]:grid-cols-3 gap-2 text-[11px]">
                 {quoteState.data?.allowedPaymentMethods.includes('COD') && <button
                   type="button"
                   onClick={() => setPaymentMethod('COD')}

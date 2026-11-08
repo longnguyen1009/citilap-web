@@ -290,14 +290,13 @@ export default function OrderTrackingPortal() {
             {/* Quick-try Public Code Chips */}
             <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
               <span className="text-slate-500 font-semibold mr-1">
-                Mã kiểm định thực tế đang sẵn hàng:
+                Mã kiểm định mẫu thử nhanh:
               </span>
               {[
-                { code: 'CTL-X1G11-01', label: 'CTL-X1G11-01 (ThinkPad)' },
-                { code: 'CTL-LEGION-01', label: 'CTL-LEGION-01 (Legion)' },
-                { code: 'CTL-MACM3-01', label: 'CTL-MACM3-01 (MacBook)' },
-                { code: 'CTL-ZEN14-01', label: 'CTL-ZEN14-01 (Zenbook)' },
-                { code: 'CTL-XPS13-01', label: 'CTL-XPS13-01 (Dell XPS)' },
+                { code: 'DEMO-THINKPAD-T14', label: 'DEMO-THINKPAD-T14 (ThinkPad)' },
+                { code: 'DEMO-ELITEBOOK-840', label: 'DEMO-ELITEBOOK-840 (EliteBook)' },
+                { code: 'DEMO-MACBOOK-AIR-M2', label: 'DEMO-MACBOOK-AIR-M2 (MacBook)' },
+                { code: 'DEMO-LEGION-5', label: 'DEMO-LEGION-5 (Legion 5)' },
               ].map((sample) => (
                 <button
                   key={sample.code}

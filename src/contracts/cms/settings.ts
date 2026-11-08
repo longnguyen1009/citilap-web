@@ -89,13 +89,13 @@ export const DEFAULT_REVIEW_VIDEOS: ReviewVideoItem[] = [
   {
     title: "Trải nghiệm thực tế Laptop Gaming & Ultrabook tại Showroom CitiLap",
     url: "https://www.tiktok.com/@citilapvn/video/7420000000000000001",
-    thumbnail: "/brand/store-photo-01.jpg",
+    thumbnail: "/brand/store-photo-01.webp",
     platform: "tiktok",
   },
   {
     title: "Quy trình kiểm định Laptop Like New 99% nguyên zin tại CitiLap",
     url: "https://www.tiktok.com/@citilapvn/video/7420000000000000002",
-    thumbnail: "/brand/store-photo-02.jpg",
+    thumbnail: "/brand/store-photo-02.webp",
     platform: "tiktok",
   },
 ];
@@ -105,10 +105,77 @@ const productBannerSchema = z.object({
   href: z.string().max(1000).refine(value => /^\/(?!\/)[^\\\s]*$/.test(value) || /^https:\/\/[^\s\\]+$/.test(value), 'Dùng đường dẫn nội bộ hoặc HTTPS.'),
 });
 
+export const giftBundlePresetSchema = z.object({
+  id: safeText(80).min(1),
+  name: safeText(120).min(1),
+  gifts: z.array(safeText(500).min(1)).max(10).default([]),
+});
+export type GiftBundlePreset = z.infer<typeof giftBundlePresetSchema>;
+
+export const accessoryBundlePresetSchema = z.object({
+  id: safeText(80).min(1),
+  name: safeText(120).min(1),
+  productIds: z.array(safeText(200).min(1)).max(8).default([]),
+});
+export type AccessoryBundlePreset = z.infer<typeof accessoryBundlePresetSchema>;
+
+export const DEFAULT_GIFT_BUNDLES: GiftBundlePreset[] = [
+  {
+    id: 'gift-van-phong',
+    name: 'Gói quà Laptop Văn phòng & Học tập',
+    gifts: [
+      'Balo CitiLap chống sốc cao cấp',
+      'Chuột không dây Silent êm ái',
+      'Túi chống sốc nhung lót êm + Bàn di chuột',
+      'Gói cài đặt phần mềm & vệ sinh tra keo tản nhiệt miễn phí trọn đời',
+    ],
+  },
+  {
+    id: 'gift-gaming',
+    name: 'Gói quà Laptop Gaming & Đồ họa',
+    gifts: [
+      'Balo Gaming CitiLap cỡ lớn chống nước',
+      'Chuột Gaming LED RGB 6 nút bấm',
+      'Bàn di chuột Gaming khổ lớn (Speed Edition)',
+      'Gói cân màu màn hình chuẩn Delta E < 2 & vệ sinh tra keo MX-6 trọn đời',
+    ],
+  },
+  {
+    id: 'gift-macbook',
+    name: 'Gói quà Apple MacBook',
+    gifts: [
+      'Túi chống sốc cao cấp chuẩn form MacBook',
+      'Phủ phím Silicon chống bụi & mồ hôi tay',
+      'Voucher giảm 20% khi mua kèm Hub chuyển đổi Type-C / Sạc dự phòng',
+      'Hỗ trợ cài đặt bộ ứng dụng văn phòng & đồ họa macOS trọn đời',
+    ],
+  },
+];
+
+export const DEFAULT_ACCESSORY_BUNDLES: AccessoryBundlePreset[] = [
+  {
+    id: 'acc-van-phong',
+    name: 'Combo phụ kiện Văn phòng (Chuột + Hub + Túi)',
+    productIds: [],
+  },
+  {
+    id: 'acc-gaming',
+    name: 'Combo Gear Chiến Game (Chuột Gaming + Phím cơ + Tai nghe)',
+    productIds: [],
+  },
+  {
+    id: 'acc-macbook',
+    name: 'Combo phụ kiện MacBook (Hub Type-C + Củ sạc GaN)',
+    productIds: [],
+  },
+];
+
 export const adminSettingsDocumentSchema = z.object({
   productTrustItems: z.array(safeText(300).min(1)).max(8).default([]),
   productShippingItems: z.array(safeText(500).min(1)).max(8).default([]),
   productBanners: z.array(productBannerSchema).max(2).default([]),
+  giftBundles: z.array(giftBundlePresetSchema).max(20).default(DEFAULT_GIFT_BUNDLES),
+  accessoryBundles: z.array(accessoryBundlePresetSchema).max(20).default(DEFAULT_ACCESSORY_BUNDLES),
   // Store info
   storeName: safeText(120).min(1, "Tên cửa hàng không được để trống"),
   storeEmail: z.string().email("Email không hợp lệ").max(120),
@@ -229,6 +296,8 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   productTrustItems: [],
   productShippingItems: [],
   productBanners: [],
+  giftBundles: DEFAULT_GIFT_BUNDLES,
+  accessoryBundles: DEFAULT_ACCESSORY_BUNDLES,
   storeName: businessProfile.brandName,
   storeEmail: businessProfile.email,
   storePhone: businessProfile.displayPhone,

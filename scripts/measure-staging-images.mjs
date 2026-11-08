@@ -16,7 +16,7 @@ async function measure(path, accept, requestedWidth, attempt) {
     headers: Object.fromEntries(['content-type', 'cache-control', 'cf-cache-status', 'age', 'etag', 'vary', 'cf-ray'].map(name => [name, response.headers.get(name)])),
   });
 }
-const sources = ['/brand/citilap-logo.png'];
+const sources = ['/brand/citilap-mark.png'];
 const catalog = await fetch(`${origin}/api/search?limit=1`, { signal: AbortSignal.timeout(30_000) }).then(r => r.json()).catch(() => null);
 const productImage = catalog?.data?.products?.[0]?.primaryImage;
 assert(productImage, 'Public catalog must return a product image to measure');

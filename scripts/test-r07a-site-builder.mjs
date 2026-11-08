@@ -14,6 +14,7 @@ await build({
       export * from './src/server/services/site-builder.service';
       export * from './src/server/services/navigation.service';
       export * from './src/server/services/catalog.service';
+      export * from './src/server/services/pricing.service';
       export * from './src/server/services/media-library.service';
       export * from './src/server/services/settings.service';
       export * from './src/server/services/storefront-cms.service';
@@ -497,6 +498,343 @@ try {
     assert.equal(storefrontSettings.copyrightText, '© 2026 CitiLap. Bản quyền đã đăng ký.');
     assert.equal(storefrontSettings.facebookUrl, 'https://facebook.com/citilap');
     assert.equal(storefrontSettings.addressHanoi, '123 Đường Công Nghệ, Quận 1, TP. HCM');
+  });
+
+  // Test 10: Conditional ProductStudio Preload in resolveSectionsForStorefront
+  await check('resolveSectionsForStorefront skips ProductStudio scan unless an enabled rule needs availability filtering, while preserving outputs/order/prices', async () => {
+    // Seed CMS Studio products with AVAILABLE, PREORDER, CONTACT, and an unpublished Studio draft
+    for (const [id, name, slug, price, availability] of [
+      ['p-studio-avail', 'Laptop Studio Available', 'laptop-studio-available', 28000000, 'AVAILABLE'],
+      ['p-studio-preorder', 'Laptop Studio Preorder', 'laptop-studio-preorder', 35000000, 'PREORDER'],
+      ['p-studio-contact', 'Laptop Studio Contact', 'laptop-studio-contact', 45000000, 'CONTACT'],
+    ]) {
+      await DB.prepare(
+        `INSERT INTO Product(id, name, slug, description, price, categoryId, brandId, status, updatedAt, isFeatured, isNewArrival, isBestSeller)
+         VALUES(?, ?, ?, 'Studio Desc', ?, 'laptop-gaming', 'lenovo', 'ACTIVE', CURRENT_TIMESTAMP, 1, 1, 0)`
+      ).bind(id, name, slug, price).run();
+      const doc = JSON.stringify({
+        schemaVersion: 1,
+        name,
+        slug,
+        categoryId: 'laptop-gaming',
+        price,
+        availability,
+        variants: [],
+        media: [],
+      });
+      await DB.prepare(
+        `INSERT INTO ProductStudio(productId, revision, draft, published, updatedAt)
+         VALUES(?, 1, ?, ?, CURRENT_TIMESTAMP)`
+      ).bind(id, doc, doc).run();
+    }
+
+    // Unpublished studio product (published IS NULL) - must remain excluded even though Product.status is ACTIVE
+    await DB.prepare(
+      `INSERT INTO Product(id, name, slug, description, price, categoryId, brandId, status, updatedAt, isFeatured, isNewArrival, isBestSeller)
+       VALUES('p-studio-unpub', 'Laptop Studio Unpub', 'laptop-studio-unpub', '', 19000000, 'laptop-gaming', 'lenovo', 'ACTIVE', CURRENT_TIMESTAMP, 1, 1, 1)`
+    ).run();
+    await DB.prepare(
+      `INSERT INTO ProductStudio(productId, revision, draft, published, updatedAt)
+       VALUES('p-studio-unpub', 1, '{"name":"Unpub"}', NULL, CURRENT_TIMESTAMP)`
+    ).run();
+
+    // Active promotion campaign on p-legion to verify price/originalPrice/discount fields
+    const startAt = new Date(Date.now() - 60_000).toISOString();
+    const endAt = new Date(Date.now() + 3_600_000).toISOString();
+    await DB.prepare(
+      `INSERT INTO PromotionCampaign(id, name, status, startAt, endAt)
+       VALUES('camp-r8', 'Round 8 Sale', 'PUBLISHED', ?, ?)`
+    ).bind(startAt, endAt).run();
+    await DB.prepare(
+      `INSERT INTO PromotionCampaignItem(id, campaignId, productId, salePrice, regularPrice)
+       VALUES('camp-r8-item', 'camp-r8', 'p-legion', 25990000, 30000000)`
+    ).run();
+
+    let studioFindManyCalls = 0;
+    const prismaClient = api.getPrismaClient(DB);
+    const origFindMany = prismaClient.productStudio.findMany.bind(prismaClient.productStudio);
+    prismaClient.productStudio.findMany = async (...args) => {
+      studioFindManyCalls++;
+      return origFindMany(...args);
+    };
+
+    const runAndCount = async (sections) => {
+      studioFindManyCalls = 0;
+      const result = await api.resolveSectionsForStorefront(DB, sections);
+      return { result, studioFindManyCalls };
+    };
+
+    const makeCriteria = (overrides = {}) => ({
+      productType: 'laptop',
+      categoryId: null,
+      brandId: null,
+      tag: 'all',
+      availability: 'all',
+      sort: 'price-asc',
+      limit: 10,
+      ...overrides,
+    });
+
+    const makeTab = (id, overrides = {}) => {
+      const tab = {
+        id,
+        label: overrides.label ?? id,
+        productIds: overrides.productIds ?? [],
+        href: overrides.href ?? '/search',
+        ...(overrides.enabled !== undefined ? { enabled: overrides.enabled } : {}),
+        ...(overrides.sourceMode !== undefined ? { sourceMode: overrides.sourceMode } : {}),
+        ...(overrides.ruleCriteria !== undefined ? { ruleCriteria: overrides.ruleCriteria } : {}),
+      };
+      return tab;
+    };
+
+    const makeGridSection = (id, overrides = {}) => ({
+      id,
+      type: 'product_grid',
+      name: id,
+      enabled: overrides.enabled ?? true,
+      data: {
+        type: 'product_grid',
+        title: `Grid ${id}`,
+        subtitle: '',
+        badge: '',
+        badgeColor: '',
+        colorTheme: 'blue',
+        links: [],
+        sourceMode: overrides.sourceMode ?? 'rule',
+        manualProductIds: overrides.manualProductIds ?? [],
+        ruleCriteria: overrides.ruleCriteria ?? makeCriteria({ limit: 12 }),
+        tabs: overrides.tabs,
+        rankNumbering: false,
+        viewAllLink: '',
+      },
+    });
+
+    try {
+      // 1. No product sections
+      const noProductRes = await runAndCount([
+        {
+          id: 'sec-banner-only',
+          type: 'banner',
+          name: 'Banner',
+          enabled: true,
+          data: {
+            type: 'banner',
+            title: 'Hero',
+            subtitle: '',
+            badge: '',
+            imageUrl: '',
+            imageAssetId: null,
+            link: '/product/lenovo-legion-5-pro',
+            buttonText: 'Xem ngay',
+            secondaryLink: '',
+            secondaryButtonText: '',
+            layout: 'hero',
+          },
+        },
+        {
+          id: 'sec-cats-only',
+          type: 'featured_categories',
+          name: 'Categories',
+          enabled: true,
+          data: {
+            type: 'featured_categories',
+            title: 'Danh mục',
+            subtitle: '',
+            categoryIds: ['laptop-gaming'],
+            items: [],
+          },
+        },
+      ]);
+      assert.equal(noProductRes.studioFindManyCalls, 0);
+      assert.equal(noProductRes.result[0].data.link, '/san-pham/lenovo-legion-5-pro');
+      assert.equal(noProductRes.result[1].resolvedCategories.length, 1);
+
+      // 2. Enabled product_grid with availability='all' or omitted on main and rule tabs
+      const omittedAvailCriteria = makeCriteria();
+      delete omittedAvailCriteria.availability;
+      const allAvailabilitySections = [
+        makeGridSection('sec-all-avail', {
+          ruleCriteria: makeCriteria(),
+          tabs: [
+            makeTab('tab-all-desc', {
+              label: 'Laptop Giá Cao',
+              href: '/search?sort=newest',
+              enabled: true,
+              sourceMode: 'rule',
+              ruleCriteria: makeCriteria({ sort: 'price-desc' }),
+            }),
+            makeTab('tab-omitted-avail', {
+              label: 'Laptop Mặc Định',
+              sourceMode: 'rule',
+              ruleCriteria: omittedAvailCriteria,
+            }),
+          ],
+        }),
+      ];
+      const noAvailRes = await runAndCount(allAvailabilitySections);
+      assert.equal(noAvailRes.studioFindManyCalls, 0, 'Must skip ProductStudio scan when availability is all/omitted');
+
+      const mainAscIds = noAvailRes.result[0].resolvedProducts.map((p) => p.id);
+      assert.deepEqual(mainAscIds, ['p-studio-avail', 'p-legion', 'p-studio-preorder', 'p-rog', 'p-studio-contact']);
+      assert.equal(noAvailRes.result[0].resolvedProducts.some((p) => p.id === 'p-draft-laptop' || p.id === 'p-studio-unpub'), false);
+
+      const legionCard = noAvailRes.result[0].resolvedProducts.find((p) => p.id === 'p-legion');
+      assert.equal(legionCard.price, 25990000, 'Campaign sale price must be preserved');
+      assert.equal(legionCard.originalPrice, 30000000, 'Campaign regular price must be preserved');
+      assert.equal(legionCard.oldPrice, 30000000);
+      assert.equal(legionCard.isOnSale, true);
+      assert.equal(legionCard.isFlashSale, false);
+      assert.equal(legionCard.discount, '-13%');
+
+      const tabDescIds = noAvailRes.result[0].resolvedTabs[0].products.map((p) => p.id);
+      assert.deepEqual(tabDescIds, ['p-studio-contact', 'p-rog', 'p-studio-preorder', 'p-legion', 'p-studio-avail']);
+      assert.equal(noAvailRes.result[0].resolvedTabs[0].href, '/search?category=laptop&sort=newest');
+      assert.deepEqual(noAvailRes.result[0].resolvedTabs[1].products.map((p) => p.id), mainAscIds);
+
+      // Verify exact output/order/price parity against forced-preload execution
+      const evalAt = new Date();
+      const [forcedPricingCtx, preloadedStudios, activeCategories] = await Promise.all([
+        api.getStorefrontPricingContext(DB, evalAt),
+        origFindMany({ select: { productId: true, published: true } }),
+        api.getActiveCategories(prismaClient),
+      ]);
+      const directMain = await api.resolveProductsByCriteria(
+        allAvailabilitySections[0].data.ruleCriteria,
+        prismaClient,
+        forcedPricingCtx,
+        evalAt,
+        { categories: activeCategories, studios: preloadedStudios }
+      );
+      assert.deepEqual(
+        noAvailRes.result[0].resolvedProducts,
+        directMain,
+        'Resolved products with skipped studio scan must be deep-equal to forced-preload resolution'
+      );
+
+      // 3. Enabled main rule with AVAILABLE, PREORDER, CONTACT
+      for (const [avail, expectedIds] of [
+        ['AVAILABLE', ['p-studio-avail', 'p-legion', 'p-rog']],
+        ['PREORDER', ['p-studio-preorder']],
+        ['CONTACT', ['p-studio-contact']],
+      ]) {
+        const res = await runAndCount([
+          makeGridSection(`sec-main-${avail}`, {
+            ruleCriteria: makeCriteria({ availability: avail }),
+          }),
+        ]);
+        assert.equal(res.studioFindManyCalls, 1, `Main rule availability=${avail} must preload ProductStudio once`);
+        assert.deepEqual(res.result[0].resolvedProducts.map((p) => p.id), expectedIds);
+      }
+
+      // 4. Enabled rule tab needing availability while main rule has availability='all'
+      const ruleTabRes = await runAndCount([
+        makeGridSection('sec-tab-avail', {
+          ruleCriteria: makeCriteria(),
+          tabs: [
+            makeTab('tab-preorder', {
+              label: 'Đặt trước',
+              enabled: true,
+              sourceMode: 'rule',
+              ruleCriteria: makeCriteria({ availability: 'PREORDER' }),
+            }),
+          ],
+        }),
+      ]);
+      assert.equal(ruleTabRes.studioFindManyCalls, 1, 'Enabled rule tab with availability!=all must trigger preload once');
+      assert.deepEqual(ruleTabRes.result[0].resolvedTabs[0].products.map((p) => p.id), ['p-studio-preorder']);
+
+      // 5. Disabled section and disabled tab with availability!=all must be ignored
+      const disabledRes = await runAndCount([
+        makeGridSection('sec-disabled-avail', {
+          enabled: false,
+          ruleCriteria: makeCriteria({ availability: 'AVAILABLE' }),
+        }),
+        makeGridSection('sec-enabled-with-disabled-tab', {
+          ruleCriteria: makeCriteria(),
+          tabs: [
+            makeTab('tab-disabled-contact', {
+              label: 'Disabled Contact Tab',
+              enabled: false,
+              sourceMode: 'rule',
+              ruleCriteria: makeCriteria({ availability: 'CONTACT' }),
+            }),
+          ],
+        }),
+      ]);
+      assert.equal(disabledRes.studioFindManyCalls, 0, 'Disabled section and disabled tab must not trigger ProductStudio preload');
+      assert.equal(disabledRes.result.length, 1);
+      assert.equal(disabledRes.result[0].resolvedTabs, undefined);
+
+      // 6. Manual main and manual tab ignore leftover ruleCriteria.availability
+      const manualRes = await runAndCount([
+        makeGridSection('sec-manual-with-leftover-criteria', {
+          sourceMode: 'manual',
+          manualProductIds: ['p-legion', 'p-rog', 'p-studio-unpub'],
+          ruleCriteria: makeCriteria({ availability: 'AVAILABLE' }),
+          tabs: [
+            makeTab('tab-manual-leftover', {
+              label: 'Tab Manual',
+              productIds: ['p-rog', 'p-legion'],
+              enabled: true,
+              sourceMode: 'manual',
+              ruleCriteria: makeCriteria({ availability: 'PREORDER' }),
+            }),
+            makeTab('tab-implicit-manual-leftover', {
+              label: 'Tab Implicit Manual',
+              productIds: ['p-legion'],
+              enabled: true,
+              ruleCriteria: makeCriteria({ availability: 'CONTACT' }),
+            }),
+          ],
+        }),
+      ]);
+      assert.equal(manualRes.studioFindManyCalls, 0, 'Manual main/tabs must ignore leftover ruleCriteria.availability');
+      assert.deepEqual(manualRes.result[0].resolvedProducts.map((p) => p.id), ['p-legion', 'p-rog']);
+      assert.equal(manualRes.result[0].resolvedProducts[0].price, 25990000);
+      assert.deepEqual(manualRes.result[0].resolvedTabs[0].products.map((p) => p.id), ['p-rog', 'p-legion']);
+      assert.deepEqual(manualRes.result[0].resolvedTabs[1].products.map((p) => p.id), ['p-legion']);
+
+      // 7. Mixed sections share exactly ONE preload across multiple main grids and rule tabs
+      const mixedRes = await runAndCount([
+        makeGridSection('sec-mixed-1', {
+          ruleCriteria: makeCriteria({ availability: 'AVAILABLE' }),
+          tabs: [
+            makeTab('tab-mixed-preorder', {
+              label: 'Preorder',
+              enabled: true,
+              sourceMode: 'rule',
+              ruleCriteria: makeCriteria({ availability: 'PREORDER' }),
+            }),
+            makeTab('tab-mixed-contact', {
+              label: 'Contact',
+              enabled: true,
+              sourceMode: 'rule',
+              ruleCriteria: makeCriteria({ availability: 'CONTACT' }),
+            }),
+          ],
+        }),
+        makeGridSection('sec-mixed-2', {
+          ruleCriteria: makeCriteria({ sort: 'price-desc' }),
+          tabs: [
+            makeTab('tab-mixed-avail-2', {
+              label: 'Available 2',
+              enabled: true,
+              sourceMode: 'rule',
+              ruleCriteria: makeCriteria({ availability: 'AVAILABLE', sort: 'price-desc' }),
+            }),
+          ],
+        }),
+      ]);
+      assert.equal(mixedRes.studioFindManyCalls, 1, 'Mixed sections must share a single ProductStudio preload');
+      assert.deepEqual(mixedRes.result[0].resolvedProducts.map((p) => p.id), ['p-studio-avail', 'p-legion', 'p-rog']);
+      assert.deepEqual(mixedRes.result[0].resolvedTabs[0].products.map((p) => p.id), ['p-studio-preorder']);
+      assert.deepEqual(mixedRes.result[0].resolvedTabs[1].products.map((p) => p.id), ['p-studio-contact']);
+      assert.deepEqual(mixedRes.result[1].resolvedProducts.map((p) => p.id), ['p-studio-contact', 'p-rog', 'p-studio-preorder', 'p-legion', 'p-studio-avail']);
+      assert.deepEqual(mixedRes.result[1].resolvedTabs[0].products.map((p) => p.id), ['p-rog', 'p-legion', 'p-studio-avail']);
+    } finally {
+      prismaClient.productStudio.findMany = origFindMany;
+    }
   });
 
   console.log(`\n========================================`);

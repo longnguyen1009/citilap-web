@@ -17,7 +17,7 @@ export function ErrorState({
   title = "Đã xảy ra lỗi tải dữ liệu",
   message = "Hệ thống gặp sự cố trong khi tải thông tin. Vui lòng thử lại sau giây lát.",
   retry,
-  supportHref = "/contact",
+  supportHref = "/lien-he",
   action,
   icon,
   className = "",

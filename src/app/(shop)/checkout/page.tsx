@@ -42,6 +42,8 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<'' | 'COD' | 'BANK_TRANSFER'>('');
   const [priceChangeDetails, setPriceChangeDetails] = useState<PriceChangeDetails | null>(null);
   const [form, setForm] = useState({fullName:'',phone:'',email:'',province:'',ward:'',address:'',note:''});
+  const [rememberInfo, setRememberInfo] = useState(true);
+  const [hasSavedRecipient, setHasSavedRecipient] = useState(false);
   const [serviceOptions, setServiceOptions] = useState<string[]>([
     'Cài đặt sẵn Windows + bộ ứng dụng văn phòng cơ bản',
   ]);
@@ -67,11 +69,17 @@ export default function CheckoutPage() {
   useEffect(()=>{
     try {
       const saved = JSON.parse(sessionStorage.getItem('citilap-checkout-v1') || 'null');
+      const savedRecipient = JSON.parse(localStorage.getItem('citilap-saved-recipient-v1') || 'null');
+      if (savedRecipient && typeof savedRecipient === 'object') {
+        setHasSavedRecipient(true);
+      }
       if (saved?.form && Object.values(saved.form).every(v=>typeof v==='string') && ['delivery','pickup'].includes(saved.deliveryType) && ['', 'COD','BANK_TRANSFER'].includes(saved.paymentMethod) && typeof saved.selectedShowroom==='string') {
         const f = saved.form as Record<string,string>;
         // Drafts from before the 2025 address reform may carry a merged province or a district; keep only valid fields.
-        setForm(prev=>({...prev,fullName:f.fullName ?? prev.fullName,phone:f.phone ?? prev.phone,email:f.email ?? prev.email,province:isVnProvince(f.province ?? '') ? f.province : '',ward:f.ward ?? '',address:f.address ?? prev.address,note:f.note ?? prev.note}));
+        setForm(prev=>({...prev,fullName:f.fullName || savedRecipient?.fullName || prev.fullName,phone:f.phone || savedRecipient?.phone || prev.phone,email:f.email || savedRecipient?.email || prev.email,province:isVnProvince(f.province ?? '') ? f.province : (isVnProvince(savedRecipient?.province ?? '') ? savedRecipient.province : ''),ward:f.ward || savedRecipient?.ward || '',address:f.address || savedRecipient?.address || prev.address,note:f.note ?? prev.note}));
         setDeliveryType(saved.deliveryType);setSelectedShowroom(saved.selectedShowroom);setPaymentMethod(saved.paymentMethod);
+      } else if (savedRecipient && typeof savedRecipient === 'object') {
+        setForm(prev=>({...prev,fullName:savedRecipient.fullName || prev.fullName,phone:savedRecipient.phone || prev.phone,email:savedRecipient.email || prev.email,province:isVnProvince(savedRecipient.province ?? '') ? savedRecipient.province : '',ward:savedRecipient.ward || '',address:savedRecipient.address || prev.address}));
       }
       const attempt = JSON.parse(sessionStorage.getItem('citilap-checkout-attempt-v1') || 'null');
       if (typeof attempt?.key === 'string' && typeof attempt?.body === 'string') setPending(attempt);
@@ -100,6 +108,20 @@ export default function CheckoutPage() {
       const data=await response.json();
       if(response.ok && data.success){
         trackStorefront('order_requested');
+        try {
+          if (rememberInfo) {
+            localStorage.setItem('citilap-saved-recipient-v1', JSON.stringify({
+              fullName: form.fullName.trim(),
+              phone: form.phone.trim(),
+              email: form.email.trim(),
+              province: form.province,
+              ward: form.ward.trim(),
+              address: form.address.trim(),
+            }));
+          } else {
+            localStorage.removeItem('citilap-saved-recipient-v1');
+          }
+        } catch {}
         forgetAttempt();sessionStorage.removeItem('citilap-checkout-v1');clearCart();
         router.push('/checkout/success?orderId='+encodeURIComponent(data.orderId)+'&token='+encodeURIComponent(data.confirmationToken));
         return;
@@ -472,6 +494,33 @@ export default function CheckoutPage() {
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                   />
                 </div>
+
+                <div className="col-span-1 md:col-span-2 flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <label className="inline-flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberInfo}
+                      onChange={(e) => setRememberInfo(e.target.checked)}
+                      style={{ accentColor: "#1d4ed8" }}
+                      className="rounded text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>Lưu họ tên, số điện thoại và địa chỉ trên thiết bị này cho lần đặt hàng sau</span>
+                  </label>
+                  {hasSavedRecipient && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          localStorage.removeItem("citilap-saved-recipient-v1");
+                        } catch {}
+                        setHasSavedRecipient(false);
+                      }}
+                      className="text-xs text-rose-600 hover:underline font-medium cursor-pointer"
+                    >
+                      Xóa thông tin đã lưu
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -526,8 +575,40 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              <fieldset className="mt-4 space-y-3"><legend className="font-bold">Phương thức thanh toán</legend>
-                {(quote?.allowedPaymentMethods || []).map(method=><label key={method} className="flex items-center gap-2"><input type="radio" name="paymentMethod" checked={paymentMethod===method} onChange={()=>setPaymentMethod(method)}/>{method==='COD'?'Thanh toán khi nhận máy (COD)':'Chuyển khoản ngân hàng'}</label>)}
+              <fieldset className="mt-4 space-y-2.5">
+                <legend className="text-sm font-bold text-gray-900 mb-1">Phương thức thanh toán</legend>
+                {(quote?.allowedPaymentMethods || []).map((method) => {
+                  const isSelected = paymentMethod === method;
+                  return (
+                    <label
+                      key={method}
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer transition ${
+                        isSelected
+                          ? "border-blue-600 bg-blue-50/50 text-blue-950 font-semibold ring-1 ring-blue-500/20"
+                          : "border-gray-200 bg-gray-50/40 hover:bg-gray-50 text-gray-800"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        checked={isSelected}
+                        onChange={() => setPaymentMethod(method)}
+                        style={{ accentColor: "#1d4ed8" }}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <div>
+                        <div className="font-bold">
+                          {method === "COD" ? "Thanh toán khi nhận máy (COD)" : "Chuyển khoản ngân hàng"}
+                        </div>
+                        <div className="text-[11px] text-gray-500 font-normal mt-0.5">
+                          {method === "COD"
+                            ? "Mở hộp kiểm tra ngoại hình, phụ kiện trước khi thanh toán"
+                            : "Quét mã VietQR hoặc chuyển khoản nhanh 24/7"}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
                 {paymentMethod==='BANK_TRANSFER' && (
                   <VietQrPaymentCard
                     bankAccountInfo={quote?.snapshot.bankAccountInfo}

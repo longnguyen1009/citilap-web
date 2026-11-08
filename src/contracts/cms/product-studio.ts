@@ -177,9 +177,11 @@ export const productVariantSchema = z.object({
   id: text.min(1),
   name: text.min(1),
   sku: text.min(1),
-  condition: z.enum(['NEW', 'LIKE_NEW', 'USED', 'REFURBISHED']).default('NEW'),
+  condition: z.enum(['NEW', 'LIKE_NEW', 'USED', 'REFURBISHED', 'LIQUIDATION']).default('NEW'),
   price: money,
   originalPrice: money.nullable().optional(),
+  stock: z.number().int().min(0).max(1_000_000).optional(),
+  tag: z.string().trim().max(60).optional(),
   availability: z.enum(['AVAILABLE', 'PREORDER', 'CONTACT', 'UNAVAILABLE']).optional(),
   ram: text.optional(),
   storage: text.optional(),
@@ -187,6 +189,43 @@ export const productVariantSchema = z.object({
   options: z.record(z.string(), z.string()).optional(),
   image: z.string().optional(),
 });
+
+export type WarrantyType = 'SHOP' | 'BRAND';
+
+export const warrantyTypeLabels = {
+  SHOP: 'Bảo hành tại CitiLap',
+  BRAND: 'Bảo hành Chính hãng',
+} as const;
+
+export const warrantyMonthsOptions = [3, 6, 12, 18, 24, 36] as const;
+
+export function formatShortWarrantyBadge(
+  warrantyType?: 'SHOP' | 'BRAND' | string | null,
+  warrantyMonths?: number | null,
+  fallbackText?: string | null
+): string {
+  if (warrantyType && warrantyMonths && warrantyMonths > 0) {
+    return warrantyType === 'BRAND'
+      ? `BH Hãng ${warrantyMonths} tháng`
+      : `BH ${warrantyMonths} tháng`;
+  }
+  if (fallbackText && fallbackText.trim()) {
+    const raw = fallbackText.trim();
+    const isBrand = /hãng|manufacturer|brand/i.test(raw);
+    const monthsMatch = raw.match(/(\d+)\s*(?:tháng|t\b)/i);
+    if (monthsMatch) {
+      return isBrand ? `BH Hãng ${monthsMatch[1]} tháng` : `BH ${monthsMatch[1]} tháng`;
+    }
+    if (/^BH\s+hãng$/i.test(raw)) return 'BH Hãng 12 tháng';
+    if (/^BH\s+/i.test(raw)) return raw;
+    return raw
+      .replace(/^Bảo hành\s*chính\s*hãng\s*/i, 'BH Hãng ')
+      .replace(/^Bảo hành\s*/i, 'BH ')
+      .replace(/\s*(?:tại\s*CitiLap|tiêu\s*chuẩn|1\s*đổi\s*1|toàn\s*diện).*$/i, '')
+      .trim();
+  }
+  return warrantyType === 'BRAND' ? 'BH Hãng 12 tháng' : 'BH 12 tháng';
+}
 
 export const productDocumentSchema = z.object({
   schemaVersion: z.literal(1),
@@ -197,6 +236,9 @@ export const productDocumentSchema = z.object({
   brandId: z.string().nullable().default(null),
   template: z.enum(['LAPTOP', 'MOUSE', 'KEYBOARD', 'HEADPHONE', 'CHARGER', 'HUB', 'BAG', 'MONITOR', 'ACCESSORY', 'TECH']),
   condition: z.enum(['NEW', 'LIKE_NEW', 'USED', 'REFURBISHED', 'LIQUIDATION']).default('NEW'),
+  warrantyType: z.enum(['SHOP', 'BRAND']).default('SHOP'),
+  warrantyMonths: z.number().int().min(1).max(60).default(12),
+  stock: z.number().int().min(0).max(1_000_000).default(0),
   isNewArrival: z.boolean().default(false),
   isBestSeller: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
@@ -217,6 +259,8 @@ export const productDocumentSchema = z.object({
     description: z.string().max(500),
     adjustment: z.number().int().min(-2_000_000_000).max(2_000_000_000),
     recommended: z.boolean(),
+    type: z.enum(['SHOP', 'BRAND']).optional(),
+    months: z.number().int().min(1).max(60).optional(),
   })).max(10),
   faqs: z.array(z.object({ q: text.min(1).max(300), a: text.min(1).max(2000) })).max(20).default([]),
   gifts: z.array(text.min(1).max(500)).max(10).default([]),
@@ -284,6 +328,9 @@ export function blankProduct(template: ProductTemplate = 'LAPTOP'): ProductDocum
     brandId: null,
     template,
     condition: 'NEW',
+    warrantyType: 'SHOP',
+    warrantyMonths: 12,
+    stock: 1,
     isNewArrival: false,
     isBestSeller: false,
     isFeatured: false,
@@ -293,7 +340,7 @@ export function blankProduct(template: ProductTemplate = 'LAPTOP'): ProductDocum
     contentHtml: '',
     price: 0,
     originalPrice: null,
-    availability: 'CONTACT',
+    availability: 'AVAILABLE',
     seoTitle: '',
     seoDescription: '',
     specs,
@@ -307,3 +354,48 @@ export function blankProduct(template: ProductTemplate = 'LAPTOP'): ProductDocum
   };
 }
 
+
+export const specKeyLabels: Record<string, string> = {
+  material: 'Chất liệu',
+  loadCapacity: 'Tải trọng',
+  compatibility: 'Tương thích',
+  connection: 'Kết nối',
+  connectivity: 'Kết nối',
+  weight: 'Trọng lượng',
+  dimensions: 'Kích thước',
+  size: 'Kích thước',
+  color: 'Màu sắc',
+  battery: 'Thời lượng pin',
+  batteryLife: 'Thời lượng pin',
+  power: 'Công suất',
+  wattage: 'Công suất',
+  ports: 'Cổng kết nối',
+  inputPort: 'Cổng vào',
+  outputPort: 'Cổng ra',
+  cableLength: 'Độ dài dây',
+  resolution: 'Độ phân giải',
+  refreshRate: 'Tần số quét',
+  panel: 'Tấm nền',
+  brightness: 'Độ sáng',
+  responseTime: 'Thời gian phản hồi',
+  switchType: 'Loại switch',
+  keycap: 'Keycap',
+  layout: 'Layout',
+  dpi: 'DPI',
+  sensor: 'Cảm biến',
+  buttons: 'Số nút',
+  led: 'Đèn LED',
+  driver: 'Driver',
+  microphone: 'Microphone',
+  waterproof: 'Kháng nước',
+  compartments: 'Số ngăn',
+  laptopSize: 'Cỡ laptop',
+  warranty: 'Bảo hành',
+  brand: 'Thương hiệu',
+  origin: 'Xuất xứ',
+};
+
+export function formatSpecKeyLabel(key: string): string {
+  const trimmed = key.trim();
+  return specKeyLabels[trimmed] || trimmed;
+}

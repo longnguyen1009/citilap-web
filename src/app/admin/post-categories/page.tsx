@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -40,6 +40,22 @@ export default function PostCategoriesPage() {
 
   // Form modal
   const [formOpen, setFormOpen] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (!formOpen) return;
+    const dialog = dialogRef.current;
+    const opener = document.activeElement as HTMLElement | null;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+    }
+    return () => {
+      if (dialog?.open) {
+        dialog.close();
+      }
+      opener?.focus();
+    };
+  }, [formOpen]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingRev, setEditingRev] = useState(0);
   const [formDoc, setFormDoc] = useState<PostCategoryDocument>({
@@ -279,7 +295,7 @@ export default function PostCategoriesPage() {
             </AdminButton>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="table-wrapper overflow-x-auto" tabIndex={0} role="region" aria-label="Danh sách chuyên mục bài viết">
             <table className="admin-table w-full text-left text-xs text-slate-600">
               <thead className="bg-slate-50/90 text-[11px] font-bold uppercase text-slate-500 border-b border-slate-200">
                 <tr>
@@ -343,114 +359,124 @@ export default function PostCategoriesPage() {
 
       {/* Create / Edit Modal */}
       {formOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <form onSubmit={handleSubmit}>
-              <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                <h3 className="font-bold text-slate-800 text-xs">
-                  {editingId ? 'Sửa chuyên mục' : 'Thêm chuyên mục mới'}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setFormOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                >
-                  ✕
-                </button>
+        <dialog
+          ref={dialogRef}
+          aria-labelledby="post-cat-modal-title"
+          onCancel={(e) => {
+            e.preventDefault();
+            if (!submitting) setFormOpen(false);
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !submitting) setFormOpen(false);
+          }}
+          className="admin-modal-dialog fixed inset-0 z-50 m-auto bg-white rounded-xl shadow-xl w-[calc(100%-2rem)] max-w-md p-0 overflow-hidden border border-slate-200 backdrop:bg-slate-950/50 backdrop:backdrop-blur-xs"
+        >
+          <form onSubmit={handleSubmit}>
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <h3 id="post-cat-modal-title" className="font-bold text-slate-800 text-xs">
+                {editingId ? 'Sửa chuyên mục' : 'Thêm chuyên mục mới'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                aria-label="Đóng hộp thoại"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3.5 text-xs">
+              {formError && (
+                <InlineAlert variant="error">{formError}</InlineAlert>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Tên chuyên mục <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formDoc.name}
+                  onChange={(e) => setFormDoc(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="VD: Đánh giá Laptop, Mẹo công nghệ..."
+                  className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
-              <div className="p-4 space-y-3.5 text-xs">
-                {formError && (
-                  <InlineAlert variant="error">{formError}</InlineAlert>
-                )}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-semibold text-slate-600">
+                    Đường dẫn (Slug) <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleSlugify}
+                    className="text-[11px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles size={11} /> Tự tạo
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={formDoc.slug}
+                  onChange={(e) => setFormDoc(prev => ({ ...prev, slug: e.target.value }))}
+                  placeholder="danh-gia-laptop"
+                  className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Thứ tự
+                  </label>
+                  <input
+                    type="number"
+                    value={formDoc.sortOrder}
+                    onChange={(e) => setFormDoc(prev => ({ ...prev, sortOrder: Number(e.target.value) }))}
+                    className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Tên chuyên mục <span className="text-red-500">*</span>
+                    Trạng thái
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={formDoc.name}
-                    onChange={(e) => setFormDoc(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="VD: Đánh giá Laptop, Mẹo công nghệ..."
+                  <select
+                    value={formDoc.status}
+                    onChange={(e) => setFormDoc(prev => ({ ...prev, status: e.target.value as 'ACTIVE' | 'INACTIVE' }))}
                     className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-semibold text-slate-600">
-                      Đường dẫn (Slug) <span className="text-red-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleSlugify}
-                      className="text-[11px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 cursor-pointer"
-                    >
-                      <Sparkles size={11} /> Tự tạo
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    value={formDoc.slug}
-                    onChange={(e) => setFormDoc(prev => ({ ...prev, slug: e.target.value }))}
-                    placeholder="danh-gia-laptop"
-                    className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Thứ tự
-                    </label>
-                    <input
-                      type="number"
-                      value={formDoc.sortOrder}
-                      onChange={(e) => setFormDoc(prev => ({ ...prev, sortOrder: Number(e.target.value) }))}
-                      className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tabular-nums"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                      Trạng thái
-                    </label>
-                    <select
-                      value={formDoc.status}
-                      onChange={(e) => setFormDoc(prev => ({ ...prev, status: e.target.value as 'ACTIVE' | 'INACTIVE' }))}
-                      className="w-full text-xs px-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="ACTIVE">Hoạt động</option>
-                      <option value="INACTIVE">Tạm ẩn</option>
-                    </select>
-                  </div>
+                  >
+                    <option value="ACTIVE">Hoạt động</option>
+                    <option value="INACTIVE">Tạm ẩn</option>
+                  </select>
                 </div>
               </div>
+            </div>
 
-              <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
-                <AdminButton
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setFormOpen(false)}
-                >
-                  Hủy
-                </AdminButton>
-                <AdminButton
-                  type="submit"
-                  size="sm"
-                  variant="primary"
-                  loading={submitting}
-                >
-                  {editingId ? 'Cập nhật' : 'Tạo mới'}
-                </AdminButton>
-              </div>
-            </form>
-          </div>
-        </div>
+            <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 flex justify-end gap-2">
+              <AdminButton
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setFormOpen(false)}
+              >
+                Hủy
+              </AdminButton>
+              <AdminButton
+                type="submit"
+                size="sm"
+                variant="primary"
+                loading={submitting}
+              >
+                {editingId ? 'Cập nhật' : 'Tạo mới'}
+              </AdminButton>
+            </div>
+          </form>
+        </dialog>
       )}
     </div>
   );

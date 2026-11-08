@@ -17,12 +17,14 @@ export interface CompareItem {
 interface CompareContextType {
   items: CompareItem[];
   isCompareOpen: boolean;
+  compareNotice: string | null;
   addToCompare: (item: CompareItem) => { success: boolean; message?: string };
   removeFromCompare: (id: string) => void;
   clearCompare: () => void;
   isInCompare: (id: string) => boolean;
   openCompare: () => void;
   closeCompare: () => void;
+  clearCompareNotice: () => void;
 }
 
 const CompareContext = createContext<CompareContextType | null>(null);
@@ -33,6 +35,13 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CompareItem[]>([]);
   const [hasHydrated, setHasHydrated] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [compareNotice, setCompareNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!compareNotice) return;
+    const timer = setTimeout(() => setCompareNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [compareNotice]);
 
   // Safely restore items from sessionStorage after hydration
   useEffect(() => {
@@ -77,12 +86,15 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (items.length >= MAX_COMPARE_PRODUCTS) {
+        const message = `Chỉ có thể so sánh tối đa ${MAX_COMPARE_PRODUCTS} sản phẩm cùng lúc. Vui lòng xóa bớt 1 sản phẩm trên thanh so sánh.`;
+        setCompareNotice(message);
         return {
           success: false,
-          message: `Chỉ có thể so sánh tối đa ${MAX_COMPARE_PRODUCTS} sản phẩm cùng lúc. Vui lòng xóa bớt sản phẩm cũ.`,
+          message,
         };
       }
 
+      setCompareNotice(null);
       // The compare API validates public product groups; stored client metadata can be stale.
       setItems((prev) => [...prev, item]);
       return { success: true };
@@ -92,11 +104,17 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
 
   const removeFromCompare = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));
+    setCompareNotice(null);
   }, []);
 
   const clearCompare = useCallback(() => {
     setItems([]);
     setIsCompareOpen(false);
+    setCompareNotice(null);
+  }, []);
+
+  const clearCompareNotice = useCallback(() => {
+    setCompareNotice(null);
   }, []);
 
   const openCompare = useCallback(() => {
@@ -112,12 +130,14 @@ export function CompareProvider({ children }: { children: React.ReactNode }) {
       value={{
         items,
         isCompareOpen,
+        compareNotice,
         addToCompare,
         removeFromCompare,
         clearCompare,
         isInCompare,
         openCompare,
         closeCompare,
+        clearCompareNotice,
       }}
     >
       {children}

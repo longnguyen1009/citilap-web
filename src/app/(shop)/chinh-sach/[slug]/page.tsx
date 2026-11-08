@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 const redirectMap: Record<string, string> = {
   "bao-hanh": "/chinh-sach-bao-hanh",
@@ -22,6 +22,7 @@ export default async function LegacyPolicyRedirect({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const target = redirectMap[slug] || "/huong-dan-mua-hang";
-  redirect(target);
+  const target = redirectMap[slug];
+  if (!target) notFound();
+  permanentRedirect(target);
 }

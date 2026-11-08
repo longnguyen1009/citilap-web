@@ -14,6 +14,7 @@ import { businessProfile } from "@/config/business-profile";
 
 import { mediaEnvironment } from "@/server/media-http";
 import { getSystemPageResolution } from "@/server/services/page.service";
+import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -56,7 +57,16 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const settings = await getStorefrontSettings();
+  const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const hanoi = {
+    ...baseHanoi,
+    address: settings?.addressHanoi || baseHanoi.address,
+  };
+  const displayPhone = settings?.storePhone || businessProfile.displayPhone;
+  const telHref = settings?.storePhone
+    ? `tel:${settings.storePhone.replace(/[^+\d]/g, "")}`
+    : businessProfile.telHref;
 
   // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors)
   const env = await mediaEnvironment();
@@ -224,10 +234,10 @@ export default async function AboutPage() {
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-4">
             <a
-              href={businessProfile.telHref}
+              href={telHref}
               className="inline-flex items-center gap-2 px-6 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm transition shadow-md shadow-blue-600/20"
             >
-              <Phone className="w-4 h-4" /> Gọi Hotline: {businessProfile.displayPhone}
+              <Phone className="w-4 h-4" /> Gọi Hotline: {displayPhone}
             </a>
             <Link
               href="/lien-he"

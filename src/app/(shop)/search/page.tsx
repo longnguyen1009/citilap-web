@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import { parseSearchParams } from '@/contracts/catalog/search';
 import Link from 'next/link';
 import { Suspense } from "react";
@@ -23,7 +24,7 @@ export async function generateMetadata({
       title: `Tìm kiếm "${q}" | CitiLap.vn`,
       description: `Kết quả tìm kiếm sản phẩm laptop, máy tính và linh kiện cho từ khóa "${q}" tại Citilap.vn. Hàng chính hãng, bảo hành uy tín.`,
       alternates: {
-        canonical: "https://citilap.vn/search",
+        canonical: `${businessProfile.canonicalSiteUrl}/search`,
       },
       robots: {
         index: false,
@@ -36,7 +37,7 @@ export async function generateMetadata({
     title: "Tìm kiếm sản phẩm laptop chính hãng | CitiLap.vn",
     description: "Tìm kiếm laptop gaming, laptop văn phòng, đồ họa và linh kiện giá tốt nhất tại Citilap.vn.",
     alternates: {
-      canonical: "https://citilap.vn/search",
+      canonical: `${businessProfile.canonicalSiteUrl}/search`,
     },
     robots: {
       index: false,
@@ -63,14 +64,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   ];
 
   return (
-    <div className="bg-surface min-h-screen pb-16">
+    <div className="bg-surface min-h-screen pb-12">
       <Breadcrumb items={breadcrumbItems} />
 
-      <div className="container mx-auto px-4 max-w-[1370px] mt-6">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-3">
         <Suspense
           fallback={
-            <div className="bg-surface-card border border-border-default rounded-card p-12 text-center">
-              <div className="w-8 h-8 border-3 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <div className="bg-surface-card border border-border-default rounded-card p-8 text-center">
+              <div className="w-7 h-7 border-3 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
               <p className="text-body-sm text-text-muted">Đang tìm kiếm sản phẩm...</p>
             </div>
           }

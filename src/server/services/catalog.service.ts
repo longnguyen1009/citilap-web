@@ -6,6 +6,7 @@ import { getProductImageUrl, getPublicMediaUrl } from "@/infra/cloudflare/r2/sto
 import { ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 import { normalizeVnd, calculateEffectivePrice, getStorefrontPricingContext, type PriceEvaluationContext } from "./pricing.service";
 import { parseRamGb, parseStorageGb, deriveCpuSeries, deriveGpuSeries, parseSpecMetrics } from "./product-studio.service";
+import { formatShortWarrantyBadge } from "@/contracts/cms/product-studio";
 export { parseRamGb, parseStorageGb, deriveCpuSeries, deriveGpuSeries, parseSpecMetrics };
 
 /**
@@ -164,19 +165,53 @@ export interface CategorySummary {
   subCategories?: CategorySummary[];
 }
 
+export function isAccessoryCategoryNode(c: CategoryNode): boolean {
+  return (
+    ['linh-kien', 'phu-kien'].includes(c.slug) ||
+    c.id === 'cat-phu-kien' ||
+    c.id.startsWith('ref-accessory-') ||
+    /^(phu-kien|linh-kien)/.test(c.slug)
+  );
+}
+
+export function getAccessoryCategoryIds(categories: CategoryNode[]): string[] {
+  return [
+    ...new Set(
+      categories
+        .filter((c) => isAccessoryCategoryNode(c))
+        .flatMap((c) => categoryDescendantIds(c, categories))
+    ),
+  ];
+}
+
 export function categoryProductScope(category: CategoryNode, categories: CategoryNode[]) {
-  if (['laptop-cu','laptop-likenew','laptop-moi'].includes(category.slug)) {
-    const accessories = categories.filter(c => ['linh-kien','phu-kien'].includes(c.slug)).flatMap(c => categoryDescendantIds(c,categories));
-    const condList = category.slug === 'laptop-moi' ? ['NEW'] : ['LIKE_NEW','USED','REFURBISHED','LIQUIDATION'];
-    return {AND:[
-      {OR:[
-        {condition:category.slug === 'laptop-moi' ? 'NEW' : {in:condList}},
-        {variants:{some:{status:{in:['ACTIVE','active']},OR:condList.map(c=>({options:{contains:`"condition":"${c}"`}}))}}},
-      ]},
-      {categoryId:{notIn:accessories}},
-    ]};
+  if (category.slug === 'laptop') {
+    const accessories = getAccessoryCategoryIds(categories);
+    return { categoryId: { notIn: accessories } };
   }
-  return {categoryId:{in:categoryDescendantIds(category,categories)}};
+  if (['laptop-cu', 'laptop-likenew', 'laptop-moi'].includes(category.slug)) {
+    const accessories = getAccessoryCategoryIds(categories);
+    const condList = category.slug === 'laptop-moi' ? ['NEW'] : ['LIKE_NEW', 'USED', 'REFURBISHED', 'LIQUIDATION'];
+    return {
+      AND: [
+        {
+          OR: [
+            { condition: category.slug === 'laptop-moi' ? 'NEW' : { in: condList } },
+            {
+              variants: {
+                some: {
+                  status: { in: ['ACTIVE', 'active'] },
+                  OR: condList.map((c) => ({ options: { contains: `"condition":"${c}"` } })),
+                },
+              },
+            },
+          ],
+        },
+        { categoryId: { notIn: accessories } },
+      ],
+    };
+  }
+  return { categoryId: { in: categoryDescendantIds(category, categories) } };
 }
 
 export interface BrandSummary {
@@ -818,8 +853,12 @@ export function mapD1ProductToHomepageProduct(
     discount: resolved.discountPercent ? `-${resolved.discountPercent}%` : undefined,
     isFlashSale: Boolean(row.isFlashSale),
     isOnSale: resolved.isOnSale,
-    stock: typeof row.stock === "number" ? row.stock : 0,
-    warranty: row.warranty || undefined,
+    stock: typeof chosenVariant?.stock === "number" ? chosenVariant.stock : (typeof published?.stock === "number" ? published.stock : (typeof row.stock === "number" ? row.stock : 0)),
+    warranty: formatShortWarrantyBadge(
+      published?.warrantyType,
+      published?.warrantyMonths,
+      row.warranty || published?.warranties?.find((w: { recommended?: boolean }) => w.recommended)?.name || published?.warranties?.[0]?.name || null
+    ),
     primaryImage: resolvedImage,
     image: resolvedImage,
     specs: {
@@ -921,18 +960,25 @@ export async function getNewArrivals(
 ): Promise<HomepageProduct[]> {
   const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
+    const [context, categories] = await Promise.all([
+      pricingContext ?? getStorefrontPricingContext(undefined, at),
+      client.category.findMany({ select: { id: true, slug: true, parentId: true } }),
+    ]);
+    const accessories = getAccessoryCategoryIds(categories);
     const rows = await client.product.findMany({
       where: {
         status: { in: ["ACTIVE", "active"] },
         deletedAt: null, NOT: { studio: { is: { published: null } } },
         isNewArrival: true,
+        categoryId: { notIn: accessories },
       },
       include: defaultInclude,
       orderBy: { createdAt: "desc" },
       take: limit,
     });
-    return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
+    return rows
+      .map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at))
+      .filter((p) => p.template !== "ACCESSORY" && !p.href?.startsWith("/phu-kien/"));
   } catch (error) {
     console.error("[CatalogService] Failed to query new arrivals from D1:", error);
     throw error;
@@ -1044,7 +1090,11 @@ export async function getLikeNewProducts(
 ): Promise<HomepageProduct[]> {
   const { client, pricingContext, at } = resolveClientAndPricing(clientOrContext, contextOrAt, maybeAt);
   try {
-    const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
+    const [context, categories] = await Promise.all([
+      pricingContext ?? getStorefrontPricingContext(undefined, at),
+      client.category.findMany({ select: { id: true, slug: true, parentId: true } }),
+    ]);
+    const accessories = getAccessoryCategoryIds(categories);
     const usedConds = ["LIKE_NEW", "USED", "REFURBISHED", "LIQUIDATION"];
     const rows = await catalogBatches((skip, take) =>
       client.product.findMany({
@@ -1052,6 +1102,7 @@ export async function getLikeNewProducts(
           status: { in: ["ACTIVE", "active"] },
           deletedAt: null,
           NOT: { studio: { is: { published: null } } },
+          categoryId: { notIn: accessories },
           OR: [
             { condition: { in: usedConds } },
             {
@@ -1072,7 +1123,7 @@ export async function getLikeNewProducts(
     );
     return rows
       .map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, { condition: usedConds }, context, at))
-      .filter((p) => p.matchesFilter)
+      .filter((p) => p.matchesFilter && p.template !== "ACCESSORY" && !p.href?.startsWith("/phu-kien/"))
       .slice(0, limit);
   } catch (error) {
     console.error("[CatalogService] Failed to query like-new products from D1:", error);
@@ -1974,7 +2025,11 @@ export async function getProductDetail(
       categoryId: product.categoryId,
       model: product.model || null,
       series: product.series || null,
-      warranty: product.warranty || "12 tháng chính hãng",
+      warranty: formatShortWarrantyBadge(
+        published?.warrantyType,
+        published?.warrantyMonths,
+        product.warranty || published?.warranties?.find((w: { recommended?: boolean }) => w.recommended)?.name || published?.warranties?.[0]?.name || null
+      ),
       condition: activeCondition,
       conditionLabel: conditionDisplayLabels[activeCondition] || activeCondition,
       origin: product.origin || null,
@@ -2136,11 +2191,14 @@ export async function resolveProductsByIds(
  * Resolves products by rule criteria (category, brand, productType, tag, availability, sort, limit).
  * Always published-only and stable ordering.
  */
+const D1_SAFE_IN_PARAMS = 80;
+
 export async function resolveProductsByCriteria(
   criteria: {
     productType?: "all" | "laptop" | "accessory";
     categoryId?: string | null;
     brandId?: string | null;
+    condition?: "all" | "NEW" | "LIKE_NEW" | "USED" | "ON_SALE";
     tag?: "all" | "isFeatured" | "isNewArrival" | "isBestSeller";
     availability?: "all" | "AVAILABLE" | "PREORDER" | "CONTACT";
     sort?: "newest" | "price-asc" | "price-desc" | "name-asc" | "best-selling";
@@ -2155,6 +2213,7 @@ export async function resolveProductsByCriteria(
   }
 ): Promise<HomepageProduct[]> {
   const context = pricingContext ?? (await getStorefrontPricingContext(undefined, at));
+  let availabilityFilter: ((id: string) => boolean) | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     status: { in: ["ACTIVE", "active"] },
@@ -2163,7 +2222,7 @@ export async function resolveProductsByCriteria(
 
   if (criteria.productType === 'accessory' || criteria.productType === 'laptop' || criteria.categoryId) {
     const categories = preloaded?.categories ?? (await getActiveCategories(client));
-    const accessories = categories.filter(c=>['linh-kien','phu-kien'].includes(c.slug)).flatMap(c=>categoryDescendantIds(c,categories));
+    const accessories = getAccessoryCategoryIds(categories);
     where.AND = [];
     if (criteria.productType === 'accessory') where.AND.push({categoryId:{in:accessories}});
     if (criteria.productType === 'laptop') where.AND.push({categoryId:{notIn:accessories}});
@@ -2175,6 +2234,16 @@ export async function resolveProductsByCriteria(
 
   if (criteria.brandId) {
     where.brandId = criteria.brandId;
+  }
+
+  if (criteria.condition && criteria.condition !== "all") {
+    if (criteria.condition === "NEW") {
+      where.condition = "NEW";
+    } else if (criteria.condition === "LIKE_NEW") {
+      where.condition = { in: ["LIKE_NEW", "USED"] };
+    } else if (criteria.condition === "USED") {
+      where.condition = "USED";
+    }
   }
 
   if (criteria.tag === "isFeatured") {
@@ -2197,8 +2266,23 @@ export async function resolveProductsByCriteria(
         return false;
       }
     }).map(s => s.productId);
-    // Legacy products without Studio use the existing AVAILABLE contract, never stock.
-    where.OR = [{ id: { in: matching } }, ...(criteria.availability === "AVAILABLE" ? [{ studio: { is: null } }] : [])];
+    // D1 caps bound parameters at 100 per query: use the smaller of the matching / excluded id sets.
+    const matchingSet = new Set(matching);
+    const excluded = studios.filter(s => !matchingSet.has(s.productId)).map(s => s.productId);
+    const legacyAvailable = criteria.availability === "AVAILABLE";
+    if (matching.length <= D1_SAFE_IN_PARAMS || excluded.length > D1_SAFE_IN_PARAMS) {
+      // Legacy products without Studio use the existing AVAILABLE contract, never stock.
+      if (matching.length <= D1_SAFE_IN_PARAMS) {
+        where.OR = [{ id: { in: matching } }, ...(legacyAvailable ? [{ studio: { is: null } }] : [])];
+      } else {
+        const studioIds = new Set(studios.map(s => s.productId));
+        availabilityFilter = (id: string) => matchingSet.has(id) || (legacyAvailable && !studioIds.has(id));
+        if (!legacyAvailable) where.studio = { isNot: null };
+      }
+    } else {
+      where.AND = [...(where.AND ?? []), { id: { notIn: excluded } }];
+      if (!legacyAvailable) where.studio = { isNot: null };
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2217,14 +2301,31 @@ export async function resolveProductsByCriteria(
 
   const limit = Math.min(48, Math.max(1, criteria.limit || 12));
 
-  const rows = await client.product.findMany({
-    where,
-    include: defaultInclude,
-    orderBy,
-    take: limit,
-  });
+  let rows;
+  if (availabilityFilter) {
+    // Both id sets are too large for one D1 query: page through candidates and filter in memory.
+    const keep = availabilityFilter;
+    rows = [];
+    for (let skip = 0; rows.length < limit; skip += 60) {
+      const batch = await client.product.findMany({ where, include: defaultInclude, orderBy, skip, take: 60 });
+      rows.push(...batch.filter((r) => keep(r.id)));
+      if (batch.length < 60) break;
+    }
+    rows = rows.slice(0, limit);
+  } else {
+    rows = await client.product.findMany({
+      where,
+      include: defaultInclude,
+      orderBy,
+      take: limit,
+    });
+  }
 
-  return rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
+  const mapped = rows.map((r) => mapD1ProductToHomepageProduct(r as unknown as ProductDbRow, undefined, context, at));
+  if (criteria.condition === "ON_SALE") {
+    return mapped.filter((p) => p.isFlashSale || (p.price > 0 && (p.originalPrice ?? 0) > p.price)).slice(0, limit);
+  }
+  return mapped;
 }
 
 

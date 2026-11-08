@@ -16,7 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
-import { Fragment, type ReactNode } from 'react';
+import { createElement, Fragment, type ReactNode } from 'react';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
 import CategoryGridSection from '@/components/home/CategoryGridSection';
 import BrandSection from '@/components/home/BrandSection';
@@ -112,19 +112,32 @@ export default function BlockRenderer({
 
           case 'cta':
             return <CtaBlock key={section.id} data={section.data} />;
-          case 'video_reviews':
+          case 'video_reviews': {
+            const vData = videoReviewsSectionDataSchema.parse(section.data);
             return (
               <VideoReviews
                 key={section.id}
-                {...videoReviewsSectionDataSchema.parse(section.data)}
+                title={vData.title}
+                subtitle={vData.subtitle}
+                limit={vData.limit}
+                videos={vData.videos}
                 fallbackVideos={settings?.reviewVideos}
-                youtubeChannelUrl={settings?.youtubeUrl}
-                tiktokChannelUrl={settings?.tiktokUrl}
+                youtubeChannelUrl={vData.youtubeUrl || settings?.youtubeUrl}
+                tiktokChannelUrl={vData.tiktokUrl || settings?.tiktokUrl}
               />
             );
+          }
           case 'customer_gallery': {
             const data = customerGallerySectionDataSchema.parse(section.data);
-            return <CustomerGallery key={section.id} title={data.title} images={data.images} />;
+            return (
+              <CustomerGallery
+                key={section.id}
+                title={data.title}
+                subtitle={data.subtitle}
+                limit={data.limit}
+                images={data.images}
+              />
+            );
           }
 
           default:
@@ -269,44 +282,61 @@ function SliderBlock({ data }: { data: unknown }) {
 }
 
 // 3. PRODUCT GRID BLOCK
+function resolveProductGridIcon(sectionId: string, colorTheme?: string, customIcon?: string): LucideIcon {
+  if (customIcon && ICON_MAP[customIcon]) {
+    return ICON_MAP[customIcon];
+  }
+  if (sectionId.includes('gaming') || colorTheme === 'red') return Zap;
+  if (sectionId.includes('office') || sectionId.includes('ultrabook') || colorTheme === 'blue') return Briefcase;
+  if (sectionId.includes('workstation') || colorTheme === 'gray') return Server;
+  if (sectionId.includes('accessories') || colorTheme === 'emerald') return Headphones;
+  if (sectionId.includes('best-selling') || colorTheme === 'orange') return TrendingUp;
+  return Sparkles;
+}
+
 function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
   const data = section.data as ProductGridSectionData;
-  const products = section.resolvedProducts || [];
+  const limit = data.ruleCriteria?.limit && data.ruleCriteria.limit > 0 ? data.ruleCriteria.limit : 48;
+  const products = (section.resolvedProducts || []).slice(0, limit);
   const colorClass = THEME_GRADIENT_MAP[data.colorTheme] || THEME_GRADIENT_MAP.blue;
-  const links = Array.isArray(data.links) ? data.links : [];
-  if (section.resolvedTabs?.length) return <ProductTabs title={data.title} tabs={section.resolvedTabs} />;
+  const links = Array.isArray(data.links) ? data.links.filter((l) => l && l.label && l.href) : [];
+  const headerIconNode = createElement(
+    resolveProductGridIcon(section.id, data.colorTheme, data.icon),
+    { className: 'w-5 h-5 text-yellow-300' }
+  );
+  if (section.resolvedTabs?.length) return <ProductTabs title={data.title} subtitle={data.subtitle} tabs={section.resolvedTabs} />;
 
   return (
-    <section className="pb-16" aria-label={data.title}>
+    <section className="pb-12 md:pb-16" aria-label={data.title}>
       <div className="container mx-auto px-4 max-w-[1370px]">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           {/* Header */}
-          <div className={`${colorClass} px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-white`}>
+          <div className={`${colorClass} px-4 md:px-6 py-3.5 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-white`}>
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-white/10 backdrop-blur-md">
-                <Sparkles className="w-5 h-5 text-yellow-300" />
+              <div className="p-2 rounded-xl bg-white/15 backdrop-blur-md shadow-2xs shrink-0">
+                {headerIconNode}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">{data.title}</h2>
                   {data.badge && (
-                    <span className={`text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full ${data.badgeColor || 'bg-white/20 text-white'}`}>
+                    <span className={`text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full ${data.badgeColor || 'bg-white/20 text-white'}`}>
                       {data.badge}
                     </span>
                   )}
                 </div>
-                {data.subtitle && <p className="text-xs text-white/80 mt-0.5">{data.subtitle}</p>}
+                {data.subtitle && <p className="text-xs text-white/85 mt-0.5">{data.subtitle}</p>}
               </div>
             </div>
 
             {/* Quick links */}
             {links.length > 0 && (
-              <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:max-w-[60%] sm:pb-0 scrollbar-none text-xs">
+              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain pb-1 sm:max-w-[62%] sm:pb-0 hide-scrollbar text-xs">
                 {links.map((link: { label: string; href: string }, idx: number) => (
                   <Link
                     key={idx}
                     href={link.href}
-                    className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/25 transition whitespace-nowrap text-white font-medium"
+                    className="px-3 py-1.5 rounded-full bg-white/15 hover:bg-white hover:text-slate-900 border border-white/15 transition whitespace-nowrap text-white font-semibold shadow-2xs"
                   >
                     {link.label}
                   </Link>
@@ -337,9 +367,9 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
               <div className="mt-6 text-center">
                 <Link
                   href={data.viewAllLink}
-                  className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
+                  className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
                 >
-                  Xem tất cả sản phẩm <ChevronRight className="w-3.5 h-3.5" />
+                  Xem tất cả {data.title} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             )}
@@ -354,10 +384,36 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
 function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) {
   const data = section.data as FeaturedCategoriesSectionData;
   const resolved = section.resolvedCategories || [];
-  const categories = data.items?.length ? data.items.flatMap((item: { categoryId: string; customName?: string; customImage?: string; href?: string }) => {
-    const category = resolved.find(c => c.id === item.categoryId);
-    return category ? [{ ...category, name: item.customName || category.name, image: item.customImage || category.image, href: item.href || category.href || `/${category.slug}` }] : [];
-  }) : resolved.map(c => ({ ...c, href: c.href || `/${c.slug}` }));
+  const rawCategories = data.items?.length
+    ? data.items
+        .filter((item) => item.enabled !== false)
+        .flatMap((item, idx) => {
+          const category = resolved.find((c) => c.id === item.categoryId);
+          if (category) {
+            return [
+              {
+                ...category,
+                name: item.customName || category.name,
+                image: item.customImage || category.image,
+                href: item.href || category.href || `/category/${category.slug}`,
+              },
+            ];
+          }
+          if (item.customName || item.href) {
+            return [
+              {
+                id: item.categoryId || `custom-cat-${idx}`,
+                name: item.customName || 'Danh mục',
+                image: item.customImage || null,
+                href: item.href || '/search',
+              },
+            ];
+          }
+          return [];
+        })
+    : resolved.map((c) => ({ ...c, href: c.href || `/category/${c.slug}` }));
+
+  const categories = data.limit && data.limit > 0 ? rawCategories.slice(0, data.limit) : rawCategories;
 
   if (categories.length === 0) {
     return <CategoryGridSection />;
@@ -366,29 +422,41 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
   return (
     <section className="py-4 md:py-6" aria-label={data.title || 'Danh mục nổi bật'}>
       <div className="container mx-auto px-4 max-w-[1370px]">
-        {data.title && <div className="mb-6">
-          <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{data.title}</h2>
-          {data.subtitle && <p className="text-slate-600 text-xs md:text-sm mt-1">{data.subtitle}</p>}
-        </div>}
+        {(data.title || data.viewAllLink) && (
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              {data.title && <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{data.title}</h2>}
+              {data.subtitle && <p className="text-slate-600 text-xs md:text-sm mt-1">{data.subtitle}</p>}
+            </div>
+            {data.viewAllLink && (
+              <Link
+                href={data.viewAllLink}
+                className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-blue-600 hover:text-blue-700 transition"
+              >
+                Xem tất cả <ChevronRight className="w-4 h-4" />
+              </Link>
+            )}
+          </div>
+        )}
 
-        <div className={data.layout === 'board' ? 'grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 lg:grid-cols-5' : 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5'}>
+        <div className={data.layout === 'board' ? 'grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 lg:grid-cols-5 shadow-2xs' : 'grid grid-rows-2 grid-flow-col auto-cols-[44%] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2.5 pb-1 sm:grid-rows-none sm:grid-flow-row sm:auto-cols-auto sm:overflow-visible sm:pb-0 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5'}>
           {categories.map((c: { id: string; name: string; href: string; image: string | null }, index: number) => (
             <Link
               key={`${c.id}-${index}`}
               href={c.href}
               className={data.layout === 'board'
-                ? 'group flex min-w-0 items-center gap-3 border-b border-r border-slate-100 p-3 hover:bg-blue-50 active:scale-[0.99] transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden sm:p-4'
-                : 'group flex flex-col items-center rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 text-center shadow-xs transition duration-150 hover:border-blue-500 hover:shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden'
+                ? 'group flex min-w-0 items-center gap-3 border-b border-r border-slate-100 p-3 hover:bg-blue-50/70 active:scale-[0.99] transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden sm:p-4'
+                : 'group snap-start flex flex-col items-center rounded-2xl border border-slate-200/80 bg-white p-2.5 sm:p-4 text-center shadow-xs transition duration-150 hover:border-blue-500 hover:shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden'
               }
             >
               <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white transition group-hover:scale-105 motion-reduce:group-hover:scale-100 ${data.layout === 'board' ? 'h-14 w-14' : 'mb-2 h-16 w-20 sm:mb-3 sm:h-20 sm:w-24'}`}>
                 {c.image ? (
-                  <Image src={c.image} alt={c.name} fill className="object-contain p-1" sizes="56px" />
+                  <Image src={c.image} alt={c.name} fill className="object-contain p-1" sizes="80px" />
                 ) : (
                   <Store className="w-6 h-6 text-slate-400" />
                 )}
               </div>
-              <h3 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition">
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition line-clamp-2">
                 {c.name}
               </h3>
             </Link>
@@ -401,19 +469,31 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
 
 // 5. FEATURED BRANDS BLOCK
 function FeaturedBrandsBlock({ section }: { section: ResolvedSectionItem }) {
-  const data = (section.data || {}) as { title?: string; subtitle?: string };
-  return (
-    <BrandSection
-      title={data.title}
-      subtitle={data.subtitle}
-      brands={section.resolvedBrands?.map((b) => ({
+  const data = (section.data || {}) as {
+    title?: string;
+    subtitle?: string;
+    limit?: number;
+    viewAllLink?: string;
+    items?: Array<{ id?: string; name: string; subtitle?: string; href?: string; logo?: string; enabled?: boolean }>;
+  };
+  const customItems = data.items?.filter((i) => i.enabled !== false && i.name?.trim());
+  const brandsList = customItems?.length
+    ? customItems
+    : section.resolvedBrands?.map((b) => ({
         id: b.id,
         name: b.name,
         slug: b.slug,
         logo: b.logo,
         subtitle: b.description || 'Chính hãng',
         href: `/brand/${b.slug}`,
-      }))}
+      }));
+  const limitedBrands = data.limit && data.limit > 0 && brandsList ? brandsList.slice(0, data.limit) : brandsList;
+  return (
+    <BrandSection
+      title={data.title}
+      subtitle={data.subtitle}
+      viewAllLink={data.viewAllLink}
+      brands={limitedBrands}
     />
   );
 }
@@ -421,13 +501,14 @@ function FeaturedBrandsBlock({ section }: { section: ResolvedSectionItem }) {
 // 6. FEATURED COLLECTION BLOCK
 function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) {
   const col = section.resolvedCollection;
-  const data = (section.data || {}) as { title?: string; subtitle?: string; limit?: number };
+  const data = (section.data || {}) as { title?: string; subtitle?: string; limit?: number; viewAllLink?: string };
 
   if (!col) return null;
   const displayProducts = data.limit && data.limit > 0 ? (col.products || []).slice(0, data.limit) : (col.products || []);
+  const targetHref = data.viewAllLink || `/collection/${col.slug}`;
 
   return (
-    <section className="pb-16" aria-label={data.title || col.name}>
+    <section className="pb-12 md:pb-16" aria-label={data.title || col.name}>
       <div className="container mx-auto px-4 max-w-[1370px]">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 px-6 py-4 flex items-center justify-between text-white">
@@ -441,7 +522,7 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
               )}
             </div>
             <Link
-              href={`/collection/${col.slug}`}
+              href={targetHref}
               className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
             >
               Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
@@ -471,7 +552,7 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
 function NewsReviewsBlock({ section }: { section: ResolvedSectionItem }) {
   const d = newsReviewsSectionDataSchema.parse(section.data);
   const items = section.resolvedPosts ?? [];
-  return <MediaSection posts={items} title={d.title} />;
+  return <MediaSection posts={items} title={d.title} subtitle={d.subtitle} viewAllLink={d.viewAllLink} />;
 }
 
 // 8. INTRO & FEATURE STRIP BLOCK
@@ -480,6 +561,8 @@ interface IntroBlockItem {
   icon: string;
   title: string;
   description: string;
+  href?: string;
+  enabled?: boolean;
 }
 
 interface IntroBlockData {
@@ -490,9 +573,11 @@ interface IntroBlockData {
 
 function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStorefrontSettings | null }) {
   const d = (data || {}) as IntroBlockData;
-  const features = Array.isArray(d.features) && d.features.length > 0 ? d.features : null;
+  const activeFeatures = Array.isArray(d.features)
+    ? d.features.filter((f) => f && f.enabled !== false)
+    : [];
 
-  if (!features) {
+  if (activeFeatures.length === 0) {
     return <FeatureStrip settings={settings} />;
   }
 
@@ -500,24 +585,46 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
     <section className="py-3 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
       <div className="container mx-auto px-4 max-w-[1370px]">
         {d.title && (
-          <div className="text-center mb-6">
+          <div className="text-center mb-5">
             <h2 className="text-xl md:text-2xl font-black text-slate-900">{d.title}</h2>
             {d.subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-1">{d.subtitle}</p>}
           </div>
         )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-          {features.map((item) => {
+          {activeFeatures.map((item) => {
             const Icon = ICON_MAP[item.icon] || Star;
-            return (
-              <div key={item.id} className="p-2 sm:p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-start gap-2 hover:bg-blue-50/50 hover:border-blue-100 transition">
-                <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 shadow-xs">
+            const cardContent = (
+              <>
+                <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 shadow-xs group-hover:bg-blue-700 transition">
                   <Icon className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-xs sm:text-sm text-slate-900">{item.title}</h3>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-blue-700 transition">{item.title}</h3>
                   <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">{item.description}</p>
                 </div>
+                {item.href && (
+                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 shrink-0 self-center transition group-hover:translate-x-0.5" />
+                )}
+              </>
+            );
+            if (item.href) {
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className="group p-2.5 sm:p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-start gap-2.5 hover:bg-blue-50/60 hover:border-blue-200 hover:shadow-2xs transition"
+                >
+                  {cardContent}
+                </Link>
+              );
+            }
+            return (
+              <div
+                key={item.id}
+                className="group p-2.5 sm:p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-start gap-2.5 hover:bg-blue-50/40 hover:border-blue-100 transition"
+              >
+                {cardContent}
               </div>
             );
           })}

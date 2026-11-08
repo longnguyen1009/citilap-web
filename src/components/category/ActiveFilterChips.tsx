@@ -34,8 +34,22 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
   const activeStorage = searchParams.getAll("storage");
   const activeCpus = searchParams.getAll("cpu");
   const activeGpus = searchParams.getAll("gpu");
+  const activeYears = searchParams.getAll("year");
+  const activeInStock = searchParams.get("inStock") === "1";
+
+  const CATEGORY_DISPLAY_NAMES: Record<string, string> = {
+    laptop: "Tất cả Laptop",
+    "laptop-moi": "Laptop Mới 100%",
+    "laptop-likenew": "Laptop Like New",
+    "laptop-cu": "Laptop Cũ & Like New",
+    "phu-kien": "Phụ kiện Tech",
+    "linh-kien": "Linh kiện & Phụ kiện",
+  };
 
   const chips: { key: string; value: string; label: string }[] = [];
+  if (activeInStock) {
+    chips.push({ key: "inStock", value: "1", label: "Sẵn hàng tại kho" });
+  }
   searchParams.getAll("tag").forEach(tag => chips.push({ key: "tag", value: tag, label: `Nhu cầu: ${NEED_LABELS[catalogNeedTag(tag)] || tag.replaceAll("-", " ")}` }));
   if (!activePricePreset) {
     for (const [key, label] of [["minPrice", "Giá từ"], ["maxPrice", "Giá đến"]]) {
@@ -55,7 +69,8 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
 
   activeCategories.forEach((c) => {
     const catObj = (facets.categories || []).find((item) => item.value === c);
-    chips.push({ key: "category", value: c, label: `Danh mục: ${catObj ? catObj.label : c}` });
+    const label = CATEGORY_DISPLAY_NAMES[c] || (catObj ? catObj.label : c);
+    chips.push({ key: "category", value: c, label: `Danh mục: ${label}` });
   });
 
   activeBrands.forEach((b) => {
@@ -96,7 +111,7 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
     const condObj = facets.conditions.find((item) => item.value === c);
     const condMap: Record<string, string> = {
       NEW: "Mới 100%",
-      LIKE_NEW: "Like New 99%",
+      LIKE_NEW: "LikeNew 99%",
       USED: "Đã qua sử dụng",
       REFURBISHED: "Refurbished",
     };
@@ -122,6 +137,10 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
     chips.push({ key: "gpu", value: gpu, label: `GPU: ${gpu}` });
   });
 
+  activeYears.forEach((yr) => {
+    chips.push({ key: "year", value: yr, label: `Năm: ${yr}` });
+  });
+
   if (chips.length === 0) return null;
 
   const removeChip = (key: string, value: string) => {
@@ -132,8 +151,8 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
       params.delete("pricePreset");
       params.delete("minPrice");
       params.delete("maxPrice");
-    } else if (key === "type") {
-      params.delete("type");
+    } else if (key === "type" || key === "inStock") {
+      params.delete(key);
     } else {
       const currentValues = params.getAll(key);
       params.delete(key);
@@ -153,28 +172,28 @@ export default function ActiveFilterChips({ facets }: ActiveFilterChipsProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mb-6 p-3 bg-surface-subtle border border-border-default rounded-control">
-      <span className="text-body-sm font-semibold text-text-secondary mr-1">Đang lọc theo:</span>
+    <div className="flex flex-wrap items-center gap-1.5 py-2 px-3 bg-surface-card border border-border-default rounded-xl shadow-2xs">
+      <span className="text-xs font-bold text-text-secondary mr-1">Đang lọc:</span>
       {chips.map((chip, idx) => (
         <span
           key={`${chip.key}-${chip.value}-${idx}`}
-          className="inline-flex items-center gap-1.5 px-3 py-1 bg-surface-card border border-border-default text-text-primary text-body-sm rounded-pill font-medium shadow-xs"
+          className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand-primary-subtle/60 border border-brand-primary/20 text-brand-primary text-xs rounded-lg font-semibold"
         >
           <span>{chip.label}</span>
           <button
             onClick={() => removeChip(chip.key, chip.value)}
-            className="hover:text-red-500 text-text-muted transition cursor-pointer p-0.5 rounded-full hover:bg-red-50"
+            className="hover:text-red-600 text-brand-primary/70 transition cursor-pointer p-0.5 rounded-md hover:bg-red-50"
             aria-label={`Xóa lọc ${chip.label}`}
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-3 h-3" />
           </button>
         </span>
       ))}
       <button
         onClick={clearAll}
-        className="ml-auto inline-flex items-center gap-1 text-body-sm font-semibold text-brand-primary hover:text-brand-primary-hover transition cursor-pointer px-2 py-1"
+        className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition cursor-pointer px-2 py-1"
       >
-        <RotateCcw className="w-3.5 h-3.5" />
+        <RotateCcw className="w-3 h-3" />
         <span>Xóa tất cả</span>
       </button>
     </div>

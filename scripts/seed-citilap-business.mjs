@@ -58,14 +58,14 @@ const REVIEW_VIDEOS = [
   {
     id: 'vid-tt-1',
     title: 'CitiLap.vn — Kiểm định thực tế 12 bước trước khi bàn giao máy tại Showroom',
-    thumbnail: '/brand/store-photo-01.jpg',
+    thumbnail: '/brand/store-photo-01.webp',
     url: 'https://www.tiktok.com/@citilapvn',
     platform: 'tiktok',
   },
   {
     id: 'vid-tt-2',
     title: 'CitiLap.vn — Tư vấn chọn laptop sinh viên & văn phòng chuẩn nhu cầu, lỗi 1 đổi 1 7 ngày',
-    thumbnail: '/brand/store-photo-02.jpg',
+    thumbnail: '/brand/store-photo-02.webp',
     url: 'https://www.tiktok.com/@citilapvn',
     platform: 'tiktok',
   },

@@ -22,11 +22,16 @@ export interface PageListItem {
   updatedAt: string;
 }
 
-export async function pageList(db: D1Database, opts: { q?: string; page?: number; limit?: number } = {}) {
+export async function pageList(
+  db: D1Database,
+  opts: { q?: string; status?: string; pageType?: string; page?: number; limit?: number } = {}
+) {
   const page = Math.max(1, Math.floor(Number(opts.page) || 1));
   const limit = Math.min(100, Math.max(1, Math.floor(Number(opts.limit) || 20)));
   const offset = (page - 1) * limit;
   const q = String(opts.q || '').trim().slice(0, 200);
+  const status = String(opts.status || '').trim().toUpperCase();
+  const pageType = String(opts.pageType || '').trim().toUpperCase();
 
   const whereClauses: string[] = ['p.deletedAt IS NULL'];
   const params: (string | number)[] = [];
@@ -36,6 +41,15 @@ export async function pageList(db: D1Database, opts: { q?: string; page?: number
       OR instr(lower(COALESCE(json_extract(s.draft, '$.slug'), p.slug)), lower(?)) > 0
     )`);
     params.push(q, q);
+  }
+  if (status === 'PUBLISHED') {
+    whereClauses.push('s.published IS NOT NULL');
+  } else if (status === 'DRAFT') {
+    whereClauses.push('s.published IS NULL');
+  }
+  if (pageType && pageType !== 'ALL') {
+    whereClauses.push(`COALESCE(json_extract(s.draft, '$.pageType'), p.pageType, 'CUSTOM') = ?`);
+    params.push(pageType);
   }
   const whereSql = whereClauses.join(' AND ');
 
@@ -163,7 +177,13 @@ export const unpublishPage = archivePage;
 
 export async function listPageRevisions(db: D1Database, pageId: string) {
   const studio = await db.prepare('SELECT revision, published, publishedRevision FROM PageStudio WHERE pageId=?').bind(pageId).first<{ revision: number; published: string | null; publishedRevision: number | null }>();
-  const revs = await db.prepare('SELECT revision, action, actor, createdAt, document FROM PageStudioRevision WHERE pageId=? ORDER BY revision DESC').bind(pageId).all<{ revision: number; action: string; actor: string; createdAt: string; document: string }>();
+  const revs = await db.prepare(`
+    SELECT r.revision, r.action, COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(u.email), ''), r.actor) AS actor, r.createdAt, r.document
+    FROM PageStudioRevision r
+    LEFT JOIN "User" u ON u.id = r.actor
+    WHERE r.pageId = ?
+    ORDER BY r.revision DESC
+  `).bind(pageId).all<{ revision: number; action: string; actor: string; createdAt: string; document: string }>();
 
   const currentRevision = studio?.revision ?? 0;
   const isPublished = !!studio?.published;

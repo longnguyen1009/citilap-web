@@ -1,3 +1,4 @@
+import { businessProfile } from "@/config/business-profile";
 import { NextResponse } from 'next/server';
 import { createHash } from 'node:crypto';
 import { getD1Database } from '@/lib/prisma';
@@ -134,7 +135,7 @@ export function rateLimitExceededResponse(retryAfter = 60): NextResponse {
   return NextResponse.json(
     {
       success: false,
-      error: 'Hệ thống đang tiếp nhận quá nhiều yêu cầu từ kết nối của bạn. Quý khách vui lòng thử lại sau ít phút hoặc liên hệ hotline 0899.188.186 để được hỗ trợ trực tiếp.',
+      error: `Hệ thống đang tiếp nhận quá nhiều yêu cầu từ kết nối của bạn. Quý khách vui lòng thử lại sau ít phút hoặc liên hệ hotline ${businessProfile.displayPhone} để được hỗ trợ trực tiếp.`,
     },
     {
       status: 429,

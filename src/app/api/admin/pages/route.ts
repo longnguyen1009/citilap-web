@@ -5,12 +5,16 @@ import { pageList, writePage } from '@/server/services/page.service';
 async function GETHandler(request: Request) {
   const url = new URL(request.url);
   const q = url.searchParams.get('q') || '';
+  const status = url.searchParams.get('status') || '';
+  const pageType = url.searchParams.get('pageType') || '';
   const page = url.searchParams.get('page') ? Number(url.searchParams.get('page')) : 1;
   const limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 20;
 
   return mediaAdmin(request, false, env =>
     pageList(env.DB, {
       q,
+      status,
+      pageType,
       page,
       limit,
     })

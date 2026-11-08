@@ -84,7 +84,16 @@ async function GETHandler(request: Request) {
          FROM Product
          WHERE deletedAt IS NULL AND status IN ('ACTIVE', 'DRAFT')
          ORDER BY name ASC
-         LIMIT 100`
+         LIMIT 200`
+      )
+      .all();
+
+    const variantsRes = await db
+      .prepare(
+        `SELECT id, productId, sku, name, price
+         FROM ProductVariant
+         WHERE status = 'ACTIVE'
+         ORDER BY createdAt ASC`
       )
       .all();
 
@@ -96,6 +105,7 @@ async function GETHandler(request: Request) {
           serialUnits: serialsRes.results || [],
           balances: balancesRes.results || [],
           products: productsRes.results || [],
+          variants: variantsRes.results || [],
         },
       },
       { headers: NO_STORE_HEADERS }
@@ -143,10 +153,16 @@ async function POSTHandler(request: Request) {
         );
       }
 
-      const variantRow = await db
-        .prepare(`SELECT id FROM ProductVariant WHERE productId = ? ORDER BY createdAt ASC LIMIT 1`)
-        .bind(productId)
-        .first<{ id: string }>();
+      const requestedVariantId = String(body.variantId || '').trim();
+      const variantRow = requestedVariantId
+        ? await db
+            .prepare(`SELECT id FROM ProductVariant WHERE id = ? AND productId = ? LIMIT 1`)
+            .bind(requestedVariantId, productId)
+            .first<{ id: string }>()
+        : await db
+            .prepare(`SELECT id FROM ProductVariant WHERE productId = ? ORDER BY createdAt ASC LIMIT 1`)
+            .bind(productId)
+            .first<{ id: string }>();
 
       const serialId = 'su-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
       const stmts = [

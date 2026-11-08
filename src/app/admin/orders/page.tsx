@@ -165,10 +165,23 @@ function OrdersContent() {
     const query = new URLSearchParams();
     if (searchTerm.trim()) query.set("search", searchTerm.trim());
     if (statusFilter && statusFilter !== "ALL") query.set("status", statusFilter);
+    if (paymentStatusFilter && paymentStatusFilter !== "ALL") query.set("paymentStatus", paymentStatusFilter);
     if (startDate) query.set("startDate", startDate);
     if (endDate) query.set("endDate", endDate);
 
     window.open(`/api/admin/orders/export?${query.toString()}`, "_blank");
+  };
+
+  const applyQuickDateRange = (days: number) => {
+    const end = new Date();
+    const start = new Date();
+    if (days > 1) {
+      start.setDate(end.getDate() - (days - 1));
+    }
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    setStartDate(fmt(start));
+    setEndDate(fmt(end));
+    setPage(1);
   };
 
   const hasFilters = Boolean(
@@ -284,6 +297,27 @@ function OrdersContent() {
             <option value="PENDING">Chờ thanh toán</option>
           </select>
 
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm("");
+                setStatusFilter("ALL");
+                setPaymentStatusFilter("ALL");
+                setStartDate("");
+                setEndDate("");
+                setPage(1);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Xóa lọc</span>
+            </button>
+          )}
+        </div>
+        <details className="admin-filter-details" open={Boolean(startDate || endDate)}>
+          <summary>Lọc theo ngày{startDate || endDate ? " · Đang áp dụng" : ""}</summary>
+          <div className="admin-filter-fields">
           <div className="flex items-center gap-1.5 text-xs text-slate-600 bg-white border border-slate-200 rounded-md px-2.5 py-1">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <input
@@ -309,29 +343,35 @@ function OrdersContent() {
               className="text-xs outline-none text-slate-700 bg-transparent"
               title="Đến ngày"
             />
+            <div className="flex items-center gap-1 pl-1 border-l border-slate-200">
+              {[
+                { label: "Hôm nay", days: 1 },
+                { label: "7 ngày", days: 7 },
+                { label: "30 ngày", days: 30 },
+              ].map((preset) => (
+                <button
+                  key={preset.days}
+                  type="button"
+                  onClick={() => applyQuickDateRange(preset.days)}
+                  className="px-1.5 py-0.5 rounded text-[11px] font-semibold text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition cursor-pointer"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchTerm("");
-                setStatusFilter("ALL");
-                setPaymentStatusFilter("ALL");
-                setStartDate("");
-                setEndDate("");
-                setPage(1);
-              }}
-              className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-              <span>Xóa lọc</span>
-            </button>
-          )}
-        </div>
+          </div>
+        </details>
+
 
         {/* Orders Table */}
-        <div className="overflow-x-auto">
+        <div
+          className="table-wrapper overflow-x-auto"
+          tabIndex={0}
+          role="region"
+          aria-label="Danh sách đơn hàng"
+        >
           <table className="admin-table w-full text-left border-collapse text-xs">
             <thead>
               <tr>
@@ -365,16 +405,27 @@ function OrdersContent() {
                   const firstItem = order.items?.[0]?.productName;
                   const isPaid = order.paymentStatus === "PAID";
                   const methodLabel = order.paymentMethod === "BANK_TRANSFER" ? "VietQR" : "COD";
+                  const noteCount = order._count?.internalNotes || 0;
 
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/70 transition">
                       <td className="whitespace-nowrap">
-                        <Link
-                          href={`/admin/orders/${order.id}`}
-                          className="font-mono font-bold text-blue-600 hover:underline"
-                        >
-                          #{order.orderNumber || order.id.slice(0, 8)}
-                        </Link>
+                        <div className="flex items-center gap-1.5">
+                          <Link
+                            href={`/admin/orders/${order.id}`}
+                            className="font-mono font-bold text-blue-600 hover:underline"
+                          >
+                            #{order.orderNumber || order.id.slice(0, 8)}
+                          </Link>
+                          {noteCount > 0 && (
+                            <span
+                              className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold tabular-nums"
+                              title={`${noteCount} ghi chú vận hành nội bộ`}
+                            >
+                              {noteCount} ghi chú
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="whitespace-nowrap">

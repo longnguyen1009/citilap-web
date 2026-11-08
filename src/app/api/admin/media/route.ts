@@ -12,7 +12,13 @@ async function POSTHandler(request: Request) {
     const form = await request.formData();
     const files = form.getAll('file');
     if (files.length !== 1 || !(files[0] instanceof File)) throw new MediaError('Chọn một tệp cho mỗi lần tải.');
-    return uploadLibraryImage(env, files[0]);
+    const folderRaw = form.get('folder');
+    const folder = typeof folderRaw === 'string' && folderRaw.trim() ? folderRaw.trim() : undefined;
+    const originalNameRaw = form.get('originalName');
+    const originalName = typeof originalNameRaw === 'string' && originalNameRaw.trim() ? originalNameRaw.trim() : undefined;
+    const thumbRaw = form.get('thumbnail');
+    const clientThumb = thumbRaw instanceof File ? thumbRaw : null;
+    return uploadLibraryImage(env, files[0], { folder, clientThumb, originalName });
   });
 }
 

@@ -3,6 +3,7 @@ import PolicyLayout from "@/components/policy/PolicyLayout";
 import { businessProfile } from "@/config/business-profile";
 import { mediaEnvironment } from "@/server/media-http";
 import { getSystemPageResolution } from "@/server/services/page.service";
+import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -43,7 +44,17 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ReturnPolicyPage() {
-  const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const settings = await getStorefrontSettings();
+  const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
+  const hanoi = {
+    ...baseHanoi,
+    address: settings?.addressHanoi || baseHanoi.address,
+  };
+  const displayPhone = settings?.storePhone || businessProfile.displayPhone;
+  const telHref = settings?.storePhone
+    ? `tel:${settings.storePhone.replace(/[^+\d]/g, "")}`
+    : businessProfile.telHref;
+  const email = settings?.storeEmail || businessProfile.email;
 
   // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors as static content)
   const env = await mediaEnvironment();
@@ -81,7 +92,7 @@ export default async function ReturnPolicyPage() {
           <p className="font-bold text-base">Chính sách đổi trả hiện đang tạm ẩn</p>
           <p className="text-xs text-amber-700">
             Nội dung đang được cập nhật để phù hợp với quy định mới. Quý khách vui lòng liên hệ hotline{" "}
-            <strong>{businessProfile.displayPhone}</strong> để được hỗ trợ thông tin chi tiết.
+            <strong>{displayPhone}</strong> để được hỗ trợ thông tin chi tiết.
           </p>
         </div>
       </PolicyLayout>
@@ -144,8 +155,8 @@ export default async function ReturnPolicyPage() {
           </p>
           <ul className="space-y-1.5 text-sm mt-2">
             <li>• <strong>Đầu mối chính:</strong> {hanoi.name} ({hanoi.address})</li>
-            <li>• <strong>Hotline tiếp nhận:</strong> <a href={businessProfile.telHref} className="text-blue-600 font-bold hover:underline">{businessProfile.displayPhone}</a></li>
-            <li>• <strong>Email hỗ trợ:</strong> <a href={`mailto:${businessProfile.email}`} className="text-blue-600 hover:underline">{businessProfile.email}</a></li>
+            <li>• <strong>Hotline tiếp nhận:</strong> <a href={telHref} className="text-blue-600 font-bold hover:underline">{displayPhone}</a></li>
+            <li>• <strong>Email hỗ trợ:</strong> <a href={`mailto:${email}`} className="text-blue-600 hover:underline">{email}</a></li>
           </ul>
         </div>
       </section>

@@ -1,9 +1,24 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from 'react';
-import Form from 'next/form';
-import { Check, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import Form from "next/form";
+import {
+  Award,
+  Cable,
+  Check,
+  Cpu,
+  HardDrive,
+  Layers,
+  MemoryStick,
+  Monitor,
+  RotateCcw,
+  ShieldCheck,
+  SlidersHorizontal,
+  Tag,
+  Wifi,
+  Zap,
+} from "lucide-react";
 import type { FacetOption } from "@/server/services/catalog.service";
 import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES } from "@/config/accessory-taxonomy";
 
@@ -32,6 +47,17 @@ const LAPTOP_PRICE_PRESETS = [
   { value: "over-30", label: "Trên 30 triệu", min: 30_000_000, max: 150_000_000 },
 ];
 
+const BRAND_LOGOS: Record<string, string> = {
+  lenovo: "/brands/lenovo.svg",
+  asus: "/brands/asus.svg",
+  dell: "/brands/dell.svg",
+  hp: "/brands/hp.svg",
+  apple: "/brands/apple.svg",
+  acer: "/brands/acer.svg",
+  msi: "/brands/msi.svg",
+  gigabyte: "/brands/gigabyte.svg",
+};
+
 export default function CategoryFilterSidebar({
   categorySlug,
   facets,
@@ -40,11 +66,11 @@ export default function CategoryFilterSidebar({
   const router = useRouter();
   const pathname = usePathname();
   const urlParams = useSearchParams();
-  const [draftParams,setDraftParams] = useState(()=>new URLSearchParams(urlParams.toString()));
+  const [draftParams, setDraftParams] = useState(() => new URLSearchParams(urlParams.toString()));
   const searchParams = onApplyMobile ? draftParams : urlParams;
-  const navigate = (params:URLSearchParams) => {
-    if(onApplyMobile) setDraftParams(params);
-    else router.push(`${pathname}?${params.toString()}`, {scroll:false});
+  const navigate = (params: URLSearchParams) => {
+    if (onApplyMobile) setDraftParams(params);
+    else router.push(`${pathname}?${params.toString()}`, { scroll: false });
   };
   const isAccessory =
     categorySlug === "linh-kien" ||
@@ -69,7 +95,9 @@ export default function CategoryFilterSidebar({
   const activeGpus = searchParams.getAll("gpu");
 
   const hasAnyFilter =
-    searchParams.has("tag") || searchParams.has("minPrice") || searchParams.has("maxPrice") ||
+    searchParams.has("tag") ||
+    searchParams.has("minPrice") ||
+    searchParams.has("maxPrice") ||
     Boolean(activeType) ||
     activeCategories.length > 0 ||
     activeBrands.length > 0 ||
@@ -84,7 +112,7 @@ export default function CategoryFilterSidebar({
 
   const updateParam = (key: string, value: string, isMulti = false) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.delete("page"); // reset page on filter change
+    params.delete("page");
 
     if (isMulti) {
       const currentValues = params.getAll(key);
@@ -138,28 +166,32 @@ export default function CategoryFilterSidebar({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3.5">
       {/* Header & Reset */}
-      <div className="flex items-center justify-between pb-4 border-b border-border-default">
-        <h2 className="text-body-lg font-bold text-text-primary">Bộ lọc tìm kiếm</h2>
+      <div className="flex items-center justify-between pb-3 border-b border-border-default">
+        <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-brand-primary" />
+          <span>Bộ lọc chi tiết</span>
+        </h2>
         {hasAnyFilter && (
           <button
             onClick={clearAllFilters}
-            className="flex items-center gap-1.5 text-body-sm font-semibold text-brand-primary hover:text-brand-primary-hover transition cursor-pointer"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-xs font-bold text-red-600 hover:bg-red-100 transition cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3 h-3" />
             <span>Xóa lọc</span>
           </button>
         )}
       </div>
 
-      {/* 0. Danh mục (nếu có trong facets, ví dụ trên trang Search) */}
+      {/* 0. Danh mục */}
       {facets.categories && facets.categories.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Danh mục
+        <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+          <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+            <Layers className="w-3.5 h-3.5 text-brand-primary" />
+            <span>Danh mục sản phẩm</span>
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {facets.categories.map((c) => {
               const isSelected = activeCategories.includes(c.value);
               return (
@@ -167,13 +199,18 @@ export default function CategoryFilterSidebar({
                   key={c.value}
                   aria-pressed={isSelected}
                   onClick={() => updateParam("category", c.value, true)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                  className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border text-left ${
                     isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm"
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                       : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
                   }`}
                 >
-                  {c.label} {c.count !== undefined && <span className="opacity-75 text-caption">({c.count})</span>}
+                  <span className="truncate">{c.label}</span>
+                  {c.count !== undefined && (
+                    <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-surface-subtle text-text-muted"}`}>
+                      {c.count}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -181,13 +218,14 @@ export default function CategoryFilterSidebar({
         </div>
       )}
 
-      {/* Loại phụ kiện (Dành riêng cho category linh-kien) */}
+      {/* Loại phụ kiện */}
       {isAccessory && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Loại phụ kiện
+        <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+          <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+            <Cable className="w-3.5 h-3.5 text-brand-primary" />
+            <span>Loại phụ kiện</span>
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {ACCESSORY_TYPES.map((t) => {
               const isSelected = activeType === t.slug;
               const facetMatch = facets.accessoryTypes?.find((f) => f.value === t.slug);
@@ -197,15 +235,15 @@ export default function CategoryFilterSidebar({
                   key={t.slug}
                   aria-pressed={isSelected}
                   onClick={() => updateParam("type", t.slug, false)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                  className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border text-left ${
                     isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm font-semibold"
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                       : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
                   }`}
                 >
-                  <span>{t.shortName}</span>
+                  <span className="truncate">{t.shortName}</span>
                   {count !== undefined && count > 0 && (
-                    <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/85" : "text-text-muted"}`}>
+                    <span className={`shrink-0 text-[10px] ${isSelected ? "text-text-inverse/85" : "text-text-muted"}`}>
                       ({count})
                     </span>
                   )}
@@ -218,27 +256,39 @@ export default function CategoryFilterSidebar({
 
       {/* 1. Thương hiệu */}
       {facets.brands.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Thương hiệu
+        <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+          <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+            <Award className="w-3.5 h-3.5 text-brand-primary" />
+            <span>Thương hiệu</span>
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {facets.brands.map((b) => {
               const isSelected = activeBrands.includes(b.value);
+              const logo = BRAND_LOGOS[b.value.toLowerCase()];
               return (
                 <button
                   key={b.value}
                   aria-pressed={isSelected}
                   onClick={() => updateParam("brand", b.value, true)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                  className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border text-left ${
                     isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm"
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                       : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
                   }`}
                 >
-                  <span>{b.label}</span>
+                  <span className="flex items-center gap-1.5 min-w-0 truncate">
+                    {logo && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={logo}
+                        alt=""
+                        className={`h-3.5 w-auto max-w-[44px] object-contain shrink-0 ${isSelected ? "brightness-0 invert" : ""}`}
+                      />
+                    )}
+                    <span className="truncate">{b.label}</span>
+                  </span>
                   {b.count > 0 && (
-                    <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
+                    <span className={`shrink-0 text-[10px] ${isSelected ? "text-text-inverse/85" : "text-text-muted"}`}>
                       ({b.count})
                     </span>
                   )}
@@ -249,13 +299,14 @@ export default function CategoryFilterSidebar({
         </div>
       )}
 
-      {/* Chuẩn kết nối (Phụ kiện: Chuột, Bàn phím, Tai nghe, Hub...) */}
+      {/* Chuẩn kết nối */}
       {isAccessory && facets.connections && facets.connections.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Chuẩn kết nối
+        <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+          <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+            <Wifi className="w-3.5 h-3.5 text-brand-primary" />
+            <span>Chuẩn kết nối</span>
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {facets.connections.map((c) => {
               const isSelected = activeConnections.includes(c.value);
               return (
@@ -263,15 +314,15 @@ export default function CategoryFilterSidebar({
                   key={c.value}
                   aria-pressed={isSelected}
                   onClick={() => updateParam("connection", c.value, true)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                  className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border ${
                     isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm"
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                       : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
                   }`}
                 >
-                  <span>{c.label}</span>
+                  <span className="truncate">{c.label}</span>
                   {c.count > 0 && (
-                    <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
+                    <span className={`text-[10px] ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
                       ({c.count})
                     </span>
                   )}
@@ -282,13 +333,14 @@ export default function CategoryFilterSidebar({
         </div>
       )}
 
-      {/* Công suất sạc (Phụ kiện: Sạc, Hub, Cáp...) */}
+      {/* Công suất sạc */}
       {isAccessory && facets.powers && facets.powers.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            Công suất sạc
+        <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+          <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+            <Zap className="w-3.5 h-3.5 text-brand-primary" />
+            <span>Công suất sạc</span>
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {facets.powers.map((p) => {
               const isSelected = activePowers.includes(p.value);
               return (
@@ -296,15 +348,15 @@ export default function CategoryFilterSidebar({
                   key={p.value}
                   aria-pressed={isSelected}
                   onClick={() => updateParam("power", p.value, true)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                  className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border ${
                     isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-sm"
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                       : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary hover:text-brand-primary"
                   }`}
                 >
-                  <span>{p.label}</span>
+                  <span className="truncate">{p.label}</span>
                   {p.count > 0 && (
-                    <span className={`ml-1.5 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
+                    <span className={`text-[10px] ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
                       ({p.count})
                     </span>
                   )}
@@ -316,11 +368,12 @@ export default function CategoryFilterSidebar({
       )}
 
       {/* 2. Mức giá */}
-      <div className="pb-5 border-b border-border-subtle">
-        <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-          Mức giá
+      <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+        <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+          <Tag className="w-3.5 h-3.5 text-brand-primary" />
+          <span>Khoảng giá</span>
         </h3>
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-1.5">
           {currentPricePresets.map((p) => {
             const isSelected = activePricePreset === p.value;
             return (
@@ -328,52 +381,77 @@ export default function CategoryFilterSidebar({
                 key={p.value}
                 aria-pressed={isSelected}
                 onClick={() => handlePricePreset(p.value)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-control text-body-sm font-medium transition cursor-pointer border text-left ${
+                className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border text-left ${
                   isSelected
-                    ? "bg-brand-primary-subtle text-brand-primary border-brand-primary font-bold"
+                    ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                     : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
                 }`}
               >
-                <span>{p.label}</span>
-                <div
-                  className={`w-4 h-4 rounded-full border flex items-center justify-center ${
-                    isSelected
-                      ? "border-brand-primary bg-brand-primary text-text-inverse"
-                      : "border-border-strong bg-surface"
-                  }`}
-                >
-                  {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                </div>
+                <span className="truncate">{p.label}</span>
+                {isSelected && <Check className="w-3 h-3 shrink-0 stroke-[3]" />}
               </button>
             );
           })}
         </div>
-        <Form action={pathname} className="mt-3 space-y-2" onSubmit={event => {
-          event.preventDefault();
-          const params = new URLSearchParams();
-          new FormData(event.currentTarget).forEach((value, key) => { if (typeof value === "string" && value.trim()) params.append(key, value); });
-          navigate(params);
-        }}>
-          {[...searchParams.entries()].filter(([key]) => !["minPrice", "maxPrice", "pricePreset", "page"].includes(key)).map(([key, value], i) => <input key={i} type="hidden" name={key} value={value} />)}
-          <div className="grid grid-cols-2 gap-2">
-            {[["minPrice", "Giá từ (₫)"], ["maxPrice", "Giá đến (₫)"]].map(([name, label]) => <label key={name} className="min-w-0 text-xs text-text-secondary">{label}<input key={searchParams.get(name)} name={name} type="number" min={0} max={1000000000} step="any" defaultValue={searchParams.get(name) || ""} className="mt-1 w-full min-w-0 rounded-control border border-border-default bg-surface px-2 py-2 text-sm text-text-primary" /></label>)}
+        <Form
+          action={pathname}
+          className="mt-2.5 space-y-2 pt-2.5 border-t border-border-subtle/80"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const params = new URLSearchParams();
+            new FormData(event.currentTarget).forEach((value, key) => {
+              if (typeof value === "string" && value.trim()) params.append(key, value);
+            });
+            navigate(params);
+          }}
+        >
+          {[...searchParams.entries()]
+            .filter(([key]) => !["minPrice", "maxPrice", "pricePreset", "page"].includes(key))
+            .map(([key, value], i) => (
+              <input key={i} type="hidden" name={key} value={value} />
+            ))}
+          <div className="grid grid-cols-2 gap-1.5">
+            {[
+              ["minPrice", "Giá từ (₫)"],
+              ["maxPrice", "Giá đến (₫)"],
+            ].map(([name, label]) => (
+              <label key={name} className="min-w-0 text-[11px] font-medium text-text-secondary">
+                {label}
+                <input
+                  key={searchParams.get(name)}
+                  name={name}
+                  type="number"
+                  min={0}
+                  max={1000000000}
+                  step="any"
+                  defaultValue={searchParams.get(name) || ""}
+                  className="mt-1 w-full min-w-0 rounded-lg border border-border-default bg-surface px-2 py-1.5 text-xs text-text-primary"
+                />
+              </label>
+            ))}
           </div>
-          <button type="submit" className="min-h-11 w-full rounded-control border border-brand-primary px-3 py-2 text-sm font-semibold text-brand-primary">Áp dụng khoảng giá</button>
+          <button
+            type="submit"
+            className="w-full rounded-lg border border-brand-primary bg-surface-card hover:bg-brand-primary-subtle px-3 py-1.5 text-xs font-bold text-brand-primary transition cursor-pointer"
+          >
+            Áp dụng khoảng giá
+          </button>
         </Form>
       </div>
 
       {/* 3. Tình trạng máy / hàng */}
       {facets.conditions.length > 0 && (
-        <div className="pb-5 border-b border-border-subtle">
-          <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-            {isAccessory ? "Tình trạng hàng" : "Tình trạng máy"}
+        <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+          <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-brand-primary" />
+            <span>{isAccessory ? "Tình trạng hàng" : "Tình trạng máy"}</span>
           </h3>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-1.5">
             {facets.conditions.map((c) => {
               const isSelected = activeConditions.includes(c.value);
               const condFallbackMap: Record<string, string> = {
                 NEW: "Mới 100%",
-                LIKE_NEW: "Like New 99%",
+                LIKE_NEW: "LikeNew 99%",
                 USED: "Đã qua sử dụng",
                 REFURBISHED: "Refurbished",
               };
@@ -383,15 +461,15 @@ export default function CategoryFilterSidebar({
                   key={c.value}
                   aria-pressed={isSelected}
                   onClick={() => updateParam("condition", c.value, true)}
-                  className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                  className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border text-left ${
                     isSelected
-                      ? "bg-brand-primary text-text-inverse border-brand-primary"
+                      ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                       : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
                   }`}
                 >
-                  <span>{displayLabel}</span>
+                  <span className="truncate">{displayLabel}</span>
                   {c.count > 0 && (
-                    <span className={`ml-1 text-caption ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
+                    <span className={`text-[10px] ${isSelected ? "text-text-inverse/80" : "text-text-muted"}`}>
                       ({c.count})
                     </span>
                   )}
@@ -402,26 +480,27 @@ export default function CategoryFilterSidebar({
         </div>
       )}
 
-      {/* 4-7. Phần cứng máy tính (Ẩn nếu là phụ kiện và không phải danh mục Nâng cấp phần cứng) */}
+      {/* 4-7. Phần cứng máy tính */}
       {(!isAccessory || activeType === "hardware") && (
         <>
           {/* Dung lượng RAM */}
           {facets.ramOptions.length > 0 && (
-            <div className="pb-5 border-b border-border-subtle">
-              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-                Dung lượng RAM
+            <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+                <MemoryStick className="w-3.5 h-3.5 text-brand-primary" />
+                <span>Dung lượng RAM</span>
               </h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {facets.ramOptions.map((r) => {
                   const isSelected = activeRams.includes(r.value);
                   return (
                     <button
                       key={r.value}
                       aria-pressed={isSelected}
-                  onClick={() => updateParam("ram", String(r.value), true)}
-                      className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
+                      onClick={() => updateParam("ram", String(r.value), true)}
+                      className={`py-2 px-2.5 rounded-lg text-xs font-bold transition cursor-pointer border text-center ${
                         isSelected
-                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
+                          ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                           : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
                       }`}
                     >
@@ -435,21 +514,22 @@ export default function CategoryFilterSidebar({
 
           {/* Ổ cứng SSD */}
           {facets.storageOptions.length > 0 && (
-            <div className="pb-5 border-b border-border-subtle">
-              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-                Dung lượng ổ cứng
+            <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+                <HardDrive className="w-3.5 h-3.5 text-brand-primary" />
+                <span>Dung lượng ổ cứng</span>
               </h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {facets.storageOptions.map((s) => {
                   const isSelected = activeStorage.includes(s.value);
                   return (
                     <button
                       key={s.value}
                       aria-pressed={isSelected}
-                  onClick={() => updateParam("storage", String(s.value), true)}
-                      className={`py-2 px-3 rounded-control text-body-sm font-medium transition cursor-pointer border text-center ${
+                      onClick={() => updateParam("storage", String(s.value), true)}
+                      className={`py-2 px-2.5 rounded-lg text-xs font-bold transition cursor-pointer border text-center ${
                         isSelected
-                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold shadow-sm"
+                          ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                           : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
                       }`}
                     >
@@ -463,21 +543,22 @@ export default function CategoryFilterSidebar({
 
           {/* CPU Series */}
           {facets.cpuSeries.length > 0 && (
-            <div className="pb-5 border-b border-border-subtle">
-              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-                Dòng Vi xử lý (CPU)
+            <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+                <Cpu className="w-3.5 h-3.5 text-brand-primary" />
+                <span>Dòng Vi xử lý (CPU)</span>
               </h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {facets.cpuSeries.map((c) => {
                   const isSelected = activeCpus.includes(c.value);
                   return (
                     <button
                       key={c.value}
                       aria-pressed={isSelected}
-                  onClick={() => updateParam("cpu", c.value, true)}
-                      className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                      onClick={() => updateParam("cpu", c.value, true)}
+                      className={`px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border text-left truncate ${
                         isSelected
-                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
+                          ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                           : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
                       }`}
                     >
@@ -491,21 +572,22 @@ export default function CategoryFilterSidebar({
 
           {/* Card đồ họa (GPU) */}
           {facets.gpuSeries.length > 0 && (
-            <div className="pb-5 border-b border-border-subtle">
-              <h3 className="text-body-sm font-bold text-text-primary uppercase tracking-wider mb-3">
-                Card màn hình (GPU)
+            <div className="rounded-xl border border-border-subtle bg-surface-subtle/40 p-3">
+              <h3 className="flex items-center gap-1.5 text-xs font-bold text-text-primary uppercase tracking-wider mb-2.5">
+                <Monitor className="w-3.5 h-3.5 text-brand-primary" />
+                <span>Card màn hình (GPU)</span>
               </h3>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {facets.gpuSeries.map((g) => {
                   const isSelected = activeGpus.includes(g.value);
                   return (
                     <button
                       key={g.value}
                       aria-pressed={isSelected}
-                  onClick={() => updateParam("gpu", g.value, true)}
-                      className={`px-3 py-1.5 rounded-control text-body-sm font-medium transition cursor-pointer border ${
+                      onClick={() => updateParam("gpu", g.value, true)}
+                      className={`px-2.5 py-2 rounded-lg text-xs font-semibold transition cursor-pointer border text-left truncate ${
                         isSelected
-                          ? "bg-brand-primary text-text-inverse border-brand-primary font-bold"
+                          ? "bg-brand-primary text-text-inverse border-brand-primary shadow-2xs"
                           : "bg-surface-card text-text-secondary border-border-default hover:border-brand-primary"
                       }`}
                     >
@@ -523,8 +605,11 @@ export default function CategoryFilterSidebar({
       {onApplyMobile && (
         <div className="pt-2 sticky bottom-0 bg-surface-card pb-4">
           <button
-            onClick={()=>{router.push(`${pathname}?${draftParams.toString()}`, {scroll:false});onApplyMobile();}}
-            className="w-full py-3 bg-brand-primary text-text-inverse font-bold rounded-control hover:bg-brand-primary-hover transition cursor-pointer shadow-md"
+            onClick={() => {
+              router.push(`${pathname}?${draftParams.toString()}`, { scroll: false });
+              onApplyMobile();
+            }}
+            className="w-full py-3 bg-brand-primary text-text-inverse font-bold rounded-xl hover:bg-brand-primary-hover transition cursor-pointer shadow-md"
           >
             Áp dụng bộ lọc
           </button>

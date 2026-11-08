@@ -51,53 +51,48 @@ interface NavGroup {
 // Short labels, grouped by daily task. Keywords keep the old long names searchable.
 const navGroups: NavGroup[] = [
   {
-    groupName: "",
+    groupName: "Bán hàng & CSKH",
     items: [
       { name: "Tổng quan", href: "/admin/dashboard", icon: LayoutDashboard, keywords: "bảng tin dashboard" },
-    ],
-  },
-  {
-    groupName: "Bán hàng",
-    items: [
       { name: "Đơn hàng", href: "/admin/orders", icon: ShoppingCart, keywords: "order" },
+      { name: "Tư vấn & Đánh giá", href: "/admin/contacts", icon: Mail, keywords: "hộp thư liên hệ contact review hẹn xem máy" },
       { name: "Khách hàng", href: "/admin/customers", icon: Users, keywords: "customer" },
-      { name: "Tư vấn", href: "/admin/contacts", icon: Mail, keywords: "hộp thư liên hệ contact" },
     ],
   },
   {
-    groupName: "Sản phẩm",
+    groupName: "Sản phẩm & Kho",
     items: [
       { name: "Sản phẩm", href: "/admin/products", icon: Package, keywords: "laptop máy tính product" },
-      { name: "Kho & Serial", href: "/admin/inventory", icon: Boxes, keywords: "tồn kho serial imei kiểm định warehouse" },
-      { name: "Danh mục", href: "/admin/categories", icon: FolderTree, keywords: "category" },
+      { name: "Kho & Kiểm định", href: "/admin/inventory", icon: Boxes, keywords: "tồn kho serial imei kiểm định warehouse" },
+      { name: "Danh mục sản phẩm", href: "/admin/categories", icon: FolderTree, keywords: "category danh mục" },
       { name: "Thương hiệu", href: "/admin/brands", icon: Tag, keywords: "hãng brand" },
+    ],
+  },
+  {
+    groupName: "Giao diện & Marketing",
+    items: [
+      { name: "Bố cục trang", href: "/admin/builder", icon: LayoutTemplate, keywords: "trang chủ landing builder bố cục" },
+      { name: "Menu & Bộ sưu tập", href: "/admin/navigation", icon: Menu, keywords: "mega menu điều hướng collection nhóm sản phẩm" },
       { name: "Flash Sale", href: "/admin/campaigns", icon: Zap, keywords: "chiến dịch khuyến mãi campaign" },
     ],
   },
   {
-    groupName: "Nội dung",
+    groupName: "Nội dung & SEO",
     items: [
       { name: "Bài viết", href: "/admin/posts", icon: Newspaper, keywords: "review tin tức post" },
       { name: "Chuyên mục", href: "/admin/post-categories", icon: Folder, keywords: "chuyên mục bài viết" },
-      { name: "Trang", href: "/admin/pages", icon: FileText, keywords: "trang thông tin chính sách page" },
-      { name: "Media", href: "/admin/media", icon: Images, keywords: "ảnh hình thư viện" },
-    ],
-  },
-  {
-    groupName: "Giao diện",
-    items: [
-      { name: "Bố cục trang", href: "/admin/builder", icon: LayoutTemplate, keywords: "trang chủ landing builder" },
-      { name: "Menu & Bộ sưu tập", href: "/admin/navigation", icon: Menu, keywords: "mega menu điều hướng collection nhóm sản phẩm" },
+      { name: "Trang & Chính sách", href: "/admin/pages", icon: FileText, keywords: "trang thông tin chính sách page" },
+      { name: "Thư viện ảnh & video", href: "/admin/media", icon: Images, keywords: "ảnh hình thư viện media" },
+      { name: "Chuyển hướng 301", href: "/admin/redirects", icon: CornerUpRight, keywords: "301 redirect" },
     ],
   },
   {
     groupName: "Hệ thống",
     items: [
-      { name: "Thống kê", href: "/admin/analytics", icon: BarChart3, keywords: "hành vi mua hàng analytics" },
-      { name: "Cài đặt", href: "/admin/settings", icon: Settings, keywords: "cấu hình setting" },
-      { name: "Tài khoản", href: "/admin/users", icon: ShieldCheck, keywords: "quyền user" },
-      { name: "Nhật ký", href: "/admin/audit", icon: History, keywords: "audit log" },
-      { name: "Chuyển hướng", href: "/admin/redirects", icon: CornerUpRight, keywords: "301 redirect" },
+      { name: "Phân tích hành vi", href: "/admin/analytics", icon: BarChart3, keywords: "hành vi mua hàng analytics thống kê" },
+      { name: "Cài đặt cửa hàng", href: "/admin/settings", icon: Settings, keywords: "cấu hình setting" },
+      { name: "Tài khoản & Quyền", href: "/admin/users", icon: ShieldCheck, keywords: "quyền user thành viên" },
+      { name: "Nhật ký hệ thống", href: "/admin/audit", icon: History, keywords: "audit log" },
     ],
   },
 ];

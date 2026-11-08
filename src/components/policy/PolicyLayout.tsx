@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
+import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
 
 export interface PolicyNavItem {
   slug: string;
@@ -67,13 +68,21 @@ interface PolicyLayoutProps {
   children: React.ReactNode;
 }
 
-export default function PolicyLayout({
+export default async function PolicyLayout({
   currentSlug,
   title,
   subtitle,
   lastUpdated,
   children,
 }: PolicyLayoutProps) {
+  const settings = await getStorefrontSettings().catch(() => null);
+  const displayPhone = settings?.storePhone || businessProfile.displayPhone;
+  const telHref = settings?.storePhone
+    ? `tel:${settings.storePhone.replace(/[^+\d]/g, "")}`
+    : businessProfile.telHref;
+  const openingHours = settings?.openingHours || "Thứ 2 – Thứ 7: 09:00 – 20:00 (CN hẹn trước)";
+  const brandName = settings?.storeName || businessProfile.brandName;
+
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
       {/* 1. Breadcrumb */}
@@ -125,13 +134,13 @@ export default function PolicyLayout({
               <div className="mt-6 pt-4 border-t border-gray-100 px-3">
                 <div className="text-xs text-gray-500 font-medium mb-1">Cần hỗ trợ trực tiếp?</div>
                 <a
-                  href={businessProfile.telHref}
+                  href={telHref}
                   className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold text-sm"
                 >
-                  <Phone className="w-4 h-4" /> Hotline: {businessProfile.displayPhone}
+                  <Phone className="w-4 h-4" /> Hotline: {displayPhone}
                 </a>
                 <div className="text-[11px] text-gray-400 mt-1">
-                  Thứ 2 – Thứ 7: 09:00 – 20:00 (CN hẹn trước)
+                  {openingHours}
                 </div>
               </div>
             </div>
@@ -151,7 +160,7 @@ export default function PolicyLayout({
                   </p>
                 )}
                 <div className="text-[11px] text-gray-400 mt-2">
-                  {lastUpdated && <>Cập nhật: {lastUpdated} · </>}Đơn vị phụ trách: {businessProfile.brandName}
+                  {lastUpdated && <>Cập nhật: {lastUpdated} · </>}Đơn vị phụ trách: {brandName}
                 </div>
               </div>
 

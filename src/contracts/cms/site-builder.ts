@@ -41,6 +41,7 @@ export const productRuleCriteriaSchema = z.object({
   productType: z.enum(['all', 'laptop', 'accessory']).default('all'),
   categoryId: z.string().max(128).nullable().default(null),
   brandId: z.string().max(128).nullable().default(null),
+  condition: z.enum(['all', 'NEW', 'LIKE_NEW', 'USED', 'ON_SALE']).optional(),
   tag: z.enum(['all', 'isFeatured', 'isNewArrival', 'isBestSeller']).default('all'),
   availability: z.enum(['all', 'AVAILABLE', 'PREORDER', 'CONTACT']).default('all'),
   sort: z.enum(['newest', 'price-asc', 'price-desc', 'name-asc', 'best-selling']).default('newest'),
@@ -89,14 +90,28 @@ export const sectionLinkItemSchema = z.object({
   href: safeUrlOrPath,
 });
 
+export const productGridTabItemSchema = z.object({
+  id: text(60).min(1),
+  label: text(100).min(1),
+  productIds: z.array(z.string().max(128)).max(48).default([]),
+  href: safeUrlOrPath.default(''),
+  enabled: z.boolean().optional(),
+  limit: z.number().int().min(1).max(48).optional(),
+  sourceMode: z.enum(['manual', 'rule']).optional(),
+  ruleCriteria: productRuleCriteriaSchema.optional(),
+});
+
+export type ProductGridTabItem = z.infer<typeof productGridTabItemSchema>;
+
 export const productGridSectionDataSchema = z.object({
-  tabs: z.array(z.object({ id: text(60).min(1), label: text(100).min(1), productIds: z.array(z.string().max(128)).max(48), href: safeUrlOrPath })).max(6).optional(),
+  tabs: z.array(productGridTabItemSchema).max(8).optional(),
   title: text(200).min(1, 'Tiêu đề lưới sản phẩm không được để trống'),
   subtitle: text(300).default(''),
   badge: text(100).default(''),
   badgeColor: text(60).default(''),
   colorTheme: text(60).default('blue'), // blue, red, indigo, gray, emerald, orange
-  links: z.array(sectionLinkItemSchema).max(8).default([]),
+  icon: text(50).optional(),
+  links: z.array(sectionLinkItemSchema).max(12).default([]),
   sourceMode: z.enum(['manual', 'rule']).default('rule'),
   manualProductIds: z.array(z.string().max(128)).max(48).default([]),
   ruleCriteria: productRuleCriteriaSchema.default({
@@ -116,25 +131,40 @@ export type ProductGridSectionData = z.infer<typeof productGridSectionDataSchema
 // 4. Featured Categories Section
 export const featuredCategoryItemSchema = z.object({
   href: safeUrlOrPath.optional(),
-  categoryId: z.string().max(128),
+  categoryId: z.string().max(128).default(''),
   customName: text(100).default(''),
   customImage: safeUrlOrPath.default(''),
+  enabled: z.boolean().optional(),
 });
 
 export const featuredCategoriesSectionDataSchema = z.object({
   layout: z.enum(['cards', 'board']).optional(),
   title: text(200).default('Khám Phá Hệ Sinh Thái Danh Mục'),
   subtitle: text(300).default(''),
-  categoryIds: z.array(z.string().max(128)).max(16).default([]),
-  items: z.array(featuredCategoryItemSchema).max(16).default([]),
+  limit: z.number().int().min(1).max(20).optional(),
+  viewAllLink: safeUrlOrPath.optional(),
+  categoryIds: z.array(z.string().max(128)).max(20).default([]),
+  items: z.array(featuredCategoryItemSchema).max(20).default([]),
 });
 export type FeaturedCategoriesSectionData = z.infer<typeof featuredCategoriesSectionDataSchema>;
 
 // 5. Featured Brands Section
+export const featuredBrandItemSchema = z.object({
+  id: z.string().max(128).optional(),
+  name: text(100),
+  subtitle: text(200).optional(),
+  href: safeUrlOrPath.optional(),
+  logo: safeUrlOrPath.optional(),
+  enabled: z.boolean().optional(),
+});
+
 export const featuredBrandsSectionDataSchema = z.object({
   title: text(200).default('Khám Phá Theo Thương Hiệu'),
   subtitle: text(300).default(''),
+  limit: z.number().int().min(1).max(20).optional(),
+  viewAllLink: safeUrlOrPath.optional(),
   brandIds: z.array(z.string().max(128)).max(20).default([]),
+  items: z.array(featuredBrandItemSchema).max(20).optional(),
 });
 export type FeaturedBrandsSectionData = z.infer<typeof featuredBrandsSectionDataSchema>;
 
@@ -144,6 +174,7 @@ export const featuredCollectionSectionDataSchema = z.object({
   subtitle: text(300).default(''),
   collectionId: z.string().max(128),
   limit: z.number().int().min(1).max(48).default(12),
+  viewAllLink: safeUrlOrPath.optional(),
 });
 export type FeaturedCollectionSectionData = z.infer<typeof featuredCollectionSectionDataSchema>;
 
@@ -152,9 +183,10 @@ export const newsReviewsSectionDataSchema = z.object({
   layout: z.enum(['featured', 'grid']).optional(),
   title: text(200).default('Góc CitiLap Media & Đánh Giá'),
   subtitle: text(300).default(''),
-  postIds: z.array(z.string().max(128)).max(10).default([]),
+  postIds: z.array(z.string().max(128)).max(20).default([]),
   limit: z.number().int().min(1).max(20).default(10),
   categoryId: z.string().max(128).nullable().default(null),
+  viewAllLink: safeUrlOrPath.optional(),
 });
 
 // 8. Intro & Feature Strip Section (Cam kết thương hiệu)
@@ -163,13 +195,15 @@ export const featureCardItemSchema = z.object({
   icon: text(50).default('shield'), // shield, truck, refresh, store, zap, star
   title: text(120),
   description: text(300),
+  href: safeUrlOrPath.optional(),
+  enabled: z.boolean().optional(),
 });
 
 export const introSectionDataSchema = z.object({
   title: text(200).default(''),
   subtitle: text(300).default(''),
   contentHtml: z.string().max(50_000).default(''),
-  features: z.array(featureCardItemSchema).max(6).default([]),
+  features: z.array(featureCardItemSchema).max(8).default([]),
 });
 
 // 9. Call-To-Action (CTA) Section
@@ -186,6 +220,10 @@ export const ctaSectionDataSchema = z.object({
 
 export const videoReviewsSectionDataSchema = z.object({
   title: text(200).default('Video review sản phẩm'),
+  subtitle: text(300).optional(),
+  limit: z.number().int().min(1).max(12).optional(),
+  youtubeUrl: safeUrlOrPath.optional(),
+  tiktokUrl: safeUrlOrPath.optional(),
   videos: z.array(z.object({
     title: text(200).min(1),
     url: z.string().max(1000).refine(v => {
@@ -193,12 +231,21 @@ export const videoReviewsSectionDataSchema = z.object({
       try { const u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password && !u.port && ['www.tiktok.com', 'tiktok.com'].includes(u.hostname) && /^\/@[^/]+\/video\/\d+$/.test(u.pathname); } catch { return false; }
     }, 'Dùng URL video YouTube hoặc TikTok.'),
     thumbnail: safeUrlOrPath.default(''),
+    href: safeUrlOrPath.optional(),
+    enabled: z.boolean().optional(),
   })).max(12).default([]),
 });
 
 export const customerGallerySectionDataSchema = z.object({
   title: text(200).default('Hình ảnh khách hàng tại CitiLap'),
-  images: z.array(z.object({ url: safeUrlOrPath, alt: text(300).min(1) })).max(20).default([]),
+  subtitle: text(300).optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  images: z.array(z.object({
+    url: safeUrlOrPath,
+    alt: text(300).min(1),
+    href: safeUrlOrPath.optional(),
+    enabled: z.boolean().optional(),
+  })).max(20).default([]),
 });
 
 // --- Generic Section Union ---
@@ -375,7 +422,7 @@ export function defaultHomepageSections(): SectionItem[] {
         sourceMode: 'rule',
         manualProductIds: [],
         ruleCriteria: {
-          productType: 'all',
+          productType: 'laptop',
           categoryId: null,
           brandId: null,
           tag: 'isNewArrival',
@@ -384,7 +431,7 @@ export function defaultHomepageSections(): SectionItem[] {
           limit: 10,
         },
         rankNumbering: false,
-        viewAllLink: '/laptop-gaming?sort=newest',
+        viewAllLink: '/search?category=laptop&sort=newest',
       },
     },
     {

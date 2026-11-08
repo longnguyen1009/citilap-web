@@ -22,7 +22,6 @@
 .admin-row-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 5px; font-size: 11px; }
 .admin-row-actions :where(a,button) { color: #2563eb; }
 .admin-row-actions :where(a,button):hover { text-decoration: underline; }
-.admin-row-actions button:last-child { color: #be123c; }
 .admin-field { display: grid; gap: 6px; font-size: 12px; font-weight: 600; color: #334155; }
 .admin-field :where(input,select) { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #0f172a; font-size: 13px; font-weight: 400; }
 .admin-drawer { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(480px,100%); height: 100dvh; max-height: 100dvh; max-width: 100%; padding: 0; border: 0; border-left: 1px solid #e2e8f0; background: white; color: #0f172a; box-shadow: -12px 0 40px rgb(15 23 42 / .12); }
@@ -35,6 +34,14 @@
 .admin-page-header { padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; }
 .admin-page-header h1 { font-weight: 600; overflow-wrap: anywhere; }
 .admin-page-header > :last-child > :last-child { min-width: 0; }
+.admin-page-actions > div { flex-wrap: wrap; }
+.admin-filter-details { border-bottom: 1px solid #e2e8f0; background: #f8fafc; }
+.admin-filter-details > summary { padding: 10px 16px; color: #334155; font-size: 13px; font-weight: 600; }
+.admin-filter-details[open] > summary { border-bottom: 1px solid #e2e8f0; }
+.admin-filter-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 12px 16px; }
+.admin-filter-fields > label { display: grid; gap: 5px; color: #475569; font-size: 12px; }
+.admin-filter-fields select { min-width: 150px; }
+.admin-inventory-workspace { display: flex; flex-direction: column; align-items: stretch; }
 .admin-table tbody tr:hover { background: #eff6ff; }
 .admin-table :where(th,td) { line-height: 1.5; }
 .admin-table :where(a,button):focus-visible { outline-offset: 1px; }
@@ -126,3 +133,13 @@
 @media (max-width: 1023px) { .admin-content-editor > .grid > div:last-child { position: static; } }
 @media (max-width: 1100px) { .admin-content { padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { .admin-shell *, .admin-drawer *, .admin-command-dialog * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* Modern Web Guidance: Native <dialog>, Responsive Table, and Layout Containment */
+dialog:modal { overscroll-behavior: contain; }
+dialog::backdrop { overflow: hidden; overscroll-behavior: contain; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); }
+.admin-modal-dialog { margin: auto; width: min(520px, calc(100% - 32px)); max-height: 85dvh; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; background: white; color: #0f172a; box-shadow: 0 24px 64px rgb(15 23 42 / .25); }
+.table-wrapper { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+.table-wrapper:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 2px; }
+.admin-table thead { position: sticky; inset-block-start: 0; z-index: 1; }
+.admin-contain-panel { content-visibility: auto; contain-intrinsic-size: auto 300px auto 800px; }
+@supports not (content-visibility: auto) { .admin-contain-panel { contain: layout style paint; } }

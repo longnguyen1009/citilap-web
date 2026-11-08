@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Tag,
   Plus,
@@ -355,9 +356,13 @@ export default function AdminBrandsPage() {
                     </td>
 
                     <td className="text-center tabular-nums">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                      <Link
+                        href={`/admin/products?brand=${encodeURIComponent(b.name)}`}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition"
+                        title={`Xem ${b.productCount} sản phẩm thuộc hãng ${b.name}`}
+                      >
                         {b.productCount}
-                      </span>
+                      </Link>
                     </td>
 
                     <td className="text-center">
@@ -558,7 +563,7 @@ export default function AdminBrandsPage() {
       {logoPickerOpen && (
         <MediaDialog title="Chọn Logo" onClose={() => setLogoPickerOpen(false)}>
           <div className="space-y-4">
-            <MediaUpload onUploaded={() => setMediaRefresh(n => n + 1)} />
+            <MediaUpload defaultFolder="brands" onUploaded={() => setMediaRefresh(n => n + 1)} />
             <MediaBrowser
               refresh={mediaRefresh}
               picker

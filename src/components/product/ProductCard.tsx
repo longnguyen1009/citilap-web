@@ -3,14 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, ShieldCheck, Laptop, Cpu, Scale } from "lucide-react";
+import { Heart, ShieldCheck, Laptop, Cpu, Scale, Gpu, MemoryStick, Monitor } from "lucide-react";
 import { useOptionalWishlist } from "@/context/WishlistContext";
 import { useOptionalCompare } from "@/context/CompareContext";
 import { Badge } from "@/components/ui/Badge";
-import { PriceTag } from "@/components/ui/PriceTag";
 import { SpecChip } from "@/components/ui/SpecChip";
 import { ConditionBadge } from "@/components/ui/ConditionBadge";
 import { StockBadge } from "@/components/ui/StockBadge";
+import { BrandLogo, detectBrandName, getBrandCardTheme } from "@/components/ui/BrandLogo";
 import { productHref as getProductHref } from '@/lib/product-paths';
 
 export type ProductCardProduct = {
@@ -119,14 +119,37 @@ function formatDisplaySpec(val?: string): string {
   return val.replace(/\s*inch\b/gi, '"').trim();
 }
 
-function formatWarranty(val?: string, fallback = "BH 12T"): string {
-  if (!val) return fallback;
-  return val
+function formatWarranty(val?: string, fallback = "BH 12 tháng"): string {
+  if (!val || !val.trim()) return fallback;
+  const raw = val.trim();
+  const isBrand = /hãng|manufacturer|brand/i.test(raw);
+  const monthsMatch = raw.match(/(\d+)\s*(?:tháng|t\b)/i);
+  if (monthsMatch) {
+    return isBrand ? `BH Hãng ${monthsMatch[1]} tháng` : `BH ${monthsMatch[1]} tháng`;
+  }
+  if (/^BH\s+hãng$/i.test(raw)) return "BH Hãng 12 tháng";
+  if (/^BH\s+/i.test(raw)) return raw;
+  return raw
+    .replace(/^Bảo hành\s*chính\s*hãng\s*/i, "BH Hãng ")
     .replace(/^Bảo hành\s*/i, "BH ")
-    .replace(/\s*tháng/i, "T")
-    .replace(/\s*chính\s*hãng/i, " hãng")
-    .replace(/\s*(1\s*đổi\s*1|tại|toàn\s*diện).*$/i, "")
+    .replace(/\s*(1\s*đổi\s*1|tại|tiêu\s*chuẩn|toàn\s*diện).*$/i, "")
     .trim();
+}
+
+function formatProductTitle(name: string): string {
+  if (!name) return "";
+  return name
+    .replace(/^\[(?:New\s*100%|Mới\s*100%)\]\s*/i, "[Mới 100%] ")
+    .replace(/^\[(?:Like\s*New\s*99%|LikeNew\s*99%)\]\s*/i, "[LikeNew 99%] ");
+}
+
+function formatVnd(val?: string | number | null): string {
+  if (val === undefined || val === null || val === "") return "";
+  if (typeof val === "number") return `${val.toLocaleString("vi-VN")}đ`;
+  const digits = String(val).replace(/\D/g, "");
+  const parsed = parseInt(digits, 10);
+  if (!isNaN(parsed)) return `${parsed.toLocaleString("vi-VN")}đ`;
+  return String(val);
 }
 
 export default function ProductCard({
@@ -163,7 +186,7 @@ export default function ProductCard({
     if (inCompare) {
       compareCtx.removeFromCompare(product.id);
     } else {
-      const res = compareCtx.addToCompare({
+      compareCtx.addToCompare({
         id: product.id,
         name: product.name,
         slug: product.slug || product.id,
@@ -171,9 +194,6 @@ export default function ProductCard({
         image: product.image,
         template: product.template,
       });
-      if (!res.success && res.message) {
-        alert(res.message);
-      }
     }
   };
 
@@ -182,8 +202,23 @@ export default function ProductCard({
   const isOutOfStock = product.availability ? product.availability === 'UNAVAILABLE' : product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const warrantyText = formatWarranty(
     product.warranty,
-    "BH hãng"
+    "BH 12 tháng"
   );
+
+  // Intelligent brand detection & delicate pastel styling
+  const detectedBrand = detectBrandName(product);
+  const brandTheme = getBrandCardTheme(detectedBrand);
+  const effectiveOldPrice = product.originalPrice ?? product.oldPrice;
+  const displayName = formatProductTitle(product.name);
+
+  // Derive discount percent
+  const discountPercent = product.discount
+    ? (product.discount.startsWith("-") ? product.discount : `-${product.discount}`)
+    : (product.isOnSale && product.originalPrice && Number(product.originalPrice) > Number(product.price))
+    ? `-${Math.round((1 - Number(product.price) / Number(product.originalPrice)) * 100)}%`
+    : effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price)
+    ? `-${Math.round((1 - Number(product.price) / Number(effectiveOldPrice)) * 100)}%`
+    : null;
 
   // Format key specs for density & clarity (only for laptops)
   const isAccessory =
@@ -198,36 +233,23 @@ export default function ProductCard({
 
   return (
     <article
-      className={`group/product relative flex flex-col h-full bg-white rounded-2xl border border-slate-300 shadow-xs hover:border-blue-500 hover:shadow-[0_6px_18px_-8px_rgba(37,99,235,0.35)] hover:-translate-y-0.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
+      className={`group/product relative flex flex-col h-full rounded-2xl border-2 ${brandTheme.cardBg} ${brandTheme.cardBorder} ${brandTheme.hoverBorder} shadow-xs hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
     >
-      {/* Top Badges Bar: Rank, Condition, Discount & Wishlist */}
-      <div className="absolute top-2 left-2 right-2 z-20 flex items-center justify-between pointer-events-none">
-        <div className="flex flex-wrap items-center gap-1 max-w-[80%]">
+      {/* Top Badges Bar: Rank, Condition & Compare, Wishlist (compact, no overlap) */}
+      <div className="absolute top-1.5 left-1.5 right-1.5 sm:left-2 sm:right-2 z-20 flex items-center justify-between gap-1 pointer-events-none">
+        <div className="flex items-center gap-1 min-w-0 shrink">
           {/* Rank Badge */}
           {rank !== undefined && (
-            <Badge variant={rank <= 3 ? "rank-top" : "rank-other"} size="xs">
+            <Badge variant={rank <= 3 ? "rank-top" : "rank-other"} size="xs" className="text-[9px] px-1 py-0.5 rounded-[2px] font-bold shrink-0">
               #{rank}
             </Badge>
           )}
 
-          {/* Condition Badge (Standardized Citilap Core) */}
-          <ConditionBadge condition={product.condition} fallbackName={product.name} size="xs" />
-
-          {/* Discount Badge */}
-          {(product.discount || (product.isOnSale && product.originalPrice && Number(product.originalPrice) > Number(product.price))) && (
-            <Badge
-              variant="sale"
-              size="xs"
-              className={badgeColor ? badgeColor : undefined}
-            >
-              {product.discount
-                ? (product.discount.startsWith("-") ? product.discount : `-${product.discount}`)
-                : `-${Math.round((1 - Number(product.price) / Number(product.originalPrice)) * 100)}%`}
-            </Badge>
-          )}
+          {/* Condition Badge (Standardized Citilap Core: Mới 100%, LikeNew 99%) */}
+          <ConditionBadge condition={product.condition} fallbackName={product.name} size="xs" className="text-[8.5px] sm:text-[9.5px] px-1 sm:px-1.5 py-0.5 rounded-[2px] font-bold leading-tight truncate max-w-full" />
         </div>
 
-        <div className="flex items-center gap-1.5 pointer-events-auto">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 pointer-events-auto">
           {/* Compare Button */}
           <button
             type="button"
@@ -237,16 +259,16 @@ export default function ProductCard({
               inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
             }
             title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
-            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-[background-color,border-color,transform] duration-150 shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
+            className={`relative w-9 h-9 sm:w-10 sm:h-10 -m-1 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 sm:before:w-8 sm:before:h-8 before:rounded-full before:shadow-xs before:transition-[background-color,border-color,transform] before:duration-150 ${
               inCompare
-                ? "bg-blue-600 text-white border border-blue-600"
-                : "bg-white/90 backdrop-blur-xs text-text-muted hover:text-blue-600 hover:bg-blue-50/80 border border-border-default"
+                ? "text-white before:bg-blue-600 before:border before:border-blue-600"
+                : "text-text-muted hover:text-blue-600 before:bg-white/95 before:backdrop-blur-xs hover:before:bg-blue-50/80 before:border before:border-border-default"
             }`}
           >
-            <Scale className="w-3.5 h-3.5" />
+            <Scale className="relative z-10 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
           </button>
 
-          {/* Wishlist Button (Accessible, not nested inside Link) */}
+          {/* Wishlist Button */}
           <button
             type="button"
             onClick={toggleWishlist}
@@ -254,19 +276,19 @@ export default function ProductCard({
             aria-label={
               liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
             }
-            className={`w-8 h-8 rounded-pill flex items-center justify-center transition-[background-color,border-color,transform] duration-150 shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden ${
+            className={`relative w-9 h-9 sm:w-10 sm:h-10 -m-1 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 sm:before:w-8 sm:before:h-8 before:rounded-full before:shadow-xs before:transition-[background-color,border-color,transform] before:duration-150 ${
               liked
-                ? "bg-red-50 text-error border border-red-200"
-                : "bg-white/90 backdrop-blur-xs text-text-muted hover:text-error hover:bg-red-50/80 border border-border-default"
+                ? "text-error before:bg-red-50 before:border before:border-red-200"
+                : "text-text-muted hover:text-error before:bg-white/95 before:backdrop-blur-xs hover:before:bg-red-50/80 before:border before:border-border-default"
             }`}
           >
-            <Heart className="w-4 h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
+            <Heart className="relative z-10 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
           </button>
         </div>
       </div>
 
       {/* Product Image Container */}
-      <div className="relative aspect-[4/3] w-full border-b border-slate-100 bg-gradient-to-b from-slate-50 to-white p-3 pt-11 sm:p-4 sm:pt-10 flex items-center justify-center overflow-hidden">
+      <div className={`relative aspect-[4/3] w-full border-b border-black/[0.04] ${brandTheme.imageBg} p-2.5 pt-7 pb-1.5 sm:p-3.5 sm:pt-7 sm:pb-2 flex items-center justify-center overflow-hidden`}>
         <div className="relative block w-full h-full">
           {(() => {
             const rawImage = product.thumbnailUrl || product.image || (product as { primaryImage?: string }).primaryImage || null;
@@ -278,7 +300,7 @@ export default function ProductCard({
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 onError={() => setImageError(true)}
-                className={`object-contain transition-transform duration-300 group-hover/product:scale-105 motion-reduce:transform-none ${
+                className={`object-contain transition-transform duration-300 scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${
                   isOutOfStock ? "grayscale opacity-60" : ""
                 }`}
               />
@@ -302,99 +324,141 @@ export default function ProductCard({
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-col flex-1 p-2.5 sm:p-3.5">
-        {/* Brand or Series line if present */}
-        {(product.brand || product.series) && (
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 truncate">
-            {[product.brand, product.series].filter(Boolean).join(" • ")}
-          </p>
-        )}
+      <div className="flex flex-col flex-1 p-2.5 sm:p-3 pt-2">
+        {/* Top Content: Brand Card (Left) & Old Struck Price + Discount % (Right) */}
+        <div className="flex flex-col">
+          {/* Row directly under image: Brand Card on left, Struck Old Price + Red Discount % on right */}
+          <div className="flex items-center justify-between gap-1.5 h-6 mb-1">
+            <div className="flex items-center min-w-0 truncate">
+              <BrandLogo brand={detectedBrand} series={product.series} />
+            </div>
 
-        {/* Title */}
-        <h3 className="text-sm sm:text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-10 group-hover/product:text-blue-700 transition-colors">
-          <Link
-            href={productHref}
-            title={product.name}
-            className="after:absolute after:inset-0 after:z-10 focus:outline-hidden focus-visible:underline"
-          >
-            {product.name}
-          </Link>
-        </h3>
-
-        {/* Price Row */}
-        <PriceTag
-          price={product.availability === 'CONTACT' ? 'Liên hệ' : product.price}
-          originalPrice={product.originalPrice ?? product.oldPrice}
-          size="md"
-          className="mt-2 mb-3"
-          priceClassName="tabular-nums"
-        />
-
-        {/* Specs Matrix - High Density & Easy to Scan */}
-        {showSpecs && hasSpecs && (
-          <div className="mt-2.5 pt-2 border-t border-border-default grid grid-cols-2 gap-1 text-caption text-text-secondary">
-            {cpu && (
-              <SpecChip
-                icon={<Cpu className="w-3 h-3 text-text-muted shrink-0" />}
-                value={cpu}
-                title={`CPU: ${product.specs?.cpu || cpu}`}
-              />
-            )}
-            {gpu && (
-              <SpecChip
-                highlight
-                value={gpu}
-                title={`GPU: ${product.specs?.gpu || gpu}`}
-              />
-            )}
-            {(ram || ssd) && (
-              <SpecChip
-                value={
-                  <>
-                    <span className="font-semibold text-text-primary">{ram ? ram.replace(/GB$/i, "G") : "RAM"}</span>
-                    {ram && ssd && <span className="text-slate-400 mx-[1px]">/</span>}
-                    <span className="text-text-secondary">{ssd ? ssd.replace(/GB$/i, "G") : ""}</span>
-                  </>
-                }
-                title={`RAM: ${product.specs?.ram || ram} / SSD: ${product.specs?.ssd || ssd}`}
-              />
-            )}
-            {display && (
-              <SpecChip
-                value={display}
-                title={`Màn hình: ${product.specs?.display || display}`}
-              />
+            {/* Struck Old Price + Red Discount % tag side-by-side */}
+            {effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[12.5px] sm:text-[14px] text-slate-500 line-through tabular-nums font-bold">
+                  {formatVnd(effectiveOldPrice)}
+                </span>
+                {discountPercent && (
+                  <span className="bg-[#D71920] text-white font-black text-[11px] sm:text-[12px] px-1.5 py-0.5 rounded-[3px] leading-none select-none tracking-tight shadow-xs">
+                    {discountPercent}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-        )}
 
-        {/* Footer Meta: Warranty & Stock Status */}
-        <div className="mt-auto pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1 text-caption">
-          {/* Warranty tag */}
-          <div
-            className="flex items-center gap-1 text-text-secondary font-medium truncate min-w-0"
-            title={product.warranty || warrantyText}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-brand-primary shrink-0" />
-            <span className="truncate">{warrantyText}</span>
+          {/* Title - fixed 2-line height (h-10 sm:h-11) so 1-line and 2-line titles occupy exact same space */}
+          <h3 className="h-10 sm:h-11 text-sm sm:text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 overflow-hidden group-hover/product:text-blue-700 transition-colors">
+            <Link
+              href={productHref}
+              title={product.name}
+              className="after:absolute after:inset-0 after:z-10 focus:outline-hidden focus-visible:underline"
+            >
+              {displayName}
+            </Link>
+          </h3>
+
+          {/* Red Price Card: Directly below title, horizontally centered */}
+          <div className="mt-2 mb-2 sm:mb-2.5">
+            <div className="w-full bg-[#D71920] hover:bg-[#c0141a] text-white font-extrabold py-1.5 sm:py-2 px-3 rounded-lg sm:rounded-xl shadow-xs flex items-center justify-center text-sm sm:text-base tracking-tight select-none transition-colors">
+              <span className="tabular-nums">
+                {product.availability === 'CONTACT' ? 'Liên hệ' : formatVnd(product.price)}
+              </span>
+            </div>
           </div>
-
-          {/* Standardized Stock Indicator */}
-          {product.availability ? (
-            <span className="text-[10px] sm:text-[11px] font-medium text-text-secondary">
-              {({AVAILABLE:'Nhận yêu cầu mua',PREORDER:'Nhận đặt trước',CONTACT:'Liên hệ tư vấn',UNAVAILABLE:'Tạm ngừng nhận đơn'} as Record<string,string>)[product.availability] || 'Chưa cập nhật'}
-            </span>
-          ) : (
-            <StockBadge stock={product.stock} variant="indicator" />
-          )}
         </div>
 
-        {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}
-        {footerAction && (
-          <div className="mt-2.5 pt-2 border-t border-border-default relative z-20">
-            {footerAction}
+        {/* Bottom Pinned Section: Cấu hình (Specs) & Bảo hành (Warranty) ALWAYS pinned to bottom */}
+        <div className="mt-auto flex flex-col justify-end pt-2">
+          {/* Specs Matrix - High Density & Easy to Scan */}
+          {showSpecs && hasSpecs && (
+            <div className="grid grid-cols-2 gap-1 text-caption text-text-secondary mb-2 pt-2 border-t border-black/[0.06] min-h-[52px]">
+              {cpu && (
+                <SpecChip
+                  icon={<Cpu className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  value={cpu}
+                  title={`CPU: ${product.specs?.cpu || cpu}`}
+                />
+              )}
+              {gpu && (
+                <SpecChip
+                  icon={<Gpu className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                  highlight
+                  value={gpu}
+                  title={`GPU: ${product.specs?.gpu || gpu}`}
+                />
+              )}
+              {(ram || ssd) && (
+                <SpecChip
+                  icon={<MemoryStick className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  value={
+                    <>
+                      <span className="font-semibold text-text-primary">{ram ? ram.replace(/GB$/i, "G") : "RAM"}</span>
+                      {ram && ssd && <span className="text-slate-400 mx-[1px]">/</span>}
+                      <span className="text-text-secondary">{ssd ? ssd.replace(/GB$/i, "G") : ""}</span>
+                    </>
+                  }
+                  title={`RAM: ${product.specs?.ram || ram} / SSD: ${product.specs?.ssd || ssd}`}
+                />
+              )}
+              {display && (
+                <SpecChip
+                  icon={<Monitor className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  value={display}
+                  title={`Màn hình: ${product.specs?.display || display}`}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Footer Meta: Warranty & Stock Status */}
+          <div className="pt-2 border-t border-black/[0.06] flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1 text-caption">
+            {/* Warranty tag */}
+            <div
+              className="flex items-center gap-1 text-slate-700 font-medium truncate min-w-0"
+              title={product.warranty || warrantyText}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="truncate">{warrantyText}</span>
+            </div>
+
+            {/* Standardized Stock Indicator */}
+            {product.availability ? (
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold ${
+                  product.availability === 'AVAILABLE' && (product.stock === undefined || product.stock === null || product.stock > 0)
+                    ? 'text-emerald-700'
+                    : product.availability === 'PREORDER'
+                    ? 'text-blue-700'
+                    : product.availability === 'CONTACT'
+                    ? 'text-amber-700'
+                    : 'text-slate-500'
+                }`}
+              >
+                {product.availability === 'AVAILABLE' && (product.stock === undefined || product.stock === null || product.stock > 0) && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
+                )}
+                {product.availability === 'AVAILABLE'
+                  ? (product.stock !== undefined && product.stock !== null && product.stock <= 0 ? 'Tạm hết hàng' : 'Sẵn hàng')
+                  : ({
+                      PREORDER: 'Đặt trước',
+                      CONTACT: 'Liên hệ',
+                      UNAVAILABLE: 'Tạm hết hàng',
+                    } as Record<string, string>)[product.availability] || 'Sẵn hàng'}
+              </span>
+            ) : (
+              <StockBadge stock={product.stock} variant="indicator" />
+            )}
           </div>
-        )}
+
+          {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}
+          {footerAction && (
+            <div className="mt-2.5 pt-2 border-t border-black/[0.06] relative z-20">
+              {footerAction}
+            </div>
+          )}
+        </div>
       </div>
     </article>
   );

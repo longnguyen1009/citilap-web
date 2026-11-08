@@ -450,10 +450,11 @@ export async function restoreLandingPageRevision(
 export async function getLandingPageRevisions(db: D1Database, id: string) {
   const rows = await db
     .prepare(`
-      SELECT revision, action, actor, createdAt
-      FROM LandingPageRevision
-      WHERE pageId = ?
-      ORDER BY revision DESC
+      SELECT r.revision, r.action, COALESCE(NULLIF(TRIM(u.name), ''), NULLIF(TRIM(u.email), ''), r.actor) AS actor, r.createdAt
+      FROM LandingPageRevision r
+      LEFT JOIN "User" u ON u.id = r.actor
+      WHERE r.pageId = ?
+      ORDER BY r.revision DESC
       LIMIT 50
     `)
     .bind(id)
@@ -507,12 +508,26 @@ export async function resolveSectionsForStorefront(
     return (canonicalCategoryPath(target, categoryPaths) || target.replace(/^\/product\//,'/san-pham/')) + suffix;
   }));
   const enabledSections = publicSections.filter((s) => s.enabled);
+  const needsStudios = enabledSections.some(
+    (s) =>
+      s.data.type === 'product_grid' &&
+      ((s.data.sourceMode !== 'manual' &&
+        Boolean(s.data.ruleCriteria?.availability && s.data.ruleCriteria.availability !== 'all')) ||
+        (s.data.tabs ?? []).some(
+          (t) =>
+            t.enabled !== false &&
+            t.sourceMode === 'rule' &&
+            Boolean(t.ruleCriteria?.availability && t.ruleCriteria.availability !== 'all')
+        ))
+  );
   // Fail-closed: evaluate pricing context with active campaigns, surfacing infrastructure errors
   const evaluatedAt = new Date();
   const [pricingContext, allBrands, allStudios] = await Promise.all([
     getStorefrontPricingContext(db, evaluatedAt),
     getActiveBrands(client).catch(() => []),
-    client.productStudio.findMany({ select: { productId: true, published: true } }).catch(() => []),
+    needsStudios
+      ? client.productStudio.findMany({ select: { productId: true, published: true } }).catch(() => [])
+      : Promise.resolve(undefined),
   ]);
 
   const preloadedCatalogMeta = { categories: allCategories, studios: allStudios };
@@ -523,28 +538,72 @@ export async function resolveSectionsForStorefront(
       const data = sec.data;
 
       if (data.type === 'product_grid') {
+        const effectiveLimit = data.ruleCriteria?.limit && data.ruleCriteria.limit > 0 ? data.ruleCriteria.limit : 12;
         const mainPromise =
           data.sourceMode === 'manual'
-            ? resolveProductsByIds(data.manualProductIds, client, pricingContext, evaluatedAt)
+            ? resolveProductsByIds(data.manualProductIds, client, pricingContext, evaluatedAt).then((list) =>
+                list.slice(0, effectiveLimit)
+              )
             : resolveProductsByCriteria(data.ruleCriteria, client, pricingContext, evaluatedAt, preloadedCatalogMeta);
 
-        const tabsPromise = data.tabs?.length
+        const activeTabs = data.tabs?.filter((t) => t.enabled !== false) ?? [];
+        const manualTabIds = [
+          ...new Set(
+            activeTabs
+              .filter((t) => t.sourceMode !== 'rule')
+              .flatMap((t) => t.productIds)
+          ),
+        ];
+        const tabsPromise = manualTabIds.length
           ? resolveProductsByIds(
-              [...new Set(data.tabs.flatMap((t) => t.productIds))],
+              manualTabIds,
               client,
               pricingContext,
               evaluatedAt
             )
-          : Promise.resolve(null);
+          : Promise.resolve([] as HomepageProduct[]);
 
         const [prods, tabProducts] = await Promise.all([mainPromise, tabsPromise]);
         resolvedSec.resolvedProducts = prods;
-        if (data.tabs?.length && tabProducts) {
-          const byId = new Map(tabProducts.map((p) => [p.id, p]));
-          resolvedSec.resolvedTabs = data.tabs.map((t) => ({
-            ...t,
-            products: t.productIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
-          }));
+        if (activeTabs.length) {
+          const byId = new Map((tabProducts || []).map((p) => [p.id, p]));
+          resolvedSec.resolvedTabs = await Promise.all(
+            activeTabs.map(async (t) => {
+              const isLaptopTab =
+                ['new-arrivals', 'new', 'like-new', 'clearance'].includes(t.id) ||
+                /laptop/i.test(t.label) ||
+                sec.id === 'sec-discover';
+              const normalizedHref =
+                t.href === '/search?sort=newest'
+                  ? '/search?category=laptop&sort=newest'
+                  : t.href === '/search?condition=NEW'
+                    ? '/search?category=laptop-moi'
+                    : t.href === '/search?condition=LIKE_NEW'
+                      ? '/search?category=laptop-likenew'
+                      : t.href;
+              const tabLimit = t.limit && t.limit > 0 ? t.limit : 48;
+              let rawList: HomepageProduct[];
+              if (t.sourceMode === 'rule' && t.ruleCriteria) {
+                rawList = await resolveProductsByCriteria(
+                  { ...t.ruleCriteria, limit: t.limit || t.ruleCriteria.limit || 15 },
+                  client,
+                  pricingContext,
+                  evaluatedAt,
+                  preloadedCatalogMeta
+                );
+              } else {
+                rawList = t.productIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+              }
+              const filtered = isLaptopTab
+                ? rawList.filter((p) => p.template !== 'ACCESSORY' && !p.href?.startsWith('/phu-kien/'))
+                : rawList;
+              return {
+                ...t,
+                href: normalizedHref,
+                products: filtered.slice(0, tabLimit),
+              };
+            })
+          );
         }
       } else if (data.type === 'news_reviews') {
         const effectiveLimit = data.limit && data.limit > 0 ? data.limit : 10;
@@ -554,7 +613,7 @@ export async function resolveSectionsForStorefront(
           limit: effectiveLimit,
         });
         if (data.postIds.length) items.sort((a, b) => data.postIds.indexOf(a.id) - data.postIds.indexOf(b.id));
-        resolvedSec.resolvedPosts = items;
+        resolvedSec.resolvedPosts = items.slice(0, effectiveLimit);
       } else if (data.type === 'featured_collection') {
         try {
           const col = await publicCollection(db, data.collectionId, pricingContext, evaluatedAt);
@@ -563,16 +622,21 @@ export async function resolveSectionsForStorefront(
           resolvedSec.resolvedCollection = undefined;
         }
       } else if (data.type === 'featured_categories') {
-        if (data.categoryIds.length > 0) {
-          resolvedSec.resolvedCategories = allCategories.filter((c) => data.categoryIds.includes(c.id));
+        const itemCategoryIds = (data.items || []).map((i) => i.categoryId).filter(Boolean);
+        const requestedIds = [...new Set([...(data.categoryIds || []), ...itemCategoryIds])];
+        if (requestedIds.length > 0) {
+          resolvedSec.resolvedCategories = allCategories.filter((c) => requestedIds.includes(c.id));
         } else {
-          resolvedSec.resolvedCategories = allCategories.filter((c) => !c.parentId).slice(0, 8);
+          resolvedSec.resolvedCategories = allCategories.filter((c) => !c.parentId).slice(0, data.limit || 10);
         }
       } else if (data.type === 'featured_brands') {
+        const brandLimit = data.limit && data.limit > 0 ? data.limit : 12;
         if (data.brandIds.length > 0) {
-          resolvedSec.resolvedBrands = allBrands.filter((b) => data.brandIds.includes(b.id));
+          resolvedSec.resolvedBrands = allBrands
+            .filter((b) => data.brandIds.includes(b.id))
+            .slice(0, brandLimit);
         } else {
-          resolvedSec.resolvedBrands = allBrands.slice(0, 12);
+          resolvedSec.resolvedBrands = allBrands.slice(0, brandLimit);
         }
       }
 

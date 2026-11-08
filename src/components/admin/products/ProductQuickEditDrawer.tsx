@@ -14,6 +14,17 @@ export interface QuickEditItem {
 
 type Detail = { revision: number; document: ProductDocument; published: boolean };
 
+const formatNumberDots = (n: number | null | undefined): string => {
+  if (n === null || n === undefined || Number.isNaN(n)) return "";
+  return new Intl.NumberFormat("vi-VN").format(n);
+};
+
+const parseNumberDots = (raw: string): number | null => {
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return null;
+  return Math.min(2000000000, parseInt(digits, 10) || 0);
+};
+
 export default function ProductQuickEditDrawer({
   item,
   onClose,
@@ -156,41 +167,128 @@ export default function ProductQuickEditDrawer({
                 <label className="admin-field">
                   Giá bán (đ)
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     required
-                    min={0}
-                    max={2000000000}
-                    step={1}
-                    value={detail.document.price}
-                    onChange={(event) => patch("price", Number(event.target.value))}
+                    value={formatNumberDots(detail.document.price)}
+                    onChange={(event) => patch("price", parseNumberDots(event.target.value) ?? 0)}
+                    placeholder="28.900.000"
                   />
                 </label>
                 <label className="admin-field">
                   Giá gốc (đ)
                   <input
-                    type="number"
-                    min={0}
-                    max={2000000000}
-                    step={1}
-                    value={detail.document.originalPrice ?? ""}
-                    onChange={(event) =>
-                      patch("originalPrice", event.target.value === "" ? null : Number(event.target.value))
-                    }
+                    type="text"
+                    inputMode="numeric"
+                    value={formatNumberDots(detail.document.originalPrice)}
+                    onChange={(event) => patch("originalPrice", parseNumberDots(event.target.value))}
+                    placeholder="Không giảm"
                   />
                 </label>
               </div>
-              <label className="admin-field">
-                Nhận đơn
-                <select
-                  value={detail.document.availability}
-                  onChange={(event) => patch("availability", event.target.value as ProductDocument["availability"])}
-                >
-                  <option value="AVAILABLE">Sẵn hàng</option>
-                  <option value="PREORDER">Đặt trước</option>
-                  <option value="CONTACT">Liên hệ</option>
-                  <option value="UNAVAILABLE">Ngừng đơn</option>
-                </select>
-              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="admin-field">
+                  Nhận đơn
+                  <select
+                    value={detail.document.availability}
+                    onChange={(event) => patch("availability", event.target.value as ProductDocument["availability"])}
+                  >
+                    <option value="AVAILABLE">Sẵn hàng</option>
+                    <option value="PREORDER">Đặt trước</option>
+                    <option value="CONTACT">Liên hệ</option>
+                    <option value="UNAVAILABLE">Tạm hết hàng</option>
+                  </select>
+                </label>
+                <label className="admin-field">
+                  Tồn kho
+                  <input
+                    type="number"
+                    min={0}
+                    max={999999}
+                    disabled={detail.document.variants.length > 0}
+                    value={
+                      detail.document.variants.length > 0
+                        ? detail.document.variants.reduce((sum, v) => sum + (v.stock ?? 1), 0)
+                        : (detail.document.stock ?? 1)
+                    }
+                    onChange={(event) => patch("stock", Math.max(0, parseInt(event.target.value, 10) || 0))}
+                  />
+                </label>
+              </div>
+
+              {detail.document.variants.length > 0 && (
+                <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="text-xs font-bold text-slate-700">
+                    Giá & Tồn kho theo cấu hình ({detail.document.variants.length})
+                  </div>
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {detail.document.variants.map((variant, idx) => (
+                      <div key={variant.id || idx} className="grid grid-cols-12 items-center gap-2 text-xs">
+                        <span className="col-span-5 truncate font-medium text-slate-700" title={variant.name}>
+                          {variant.name || `Cấu hình #${idx + 1}`}
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          aria-label={`Giá bán ${variant.name}`}
+                          value={formatNumberDots(variant.price)}
+                          onChange={(e) => {
+                            const nextVariants = [...detail.document.variants];
+                            nextVariants[idx] = { ...variant, price: parseNumberDots(e.target.value) ?? 0 };
+                            patch("variants", nextVariants);
+                          }}
+                          className="col-span-5 rounded border border-slate-300 bg-white px-2 py-1 text-right font-mono text-xs"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          max={999999}
+                          aria-label={`Tồn kho ${variant.name}`}
+                          title="Số lượng tồn kho"
+                          value={variant.stock ?? 1}
+                          onChange={(e) => {
+                            const nextVariants = [...detail.document.variants];
+                            nextVariants[idx] = { ...variant, stock: Math.max(0, parseInt(e.target.value, 10) || 0) };
+                            patch("variants", nextVariants);
+                          }}
+                          className="col-span-2 rounded border border-slate-300 bg-white px-1.5 py-1 text-center font-mono text-xs"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-1.5 rounded-lg border border-slate-200 p-3">
+                <div className="text-xs font-bold text-slate-700">Nhãn nổi bật trên Storefront</div>
+                <div className="flex flex-wrap gap-3 pt-1 text-xs text-slate-700">
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(detail.document.isFeatured)}
+                      onChange={(e) => patch("isFeatured", e.target.checked)}
+                    />
+                    <span>Nổi bật (Featured)</span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(detail.document.isBestSeller)}
+                      onChange={(e) => patch("isBestSeller", e.target.checked)}
+                    />
+                    <span>Bán chạy (Best Seller)</span>
+                  </label>
+                  <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(detail.document.isNewArrival)}
+                      onChange={(e) => patch("isNewArrival", e.target.checked)}
+                    />
+                    <span>Mới về (New Arrival)</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs text-slate-500">
                 <span>
                   {detail.document.variants.length > 0

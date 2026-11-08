@@ -38,6 +38,25 @@ export default function ComparePageClient({ initialIds }: ComparePageClientProps
   const [searching, setSearching] = useState(false);
   const [compareNotice, setCompareNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [recentProducts, setRecentProducts] = useState<Array<{ id: string; name: string; price?: number; image?: string }>>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("citilap_recently_viewed");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setRecentProducts(
+            parsed
+              .filter((p) => p && typeof p.id === "string" && typeof p.name === "string")
+              .slice(0, 6)
+          );
+        }
+      }
+    } catch {
+      // Ignore storage error
+    }
+  }, []);
 
   // A shared table owns its selection; session items only seed a table without a URL.
   const [selectedIds, setSelectedIds] = useState<string[] | null>(
@@ -226,6 +245,35 @@ export default function ComparePageClient({ initialIds }: ComparePageClientProps
 
             {compareNotice && <p className="text-xs text-emerald-700 font-semibold">{compareNotice}</p>}
 
+            {recentProducts.filter((rp) => !activeIds.includes(rp.id)).length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-[11px] font-bold text-slate-500 mb-2">
+                  Thêm nhanh từ sản phẩm bạn vừa xem:
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {recentProducts
+                    .filter((rp) => !activeIds.includes(rp.id))
+                    .slice(0, 4)
+                    .map((rp) => (
+                      <button
+                        key={rp.id}
+                        type="button"
+                        onClick={() => {
+                          if (activeIds.length < MAX_COMPARE_PRODUCTS) {
+                            setSelectedIds([...activeIds, rp.id]);
+                            setCompareNotice(`Đã thêm "${rp.name}" vào bảng so sánh.`);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-blue-50 hover:border-blue-300 text-xs text-slate-700 hover:text-blue-700 font-semibold transition cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        <span className="truncate max-w-[180px]">{rp.name}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+            )}
+
             {quickSearch.trim().length >= 2 && (
               <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-sm max-h-48 overflow-y-auto divide-y divide-slate-100">
                 {searching ? (
@@ -344,86 +392,100 @@ export default function ComparePageClient({ initialIds }: ComparePageClientProps
 
             {/* Product Overview Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {data.products.map((p) => (
-                <div
-                  key={p.id}
-                  className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between relative group"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedIds(activeIds.filter(id => id !== p.id))}
-                    title={`Bỏ ${p.name}`}
-                    className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-
-                  <div>
-                    <div className="aspect-[4/3] w-full bg-slate-50 rounded-xl p-3 mb-3 flex items-center justify-center border border-slate-100 overflow-hidden">
-                      {p.image ? (
-                        <Image
-                          src={p.image.startsWith("/api/library/") && !p.image.includes("?") ? `${p.image}?size=thumb&v=2` : p.image}
-                          alt={p.name}
-                          width={200}
-                          height={150}
-                          className="h-full w-full object-contain"
-                        />
-                      ) : (
-                        <span className="text-xs text-slate-400 font-medium">Chưa có ảnh</span>
-                      )}
-                    </div>
-
-                    <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2 min-h-10">
-                      <Link href={productHref({ slug: p.slug, template: p.template })} className="hover:text-blue-600 transition">
-                        {p.name}
-                      </Link>
-                    </h3>
-
-                    <div className="mt-2 flex items-baseline gap-2">
-                      <span className="text-base sm:text-lg font-black text-rose-600 font-mono">
-                        {p.price > 0 ? `${p.price.toLocaleString("vi-VN")}đ` : "Liên hệ"}
-                      </span>
-                      {p.originalPrice && p.originalPrice > p.price && (
-                        <span className="text-xs text-slate-400 line-through">
-                          {p.originalPrice.toLocaleString("vi-VN")}đ
+              {(() => {
+                const pricedIds = data.products.filter((item) => item.price > 0);
+                const minPrice = pricedIds.length >= 2 ? Math.min(...pricedIds.map((item) => item.price)) : null;
+                return data.products.map((p) => {
+                  const isLowestPrice = minPrice !== null && p.price === minPrice;
+                  return (
+                    <div
+                      key={p.id}
+                      className={`bg-white border rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between relative group ${
+                        isLowestPrice ? "border-emerald-300 ring-1 ring-emerald-500/20" : "border-slate-200"
+                      }`}
+                    >
+                      {isLowestPrice && (
+                        <span className="absolute top-3 left-3 z-10 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[11px] font-bold shadow-2xs">
+                          Giá tốt nhất nhóm
                         </span>
                       )}
-                    </div>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedIds(activeIds.filter(id => id !== p.id))}
+                        title={`Bỏ ${p.name}`}
+                        className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={p.price <= 0 || !['AVAILABLE', 'PREORDER'].includes(p.availability || '')}
-                      onClick={() => {
-                        addToCart({
-                          id: p.variantId ? `${p.id}:${p.variantId}` : p.id,
-                          productId: p.id,
-                          variantId: p.variantId || undefined,
-                          template: p.template,
-                          name: p.name,
-                          slug: p.slug,
-                          price: p.price,
-                          displayPrice: `${p.price.toLocaleString("vi-VN")}đ`,
-                          image: p.image || "/brand/marketing-banner.webp",
-                          quantity: 1,
-                        });
-                        trackStorefront("add_to_cart");
-                      }}
-                      className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ShoppingCart className="w-3.5 h-3.5" />
-                      <span>Thêm giỏ hàng</span>
-                    </button>
-                    <Link
-                      href={productHref({ slug: p.slug, template: p.template })}
-                      className="py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition"
-                    >
-                      Chi tiết →
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                      <div>
+                        <div className="aspect-[4/3] w-full bg-slate-50 rounded-xl p-3 mb-3 flex items-center justify-center border border-slate-100 overflow-hidden">
+                          {p.image ? (
+                            <Image
+                              src={p.image.startsWith("/api/library/") && !p.image.includes("?") ? `${p.image}?size=thumb&v=2` : p.image}
+                              alt={p.name}
+                              width={200}
+                              height={150}
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium">Chưa có ảnh</span>
+                          )}
+                        </div>
+
+                        <h3 className="font-bold text-slate-900 text-sm leading-snug line-clamp-2 min-h-10">
+                          <Link href={productHref({ slug: p.slug, template: p.template })} className="hover:text-blue-600 transition">
+                            {p.name}
+                          </Link>
+                        </h3>
+
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <span className="text-base sm:text-lg font-black text-rose-600 font-mono">
+                            {p.price > 0 ? `${p.price.toLocaleString("vi-VN")}đ` : "Liên hệ"}
+                          </span>
+                          {p.originalPrice && p.originalPrice > p.price && (
+                            <span className="text-xs text-slate-400 line-through">
+                              {p.originalPrice.toLocaleString("vi-VN")}đ
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={p.price <= 0 || !['AVAILABLE', 'PREORDER'].includes(p.availability || '')}
+                          onClick={() => {
+                            addToCart({
+                              id: p.variantId ? `${p.id}:${p.variantId}` : p.id,
+                              productId: p.id,
+                              variantId: p.variantId || undefined,
+                              template: p.template,
+                              name: p.name,
+                              slug: p.slug,
+                              price: p.price,
+                              displayPrice: `${p.price.toLocaleString("vi-VN")}đ`,
+                              image: p.image || "/brand/marketing-banner.webp",
+                              quantity: 1,
+                            });
+                            trackStorefront("add_to_cart");
+                          }}
+                          className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <ShoppingCart className="w-3.5 h-3.5" />
+                          <span>Thêm giỏ hàng</span>
+                        </button>
+                        <Link
+                          href={productHref({ slug: p.slug, template: p.template })}
+                          className="py-2 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs transition"
+                        >
+                          Chi tiết →
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
 
             {/* Detailed Comparison Specs Table */}

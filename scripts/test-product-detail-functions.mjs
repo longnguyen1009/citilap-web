@@ -14,9 +14,9 @@ export async function runProductDetailChecks({db,send,base,cookie,bucket}) {
   assert.equal((await send('/api/admin/settings','POST',{expectedRevision:settings.json.data.revision,document:config},true)).status,200);
   await db.prepare("UPDATE PromotionCampaign SET status='ARCHIVED'").run();
   await db.prepare("UPDATE Product SET price=20000000,isFlashSale=0 WHERE id='fixture-q'").run();
-  const photo=await readFile('public/brand/brand-logo-original.jpg');
-  await bucket.put('library/pdp-fixture.jpg',photo,{httpMetadata:{contentType:'image/jpeg'}});
-  await db.prepare("INSERT INTO MediaAsset(id,kind,provider,storageKey,name,alt,mimeType,size) VALUES('pdp-image','IMAGE','R2','library/pdp-fixture.jpg','Fixture branding image','Fixture image','image/jpeg',?)").bind(photo.length).run();
+  const photo=await readFile('public/brand/citilap-mark.png');
+  await bucket.put('library/pdp-fixture.png',photo,{httpMetadata:{contentType:'image/png'}});
+  await db.prepare("INSERT INTO MediaAsset(id,kind,provider,storageKey,name,alt,mimeType,size) VALUES('pdp-image','IMAGE','R2','library/pdp-fixture.png','Fixture branding image','Fixture image','image/png',?)").bind(photo.length).run();
   const document={schemaVersion:1,name:'Fixture Laptop Alpha',slug:'fixture-p',categoryId:'fixture-cat',brand:'Fixture Brand',brandId:'fixture-brand',template:'LAPTOP',condition:'NEW',isFlashSale:false,isFeatured:false,isNewArrival:false,isBestSeller:false,tags:['gaming'],description:'Fixture description',contentHtml:'<p>Fixture product article</p>',price:20000000,originalPrice:22000000,availability:'AVAILABLE',seoTitle:'Fixture PDP',seoDescription:'Fixture description',specs:[{key:'RAM',value:'16GB'}],media:[{assetId:'pdp-image',alt:'Fixture branded image',variantId:''}],variants:[],warranties:[{name:'Fixture 12 months',description:'Fixture standard coverage',adjustment:0,recommended:true},{name:'Fixture 24 months',description:'Fixture extra coverage',adjustment:890000,recommended:false}],faqs:[{q:'Fixture upgrade question?',a:'Fixture upgrade answer.'}],gifts:['Fixture gift'],accessoryProductIds:['fixture-q'],relatedProductIds:[]};
   let revision;
   await check('Admin content publishes and reloads; stale revision rejected',async()=>{

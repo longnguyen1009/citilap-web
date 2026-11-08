@@ -12,12 +12,14 @@ async function GETHandler(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const paymentStatus = searchParams.get('paymentStatus');
     const search = searchParams.get('search');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
     const orders = await getAllOrdersForExport({
       status,
+      paymentStatus,
       search,
       startDate,
       endDate,

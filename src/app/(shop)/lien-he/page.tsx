@@ -42,7 +42,6 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
   const settings = await getStorefrontSettings();
   const hanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
   const bacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
-  const hcm = businessProfile.locations.find((l) => l.id === "hcm")!;
 
   const brandName = settings?.storeName || businessProfile.brandName;
   const phone = settings?.storePhone || businessProfile.displayPhone;
@@ -245,20 +244,6 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
                 </div>
               </div>
             )}
-
-            {/* Cơ sở TP.HCM (Tạm đóng) */}
-            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200/80 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-200 text-gray-600">
-                  Tạm đóng cửa
-                </span>
-                <h3 className="text-sm font-bold text-gray-700">{hcm.name}</h3>
-              </div>
-              <p className="text-xs text-gray-500">{hcm.address}</p>
-              <p className="text-[11px] text-gray-500 italic">
-                {hcm.statusNotice}
-              </p>
-            </div>
           </div>
 
           {/* Right: Message Form (5 cols) */}

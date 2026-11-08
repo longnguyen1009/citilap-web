@@ -70,28 +70,28 @@ export default function Footer({
               <Truck className="w-10 h-10 text-blue-500 shrink-0" />
               <div>
                 <h4 className="font-bold text-white text-sm uppercase">Giao hàng toàn quốc</h4>
-                <p className="text-xs text-gray-400">Kiểm tra máy khi nhận, cước chốt khi tư vấn</p>
+                <p className="text-xs text-gray-400">Đồng kiểm khi nhận máy, đóng gói chống sốc an toàn</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <ShieldCheck className="w-10 h-10 text-blue-500 shrink-0" />
               <div>
                 <h4 className="font-bold text-white text-sm uppercase">Bảo hành linh hoạt</h4>
-                <p className="text-xs text-gray-400">Gói 3 - 12 tháng theo cấu hình & SKU máy</p>
+                <p className="text-xs text-gray-400">Gói 3 - 12 tháng minh bạch, hỗ trợ kỹ thuật trọn đời</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <RefreshCw className="w-10 h-10 text-blue-500 shrink-0" />
               <div>
                 <h4 className="font-bold text-white text-sm uppercase">Lỗi 1 đổi 1 trong 7 ngày</h4>
-                <p className="text-xs text-gray-400">Lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu lỗi phần cứng</p>
+                <p className="text-xs text-gray-400">Đổi máy mới ngay nếu phát sinh lỗi phần cứng</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
               <Store className="w-10 h-10 text-blue-500 shrink-0" />
               <div>
                 <h4 className="font-bold text-white text-sm uppercase">Trải nghiệm thực tế</h4>
-                <p className="text-xs text-gray-400">Xem và mua trực tiếp tại Hà Nội & Bắc Ninh</p>
+                <p className="text-xs text-gray-400">Trải nghiệm & test máy trực tiếp tại showroom</p>
               </div>
             </div>
           </div>

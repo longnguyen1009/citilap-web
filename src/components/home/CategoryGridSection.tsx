@@ -3,11 +3,24 @@
 import { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Sparkles, ArrowRight, Layers, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Sparkles, ArrowRight, Layers, Gamepad2, Briefcase, Palette, Laptop, RefreshCw, Cpu, type LucideIcon } from "lucide-react";
 import { SHOWCASE_CATEGORIES } from "@/config/category-showcase";
 import type { ResolvedNavigation } from "@/contracts/cms/navigation";
 
 type DisplayCategory = { id: string; name: string; href: string; icon: LucideIcon; image?: string | null; alt?: string; badge?: string; badgeColor?: string };
+
+function resolveCategoryIcon(slug: string, href: string): LucideIcon {
+  const matched = SHOWCASE_CATEGORIES.find((item) => item.href === href || item.slug === slug || item.id === slug);
+  if (matched) return matched.icon;
+  const key = `${slug} ${href}`.toLowerCase();
+  if (key.includes("gaming")) return Gamepad2;
+  if (key.includes("van-phong")) return Briefcase;
+  if (key.includes("do-hoa") || key.includes("workstation")) return Palette;
+  if (key.includes("macbook") || key.includes("mong-nhe") || key.includes("sinh-vien")) return Laptop;
+  if (key.includes("likenew") || key.includes("cu")) return RefreshCw;
+  if (key.includes("phu-kien") || key.includes("linh-kien")) return Cpu;
+  return Layers;
+}
 
 export default function CategoryGridSection({ navigation }: { navigation?: ResolvedNavigation | null }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -50,7 +63,14 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
 
   // Chia 16 danh mục thành 2 hàng đều đặn (mỗi hàng 8 mục)
   const displayCategories: DisplayCategory[] = navigation
-    ? navigation.categories.filter(cat => !cat.parentId).map((cat) => ({ id: cat.id, name: cat.name, href: cat.href, icon: Layers, image: cat.image, alt: cat.alt }))
+    ? navigation.categories.filter(cat => !cat.parentId).map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        href: cat.href,
+        icon: resolveCategoryIcon(cat.slug, cat.href),
+        image: cat.image,
+        alt: cat.alt,
+      }))
     : SHOWCASE_CATEGORIES;
   const rows = Array.from({ length: Math.ceil(displayCategories.length / 8) }, (_, index) =>
     displayCategories.slice(index * 8, (index + 1) * 8)
@@ -126,8 +146,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
             tabIndex={0}
             role="region"
             aria-label="Danh mục nổi bật"
-            className="overflow-x-auto scrollbar-none pb-2 -mx-2 px-2 snap-x snap-mandatory scroll-smooth focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-xl"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            className="overflow-x-auto overscroll-x-contain hide-scrollbar pb-2 -mx-2 px-2 snap-x snap-mandatory scroll-smooth focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-xl"
           >
             <div className="flex flex-col gap-4 min-w-[760px] md:min-w-[980px] lg:min-w-full">
               {rows.map((row, rowIndex) => (

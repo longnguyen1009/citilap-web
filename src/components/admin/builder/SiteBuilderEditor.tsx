@@ -32,7 +32,21 @@ import {
   X,
   Search,
   Image as ImageIcon,
+  ExternalLink,
+  Flame,
+  Zap,
+  Briefcase,
+  Server,
+  Headphones,
+  Star,
+  ShieldCheck,
+  Truck,
+  RefreshCw,
+  Store,
+  Check,
+  Link as LinkIcon,
 } from 'lucide-react';
+import { youtubeId, tiktokVideoId } from '@/contracts/cms/media';
 import type {
   LandingPageStudioResponse,
   SectionItem,
@@ -41,6 +55,7 @@ import type {
 } from '@/contracts/cms/site-builder';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
+import MediaUpload from '@/components/admin/media/MediaUpload';
 import BlockRenderer from '@/components/builder/BlockRenderer';
 import { WishlistProvider } from '@/context/WishlistContext';
 import { CompareProvider } from '@/context/CompareContext';
@@ -289,6 +304,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [mediaPickerTarget, setMediaPickerTarget] = useState<string | null>(null);
   const [productPickerTarget, setProductPickerTarget] = useState<string | null>(null);
+  const [postPickerTarget, setPostPickerTarget] = useState<string | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewViewport, setPreviewViewport] = useState<'desktop' | 'mobile'>('desktop');
   const [previewSections, setPreviewSections] = useState<ResolvedSectionItem[]>([]);
@@ -1018,13 +1034,43 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     const Icon = meta.icon;
                     const isSelected = sec.id === selectedSectionId;
 
+                    let blockSummary = meta.label;
+                    if (sec.data.type === 'banner') {
+                      blockSummary = `Banner (${sec.data.layout || 'hero'})`;
+                    } else if (sec.data.type === 'intro') {
+                      const count = (sec.data.features || []).filter((f) => f.enabled !== false).length;
+                      blockSummary = `Cam kết dịch vụ • ${count} ô`;
+                    } else if (sec.data.type === 'featured_categories') {
+                      const count = (sec.data.items || []).filter((i) => i.enabled !== false).length || sec.data.categoryIds?.length || 0;
+                      blockSummary = `${sec.data.layout === 'board' ? 'Bảng phân loại' : 'Thẻ danh mục'} • ${count} mục`;
+                    } else if (sec.data.type === 'product_grid') {
+                      if (sec.id === 'sec-hot-sale') {
+                        blockSummary = `HOT SALE / Flash Sale`;
+                      } else if (sec.data.tabs?.length) {
+                        const tabCount = sec.data.tabs.filter((t) => t.enabled !== false).length;
+                        blockSummary = `Khối Tab sản phẩm • ${tabCount} tab`;
+                      } else {
+                        const lim = sec.data.ruleCriteria?.limit || 12;
+                        const linkCount = sec.data.links?.length || 0;
+                        blockSummary = `${sec.data.sourceMode === 'manual' ? `Thủ công (${sec.data.manualProductIds?.length || 0})` : 'Tự động'} • Tối đa ${lim} SP${linkCount ? ` • ${linkCount} link` : ''}`;
+                      }
+                    } else if (sec.data.type === 'video_reviews') {
+                      const count = (sec.data.videos || []).filter((v) => v.enabled !== false).length;
+                      blockSummary = `Video Review • ${count} video`;
+                    } else if (sec.data.type === 'news_reviews') {
+                      blockSummary = `Tin tức Media • Tối đa ${sec.data.limit || 5} bài`;
+                    } else if (sec.data.type === 'customer_gallery') {
+                      const count = (sec.data.images || []).filter((i) => i.enabled !== false).length;
+                      blockSummary = `Ảnh khách hàng • ${count} ảnh`;
+                    }
+
                     return (
                       <div
                         key={sec.id}
                         onClick={() => setSelectedSectionId(sec.id)}
                         className={`group p-2.5 rounded-xl border transition flex items-center justify-between gap-2 cursor-pointer ${
                           isSelected
-                            ? 'bg-blue-50/80 border-blue-400 shadow-2xs'
+                            ? 'bg-blue-50/90 border-blue-500 shadow-xs'
                             : sec.enabled
                             ? 'bg-white border-slate-200 hover:border-slate-300'
                             : 'bg-slate-50 border-dashed border-slate-300 opacity-60'
@@ -1045,30 +1091,38 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                             <div className="text-xs font-bold text-slate-900 truncate">
                               {sec.name || meta.label}
                             </div>
-                            <div className="text-[10px] text-slate-400 truncate">
-                              {meta.label} {!sec.enabled && '• Đang ẩn'}
+                            <div className="text-[10px] text-slate-500 truncate">
+                              {blockSummary} {!sec.enabled && '• Đang ẩn'}
                             </div>
                           </div>
                         </div>
 
                         {/* Quick Control Actions */}
                         <div
-                          className="flex items-center gap-0.5 shrink-0"
+                          className="flex items-center gap-1 shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
                             type="button"
+                            role="switch"
+                            aria-checked={sec.enabled}
                             onClick={() => handleToggleVisible(sec.id)}
-                            className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100"
-                            title={sec.enabled ? 'Ẩn khối' : 'Hiện khối'}
+                            className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                              sec.enabled ? 'bg-emerald-500' : 'bg-slate-300'
+                            }`}
+                            title={sec.enabled ? 'Đang bật hiển thị (Bấm để ẩn khối)' : 'Đang ẩn (Bấm để bật hiển thị khối)'}
                           >
-                            {sec.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                            <span
+                              className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
+                                sec.enabled ? 'translate-x-3' : 'translate-x-0'
+                              }`}
+                            />
                           </button>
                           <button
                             type="button"
                             disabled={idx === 0}
                             onClick={() => handleMoveSection(idx, -1)}
-                            className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 disabled:opacity-20"
+                            className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 disabled:opacity-20 cursor-pointer"
                             title="Di chuyển lên"
                           >
                             <ArrowUp className="w-3.5 h-3.5" />
@@ -1077,7 +1131,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                             type="button"
                             disabled={idx === sections.length - 1}
                             onClick={() => handleMoveSection(idx, 1)}
-                            className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 disabled:opacity-20"
+                            className="p-1 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 disabled:opacity-20 cursor-pointer"
                             title="Di chuyển xuống"
                           >
                             <ArrowDown className="w-3.5 h-3.5" />
@@ -1085,7 +1139,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                           <button
                             type="button"
                             onClick={() => handleDuplicateSection(idx)}
-                            className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100"
+                            className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100 cursor-pointer"
                             title="Nhân bản"
                           >
                             <Copy className="w-3.5 h-3.5" />
@@ -1093,7 +1147,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                           <button
                             type="button"
                             onClick={() => handleDeleteSection(sec.id)}
-                            className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100"
+                            className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100 cursor-pointer"
                             title="Xóa khối"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1102,6 +1156,24 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                       </div>
                     );
                   })
+                )}
+
+                {pageId === 'home' && (
+                  <div className="mt-3 p-3 rounded-xl bg-slate-100/90 border border-slate-200/90 text-[11px] text-slate-600 space-y-1.5">
+                    <div className="font-bold text-slate-800 flex items-center justify-between">
+                      <span>Khối chân trang chủ cố định</span>
+                      <Link
+                        href="/admin/settings"
+                        target="_blank"
+                        className="text-blue-600 hover:text-blue-700 font-bold"
+                      >
+                        Cấu hình ↗
+                      </Link>
+                    </div>
+                    <p className="leading-snug text-slate-500">
+                      Khối <strong>Đánh giá khách hàng</strong> &amp; <strong>Form Tư vấn chọn máy</strong> ở cuối trang chủ lấy dữ liệu Hotline/Zalo và Đánh giá từ Cài đặt Cửa hàng.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
@@ -1284,21 +1356,24 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                   )}
                   {selectedSection.data.type === 'product_grid' && (
                     <ProductGridForm
+                      sectionId={selectedSection.id}
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
-                      onPickProduct={() => setProductPickerTarget('product_grid')}
+                      onPickProduct={(target) => setProductPickerTarget(target || 'product_grid')}
                     />
                   )}
                   {selectedSection.data.type === 'featured_categories' && (
                     <FeaturedCategoriesForm
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
+                      onPickMedia={(itemIdx) => setMediaPickerTarget(`cat_item_image:${itemIdx}`)}
                     />
                   )}
                   {selectedSection.data.type === 'featured_brands' && (
                     <FeaturedBrandsForm
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
+                      onPickMedia={(brandIdx) => setMediaPickerTarget(`brand_logo:${brandIdx}`)}
                     />
                   )}
                   {selectedSection.data.type === 'featured_collection' && (
@@ -1311,6 +1386,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     <NewsReviewsForm
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
+                      onPickPost={() => setPostPickerTarget('news_reviews')}
                     />
                   )}
                   {selectedSection.data.type === 'intro' && (
@@ -1338,6 +1414,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     <CtaForm
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
+                      onPickMedia={() => setMediaPickerTarget('cta_bg_image')}
                     />
                   )}
                 </div>
@@ -1357,13 +1434,31 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
           title="Chọn hình ảnh từ thư viện"
           onClose={() => setMediaPickerTarget(null)}
         >
-          <MediaBrowser
-            picker
-            onSelect={(asset) => {
+          <div className="space-y-4">
+            <MediaUpload defaultFolder="banners" onUploaded={() => undefined} />
+            <MediaBrowser
+              picker
+              onSelect={(asset) => {
               if (mediaPickerTarget === 'banner_image' && selectedSection?.data.type === 'banner') {
                 updateSelectedSectionData({ imageUrl: asset.url || '', imageAssetId: asset.id });
               } else if (mediaPickerTarget === 'og_image') {
                 setOgImageAssetId(asset.id);
+              } else if (mediaPickerTarget === 'cta_bg_image' && selectedSection?.data.type === 'cta') {
+                updateSelectedSectionData({ bgImageUrl: asset.url || '' });
+              } else if (mediaPickerTarget.startsWith('cat_item_image:') && selectedSection?.data.type === 'featured_categories') {
+                const cIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                const items = [...(selectedSection.data.items || [])];
+                if (items[cIdx]) {
+                  items[cIdx] = { ...items[cIdx], customImage: asset.url || '' };
+                  updateSelectedSectionData({ items });
+                }
+              } else if (mediaPickerTarget.startsWith('brand_logo:') && selectedSection?.data.type === 'featured_brands') {
+                const bIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                const items = [...(selectedSection.data.items || [])];
+                if (items[bIdx]) {
+                  items[bIdx] = { ...items[bIdx], logo: asset.url || '' };
+                  updateSelectedSectionData({ items });
+                }
               } else if (mediaPickerTarget.startsWith('slide_image:') && selectedSection?.data.type === 'slider') {
                 const sIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
                 const slides = [...(selectedSection.data.slides || [])];
@@ -1388,12 +1483,13 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
               } else if (mediaPickerTarget === 'gallery_image_add' && selectedSection?.data.type === 'customer_gallery') {
                 const current = selectedSection.data.images || [];
                 updateSelectedSectionData({
-                  images: [...current, { url: asset.url || '', alt: 'Khách hàng CitiLap' }],
+                  images: [...current, { url: asset.url || '', alt: 'Khách hàng CitiLap', enabled: true }],
                 });
               }
               setMediaPickerTarget(null);
             }}
           />
+          </div>
         </MediaDialog>
       )}
 
@@ -1403,9 +1499,36 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
           onClose={() => setProductPickerTarget(null)}
           onSelect={(product) => {
             if (selectedSection?.data.type === 'product_grid') {
-              const current = selectedSection.data.manualProductIds || [];
-              if (!current.includes(product.id) && current.length < 48) {
-                updateSelectedSectionData({ manualProductIds: [...current, product.id] });
+              if (productPickerTarget.startsWith('product_tab:')) {
+                const tabIdx = parseInt(productPickerTarget.split(':')[1], 10);
+                const tabs = [...(selectedSection.data.tabs || [])];
+                if (tabs[tabIdx]) {
+                  const currentIds = tabs[tabIdx].productIds || [];
+                  if (!currentIds.includes(product.id) && currentIds.length < 48) {
+                    tabs[tabIdx] = { ...tabs[tabIdx], productIds: [...currentIds, product.id] };
+                    updateSelectedSectionData({ tabs });
+                  }
+                }
+              } else {
+                const current = selectedSection.data.manualProductIds || [];
+                if (!current.includes(product.id) && current.length < 48) {
+                  updateSelectedSectionData({ manualProductIds: [...current, product.id] });
+                }
+              }
+            }
+          }}
+        />
+      )}
+
+      {/* 4b. POST SELECTOR DIALOG */}
+      {postPickerTarget && (
+        <PostSelectorDialog
+          onClose={() => setPostPickerTarget(null)}
+          onSelect={(post) => {
+            if (selectedSection?.data.type === 'news_reviews') {
+              const current = selectedSection.data.postIds || [];
+              if (!current.includes(post.id) && current.length < 20) {
+                updateSelectedSectionData({ postIds: [...current, post.id] });
               }
             }
           }}
@@ -1714,6 +1837,185 @@ function ProductSelectorDialog({
       </div>
     </MediaDialog>
   );
+}
+
+interface PostItem {
+  id: string;
+  title: string;
+  slug: string;
+  status: string;
+}
+
+function PostSelectorDialog({
+  onClose,
+  onSelect,
+}: {
+  onClose: () => void;
+  onSelect: (p: PostItem) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<{ items: PostItem[]; total: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await mediaRequest<{ items: PostItem[]; total: number }>(
+          `/api/admin/posts?q=${encodeURIComponent(query)}&page=${page}&limit=10`
+        );
+        if (!ignore) {
+          setData(res);
+          setLoading(false);
+        }
+      } catch {
+        if (!ignore) setLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      ignore = true;
+    };
+  }, [query, page]);
+
+  return (
+    <MediaDialog title="Chọn bài viết công nghệ / media" onClose={onClose}>
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Tìm kiếm bài viết theo tiêu đề..."
+            className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs"
+          />
+        </div>
+
+        <div className="max-h-60 overflow-y-auto space-y-1">
+          {loading ? (
+            <p className="text-center text-slate-400 text-xs py-6">Đang tìm kiếm...</p>
+          ) : !data || data.items.length === 0 ? (
+            <p className="text-center text-slate-400 text-xs py-6">Không tìm thấy bài viết nào.</p>
+          ) : (
+            data.items.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  onSelect(p);
+                  onClose();
+                }}
+                className="w-full flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50 text-left transition cursor-pointer"
+              >
+                <div>
+                  <div className="text-xs font-bold text-slate-900">{p.title}</div>
+                  <div className="text-[10px] text-slate-500 font-mono">/news/{p.slug}</div>
+                </div>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    p.status === 'PUBLISHED'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {p.status === 'PUBLISHED' ? 'Đã xuất bản' : 'Bản nháp'}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+
+        {data && (
+          <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-30 cursor-pointer"
+            >
+              Trang trước
+            </button>
+            <span className="text-slate-500">
+              Trang {page} ({data.total} bài)
+            </span>
+            <button
+              type="button"
+              disabled={page * 10 >= data.total}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-30 cursor-pointer"
+            >
+              Trang sau
+            </button>
+          </div>
+        )}
+      </div>
+    </MediaDialog>
+  );
+}
+
+interface CategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+  parentId?: string | null;
+  image?: string | null;
+}
+interface BrandOption {
+  id: string;
+  name: string;
+  slug: string;
+  logo?: string | null;
+  description?: string | null;
+}
+interface PostCategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+function useCatalogOptions() {
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [brands, setBrands] = useState<BrandOption[]>([]);
+  const [postCategories, setPostCategories] = useState<PostCategoryOption[]>([]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function load() {
+      try {
+        const [navRes, brandRes, postCatRes] = await Promise.allSettled([
+          mediaRequest<{ document?: { categories?: CategoryOption[] } }>('/api/admin/navigation'),
+          mediaRequest<{ items: BrandOption[] }>('/api/admin/brands?status=ACTIVE'),
+          mediaRequest<PostCategoryOption[]>('/api/admin/post-categories?status=ACTIVE'),
+        ]);
+        if (!ignore) {
+          if (navRes.status === 'fulfilled' && navRes.value?.document?.categories) {
+            setCategories(navRes.value.document.categories);
+          }
+          if (brandRes.status === 'fulfilled' && Array.isArray(brandRes.value?.items)) {
+            setBrands(brandRes.value.items);
+          }
+          if (postCatRes.status === 'fulfilled' && Array.isArray(postCatRes.value)) {
+            setPostCategories(postCatRes.value);
+          }
+        }
+      } catch {
+        // fail-soft
+      }
+    }
+    void load();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  return { categories, brands, postCategories };
 }
 
 // ==========================================
@@ -2093,24 +2395,37 @@ function SliderForm({
 }
 
 function ProductGridForm({
+  sectionId,
   data,
   update,
   onPickProduct,
 }: {
+  sectionId?: string;
   data: ProductGridData;
   update: (p: Partial<ProductGridData>) => void;
-  onPickProduct: () => void;
+  onPickProduct: (target?: string) => void;
 }) {
+  const { categories, brands } = useCatalogOptions();
   const [productNames, setProductNames] = useState<Record<string, string>>({});
+  const [newQuickLabel, setNewQuickLabel] = useState('');
+  const [newQuickHref, setNewQuickHref] = useState('');
+
+  // Collect all product IDs in main shelf and all tabs to resolve product names
+  const allReferencedIds = [
+    ...(data.manualProductIds || []),
+    ...(data.tabs || []).flatMap((t) => t.productIds || []),
+  ];
 
   useEffect(() => {
     let ignore = false;
-    const missingIds = (data.manualProductIds || []).filter((id) => !productNames[id]);
+    const missingIds = [...new Set(allReferencedIds)].filter((id) => !productNames[id]);
     if (missingIds.length === 0) return;
 
     async function fetchMissingNames() {
       try {
-        const res = await mediaRequest<{ items: Array<{ id: string; name: string }> }>('/api/admin/products?limit=100');
+        const res = await mediaRequest<{ items: Array<{ id: string; name: string }> }>(
+          `/api/admin/products?ids=${encodeURIComponent(missingIds.join(','))}&limit=${Math.min(100, Math.max(50, missingIds.length))}`
+        );
         if (!ignore && res?.items) {
           const map: Record<string, string> = {};
           for (const it of res.items) {
@@ -2126,222 +2441,117 @@ function ProductGridForm({
     return () => {
       ignore = true;
     };
-  }, [data.manualProductIds, productNames]);
+  }, [allReferencedIds, productNames]);
+
+  const isHotSaleSection = sectionId === 'sec-hot-sale';
+  const hasTabs = Boolean(data.tabs && data.tabs.length > 0);
+
+  const addQuickLink = () => {
+    if (!newQuickLabel.trim() || !newQuickHref.trim()) return;
+    const current = data.links || [];
+    update({ links: [...current, { label: newQuickLabel.trim(), href: newQuickHref.trim() }] });
+    setNewQuickLabel('');
+    setNewQuickHref('');
+  };
 
   return (
-    <div className="space-y-4">
-      {!!data.tabs?.length && <fieldset className="space-y-3 rounded-xl border p-3"><legend className="px-1 font-bold">Các tab sản phẩm</legend>{data.tabs.map((tab, index) => <div key={tab.id} className="space-y-2 rounded border bg-slate-50 p-3"><label className="block text-xs">Tên tab<input value={tab.label} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, label: e.target.value } : t) })} className="mt-1 w-full rounded border p-2" /></label><label className="block text-xs">Link xem tất cả<input value={tab.href} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, href: e.target.value } : t) })} className="mt-1 w-full rounded border p-2" /></label><label className="block text-xs">ID sản phẩm, mỗi dòng một ID<textarea value={tab.productIds.join('\n')} onChange={e => update({ tabs: data.tabs?.map((t, i) => i === index ? { ...t, productIds: e.target.value.split(/\s+/).filter(Boolean) } : t) })} rows={3} className="mt-1 w-full rounded border p-2 font-mono" /></label></div>)}</fieldset>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề lưới sản phẩm</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Ví dụ: Sản phẩm bán chạy"
-          />
+    <div className="space-y-5">
+      {/* 1. HOT SALE SPECIAL NOTICE */}
+      {isHotSaleSection && (
+        <div className="p-4 rounded-xl bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 text-xs space-y-2">
+          <div className="flex items-center gap-2 font-bold text-red-700 text-sm">
+            <Flame className="w-4 h-4 text-red-600 shrink-0" />
+            <span>Khối HOT SALE / Flash Sale trang chủ</span>
+          </div>
+          <p className="text-slate-700 leading-relaxed">
+            Trên trang chủ công khai, khối này hiển thị các sản phẩm Flash Sale đang hoạt động. Bạn có thể tạo đợt giảm giá, cấu hình % giảm và thời gian đếm ngược tại{' '}
+            <Link href="/admin/campaigns" target="_blank" className="font-bold text-red-700 underline hover:text-red-800">
+              Quản lý Chiến dịch Khuyến mãi ↗
+            </Link>
+            .
+          </p>
+          <p className="text-slate-500 text-[11px]">
+            Cấu hình bên dưới dùng cho tiêu đề, liên kết &quot;Tất cả ưu đãi&quot; và sản phẩm hiển thị dự phòng khi không có chiến dịch nào kích hoạt.
+          </p>
         </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Huy hiệu & Màu chủ đề</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={data.badge || ''}
-              onChange={(e) => update({ badge: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-              placeholder="Huy hiệu (Hot/Sale)"
-            />
-            <select
-              value={data.colorTheme || 'blue'}
-              onChange={(e) => update({ colorTheme: e.target.value })}
-              className="px-2 py-2 border border-slate-300 rounded-lg text-xs shrink-0"
-            >
-              <option value="blue">Xanh dương</option>
-              <option value="red">Đỏ Gaming</option>
-              <option value="indigo">Chàm</option>
-              <option value="emerald">Xanh lục</option>
-              <option value="orange">Cam</option>
-              <option value="gray">Xám tối</option>
-            </select>
-          </div>
-        </div>
-      </div>
+      )}
 
-      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-        <label className="font-bold text-slate-800 block">Phương thức chọn sản phẩm:</label>
-        <div className="flex gap-4">
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="sourceMode"
-              value="rule"
-              checked={data.sourceMode === 'rule'}
-              onChange={() => update({ sourceMode: 'rule' })}
-            />
-            <span className="font-medium">Theo điều kiện tự động (Rule-based)</span>
-          </label>
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="sourceMode"
-              value="manual"
-              checked={data.sourceMode === 'manual'}
-              onChange={() => update({ sourceMode: 'manual' })}
-            />
-            <span className="font-medium">Chọn thủ công từng sản phẩm (Manual)</span>
-          </label>
-        </div>
-      </div>
-
-      {data.sourceMode === 'rule' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 border border-slate-200 rounded-xl bg-white">
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">Loại sản phẩm</label>
-            <select
-              value={data.ruleCriteria?.productType || 'all'}
-              onChange={(e) =>
-                update({
-                  ruleCriteria: {
-                    ...data.ruleCriteria,
-                    productType: e.target.value as ProductRuleCriteria['productType'],
-                  },
-                })
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            >
-              <option value="all">Tất cả sản phẩm</option>
-              <option value="laptop">Chỉ Laptop</option>
-              <option value="accessory">Chỉ Phụ kiện & Đồ chơi</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">Tình trạng kho</label>
-            <select
-              value={data.ruleCriteria?.availability || 'all'}
-              onChange={(e) =>
-                update({
-                  ruleCriteria: {
-                    ...data.ruleCriteria,
-                    availability: e.target.value as ProductRuleCriteria['availability'],
-                  },
-                })
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            >
-              <option value="all">Tất cả trạng thái</option>
-              <option value="AVAILABLE">Còn hàng trong kho</option>
-              <option value="PREORDER">Nhận đặt trước (Pre-order)</option>
-              <option value="CONTACT">Liên hệ trực tiếp</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">Thẻ đánh dấu (Tag)</label>
-            <select
-              value={data.ruleCriteria?.tag || 'all'}
-              onChange={(e) =>
-                update({
-                  ruleCriteria: {
-                    ...data.ruleCriteria,
-                    tag: e.target.value as ProductRuleCriteria['tag'],
-                  },
-                })
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            >
-              <option value="all">Tất cả nhãn</option>
-              <option value="isFeatured">Sản phẩm Nổi bật</option>
-              <option value="isNewArrival">Hàng Mới Về</option>
-              <option value="isBestSeller">Bán Chạy Nhất</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">Sắp xếp theo</label>
-            <select
-              value={data.ruleCriteria?.sort || 'newest'}
-              onChange={(e) =>
-                update({
-                  ruleCriteria: {
-                    ...data.ruleCriteria,
-                    sort: e.target.value as ProductRuleCriteria['sort'],
-                  },
-                })
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            >
-              <option value="newest">Mới nhất cập nhật</option>
-              <option value="price-asc">Giá từ thấp đến cao</option>
-              <option value="price-desc">Giá từ cao xuống thấp</option>
-              <option value="name-asc">Tên sản phẩm (A-Z)</option>
-              <option value="best-selling">Bán chạy nhất</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="font-bold text-slate-700 block mb-1">Số lượng hiển thị (Limit)</label>
-            <input
-              type="number"
-              min={1}
-              max={48}
-              value={data.ruleCriteria?.limit || 12}
-              onChange={(e) =>
-                update({
-                  ruleCriteria: {
-                    ...data.ruleCriteria,
-                    limit: Math.min(48, Math.max(1, parseInt(e.target.value) || 12)),
-                  },
-                })
-              }
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3 p-4 border border-slate-200 rounded-xl bg-white">
+      {/* 2. TAB MANAGER (E.G. KHÁM PHÁ LAPTOP) */}
+      {(hasTabs || sectionId === 'sec-discover') && (
+        <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50/30 p-4">
           <div className="flex items-center justify-between">
-            <span className="font-bold text-slate-700">
-              Đã chọn: {data.manualProductIds?.length || 0} sản phẩm (tối đa 48)
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-blue-600 text-white shadow-2xs">
+                <Grid className="w-4 h-4" />
+              </span>
+              <div>
+                <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
+                  Cấu hình các Tab sản phẩm ({data.tabs?.length || 0} Tab)
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Hiển thị dạng thanh Tab chuyển đổi linh hoạt trên trang chủ (Khám phá laptop)
+                </p>
+              </div>
+            </div>
             <button
               type="button"
-              onClick={onPickProduct}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+              onClick={() => {
+                const current = data.tabs || [];
+                const newTabId = `tab-${Date.now()}`;
+                update({
+                  tabs: [
+                    ...current,
+                    {
+                      id: newTabId,
+                      label: `Tab #${current.length + 1}`,
+                      href: '/search?category=laptop',
+                      limit: 15,
+                      productIds: [],
+                      enabled: true,
+                      sourceMode: 'manual',
+                    },
+                  ],
+                });
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
             >
-              + Chọn sản phẩm
+              <Plus className="w-3.5 h-3.5" /> Thêm Tab mới
             </button>
           </div>
 
-          {data.manualProductIds && data.manualProductIds.length > 0 ? (
-            <div className="space-y-1.5 max-h-60 overflow-y-auto">
-              {data.manualProductIds.map((pId: string, idx: number) => (
-                <div
-                  key={pId}
-                  className="flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg text-xs transition"
-                >
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                      {idx + 1}
+          <div className="space-y-3 pt-1">
+            {data.tabs?.map((tab, tIdx) => (
+              <div key={tab.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {tIdx + 1}
                     </span>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-slate-900 truncate">
-                        {productNames[pId] || `Sản phẩm ${pId}`}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono truncate">
-                        ID: {pId}
-                      </div>
-                    </div>
+                    <span className="font-bold text-xs text-slate-800 truncate">{tab.label}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">({tab.id})</span>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
+                      <input
+                        type="checkbox"
+                        checked={tab.enabled !== false}
+                        onChange={(e) => {
+                          const next = [...(data.tabs || [])];
+                          next[tIdx] = { ...next[tIdx], enabled: e.target.checked };
+                          update({ tabs: next });
+                        }}
+                        className="rounded text-blue-600"
+                      />
+                      <span>Bật</span>
+                    </label>
                     <button
                       type="button"
-                      disabled={idx === 0}
+                      disabled={tIdx === 0}
                       onClick={() => {
-                        const next = [...(data.manualProductIds || [])];
-                        [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
-                        update({ manualProductIds: next });
+                        const next = [...(data.tabs || [])];
+                        [next[tIdx], next[tIdx - 1]] = [next[tIdx - 1], next[tIdx]];
+                        update({ tabs: next });
                       }}
                       className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
                       title="Di chuyển lên"
@@ -2350,11 +2560,11 @@ function ProductGridForm({
                     </button>
                     <button
                       type="button"
-                      disabled={idx === (data.manualProductIds?.length || 0) - 1}
+                      disabled={tIdx === (data.tabs?.length || 0) - 1}
                       onClick={() => {
-                        const next = [...(data.manualProductIds || [])];
-                        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-                        update({ manualProductIds: next });
+                        const next = [...(data.tabs || [])];
+                        [next[tIdx], next[tIdx + 1]] = [next[tIdx + 1], next[tIdx]];
+                        update({ tabs: next });
                       }}
                       className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
                       title="Di chuyển xuống"
@@ -2364,30 +2574,800 @@ function ProductGridForm({
                     <button
                       type="button"
                       onClick={() => {
-                        update({
-                          manualProductIds: data.manualProductIds?.filter((x: string) => x !== pId),
-                        });
+                        if (!window.confirm(`Xóa tab "${tab.label}"?`)) return;
+                        update({ tabs: data.tabs?.filter((_, idx) => idx !== tIdx) });
                       }}
                       className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                      title="Xóa khỏi danh sách"
+                      title="Xóa tab"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-slate-400 text-xs italic">
-              Chưa có sản phẩm nào được chọn. Hãy bấm nút &quot;+ Chọn sản phẩm&quot; phía trên.
-            </p>
-          )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Tên tab hiển thị *</label>
+                    <input
+                      type="text"
+                      value={tab.label}
+                      onChange={(e) => {
+                        const next = [...(data.tabs || [])];
+                        next[tIdx] = { ...next[tIdx], label: e.target.value };
+                        update({ tabs: next });
+                      }}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+                      placeholder="Ví dụ: Laptop Mới"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Mã định danh (ID) *</label>
+                    <input
+                      type="text"
+                      value={tab.id}
+                      onChange={(e) => {
+                        const next = [...(data.tabs || [])];
+                        next[tIdx] = { ...next[tIdx], id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') };
+                        update({ tabs: next });
+                      }}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono"
+                      placeholder="new-arrivals"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Liên kết &quot;Xem tất cả&quot;</label>
+                    <input
+                      type="text"
+                      value={tab.href || ''}
+                      onChange={(e) => {
+                        const next = [...(data.tabs || [])];
+                        next[tIdx] = { ...next[tIdx], href: e.target.value };
+                        update({ tabs: next });
+                      }}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+                      placeholder="/search?category=laptop-moi"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-bold text-slate-700">Nguồn sản phẩm tab:</span>
+                    <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`tab_src_${tab.id}`}
+                        checked={tab.sourceMode !== 'rule'}
+                        onChange={() => {
+                          const next = [...(data.tabs || [])];
+                          next[tIdx] = { ...next[tIdx], sourceMode: 'manual' };
+                          update({ tabs: next });
+                        }}
+                      />
+                      <span>Thủ công ({tab.productIds?.length || 0} SP)</span>
+                    </label>
+                    <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input
+                        type="radio"
+                        name={`tab_src_${tab.id}`}
+                        checked={tab.sourceMode === 'rule'}
+                        onChange={() => {
+                          const next = [...(data.tabs || [])];
+                          next[tIdx] = {
+                            ...next[tIdx],
+                            sourceMode: 'rule',
+                            ruleCriteria: next[tIdx].ruleCriteria || {
+                              productType: 'laptop',
+                              categoryId: null,
+                              brandId: null,
+                              condition: tab.id === 'new' ? 'NEW' : tab.id === 'like-new' ? 'LIKE_NEW' : tab.id === 'clearance' ? 'ON_SALE' : 'all',
+                              tag: 'all',
+                              availability: 'all',
+                              sort: 'newest',
+                              limit: 15,
+                            },
+                          };
+                          update({ tabs: next });
+                        }}
+                      />
+                      <span>Theo điều kiện tự động</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">
+                      Số lượng hiển thị (Limit):
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={48}
+                      value={tab.limit || 15}
+                      onChange={(e) => {
+                        const next = [...(data.tabs || [])];
+                        next[tIdx] = { ...next[tIdx], limit: Math.min(48, Math.max(1, parseInt(e.target.value) || 15)) };
+                        update({ tabs: next });
+                      }}
+                      className="w-16 px-2 py-1 border border-slate-300 rounded text-xs text-center"
+                    />
+                  </div>
+                </div>
+
+                {tab.sourceMode === 'rule' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tình trạng máy</label>
+                      <select
+                        value={tab.ruleCriteria?.condition || 'all'}
+                        onChange={(e) => {
+                          const next = [...(data.tabs || [])];
+                          const base = next[tIdx].ruleCriteria || {
+                            productType: 'laptop' as const,
+                            categoryId: null,
+                            brandId: null,
+                            condition: 'all' as const,
+                            tag: 'all' as const,
+                            availability: 'all' as const,
+                            sort: 'newest' as const,
+                            limit: tab.limit || 15,
+                          };
+                          next[tIdx] = {
+                            ...next[tIdx],
+                            ruleCriteria: { ...base, condition: e.target.value as any },
+                          };
+                          update({ tabs: next });
+                        }}
+                        className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
+                      >
+                        <option value="all">Tất cả tình trạng</option>
+                        <option value="NEW">Chỉ máy Mới 100%</option>
+                        <option value="LIKE_NEW">Chỉ máy Like-New 99%</option>
+                        <option value="USED">Hàng cũ tuyển chọn</option>
+                        <option value="ON_SALE">Đang giảm giá sốc (Flash Sale)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Sắp xếp</label>
+                      <select
+                        value={tab.ruleCriteria?.sort || 'newest'}
+                        onChange={(e) => {
+                          const next = [...(data.tabs || [])];
+                          const base = next[tIdx].ruleCriteria || {
+                            productType: 'laptop' as const,
+                            categoryId: null,
+                            brandId: null,
+                            condition: 'all' as const,
+                            tag: 'all' as const,
+                            availability: 'all' as const,
+                            sort: 'newest' as const,
+                            limit: tab.limit || 15,
+                          };
+                          next[tIdx] = {
+                            ...next[tIdx],
+                            ruleCriteria: { ...base, sort: e.target.value as any },
+                          };
+                          update({ tabs: next });
+                        }}
+                        className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
+                      >
+                        <option value="newest">Mới nhất cập nhật</option>
+                        <option value="best-selling">Bán chạy nhất</option>
+                        <option value="price-asc">Giá thấp đến cao</option>
+                        <option value="price-desc">Giá cao xuống thấp</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Loại sản phẩm</label>
+                      <select
+                        value={tab.ruleCriteria?.productType || 'laptop'}
+                        onChange={(e) => {
+                          const next = [...(data.tabs || [])];
+                          const base = next[tIdx].ruleCriteria || {
+                            productType: 'laptop' as const,
+                            categoryId: null,
+                            brandId: null,
+                            condition: 'all' as const,
+                            tag: 'all' as const,
+                            availability: 'all' as const,
+                            sort: 'newest' as const,
+                            limit: tab.limit || 15,
+                          };
+                          next[tIdx] = {
+                            ...next[tIdx],
+                            ruleCriteria: { ...base, productType: e.target.value as any },
+                          };
+                          update({ tabs: next });
+                        }}
+                        className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
+                      >
+                        <option value="laptop">Chỉ Laptop</option>
+                        <option value="accessory">Phụ kiện & Đồ chơi</option>
+                        <option value="all">Tất cả sản phẩm</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-slate-700">
+                        Sản phẩm đã chọn: {tab.productIds?.length || 0} máy
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onPickProduct(`product_tab:${tIdx}`)}
+                        className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
+                      >
+                        + Chọn sản phẩm vào tab
+                      </button>
+                    </div>
+
+                    {tab.productIds && tab.productIds.length > 0 ? (
+                      <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
+                        {tab.productIds.map((pId, pIdx) => (
+                          <div
+                            key={pId}
+                            className="flex items-center justify-between p-1.5 bg-white border border-slate-200 rounded text-xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                {pIdx + 1}
+                              </span>
+                              <span className="font-semibold text-slate-800 truncate">
+                                {productNames[pId] || `Sản phẩm ${pId}`}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                disabled={pIdx === 0}
+                                onClick={() => {
+                                  const nextTabs = [...(data.tabs || [])];
+                                  const pList = [...nextTabs[tIdx].productIds];
+                                  [pList[pIdx], pList[pIdx - 1]] = [pList[pIdx - 1], pList[pIdx]];
+                                  nextTabs[tIdx] = { ...nextTabs[tIdx], productIds: pList };
+                                  update({ tabs: nextTabs });
+                                }}
+                                className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                                title="Lên"
+                              >
+                                <ArrowUp className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                disabled={pIdx === tab.productIds.length - 1}
+                                onClick={() => {
+                                  const nextTabs = [...(data.tabs || [])];
+                                  const pList = [...nextTabs[tIdx].productIds];
+                                  [pList[pIdx], pList[pIdx + 1]] = [pList[pIdx + 1], pList[pIdx]];
+                                  nextTabs[tIdx] = { ...nextTabs[tIdx], productIds: pList };
+                                  update({ tabs: nextTabs });
+                                }}
+                                className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                                title="Xuống"
+                              >
+                                <ArrowDown className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextTabs = [...(data.tabs || [])];
+                                  nextTabs[tIdx] = {
+                                    ...nextTabs[tIdx],
+                                    productIds: nextTabs[tIdx].productIds.filter((x) => x !== pId),
+                                  };
+                                  update({ tabs: nextTabs });
+                                }}
+                                className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                                title="Xóa"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-slate-400 text-[11px] italic py-1">
+                        Tab chưa có sản phẩm. Bấm &quot;+ Chọn sản phẩm vào tab&quot; phía trên.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
+      {/* 3. HEADER & APPEARANCE SETTINGS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="font-bold text-slate-700 block mb-1">Đường dẫn &quot;Xem tất cả&quot;</label>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề kệ sản phẩm *</label>
+          <input
+            type="text"
+            value={data.title || ''}
+            onChange={(e) => update({ title: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Ví dụ: Laptop Gaming, Laptop Văn Phòng..."
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ (dòng nhỏ dưới tiêu đề)</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Ví dụ: Trang bị GPU RTX 4000 series mạnh mẽ..."
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Huy hiệu (Badge)</label>
+          <input
+            type="text"
+            value={data.badge || ''}
+            onChange={(e) => update({ badge: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Hot Deal / Best Seller"
+          />
+        </div>
+
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Màu chủ đề (Header Gradient)</label>
+          <select
+            value={data.colorTheme || 'blue'}
+            onChange={(e) => update({ colorTheme: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          >
+            <option value="blue">Xanh dương (Văn phòng / Doanh nhân)</option>
+            <option value="red">Đỏ Gaming (Chiến thần đồ họa)</option>
+            <option value="indigo">Chàm / Apple (MacBook)</option>
+            <option value="gray">Xám đậm (Workstation Máy trạm)</option>
+            <option value="emerald">Xanh lục (Phụ kiện & Setup)</option>
+            <option value="orange">Cam (Bán chạy nhất)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Biểu tượng tiêu đề (Icon)</label>
+          <select
+            value={data.icon || 'auto'}
+            onChange={(e) => update({ icon: e.target.value === 'auto' ? undefined : e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          >
+            <option value="auto">Tự động theo chủ đề kệ</option>
+            <option value="zap">⚡ Tia sét (Gaming)</option>
+            <option value="briefcase">💼 Cặp xách (Ultrabook/Văn phòng)</option>
+            <option value="server">🖥️ Máy trạm (Workstation)</option>
+            <option value="headphones">🎧 Tai nghe (Phụ kiện)</option>
+            <option value="sparkles">✨ Ngôi sao lấp lánh (Mới nhất)</option>
+            <option value="trending">📈 Biểu đồ xu hướng (Bán chạy)</option>
+            <option value="star">⭐ Ngôi sao (Đánh giá cao)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 4. HEADER QUICK LINKS MANAGER */}
+      <div className="space-y-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/60">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="font-bold text-slate-800 text-xs block">
+              Liên kết nhanh đầu kệ (Header Quick Links)
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Các link ngắn hiển thị ngang trên thanh tiêu đề (Ví dụ: RTX 4060, RTX 4070, Legion, ROG Strix...)
+            </span>
+          </div>
+          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+            {data.links?.length || 0} link
+          </span>
+        </div>
+
+        {/* Existing links */}
+        {data.links && data.links.length > 0 ? (
+          <div className="space-y-2">
+            {data.links.map((link, lIdx) => (
+              <div key={lIdx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-xs">
+                <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {lIdx + 1}
+                </span>
+                <input
+                  type="text"
+                  value={link.label}
+                  onChange={(e) => {
+                    const next = [...(data.links || [])];
+                    next[lIdx] = { ...next[lIdx], label: e.target.value };
+                    update({ links: next });
+                  }}
+                  className="w-1/3 px-2 py-1 border border-slate-300 rounded text-xs"
+                  placeholder="Tên link (Ví dụ: Legion)"
+                />
+                <input
+                  type="text"
+                  value={link.href}
+                  onChange={(e) => {
+                    const next = [...(data.links || [])];
+                    next[lIdx] = { ...next[lIdx], href: e.target.value };
+                    update({ links: next });
+                  }}
+                  className="flex-1 px-2 py-1 border border-slate-300 rounded text-xs font-mono"
+                  placeholder="/laptop-gaming?brand=lenovo"
+                />
+                <button
+                  type="button"
+                  disabled={lIdx === 0}
+                  onClick={() => {
+                    const next = [...(data.links || [])];
+                    [next[lIdx], next[lIdx - 1]] = [next[lIdx - 1], next[lIdx]];
+                    update({ links: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển lên"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={lIdx === (data.links?.length || 0) - 1}
+                  onClick={() => {
+                    const next = [...(data.links || [])];
+                    [next[lIdx], next[lIdx + 1]] = [next[lIdx + 1], next[lIdx]];
+                    update({ links: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển xuống"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    update({ links: data.links?.filter((_, i) => i !== lIdx) });
+                  }}
+                  className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                  title="Xóa link"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-slate-400 text-xs italic">Chưa có liên kết nhanh nào trên thanh tiêu đề.</p>
+        )}
+
+        {/* Add new link form */}
+        <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-200">
+          <input
+            type="text"
+            value={newQuickLabel}
+            onChange={(e) => setNewQuickLabel(e.target.value)}
+            className="w-full sm:w-1/3 px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+            placeholder="Tên link mới (e.g. RTX 4060)"
+          />
+          <input
+            type="text"
+            value={newQuickHref}
+            onChange={(e) => setNewQuickHref(e.target.value)}
+            className="w-full sm:flex-1 px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white font-mono"
+            placeholder="Đường dẫn (e.g. /laptop-gaming?gpu=RTX+4060)"
+          />
+          <button
+            type="button"
+            onClick={addQuickLink}
+            disabled={!newQuickLabel.trim() || !newQuickHref.trim()}
+            className="w-full sm:w-auto px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold cursor-pointer shrink-0"
+          >
+            + Thêm link
+          </button>
+        </div>
+      </div>
+
+      {/* 5. PRODUCT DISPLAY CONDITIONS & LIMIT */}
+      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+          <div>
+            <label className="font-bold text-slate-800 text-xs block">Nguồn &amp; Số lượng sản phẩm hiển thị</label>
+            <span className="text-[11px] text-slate-500">
+              Chọn tự động theo tiêu chí hoặc tự tay chọn từng sản phẩm
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700">Hiển thị tối đa:</span>
+            <input
+              type="number"
+              min={1}
+              max={48}
+              value={data.ruleCriteria?.limit || 10}
+              onChange={(e) => {
+                const limitVal = Math.min(48, Math.max(1, parseInt(e.target.value) || 10));
+                update({
+                  ruleCriteria: {
+                    ...(data.ruleCriteria || {}),
+                    limit: limitVal,
+                  },
+                });
+              }}
+              className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-xs font-bold text-center bg-white"
+            />
+            <span className="text-xs text-slate-500">sản phẩm</span>
+          </div>
+        </div>
+
+        <div className="flex gap-4">
+          <label className="inline-flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="radio"
+              name={`sourceMode_${sectionId || 'grid'}`}
+              value="rule"
+              checked={data.sourceMode === 'rule'}
+              onChange={() => update({ sourceMode: 'rule' })}
+            />
+            <span className="font-bold text-slate-800">Theo điều kiện tự động (Rule-based)</span>
+          </label>
+          <label className="inline-flex items-center gap-2 cursor-pointer text-xs">
+            <input
+              type="radio"
+              name={`sourceMode_${sectionId || 'grid'}`}
+              value="manual"
+              checked={data.sourceMode === 'manual'}
+              onChange={() => update({ sourceMode: 'manual' })}
+            />
+            <span className="font-bold text-slate-800">
+              Chọn thủ công từng sản phẩm ({data.manualProductIds?.length || 0} đã chọn)
+            </span>
+          </label>
+        </div>
+
+        {data.sourceMode === 'rule' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 border border-slate-200 rounded-xl bg-white text-xs">
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Loại sản phẩm</label>
+              <select
+                value={data.ruleCriteria?.productType || 'all'}
+                onChange={(e) =>
+                  update({
+                    ruleCriteria: {
+                      ...data.ruleCriteria,
+                      productType: e.target.value as ProductRuleCriteria['productType'],
+                    },
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+              >
+                <option value="all">Tất cả sản phẩm</option>
+                <option value="laptop">Chỉ Laptop</option>
+                <option value="accessory">Chỉ Phụ kiện &amp; Đồ chơi</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Danh mục máy</label>
+              <select
+                value={data.ruleCriteria?.categoryId || ''}
+                onChange={(e) =>
+                  update({
+                    ruleCriteria: {
+                      ...data.ruleCriteria,
+                      categoryId: e.target.value ? e.target.value : null,
+                    },
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+              >
+                <option value="">Tất cả danh mục</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.parentId ? `↳ ${c.name}` : c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Thương hiệu</label>
+              <select
+                value={data.ruleCriteria?.brandId || ''}
+                onChange={(e) =>
+                  update({
+                    ruleCriteria: {
+                      ...data.ruleCriteria,
+                      brandId: e.target.value ? e.target.value : null,
+                    },
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+              >
+                <option value="">Tất cả thương hiệu</option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Tình trạng máy</label>
+              <select
+                value={(data.ruleCriteria as any)?.condition || 'all'}
+                onChange={(e) =>
+                  update({
+                    ruleCriteria: {
+                      ...data.ruleCriteria,
+                      condition: e.target.value as any,
+                    },
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+              >
+                <option value="all">Tất cả tình trạng</option>
+                <option value="NEW">Chỉ máy Mới 100%</option>
+                <option value="LIKE_NEW">Chỉ máy Like-New 99%</option>
+                <option value="USED">Hàng cũ tuyển chọn</option>
+                <option value="ON_SALE">Đang giảm giá sốc (Flash Sale)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Thẻ đánh dấu (Tag)</label>
+              <select
+                value={data.ruleCriteria?.tag || 'all'}
+                onChange={(e) =>
+                  update({
+                    ruleCriteria: {
+                      ...data.ruleCriteria,
+                      tag: e.target.value as ProductRuleCriteria['tag'],
+                    },
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+              >
+                <option value="all">Tất cả nhãn</option>
+                <option value="isFeatured">Sản phẩm Nổi bật</option>
+                <option value="isNewArrival">Hàng Mới Về</option>
+                <option value="isBestSeller">Bán Chạy Nhất</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Tình trạng kho</label>
+              <select
+                value={data.ruleCriteria?.availability || 'all'}
+                onChange={(e) =>
+                  update({
+                    ruleCriteria: {
+                      ...data.ruleCriteria,
+                      availability: e.target.value as ProductRuleCriteria['availability'],
+                    },
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="AVAILABLE">Còn hàng trong kho</option>
+                <option value="PREORDER">Nhận đặt trước (Pre-order)</option>
+                <option value="CONTACT">Liên hệ trực tiếp</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-700 block mb-1">Sắp xếp theo</label>
+              <select
+                value={data.ruleCriteria?.sort || 'newest'}
+                onChange={(e) =>
+                  update({
+                    ruleCriteria: {
+                      ...data.ruleCriteria,
+                      sort: e.target.value as ProductRuleCriteria['sort'],
+                    },
+                  })
+                }
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
+              >
+                <option value="newest">Mới nhất cập nhật</option>
+                <option value="price-asc">Giá từ thấp đến cao</option>
+                <option value="price-desc">Giá từ cao xuống thấp</option>
+                <option value="name-asc">Tên sản phẩm (A-Z)</option>
+                <option value="best-selling">Bán chạy nhất</option>
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 p-3.5 border border-slate-200 rounded-xl bg-white">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-700 text-xs">
+                Đã chọn: {data.manualProductIds?.length || 0} sản phẩm (Hiển thị tối đa{' '}
+                {data.ruleCriteria?.limit || 10} SP theo thiết lập trên)
+              </span>
+              <button
+                type="button"
+                onClick={() => onPickProduct()}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-2xs"
+              >
+                + Chọn sản phẩm
+              </button>
+            </div>
+
+            {data.manualProductIds && data.manualProductIds.length > 0 ? (
+              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                {data.manualProductIds.map((pId: string, idx: number) => (
+                  <div
+                    key={pId}
+                    className="flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg text-xs transition"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 pr-2">
+                      <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-900 truncate">
+                          {productNames[pId] || `Sản phẩm ${pId}`}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono truncate">ID: {pId}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => {
+                          const next = [...(data.manualProductIds || [])];
+                          [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+                          update({ manualProductIds: next });
+                        }}
+                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                        title="Di chuyển lên"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === (data.manualProductIds?.length || 0) - 1}
+                        onClick={() => {
+                          const next = [...(data.manualProductIds || [])];
+                          [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                          update({ manualProductIds: next });
+                        }}
+                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                        title="Di chuyển xuống"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          update({
+                            manualProductIds: data.manualProductIds?.filter((x: string) => x !== pId),
+                          });
+                        }}
+                        className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                        title="Xóa khỏi danh sách"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-400 text-xs italic py-2">
+                Chưa có sản phẩm nào được chọn. Hãy bấm nút &quot;+ Chọn sản phẩm&quot; phía trên.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 6. FOOTER SETTINGS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Đường dẫn nút &quot;Xem tất cả&quot;</label>
           <input
             type="text"
             value={data.viewAllLink || ''}
@@ -2415,37 +3395,287 @@ function ProductGridForm({
 function FeaturedCategoriesForm({
   data,
   update,
+  onPickMedia,
 }: {
   data: FeaturedCategoriesData;
   update: (p: Partial<FeaturedCategoriesData>) => void;
+  onPickMedia: (itemIdx: number) => void;
 }) {
+  const { categories } = useCatalogOptions();
+
+  const handleSyncFromCatalog = () => {
+    if (!categories.length) return;
+    const synced = categories.slice(0, 10).map((c) => ({
+      categoryId: c.id,
+      customName: c.name,
+      customImage: c.image || '',
+      href: `/category/${c.slug}`,
+      enabled: true,
+    }));
+    update({ items: synced, categoryIds: synced.map((x) => x.categoryId) });
+  };
+
   return (
     <div className="space-y-4">
-      <label className="block text-xs font-bold">Bố cục<select value={data.layout || 'cards'} onChange={e => update({ layout: e.target.value as 'cards' | 'board' })} className="mt-1 w-full rounded border p-2"><option value="cards">Thẻ danh mục</option><option value="board">Bảng phân loại</option></select></label>
-      {!!data.items.length && <fieldset className="space-y-3 rounded border p-3"><legend className="px-1 font-bold">Ô phân loại</legend>{data.items.map((item, index) => <div key={index} className="space-y-2 rounded border p-2">{(['customName', 'customImage', 'href'] as const).map(field => <label key={field} className="block text-xs">{field === 'customName' ? 'Tên hiển thị' : field === 'customImage' ? 'URL ảnh đại diện' : 'Liên kết'}<input value={item[field] || ''} onChange={e => update({ items: data.items.map((x, i) => i === index ? { ...x, [field]: e.target.value } : x) })} className="mt-1 w-full rounded border p-2" /></label>)}</div>)}</fieldset>}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Bố cục hiển thị</label>
+          <select
+            value={data.layout || 'cards'}
+            onChange={(e) => update({ layout: e.target.value as 'cards' | 'board' })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+          >
+            <option value="cards">Thẻ danh mục lớn (10 ô - Hệ sinh thái danh mục)</option>
+            <option value="board">Bảng phân loại (Lưới ô vuông - Phụ kiện góc làm việc)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Số lượng ô hiển thị tối đa</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={data.limit || 10}
+            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 10)) })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối danh mục</label>
+          <input
+            type="text"
+            value={data.title || ''}
+            onChange={(e) => update({ title: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Khám Phá Hệ Sinh Thái Danh Mục"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Lựa chọn dòng máy phù hợp nhất theo nhu cầu..."
+          />
+        </div>
+      </div>
+
       <div>
-        <label className="font-bold text-slate-700 block mb-1">Tiêu đề danh mục</label>
+        <label className="font-bold text-slate-700 block mb-1">Đường dẫn &quot;Xem tất cả&quot; (tùy chọn)</label>
         <input
           type="text"
-          value={data.title || ''}
-          onChange={(e) => update({ title: e.target.value })}
+          value={data.viewAllLink || ''}
+          onChange={(e) => update({ viewAllLink: e.target.value })}
           className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Khám Phá Hệ Sinh Thái Danh Mục"
+          placeholder="/phan-loai"
         />
       </div>
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-        <input
-          type="text"
-          value={data.subtitle || ''}
-          onChange={(e) => update({ subtitle: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Mô tả danh mục..."
-        />
-      </div>
-      <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1">
-        <div className="font-bold">Cơ chế hiển thị tự động:</div>
-        <p>Các danh mục công khai đang hoạt động sẽ được tự động đồng bộ và hiển thị kèm icon theo cấu hình catalog hệ thống.</p>
+
+      {/* ITEMS LIST */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="font-bold text-slate-800 text-xs block">
+              Danh sách các ô danh mục ({data.items?.length || 0})
+            </span>
+            <span className="text-[11px] text-slate-500">
+              Mỗi ô có thể gắn hình ảnh riêng, đổi tên hiển thị và gán liên kết khi bấm.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {(!data.items || data.items.length === 0) && (
+              <button
+                type="button"
+                onClick={handleSyncFromCatalog}
+                className="px-2.5 py-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer"
+              >
+                Đồng bộ từ catalog
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const current = data.items || [];
+                update({
+                  items: [
+                    ...current,
+                    {
+                      categoryId: '',
+                      customName: `Mục #${current.length + 1}`,
+                      customImage: '',
+                      href: '/search',
+                      enabled: true,
+                    },
+                  ],
+                });
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> Thêm ô
+            </button>
+          </div>
+        </div>
+
+        {data.items?.map((item, index) => (
+          <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {index + 1}
+                </span>
+                <span className="font-bold text-xs text-slate-800 truncate">
+                  {item.customName || `Ô #${index + 1}`}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
+                  <input
+                    type="checkbox"
+                    checked={item.enabled !== false}
+                    onChange={(e) => {
+                      const next = [...data.items];
+                      next[index] = { ...next[index], enabled: e.target.checked };
+                      update({ items: next });
+                    }}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Bật</span>
+                </label>
+                <button
+                  type="button"
+                  disabled={index === 0}
+                  onClick={() => {
+                    const next = [...data.items];
+                    [next[index], next[index - 1]] = [next[index - 1], next[index]];
+                    update({ items: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển lên"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={index === data.items.length - 1}
+                  onClick={() => {
+                    const next = [...data.items];
+                    [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                    update({ items: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển xuống"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    update({ items: data.items.filter((_, i) => i !== index) });
+                  }}
+                  className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                  title="Xóa ô"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tên hiển thị *</label>
+                <input
+                  type="text"
+                  value={item.customName || ''}
+                  onChange={(e) => {
+                    const next = [...data.items];
+                    next[index] = { ...next[index], customName: e.target.value };
+                    update({ items: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                  placeholder="Ví dụ: Laptop Gaming"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Liên kết khi bấm (URL) *</label>
+                <input
+                  type="text"
+                  value={item.href || ''}
+                  onChange={(e) => {
+                    const next = [...data.items];
+                    next[index] = { ...next[index], href: e.target.value };
+                    update({ items: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                  placeholder="/category/laptop-gaming"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Danh mục hệ thống liên kết</label>
+                <select
+                  value={item.categoryId || ''}
+                  onChange={(e) => {
+                    const next = [...data.items];
+                    const selectedCat = categories.find((c) => c.id === e.target.value);
+                    next[index] = {
+                      ...next[index],
+                      categoryId: e.target.value,
+                      customName: next[index].customName || selectedCat?.name || '',
+                      href: next[index].href || (selectedCat ? `/category/${selectedCat.slug}` : ''),
+                    };
+                    update({ items: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                >
+                  <option value="">-- Tùy chỉnh (không gắn ID) --</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.id})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Ảnh đại diện icon / ô</label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="text"
+                  value={item.customImage || ''}
+                  onChange={(e) => {
+                    const next = [...data.items];
+                    next[index] = { ...next[index], customImage: e.target.value };
+                    update({ items: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                  placeholder="URL ảnh hoặc chọn từ thư viện"
+                />
+                <button
+                  type="button"
+                  onClick={() => onPickMedia(index)}
+                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
+                >
+                  Chọn ảnh
+                </button>
+                {item.customImage && (
+                  <div className="w-9 h-9 rounded-lg border border-slate-200 bg-white p-0.5 shrink-0 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.customImage} alt="" className="w-full h-full object-contain" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -2454,35 +3684,73 @@ function FeaturedCategoriesForm({
 function FeaturedBrandsForm({
   data,
   update,
+  onPickMedia,
 }: {
   data: FeaturedBrandsData;
   update: (p: Partial<FeaturedBrandsData>) => void;
+  onPickMedia?: (bIdx: number) => void;
 }) {
+  const { brands } = useCatalogOptions();
+
   return (
     <div className="space-y-4">
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối thương hiệu</label>
-        <input
-          type="text"
-          value={data.title || ''}
-          onChange={(e) => update({ title: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Khám Phá Theo Thương Hiệu"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối thương hiệu</label>
+          <input
+            type="text"
+            value={data.title || ''}
+            onChange={(e) => update({ title: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Khám Phá Theo Thương Hiệu"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Đối tác phân phối thiết bị công nghệ chính hãng..."
+          />
+        </div>
       </div>
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-        <input
-          type="text"
-          value={data.subtitle || ''}
-          onChange={(e) => update({ subtitle: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Phân phối chính hãng các dòng máy hàng đầu thế giới"
-        />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Số lượng thương hiệu hiển thị</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={data.limit || 8}
+            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 8)) })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Đường dẫn Xem tất cả</label>
+          <input
+            type="text"
+            value={data.viewAllLink || ''}
+            onChange={(e) => update({ viewAllLink: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="/phan-loai"
+          />
+        </div>
       </div>
+
       <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1">
-        <div className="font-bold">Đồng bộ từ thương hiệu sản phẩm:</div>
-        <p>Logo các thương hiệu lớn (Dell, Lenovo, Asus, Apple, HP...) được tự động lấy từ danh mục thương hiệu catalog.</p>
+        <div className="font-bold flex items-center justify-between">
+          <span>Tự động đồng bộ từ thương hiệu hệ thống:</span>
+          <Link href="/admin/brands" target="_blank" className="text-blue-700 hover:underline font-bold">
+            Quản lý thương hiệu ↗
+          </Link>
+        </div>
+        <p>
+          Các thương hiệu lớn đang hoạt động ({brands.map((b) => b.name).join(', ')}) sẽ được tự động hiển thị kèm logo và liên kết tương ứng theo giới hạn {data.limit || 8} hãng.
+        </p>
       </div>
     </div>
   );
@@ -2583,7 +3851,7 @@ function FeaturedCollectionForm({
             value={data.subtitle || ''}
             onChange={(e) => update({ subtitle: e.target.value })}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Ví dụ: Bộ sưu tập tuyển chọn các dòng máy bán chạy nhất"
+            placeholder="Ví dụ: Tuyển chọn các dòng máy bán chạy nhất"
           />
         </div>
         <div>
@@ -2606,15 +3874,49 @@ function FeaturedCollectionForm({
 function NewsReviewsForm({
   data,
   update,
+  onPickPost,
 }: {
   data: NewsReviewsData;
   update: (p: Partial<NewsReviewsData>) => void;
+  onPickPost?: () => void;
 }) {
+  const { postCategories } = useCatalogOptions();
+  const [postTitles, setPostTitles] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let ignore = false;
+    const missingIds = (data.postIds || []).filter((id) => !postTitles[id]);
+    if (missingIds.length === 0) return;
+
+    async function loadPostTitles() {
+      try {
+        const res = await mediaRequest<{ items: Array<{ id: string; title: string }> }>(
+          `/api/admin/posts?limit=50`
+        );
+        if (!ignore && res?.items) {
+          const map: Record<string, string> = {};
+          for (const item of res.items) {
+            map[item.id] = item.title;
+          }
+          setPostTitles((prev) => ({ ...prev, ...map }));
+        }
+      } catch {
+        // fail-soft
+      }
+    }
+    void loadPostTitles();
+    return () => {
+      ignore = true;
+    };
+  }, [data.postIds, postTitles]);
+
+  const hasSpecificPosts = Boolean(data.postIds && data.postIds.length > 0);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề tin tức</label>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề tin tức *</label>
           <input
             type="text"
             value={data.title || ''}
@@ -2624,18 +3926,177 @@ function NewsReviewsForm({
           />
         </div>
         <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Cập nhật tin công nghệ và thủ thuật sử dụng..."
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
           <label className="font-bold text-slate-700 block mb-1">Số bài hiển thị (Limit)</label>
           <input
             type="number"
             min={1}
-            max={10}
-            value={data.limit || 4}
-            onChange={(e) =>
-              update({ limit: Math.min(10, Math.max(1, parseInt(e.target.value) || 4)) })
-            }
+            max={20}
+            value={data.limit || 5}
+            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 5)) })}
             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
           />
         </div>
+
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Bố cục hiển thị</label>
+          <select
+            value={data.layout || 'grid'}
+            onChange={(e) => update({ layout: e.target.value as 'grid' | 'featured' })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+          >
+            <option value="grid">Lưới bài viết có thanh cuộn ngang (Trang chủ)</option>
+            <option value="featured">Bài nổi bật lớn + Danh sách bên cạnh</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Đường dẫn &quot;Xem tất cả&quot;</label>
+          <input
+            type="text"
+            value={data.viewAllLink || ''}
+            onChange={(e) => update({ viewAllLink: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
+            placeholder="/news"
+          />
+        </div>
+      </div>
+
+      {/* SOURCE MODE & SPECIFIC POSTS */}
+      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="font-bold text-slate-800 text-xs block">Nguồn bài viết hiển thị:</label>
+          <div className="flex gap-4 text-xs">
+            <label className="inline-flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="radio"
+                name="news_source"
+                checked={!hasSpecificPosts}
+                onChange={() => update({ postIds: [] })}
+              />
+              <span>Tự động theo chuyên mục</span>
+            </label>
+            <label className="inline-flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="radio"
+                name="news_source"
+                checked={hasSpecificPosts}
+                onChange={() => {
+                  if (!data.postIds?.length && onPickPost) onPickPost();
+                }}
+              />
+              <span>Chọn bài viết cụ thể ({data.postIds?.length || 0})</span>
+            </label>
+          </div>
+        </div>
+
+        {!hasSpecificPosts ? (
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              Lọc theo chuyên mục bài viết (Để trống để lấy tất cả chuyên mục)
+            </label>
+            <select
+              value={data.categoryId || ''}
+              onChange={(e) => update({ categoryId: e.target.value || null })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
+            >
+              <option value="">Tất cả chuyên mục bài viết</option>
+              {postCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-slate-600">
+                Đã chọn {data.postIds.length} bài viết (Hiển thị tối đa {data.limit || 5} bài)
+              </span>
+              {onPickPost && (
+                <button
+                  type="button"
+                  onClick={onPickPost}
+                  className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
+                >
+                  + Chọn thêm bài viết
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {data.postIds.map((pId, idx) => (
+                <div
+                  key={pId}
+                  className="flex items-center justify-between p-2 bg-white border border-slate-200 rounded-lg text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-slate-900 truncate">
+                        {postTitles[pId] || `Bài viết ${pId}`}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-mono truncate">ID: {pId}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => {
+                        const next = [...data.postIds];
+                        [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
+                        update({ postIds: next });
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                      title="Lên"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === data.postIds.length - 1}
+                      onClick={() => {
+                        const next = [...data.postIds];
+                        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                        update({ postIds: next });
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                      title="Xuống"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        update({ postIds: data.postIds.filter((x) => x !== pId) });
+                      }}
+                      className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                      title="Xóa"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2650,57 +4111,189 @@ function IntroForm({
 }) {
   return (
     <div className="space-y-4">
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Tiêu đề cam kết dịch vụ</label>
-        <input
-          type="text"
-          value={data.title || ''}
-          onChange={(e) => update({ title: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Cam Kết Chất Lượng CitiLap"
-        />
-      </div>
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-        <input
-          type="text"
-          value={data.subtitle || ''}
-          onChange={(e) => update({ subtitle: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="4 tiêu chuẩn dịch vụ vượt trội dành cho khách hàng"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề cam kết dịch vụ</label>
+          <input
+            type="text"
+            value={data.title || ''}
+            onChange={(e) => update({ title: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Cam Kết Chất Lượng CitiLap"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="4 tiêu chuẩn dịch vụ vượt trội dành cho khách hàng"
+          />
+        </div>
       </div>
 
-      <div className="space-y-2 pt-2">
-        <span className="font-bold text-slate-800 block">Danh sách các cam kết (Tối đa 6):</span>
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-slate-800 text-xs">
+            Danh sách các cam kết dịch vụ ({data.features?.length || 0}/8)
+          </span>
+          <button
+            type="button"
+            disabled={(data.features?.length || 0) >= 8}
+            onClick={() => {
+              const current = data.features || [];
+              update({
+                features: [
+                  ...current,
+                  {
+                    id: `feat-${Date.now()}`,
+                    icon: 'star',
+                    title: `Cam kết #${current.length + 1}`,
+                    description: 'Mô tả tiêu chuẩn dịch vụ',
+                    href: '',
+                    enabled: true,
+                  },
+                ],
+              });
+            }}
+            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer disabled:opacity-40"
+          >
+            <Plus className="w-3.5 h-3.5" /> Thêm cam kết
+          </button>
+        </div>
+
         {data.features?.map((feat, fIdx) => (
-          <div key={feat.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-700">
-              <span>Mục #{fIdx + 1} ({feat.icon})</span>
+          <div key={feat.id || fIdx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {fIdx + 1}
+                </span>
+                <span className="font-bold text-xs text-slate-800 truncate">{feat.title}</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
+                  <input
+                    type="checkbox"
+                    checked={feat.enabled !== false}
+                    onChange={(e) => {
+                      const next = [...(data.features || [])];
+                      next[fIdx] = { ...next[fIdx], enabled: e.target.checked };
+                      update({ features: next });
+                    }}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Bật</span>
+                </label>
+                <button
+                  type="button"
+                  disabled={fIdx === 0}
+                  onClick={() => {
+                    const next = [...(data.features || [])];
+                    [next[fIdx], next[fIdx - 1]] = [next[fIdx - 1], next[fIdx]];
+                    update({ features: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển lên"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  disabled={fIdx === (data.features?.length || 0) - 1}
+                  onClick={() => {
+                    const next = [...(data.features || [])];
+                    [next[fIdx], next[fIdx + 1]] = [next[fIdx + 1], next[fIdx]];
+                    update({ features: next });
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                  title="Di chuyển xuống"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    update({ features: data.features?.filter((_, i) => i !== fIdx) });
+                  }}
+                  className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
+                  title="Xóa cam kết"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input
-                type="text"
-                value={feat.title}
-                onChange={(e) => {
-                  const next = [...(data.features || [])];
-                  next[fIdx] = { ...next[fIdx], title: e.target.value };
-                  update({ features: next });
-                }}
-                placeholder="Tiêu đề cam kết"
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-              />
-              <input
-                type="text"
-                value={feat.description}
-                onChange={(e) => {
-                  const next = [...(data.features || [])];
-                  next[fIdx] = { ...next[fIdx], description: e.target.value };
-                  update({ features: next });
-                }}
-                placeholder="Chi tiết cam kết"
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-              />
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Biểu tượng (Icon)</label>
+                <select
+                  value={feat.icon || 'star'}
+                  onChange={(e) => {
+                    const next = [...(data.features || [])];
+                    next[fIdx] = { ...next[fIdx], icon: e.target.value };
+                    update({ features: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                >
+                  <option value="star">⭐ Ngôi sao (Máy lướt/chất)</option>
+                  <option value="shield">🛡️ Khiên bảo vệ (Nguyên zin/Bảo hành)</option>
+                  <option value="refresh">🔄 Mũi tên đổi mới (Đổi lỗi 7 ngày)</option>
+                  <option value="truck">🚚 Xe tải (Giao hàng toàn quốc)</option>
+                  <option value="store">🏬 Cửa hàng (Showroom)</option>
+                  <option value="zap">⚡ Tia sét (Tốc độ)</option>
+                  <option value="headphones">🎧 Tai nghe (Hỗ trợ 24/7)</option>
+                  <option value="sparkles">✨ Lấp lánh (Ưu đãi đặc biệt)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Tiêu đề cam kết *</label>
+                <input
+                  type="text"
+                  value={feat.title}
+                  onChange={(e) => {
+                    const next = [...(data.features || [])];
+                    next[fIdx] = { ...next[fIdx], title: e.target.value };
+                    update({ features: next });
+                  }}
+                  placeholder="Ví dụ: Theo đúng nhu cầu"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Chi tiết mô tả</label>
+                <input
+                  type="text"
+                  value={feat.description}
+                  onChange={(e) => {
+                    const next = [...(data.features || [])];
+                    next[fIdx] = { ...next[fIdx], description: e.target.value };
+                    update({ features: next });
+                  }}
+                  placeholder="Ví dụ: Tư vấn cấu hình chuẩn xác"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Liên kết khi bấm (tùy chọn)</label>
+                <input
+                  type="text"
+                  value={feat.href || ''}
+                  onChange={(e) => {
+                    const next = [...(data.features || [])];
+                    next[fIdx] = { ...next[fIdx], href: e.target.value };
+                    update({ features: next });
+                  }}
+                  placeholder="/chinh-sach-bao-hanh"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                />
+              </div>
             </div>
           </div>
         ))}
@@ -2712,9 +4305,11 @@ function IntroForm({
 function CtaForm({
   data,
   update,
+  onPickMedia,
 }: {
   data: CtaData;
   update: (p: Partial<CtaData>) => void;
+  onPickMedia?: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -2735,7 +4330,7 @@ function CtaForm({
           value={data.subtitle || ''}
           onChange={(e) => update({ subtitle: e.target.value })}
           className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Chuyên viên CitiLap sẵn sàng tư vấn trực tiếp..."
+          placeholder="Chuyên viên CitiLap sẵn sàng tư vấn trực tiếp 1-1 qua Zalo hoặc Hotline."
         />
       </div>
 
@@ -2756,7 +4351,7 @@ function CtaForm({
             type="text"
             value={data.primaryLink || ''}
             onChange={(e) => update({ primaryLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
             placeholder="https://zalo.me"
           />
         </div>
@@ -2779,9 +4374,43 @@ function CtaForm({
             type="text"
             value={data.secondaryLink || ''}
             onChange={(e) => update({ secondaryLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="tel:0987654321"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
+            placeholder="tel:0988123456"
           />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Số điện thoại hiển thị</label>
+          <input
+            type="text"
+            value={data.phone || ''}
+            onChange={(e) => update({ phone: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="0988 123 456"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Ảnh nền (tùy chọn)</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={data.bgImageUrl || ''}
+              onChange={(e) => update({ bgImageUrl: e.target.value })}
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
+              placeholder="URL hình ảnh"
+            />
+            {onPickMedia && (
+              <button
+                type="button"
+                onClick={onPickMedia}
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
+              >
+                Chọn ảnh
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -2797,22 +4426,197 @@ function VideoReviewsForm({
   update: (p: Partial<VideoReviewsData>) => void;
   onPickMedia: (videoIdx: number) => void;
 }) {
+  const [syncingYt, setSyncingYt] = useState(false);
+  const [quickUrl, setQuickUrl] = useState('');
+  const [resolvingQuick, setResolvingQuick] = useState(false);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  const handleSyncYt = async () => {
+    const channel = (data.youtubeUrl || '').trim();
+    if (!channel || syncingYt) return;
+    setSyncingYt(true);
+    setStatusMsg(null);
+    try {
+      const res = await fetch(`/api/admin/fetch-videos?channelUrl=${encodeURIComponent(channel)}&limit=${data.limit || 6}`);
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success && Array.isArray(json.data)) {
+        const existing = data.videos || [];
+        const existingUrls = new Set(existing.map((v) => v.url));
+        const newItems = json.data
+          .filter((v: { url: string }) => !existingUrls.has(v.url))
+          .map((v: { title: string; url: string; thumbnail: string }) => ({
+            title: v.title,
+            url: v.url,
+            thumbnail: v.thumbnail,
+            href: '',
+            enabled: true,
+          }));
+        update({ videos: [...newItems, ...existing].slice(0, 12) });
+        setStatusMsg(`Đã lấy thành công ${newItems.length} video mới nhất từ YouTube.`);
+      } else {
+        setStatusMsg(json.error || 'Không thể lấy video từ kênh YouTube này.');
+      }
+    } catch {
+      setStatusMsg('Lỗi kết nối khi đồng bộ video.');
+    } finally {
+      setSyncingYt(false);
+    }
+  };
+
+  const handleAddQuickUrl = async () => {
+    const raw = quickUrl.trim();
+    if (!raw || resolvingQuick) return;
+    setResolvingQuick(true);
+    setStatusMsg(null);
+    try {
+      const urls = raw.split(/[\n,\s]+/).map((u) => u.trim()).filter(Boolean);
+      let items: Array<{ title: string; url: string; thumbnail: string }> = [];
+      if (urls.length > 1) {
+        const res = await fetch('/api/admin/fetch-videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (json.success && Array.isArray(json.data)) {
+          items = json.data;
+        }
+      } else {
+        const res = await fetch(`/api/admin/fetch-videos?videoUrl=${encodeURIComponent(raw)}`);
+        const json = await res.json().catch(() => ({}));
+        if (json.success && json.data) {
+          items = [json.data];
+        }
+      }
+
+      if (items.length > 0) {
+        const existing = data.videos || [];
+        const existingUrls = new Set(existing.map((v) => v.url));
+        const newItems = items
+          .filter((v) => !existingUrls.has(v.url))
+          .map((v) => ({
+            title: v.title,
+            url: v.url,
+            thumbnail: v.thumbnail,
+            href: '',
+            enabled: true,
+          }));
+        update({ videos: [...newItems, ...existing].slice(0, 12) });
+        setQuickUrl('');
+        setStatusMsg(`Đã thêm ${items.length} video.`);
+      } else {
+        setStatusMsg('Không thể phân giải video từ URL đã nhập.');
+      }
+    } catch {
+      setStatusMsg('Lỗi kết nối khi thêm video.');
+    } finally {
+      setResolvingQuick(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối</label>
-        <input
-          type="text"
-          value={data.title}
-          onChange={(e) => update({ title: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Video review sản phẩm"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối video review *</label>
+          <input
+            type="text"
+            value={data.title}
+            onChange={(e) => update({ title: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Video review sản phẩm"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Tổng hợp video đánh giá chuyên sâu và trải nghiệm thực tế..."
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Số lượng video hiển thị tối đa</label>
+          <input
+            type="number"
+            min={1}
+            max={12}
+            value={data.limit || 5}
+            onChange={(e) => update({ limit: Math.min(12, Math.max(1, parseInt(e.target.value) || 5)) })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          />
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="font-bold text-slate-700 text-xs">Link Kênh YouTube</label>
+            {data.youtubeUrl && (
+              <button
+                type="button"
+                disabled={syncingYt}
+                onClick={() => void handleSyncYt()}
+                className="text-[10px] text-rose-600 hover:underline font-semibold inline-flex items-center gap-0.5 cursor-pointer disabled:opacity-50"
+              >
+                {syncingYt ? <RefreshCw className="w-2.5 h-2.5 animate-spin" /> : null}
+                Lấy video mới
+              </button>
+            )}
+          </div>
+          <input
+            type="text"
+            value={data.youtubeUrl || ''}
+            onChange={(e) => update({ youtubeUrl: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
+            placeholder="https://www.youtube.com/@thinkview/videos"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Link Kênh TikTok</label>
+          <input
+            type="text"
+            value={data.tiktokUrl || ''}
+            onChange={(e) => update({ tiktokUrl: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
+            placeholder="https://www.tiktok.com/@citilapvn"
+          />
+        </div>
+      </div>
+
+      {/* Quick Video URL input */}
+      <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-2">
+        <label className="font-bold text-slate-700 text-xs block">
+          Dán nhanh link YouTube hoặc TikTok (tự lấy tiêu đề &amp; ảnh thu nhỏ):
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={quickUrl}
+            onChange={(e) => setQuickUrl(e.target.value)}
+            placeholder="Dán URL video YouTube hoặc TikTok (hỗ trợ nhiều link cách nhau bởi xuống dòng)"
+            className="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+          />
+          <button
+            type="button"
+            disabled={!quickUrl.trim() || resolvingQuick}
+            onClick={() => void handleAddQuickUrl()}
+            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
+          >
+            {resolvingQuick ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+            Thêm
+          </button>
+        </div>
+        {statusMsg && <p className="text-[11px] text-blue-700 font-medium">{statusMsg}</p>}
       </div>
 
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800">Danh sách video ({data.videos?.length || 0})</span>
+          <span className="font-bold text-slate-800 text-xs">
+            Danh sách video ({data.videos?.length || 0}) • Hiển thị tối đa {data.limit || 5} video
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -2821,139 +4625,199 @@ function VideoReviewsForm({
                 videos: [
                   ...current,
                   {
-                    title: '',
+                    title: `Video đánh giá #${current.length + 1}`,
                     url: '',
                     thumbnail: '',
+                    href: '',
+                    enabled: true,
                   },
                 ],
               });
             }}
-            className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
+            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
           >
-            + Thêm video
+            <Plus className="w-3.5 h-3.5" /> Thêm video
           </button>
         </div>
 
-        {data.videos?.map((v, index) => (
-          <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-            <div className="flex items-center justify-between pb-1 border-b border-slate-200">
-              <span className="font-bold text-slate-700 text-xs">Video #{index + 1}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={index === 0}
-                  onClick={() => {
-                    const next = [...data.videos];
-                    [next[index], next[index - 1]] = [next[index - 1], next[index]];
-                    update({ videos: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển lên"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={index === data.videos.length - 1}
-                  onClick={() => {
-                    const next = [...data.videos];
-                    [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                    update({ videos: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển xuống"
-                >
-                  <ArrowDown className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
-                  onClick={() => {
-                    if (!window.confirm(`Xóa video #${index + 1}?`)) return;
-                    update({ videos: data.videos.filter((_, i) => i !== index) });
-                  }}
-                >
-                  Xóa video
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Tên video</label>
-              <input
-                type="text"
-                value={v.title}
-                onChange={(e) => {
-                  const next = [...data.videos];
-                  next[index] = { ...next[index], title: e.target.value };
-                  update({ videos: next });
-                }}
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                placeholder="Ví dụ: Đánh giá chi tiết laptop CitiLap Gaming"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">
-                URL video (YouTube hoặc TikTok) *
-              </label>
-              <input
-                type="text"
-                value={v.url}
-                onChange={(e) => {
-                  const next = [...data.videos];
-                  next[index] = { ...next[index], url: e.target.value };
-                  update({ videos: next });
-                }}
-                className={`w-full px-2.5 py-1.5 border rounded text-xs bg-white ${
-                  !v.url.trim() ? 'border-amber-300' : 'border-slate-300'
-                }`}
-                placeholder="https://www.youtube.com/watch?v=... hoặc https://www.tiktok.com/@.../video/..."
-              />
-              {!v.url.trim() ? (
-                <p className="text-[11px] text-rose-500 font-medium mt-1">
-                  Vui lòng nhập URL video (YouTube hoặc TikTok)
-                </p>
-              ) : !v.url.startsWith('https://') ? (
-                <p className="text-[11px] text-amber-600 font-medium mt-1">
-                  Đường dẫn video phải bắt đầu bằng https://
-                </p>
-              ) : null}
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">
-                URL ảnh đại diện thumbnail (tùy chọn, tự lấy nếu dùng YouTube)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={v.thumbnail || ''}
-                  onChange={(e) => {
-                    const next = [...data.videos];
-                    next[index] = { ...next[index], thumbnail: e.target.value };
-                    update({ videos: next });
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                  placeholder="URL ảnh hoặc chọn từ thư viện"
-                />
-                <button
-                  type="button"
-                  onClick={() => onPickMedia(index)}
-                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
-                >
-                  Chọn ảnh
-                </button>
-              </div>
-              {v.thumbnail && (
-                <div className="mt-2 h-16 w-28 rounded overflow-hidden border border-slate-200 bg-slate-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" />
+        {data.videos?.map((v, index) => {
+          const ytMatch = youtubeId(v.url || '');
+          return (
+            <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+              <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
+                    {index + 1}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shrink-0 ${
+                    v.url?.includes('tiktok.com') || tiktokVideoId(v.url || '')
+                      ? 'bg-slate-900 text-cyan-300'
+                      : 'bg-red-600 text-white'
+                  }`}>
+                    {v.url?.includes('tiktok.com') || tiktokVideoId(v.url || '') ? 'TikTok' : 'YouTube'}
+                  </span>
+                  <span className="font-bold text-xs text-slate-800 truncate">{v.title}</span>
                 </div>
-              )}
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
+                    <input
+                      type="checkbox"
+                      checked={v.enabled !== false}
+                      onChange={(e) => {
+                        const next = [...data.videos];
+                        next[index] = { ...next[index], enabled: e.target.checked };
+                        update({ videos: next });
+                      }}
+                      className="rounded text-blue-600"
+                    />
+                    <span>Bật</span>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={index === 0}
+                    onClick={() => {
+                      const next = [...data.videos];
+                      [next[index], next[index - 1]] = [next[index - 1], next[index]];
+                      update({ videos: next });
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                    title="Di chuyển lên"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={index === data.videos.length - 1}
+                    onClick={() => {
+                      const next = [...data.videos];
+                      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                      update({ videos: next });
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                    title="Di chuyển xuống"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
+                    onClick={() => {
+                      if (!window.confirm(`Xóa video #${index + 1}?`)) return;
+                      update({ videos: data.videos.filter((_, i) => i !== index) });
+                    }}
+                  >
+                    Xóa
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Tiêu đề video *</label>
+                  <input
+                    type="text"
+                    value={v.title}
+                    onChange={(e) => {
+                      const next = [...data.videos];
+                      next[index] = { ...next[index], title: e.target.value };
+                      update({ videos: next });
+                    }}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                    placeholder="Ví dụ: Đánh giá chi tiết laptop Lenovo Legion 5"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-0.5">
+                    URL video (YouTube hoặc TikTok) *
+                  </label>
+                  <input
+                    type="text"
+                    value={v.url}
+                    onChange={(e) => {
+                      const next = [...data.videos];
+                      const newUrl = e.target.value;
+                      const yt = youtubeId(newUrl);
+                      next[index] = {
+                        ...next[index],
+                        url: newUrl,
+                        thumbnail: next[index].thumbnail || (yt ? `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` : ''),
+                      };
+                      update({ videos: next });
+                    }}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-[11px] font-bold text-slate-700 block">Ảnh đại diện (Thumbnail)</label>
+                    {ytMatch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = [...data.videos];
+                          next[index] = { ...next[index], thumbnail: `https://i.ytimg.com/vi/${ytMatch}/hqdefault.jpg` };
+                          update({ videos: next });
+                        }}
+                        className="text-[10px] text-blue-600 hover:underline font-bold"
+                      >
+                        Lấy từ YouTube ⚡
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={v.thumbnail || ''}
+                      onChange={(e) => {
+                        const next = [...data.videos];
+                        next[index] = { ...next[index], thumbnail: e.target.value };
+                        update({ videos: next });
+                      }}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                      placeholder="URL thumbnail"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onPickMedia(index)}
+                      className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
+                    >
+                      Chọn ảnh
+                    </button>
+                    {v.thumbnail && (
+                      <div className="w-12 h-8 rounded border border-slate-200 bg-slate-100 overflow-hidden shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-0.5">
+                    Liên kết sản phẩm liên quan (tùy chọn)
+                  </label>
+                  <input
+                    type="text"
+                    value={(v as any).href || ''}
+                    onChange={(e) => {
+                      const next = [...data.videos];
+                      next[index] = { ...next[index], href: e.target.value } as any;
+                      update({ videos: next });
+                    }}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                    placeholder="/laptop/lenovo-legion-5-pro"
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -2970,22 +4834,76 @@ function CustomerGalleryForm({
   onPickMedia: (imgIdx: number) => void;
   onAddMedia: () => void;
 }) {
+  const images = data.images || [];
+  const uniqueUrlCount = new Set(images.map((img) => img.url.trim())).size;
+  const hasDuplicates = images.length > uniqueUrlCount;
+
+  const handleRemoveDuplicates = () => {
+    const seen = new Set<string>();
+    const deduplicated = images.filter((img) => {
+      const url = img.url.trim();
+      if (!url || seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+    update({ images: deduplicated });
+  };
+
   return (
     <div className="space-y-4">
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối</label>
-        <input
-          type="text"
-          value={data.title}
-          onChange={(e) => update({ title: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Hình ảnh khách hàng tại CitiLap"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối ảnh khách hàng *</label>
+          <input
+            type="text"
+            value={data.title}
+            onChange={(e) => update({ title: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Hình ảnh khách hàng tại CitiLap"
+          />
+        </div>
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
+          <input
+            type="text"
+            value={data.subtitle || ''}
+            onChange={(e) => update({ subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+            placeholder="Hình ảnh khách hàng tin tưởng mua sắm và nhận máy..."
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="font-bold text-slate-700 block mb-1">Số lượng ảnh hiển thị tối đa</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={data.limit || 10}
+            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 10)) })}
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          />
+        </div>
+        {hasDuplicates && (
+          <div className="pt-5">
+            <button
+              type="button"
+              onClick={handleRemoveDuplicates}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer shadow-xs"
+            >
+              <span>Phát hiện ảnh trùng lặp: Bấm để dọn dẹp</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800">Danh sách ảnh ({data.images?.length || 0})</span>
+          <span className="font-bold text-slate-800 text-xs">
+            Danh sách ảnh ({images.length}) • Hiển thị tối đa {data.limit || 10} ảnh
+          </span>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -2997,13 +4915,14 @@ function CustomerGalleryForm({
             <button
               type="button"
               onClick={() => {
-                const current = data.images || [];
                 update({
                   images: [
-                    ...current,
+                    ...images,
                     {
                       url: '',
-                      alt: '',
+                      alt: `Khách hàng trải nghiệm laptop tại CitiLap #${images.length + 1}`,
+                      href: '',
+                      enabled: true,
                     },
                   ],
                 });
@@ -3015,118 +4934,143 @@ function CustomerGalleryForm({
           </div>
         </div>
 
-        {data.images?.map((img, index) => (
-          <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex gap-3 items-start">
-            <div className="w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0">
-              {img.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={img.url} alt={img.alt || 'Gallery image'} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-400 text-[10px]">
-                  Chưa có ảnh
+        {images.map((img, index) => {
+          const isDuplicate = images.findIndex((other) => other.url.trim() === img.url.trim()) !== index;
+          return (
+            <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex gap-3 items-start">
+              <div className="w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 relative">
+                {img.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={img.url} alt={img.alt || 'Gallery image'} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-400 text-[10px]">
+                    Chưa có ảnh
+                  </div>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700 text-xs">Ảnh #{index + 1}</span>
+                    {isDuplicate && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                        Trùng lặp URL
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
+                      <input
+                        type="checkbox"
+                        checked={(img as any).enabled !== false}
+                        onChange={(e) => {
+                          const next = [...images];
+                          next[index] = { ...next[index], enabled: e.target.checked } as any;
+                          update({ images: next });
+                        }}
+                        className="rounded text-blue-600"
+                      />
+                      <span>Bật</span>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={index === 0}
+                      onClick={() => {
+                        const next = [...images];
+                        [next[index], next[index - 1]] = [next[index - 1], next[index]];
+                        update({ images: next });
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                      title="Di chuyển lên"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={index === images.length - 1}
+                      onClick={() => {
+                        const next = [...images];
+                        [next[index], next[index + 1]] = [next[index + 1], next[index]];
+                        update({ images: next });
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
+                      title="Di chuyển xuống"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
+                      onClick={() => {
+                        if (!window.confirm(`Xóa ảnh #${index + 1}?`)) return;
+                        update({ images: images.filter((_, i) => i !== index) });
+                      }}
+                    >
+                      Xóa
+                    </button>
+                  </div>
                 </div>
-              )}
+
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">URL ảnh *</label>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={img.url}
+                      onChange={(e) => {
+                        const next = [...images];
+                        next[index] = { ...next[index], url: e.target.value };
+                        update({ images: next });
+                      }}
+                      className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
+                      placeholder="https://... hoặc /brand/store-photo-02.webp"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onPickMedia(index)}
+                      className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
+                    >
+                      Chọn ảnh
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Mô tả ảnh (Alt)</label>
+                    <input
+                      type="text"
+                      value={img.alt}
+                      onChange={(e) => {
+                        const next = [...images];
+                        next[index] = { ...next[index], alt: e.target.value };
+                        update({ images: next });
+                      }}
+                      className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white"
+                      placeholder="Ví dụ: Khách hàng mua laptop tại CitiLap"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Liên kết khi click (tùy chọn)</label>
+                    <input
+                      type="text"
+                      value={(img as any).href || ''}
+                      onChange={(e) => {
+                        const next = [...images];
+                        next[index] = { ...next[index], href: e.target.value } as any;
+                        update({ images: next });
+                      }}
+                      className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
+                      placeholder="/laptop-gaming"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <div className="flex-1 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-700 text-xs">Ảnh #{index + 1}</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    disabled={index === 0}
-                    onClick={() => {
-                      const next = [...data.images];
-                      [next[index], next[index - 1]] = [next[index - 1], next[index]];
-                      update({ images: next });
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                    title="Di chuyển lên"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={index === data.images.length - 1}
-                    onClick={() => {
-                      const next = [...data.images];
-                      [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                      update({ images: next });
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                    title="Di chuyển xuống"
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
-                    onClick={() => {
-                      if (!window.confirm(`Xóa ảnh #${index + 1}?`)) return;
-                      update({ images: data.images.filter((_, i) => i !== index) });
-                    }}
-                  >
-                    Xóa
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">URL ảnh *</label>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={img.url}
-                    onChange={(e) => {
-                      const next = [...data.images];
-                      next[index] = { ...next[index], url: e.target.value };
-                      update({ images: next });
-                    }}
-                    className={`w-full px-2.5 py-1 border rounded text-xs bg-white ${
-                      !img.url.trim() ? 'border-amber-300' : 'border-slate-300'
-                    }`}
-                    placeholder="https://... hoặc /images/..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onPickMedia(index)}
-                    className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
-                  >
-                    Chọn
-                  </button>
-                </div>
-                {!img.url.trim() ? (
-                  <p className="text-[11px] text-rose-500 font-medium mt-1">
-                    Vui lòng nhập URL ảnh hoặc chọn từ thư viện Media
-                  </p>
-                ) : !img.url.startsWith('http://') && !img.url.startsWith('https://') && !img.url.startsWith('/') ? (
-                  <p className="text-[11px] text-amber-600 font-medium mt-1">
-                    Đường dẫn ảnh phải bắt đầu bằng https:// hoặc /
-                  </p>
-                ) : data.images.findIndex((other) => other.url.trim() === img.url.trim()) !== index ? (
-                  <p className="text-[11px] text-amber-600 font-medium mt-1">
-                    Ảnh này trùng với ảnh #{data.images.findIndex((other) => other.url.trim() === img.url.trim()) + 1} — trang chủ sẽ hiển thị lặp lại. Hãy chọn ảnh khác.
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Mô tả ảnh (Alt / Caption)</label>
-                <input
-                  type="text"
-                  value={img.alt}
-                  onChange={(e) => {
-                    const next = [...data.images];
-                    next[index] = { ...next[index], alt: e.target.value };
-                    update({ images: next });
-                  }}
-                  className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white"
-                  placeholder="Ví dụ: Khách hàng nhận máy MacBook Air M3"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

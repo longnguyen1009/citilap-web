@@ -21,18 +21,18 @@ async function resolveFallbackProductTabs() {
   }
 
   const [newArrivals, newLaptops, likeNewLaptops, clearanceLaptops] = await Promise.all([
-    searchProducts({ sort: 'newest', limit: 10 }).catch(() => ({ products: [] })),
-    searchProducts({ condition: ['NEW'], sort: 'newest', limit: 10 }).catch(() => ({ products: [] })),
-    searchProducts({ condition: ['LIKE_NEW', 'USED'], sort: 'newest', limit: 10 }).catch(() => ({ products: [] })),
-    searchProducts({ condition: ['LIQUIDATION', 'REFURBISHED'], sort: 'price-asc', limit: 10 }).catch(() => ({ products: [] })),
+    searchProducts({ category: ['laptop'], sort: 'newest', limit: 10 }).catch(() => ({ products: [] })),
+    searchProducts({ category: ['laptop-moi'], condition: ['NEW'], sort: 'newest', limit: 10 }).catch(() => ({ products: [] })),
+    searchProducts({ category: ['laptop-likenew'], condition: ['LIKE_NEW', 'USED'], sort: 'newest', limit: 10 }).catch(() => ({ products: [] })),
+    searchProducts({ category: ['laptop'], condition: ['LIQUIDATION', 'REFURBISHED'], sort: 'price-asc', limit: 10 }).catch(() => ({ products: [] })),
   ]);
 
   return {
     title: 'Sản phẩm nổi bật',
     tabs: [
-      { id: 'new-arrivals', label: 'LAPTOP MỚI VỀ', href: '/laptop-moi', products: newArrivals.products },
-      { id: 'new-laptops', label: 'LAPTOP MỚI', href: '/laptop-moi', products: newLaptops.products },
-      { id: 'likenew', label: 'LAPTOP LIKENEW', href: '/laptop-cu', products: likeNewLaptops.products },
+      { id: 'new-arrivals', label: 'LAPTOP MỚI VỀ', href: '/search?category=laptop&sort=newest', products: newArrivals.products },
+      { id: 'new-laptops', label: 'LAPTOP MỚI', href: '/search?category=laptop-moi', products: newLaptops.products },
+      { id: 'likenew', label: 'LAPTOP LIKENEW', href: '/search?category=laptop-likenew', products: likeNewLaptops.products },
       { id: 'clearance', label: 'XẢ HÀNG GIÁ SỐC', href: '/hot-sale', products: clearanceLaptops.products },
     ],
   };
@@ -73,7 +73,7 @@ export default async function FlashSaleSection({
           {bannerImage && (
             <div className="overflow-hidden rounded-2xl shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={bannerImage} alt={bannerAlt} className="w-full h-auto max-h-[180px] object-cover" />
+              <img loading="lazy" decoding="async" src={bannerImage} alt={bannerAlt} className="w-full h-auto max-h-[180px] object-cover" />
             </div>
           )}
           <p className="rounded-xl border border-red-100 bg-white p-6 text-center text-sm text-slate-600">

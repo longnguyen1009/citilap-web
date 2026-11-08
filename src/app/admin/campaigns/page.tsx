@@ -101,7 +101,73 @@ export default function AdminCampaignsPage() {
   const [filterTab, setFilterTab] = useState<FilterTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Editor Modal State
+  // Storefront Flash Sale / Hot Sale Banner fallback settings
+  const [bannerSettingsOpen, setBannerSettingsOpen] = useState(false);
+  const [bannerSettings, setBannerSettings] = useState<{
+    hotSaleBannerImage: string;
+    hotSaleBannerLink: string;
+    flashSaleEnabled: boolean;
+    flashSaleTitle: string;
+    flashSaleStartAt: string;
+    flashSaleEndAt: string;
+  } | null>(null);
+  const [settingsRevision, setSettingsRevision] = useState<number>(0);
+  const [fullSettingsDoc, setFullSettingsDoc] = useState<Record<string, unknown> | null>(null);
+  const [savingBannerSettings, setSavingBannerSettings] = useState(false);
+
+  const loadBannerSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/settings', { credentials: 'same-origin' });
+      const json = await res.json();
+      if (res.ok && json.success && json.data?.document) {
+        const doc = json.data.document;
+        setFullSettingsDoc(doc);
+        setSettingsRevision(json.data.revision ?? 0);
+        setBannerSettings({
+          hotSaleBannerImage: doc.hotSaleBannerImage || '',
+          hotSaleBannerLink: doc.hotSaleBannerLink || '',
+          flashSaleEnabled: Boolean(doc.flashSaleEnabled),
+          flashSaleTitle: doc.flashSaleTitle || 'Giá Sốc Giờ Vàng',
+          flashSaleStartAt: doc.flashSaleStartAt || '',
+          flashSaleEndAt: doc.flashSaleEndAt || '',
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSaveBannerSettings = async () => {
+    if (!bannerSettings || !fullSettingsDoc) return;
+    setSavingBannerSettings(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          expectedRevision: settingsRevision,
+          document: {
+            ...fullSettingsDoc,
+            ...bannerSettings,
+          },
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Không thể lưu cấu hình Banner & Flash Sale dự phòng.');
+      }
+      setSettingsRevision(json.data.revision);
+      setFullSettingsDoc(json.data.document);
+      setSuccessMsg('Đã lưu cấu hình Banner HOT SALE & chế độ Flash Sale dự phòng.');
+      setBannerSettingsOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Lỗi khi lưu cấu hình.');
+    } finally {
+      setSavingBannerSettings(false);
+    }
+  };
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<CampaignData | null>(null);
   const [formName, setFormName] = useState("");
@@ -411,6 +477,16 @@ export default function AdminCampaignsPage() {
             <AdminButton
               variant="secondary"
               size="sm"
+              onClick={() => {
+                if (!bannerSettings) void loadBannerSettings();
+                setBannerSettingsOpen(prev => !prev);
+              }}
+            >
+              Cấu hình Banner & Dự phòng
+            </AdminButton>
+            <AdminButton
+              variant="secondary"
+              size="sm"
               onClick={fetchCampaigns}
               disabled={loading}
               aria-label="Làm mới"
@@ -422,6 +498,83 @@ export default function AdminCampaignsPage() {
           </div>
         }
       />
+
+      {bannerSettingsOpen && bannerSettings && (
+        <AdminCard title="Cấu hình Banner HOT SALE & Chế độ Flash Sale dự phòng">
+          <div className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="block font-semibold text-slate-700">
+                Ảnh Banner HOT SALE ngang (1600×160)
+                <input
+                  type="text"
+                  value={bannerSettings.hotSaleBannerImage}
+                  onChange={e => setBannerSettings({ ...bannerSettings, hotSaleBannerImage: e.target.value })}
+                  placeholder="/api/library/... hoặc https://..."
+                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-1.5 font-normal"
+                />
+              </label>
+              <label className="block font-semibold text-slate-700">
+                Liên kết khi bấm vào Banner
+                <input
+                  type="text"
+                  value={bannerSettings.hotSaleBannerLink}
+                  onChange={e => setBannerSettings({ ...bannerSettings, hotSaleBannerLink: e.target.value })}
+                  placeholder="/laptop-gaming"
+                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-1.5 font-normal"
+                />
+              </label>
+            </div>
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              <label className="inline-flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bannerSettings.flashSaleEnabled}
+                  onChange={e => setBannerSettings({ ...bannerSettings, flashSaleEnabled: e.target.checked })}
+                  className="w-4 h-4 rounded text-red-600"
+                />
+                <span>Bật chế độ Flash Sale dự phòng toàn trang (áp dụng cho SP gắn cờ Flash Sale khi không có chiến dịch riêng)</span>
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="block font-semibold text-slate-600">
+                  Tiêu đề khối Flash Sale
+                  <input
+                    type="text"
+                    value={bannerSettings.flashSaleTitle}
+                    onChange={e => setBannerSettings({ ...bannerSettings, flashSaleTitle: e.target.value })}
+                    className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-normal"
+                  />
+                </label>
+                <label className="block font-semibold text-slate-600">
+                  Bắt đầu dự phòng (GMT+7)
+                  <input
+                    type="datetime-local"
+                    value={isoToDatetimeLocalGmt7(bannerSettings.flashSaleStartAt)}
+                    onChange={e => setBannerSettings({ ...bannerSettings, flashSaleStartAt: datetimeLocalGmt7ToIso(e.target.value) })}
+                    className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-mono font-normal"
+                  />
+                </label>
+                <label className="block font-semibold text-slate-600">
+                  Kết thúc dự phòng (GMT+7)
+                  <input
+                    type="datetime-local"
+                    value={isoToDatetimeLocalGmt7(bannerSettings.flashSaleEndAt)}
+                    onChange={e => setBannerSettings({ ...bannerSettings, flashSaleEndAt: datetimeLocalGmt7ToIso(e.target.value) })}
+                    className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-mono font-normal"
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <AdminButton variant="secondary" size="sm" onClick={() => setBannerSettingsOpen(false)}>
+                Đóng
+              </AdminButton>
+              <AdminButton variant="primary" size="sm" loading={savingBannerSettings} onClick={() => void handleSaveBannerSettings()}>
+                Lưu cấu hình Banner
+              </AdminButton>
+            </div>
+          </div>
+        </AdminCard>
+      )}
 
       {/* Alerts */}
       {successMsg && (

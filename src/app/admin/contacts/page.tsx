@@ -83,6 +83,7 @@ function ContactsContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState<ContactFilterStatus>(initialStatus);
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "INQUIRY" | "REVIEW">("ALL");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -305,38 +306,60 @@ function ContactsContent() {
       <AdminCard bodyClassName="p-0 overflow-hidden">
         {/* Top Bar: Status Tabs + Inline Search */}
         <div className="px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/60">
-          <div className="flex items-center gap-1" role="tablist" aria-label="Lọc theo trạng thái">
-            {STATUS_TABS.map((tab) => {
-              const active = statusFilter === tab.key;
-              return (
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1" role="tablist" aria-label="Lọc theo trạng thái">
+              {STATUS_TABS.map((tab) => {
+                const active = statusFilter === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => {
+                      setStatusFilter(tab.key);
+                      setPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
+                      active
+                        ? "bg-slate-900 text-white shadow-2xs"
+                        : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    {tab.key === "PENDING" && pendingCount > 0 && (
+                      <span
+                        className={`px-1.5 py-0.2 rounded-full text-[10px] tabular-nums ${
+                          active ? "bg-amber-400 text-slate-950 font-bold" : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {pendingCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+              {[
+                { key: "ALL" as const, label: "Tất cả loại" },
+                { key: "INQUIRY" as const, label: "Tư vấn & Hẹn xem máy" },
+                { key: "REVIEW" as const, label: "Đánh giá SP ⭐" },
+              ].map((t) => (
                 <button
-                  key={tab.key}
+                  key={t.key}
                   type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => {
-                    setStatusFilter(tab.key);
-                    setPage(1);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                    active
-                      ? "bg-slate-900 text-white shadow-2xs"
-                      : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
+                  onClick={() => setTypeFilter(t.key)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                    typeFilter === t.key
+                      ? "bg-blue-600 text-white"
+                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
                   }`}
                 >
-                  <span>{tab.label}</span>
-                  {tab.key === "PENDING" && pendingCount > 0 && (
-                    <span
-                      className={`px-1.5 py-0.2 rounded-full text-[10px] tabular-nums ${
-                        active ? "bg-amber-400 text-slate-950 font-bold" : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
-                      {pendingCount}
-                    </span>
-                  )}
+                  {t.label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
@@ -405,12 +428,27 @@ function ContactsContent() {
                 </button>
               </div>
             </div>
-          ) : contacts.length === 0 ? (
+          ) : contacts.filter((c) => {
+              const isRev = Boolean(c.message && /^\[Đánh giá/i.test(c.message.trim()));
+              if (typeFilter === "REVIEW") return isRev;
+              if (typeFilter === "INQUIRY") return !isRev;
+              return true;
+            }).length === 0 ? (
             <div className="py-12 text-center text-slate-500 text-xs">
-              Không có yêu cầu liên hệ nào phù hợp.
+              Không có yêu cầu liên hệ nào phù hợp với bộ lọc hiện tại.
             </div>
           ) : (
-            contacts.map((contact) => (
+            contacts
+              .filter((c) => {
+                const isRev = Boolean(c.message && /^\[Đánh giá/i.test(c.message.trim()));
+                if (typeFilter === "REVIEW") return isRev;
+                if (typeFilter === "INQUIRY") return !isRev;
+                return true;
+              })
+              .map((contact) => {
+                const isReview = Boolean(contact.message && /^\[Đánh giá/i.test(contact.message.trim()));
+                const isAppointment = Boolean(contact.message && /^\[HẸN XEM MÁY/i.test(contact.message.trim()));
+                return (
               <div
                 key={contact.id}
                 className={`p-3.5 transition-colors ${
@@ -426,6 +464,16 @@ function ContactsContent() {
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2.5 text-xs">
                       <span className="admin-contact-name font-bold text-slate-900">{contact.name}</span>
+                      {isReview && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                          ⭐ Đánh giá sản phẩm
+                        </span>
+                      )}
+                      {isAppointment && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                          📅 Hẹn xem máy
+                        </span>
+                      )}
                       <a
                         href={`tel:${contact.phone}`}
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono font-bold"
@@ -624,7 +672,8 @@ function ContactsContent() {
                   </div>
                 </div>
               </div>
-            ))
+                );
+              })
           )}
         </div>
 
