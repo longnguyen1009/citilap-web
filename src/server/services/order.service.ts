@@ -717,31 +717,6 @@ export async function getOrderById(orderId: string, d1Database?: D1Database) {
 }
 
 /**
- * Retrieve an order by its order number.
- */
-export async function getOrderByOrderNumber(orderNumber: string, d1Database?: D1Database) {
-  const prisma = getPrismaClient(d1Database);
-  return prisma.order.findUnique({
-    where: { orderNumber },
-    include: {
-      items: {
-        include: {
-          product: {
-            select: { id: true, name: true, slug: true, images: true },
-          },
-        },
-      },
-      events: {
-        orderBy: { createdAt: 'desc' },
-      },
-      internalNotes: {
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  });
-}
-
-/**
  * Strip sensitive internal operational data before sending to public customers.
  */
 export function sanitizeOrderForPublic(order: OrderRecord | Record<string, unknown> | null) {

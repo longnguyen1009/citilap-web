@@ -468,12 +468,12 @@ export default function NavigationStudio({ initialTab = 'menus' }: { initialTab?
                     {t === 'menus' ? `Menu điều hướng` : `Bộ sưu tập (${doc.collections.length})`}
                   </button>
                 ))}
-                <a
+                <Link
                   href="/admin/categories"
                   className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-blue-600"
                 >
                   Danh mục SP ({doc.categories.length}) ↗
-                </a>
+                </Link>
               </nav>
             )}
 

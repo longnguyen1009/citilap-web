@@ -13,6 +13,7 @@ export function useDraftAutosave(
   saving: boolean,
   _save?: () => Promise<boolean>
 ) {
+  void _save;
   const [savedAt, setSavedAt] = useState('');
   const prevRevision = useRef<number>(revision);
 

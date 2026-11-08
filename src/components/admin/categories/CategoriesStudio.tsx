@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import Link from 'next/link';
 import {
   FolderTree,
   Plus,
   Edit2,
   Trash2,
   Eye,
-  EyeOff,
   ExternalLink,
   Search,
   X,
@@ -22,11 +20,9 @@ import {
   Globe,
   RefreshCw,
   Layers,
-  ChevronRight,
   Info,
   Check,
   RotateCcw,
-  Upload,
 } from 'lucide-react';
 import PageHeader from '@/components/admin/ui/PageHeader';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
@@ -117,7 +113,6 @@ export default function CategoriesStudio() {
   // Dialog states
   const [imagePickerOpen, setImagePickerOpen] = useState(false);
   const [previewData, setPreviewData] = useState<ResolvedNavigation | null>(null);
-  const [leaveConfirm, setLeaveConfirm] = useState<(() => void) | null>(null);
 
   const formNameInputRef = useRef<HTMLInputElement>(null);
   const latestDoc = useRef(doc);
@@ -1462,7 +1457,7 @@ export default function CategoriesStudio() {
                 <strong>💡 Hướng dẫn cấu trúc danh mục:</strong> Cấu trúc phân cấp cha/con tự động
                 đồng bộ với <strong>MegaMenu</strong> và bộ lọc tìm kiếm sản phẩm. Danh mục cha bị ẩn
                 sẽ tự động ẩn các danh mục con. Sau khi thay đổi, nhấn nút{' '}
-                <strong className="text-blue-700">"Xuất bản ngay"</strong> ở góc trên bên phải để áp
+                <strong className="text-blue-700">&quot;Xuất bản ngay&quot;</strong> ở góc trên bên phải để áp
                 dụng tức thì ra trang web chính thức.
               </div>
             </div>

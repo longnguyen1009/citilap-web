@@ -6,7 +6,7 @@ import {
   getLikeNewProducts,
   getBestSellingProducts,
   type HomepageProduct,
-} from "./catalog.service";
+} from "@/server/services/catalog.service";
 import type { ProductCardProduct } from "@/components/product/ProductCard";
 
 import type { PriceEvaluationContext } from "@/server/services/pricing.service";

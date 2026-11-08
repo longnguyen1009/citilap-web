@@ -13,7 +13,6 @@ import {
   Home,
   Layers,
   X,
-  Sparkles,
 } from 'lucide-react';
 import {
   PageHeader,

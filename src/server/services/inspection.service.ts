@@ -105,10 +105,14 @@ export async function publicInspections(db: D1Database, productId: string, varia
       if (!PUBLIC_CODE_PATTERN.test(code)) return false;
       return evaluateStudioVisibility(row.studioPublished, [variantId, row.variantId]).visible;
     })
-    .map(({ studioPublished: _studioPublished, ...inspection }) => ({
-      ...inspection,
-      publicCode: inspection.publicCode.trim(),
-    }));
+    .map((row) => {
+      const { studioPublished, ...inspection } = row;
+      void studioPublished;
+      return {
+        ...inspection,
+        publicCode: inspection.publicCode.trim(),
+      };
+    });
 }
 
 interface RawInspectionLookupRow extends PublicInspection {

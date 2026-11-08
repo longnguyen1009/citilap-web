@@ -1,24 +1,16 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
-  History,
-  Search,
-  Filter,
   RefreshCw,
-  Calendar,
   User,
   ArrowRight,
   ExternalLink,
-  ShieldAlert,
-  Database,
   ChevronLeft,
   ChevronRight,
   Copy,
   Check,
-  Tag,
-  Layers,
 } from 'lucide-react';
 import {
   PageHeader,

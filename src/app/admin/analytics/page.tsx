@@ -1,17 +1,12 @@
 import Link from 'next/link';
 import { mediaEnvironment } from '@/server/media-http';
 import {
-  TrendingUp,
   Eye,
   Search,
   ShoppingCart,
   CreditCard,
   PhoneCall,
   Calendar,
-  AlertCircle,
-  HelpCircle,
-  ArrowRight,
-  BarChart3,
   Layers,
   Sparkles,
 } from 'lucide-react';

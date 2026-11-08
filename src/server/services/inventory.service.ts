@@ -208,33 +208,9 @@ export interface TransferResult {
   isIdempotentReplay?: boolean;
 }
 
-export interface ReceiveInventoryParams {
-  warehouseId: string;
-  productId: string;
-  variantId?: string;
-  serialNumber?: string;
-  condition?: SerialUnitCondition;
-  costPrice?: number;
-  warrantyMonths?: number;
-  notes?: string;
-  quantity?: number;
-  actorId?: string;
-  idempotencyKey?: string;
-}
-
 // ==============================================================================
 // SERVICE IMPLEMENTATION
 // ==============================================================================
-
-/**
- * Lists all active warehouses sorted by display priority.
- */
-export async function listActiveWarehouses(client: PrismaClient = prisma) {
-  return client.warehouse.findMany({
-    where: { status: "ACTIVE" },
-    orderBy: { sortOrder: "asc" },
-  });
-}
 
 /**
  * Calculates authoritative stock availability for a given SKU across warehouses.
@@ -351,25 +327,6 @@ export async function getSkuAvailability(
     available: totalAvailable,
     byWarehouse,
   };
-}
-
-/**
- * Retrieves physical serial units currently AVAILABLE in inventory for a variant or product.
- * Internal use only — serial numbers are never exposed publicly on the storefront.
- */
-export async function getAvailableSerialUnits(
-  variantId: string,
-  warehouseId?: string,
-  client: PrismaClient = prisma
-) {
-  return client.serialUnit.findMany({
-    where: {
-      variantId,
-      status: "AVAILABLE",
-      ...(warehouseId ? { warehouseId } : {}),
-    },
-    orderBy: { receivedAt: "asc" }, // FIFO priority
-  });
 }
 
 /**
@@ -1000,134 +957,4 @@ export async function transferInventory(
       transferredAt: new Date(),
     };
   }
-}
-
-/**
- * Receives inventory stock into a warehouse (Initial receive or purchase receipt).
- */
-export async function receiveInventory(
-  params: ReceiveInventoryParams,
-  client: PrismaClient = prisma
-) {
-  const {
-    warehouseId,
-    productId,
-    variantId,
-    serialNumber,
-    condition = "NEW",
-    costPrice,
-    warrantyMonths = 12,
-    notes,
-    quantity = 1,
-    actorId,
-    idempotencyKey,
-  } = params;
-
-  if (serialNumber) {
-    // Normalized serial number (upper & trimmed)
-    const normalizedSerial = serialNumber.trim().toUpperCase();
-
-    const unit = await client.serialUnit.create({
-      data: {
-        warehouseId,
-        productId,
-        variantId,
-        serialNumber: normalizedSerial,
-        condition,
-        status: "AVAILABLE",
-        costPrice,
-        warrantyMonths,
-        notes,
-      },
-    });
-
-    await client.inventoryTransaction.create({
-      data: {
-        warehouseId,
-        productId,
-        variantId,
-        serialUnitId: unit.id,
-        transactionType: "RECEIVE",
-        quantityDelta: 1,
-        referenceType: "PURCHASE",
-        actorId,
-        idempotencyKey,
-        reason: "Stock reception",
-      },
-    });
-
-    return { type: "SERIALIZED", unit };
-  } else {
-    if (!variantId) throw new InventoryError("variantId is required for quantity stock reception", "MISSING_VARIANT_ID");
-
-    const existing = await client.inventoryBalance.findUnique({
-      where: { warehouseId_variantId: { warehouseId, variantId } },
-    });
-
-    let balance;
-    if (existing) {
-      balance = await client.inventoryBalance.update({
-        where: { id: existing.id },
-        data: { onHand: { increment: quantity } },
-      });
-    } else {
-      balance = await client.inventoryBalance.create({
-        data: {
-          warehouseId,
-          productId,
-          variantId,
-          onHand: quantity,
-          reserved: 0,
-        },
-      });
-    }
-
-    await client.inventoryTransaction.create({
-      data: {
-        warehouseId,
-        productId,
-        variantId,
-        transactionType: "RECEIVE",
-        quantityDelta: quantity,
-        referenceType: "PURCHASE",
-        actorId,
-        idempotencyKey,
-        reason: "Quantity stock reception",
-      },
-    });
-
-    return { type: "QUANTITY", balance };
-  }
-}
-
-/**
- * Transitional helper: Recomputes authoritative stock from SerialUnits / InventoryBalances
- * and synchronizes legacy `Product.stock` & `ProductVariant.stock` fields so legacy queries
- * remain completely accurate without schema divergence.
- */
-export async function syncLegacyProductStock(productId: string, client: PrismaClient = prisma) {
-  const product = await client.product.findUnique({
-    where: { id: productId },
-    include: { variants: true },
-  });
-
-  if (!product) return;
-
-  let productTotalAvailable = 0;
-
-  for (const variant of product.variants) {
-    const avail = await getSkuAvailability(variant.sku, undefined, client);
-    await client.productVariant.update({
-      where: { id: variant.id },
-      data: { stock: avail.available },
-    });
-    productTotalAvailable += avail.available;
-  }
-
-  await client.product.update({
-    where: { id: productId },
-    data: { stock: productTotalAvailable },
-  });
-
-  return { productId, synchronizedStock: productTotalAvailable };
 }

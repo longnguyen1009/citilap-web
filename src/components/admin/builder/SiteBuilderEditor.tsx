@@ -32,19 +32,8 @@ import {
   X,
   Search,
   Image as ImageIcon,
-  ExternalLink,
   Flame,
-  Zap,
-  Briefcase,
-  Server,
-  Headphones,
-  Star,
-  ShieldCheck,
-  Truck,
   RefreshCw,
-  Store,
-  Check,
-  Link as LinkIcon,
 } from 'lucide-react';
 import { youtubeId, tiktokVideoId } from '@/contracts/cms/media';
 import type {
@@ -3684,7 +3673,6 @@ function FeaturedCategoriesForm({
 function FeaturedBrandsForm({
   data,
   update,
-  onPickMedia,
 }: {
   data: FeaturedBrandsData;
   update: (p: Partial<FeaturedBrandsData>) => void;

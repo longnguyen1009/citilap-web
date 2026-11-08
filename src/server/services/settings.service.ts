@@ -66,8 +66,9 @@ export async function getAdminSettings(
 export async function saveAdminSettings(
   db: D1Database,
   input: unknown,
-  actor = "admin"
+  _actor = "admin"
 ): Promise<{ revision: number; document: AdminSettingsDocument }> {
+  void _actor;
   const { expectedRevision, document } = settingsMutationSchema.parse(input);
 
   // Check current revision in DB

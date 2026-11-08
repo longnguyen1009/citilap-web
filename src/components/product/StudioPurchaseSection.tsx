@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, Phone, ShoppingCart, ShieldCheck, Scale, Gift, CreditCard, AlertCircle } from "lucide-react";
+import { Check, Phone, ShoppingCart, ShieldCheck, Scale, Gift, CreditCard } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useCompare } from "@/context/CompareContext";
 import { businessProfile } from "@/config/business-profile";

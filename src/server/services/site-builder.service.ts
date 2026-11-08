@@ -276,8 +276,9 @@ export async function writeLandingPage(
   env: MediaEnvironment,
   id: string | null,
   input: unknown,
-  actor = 'admin'
+  _actor = 'admin'
 ) {
+  void _actor;
   const { expectedRevision, action, document: d } = landingPageStudioWriteSchema.parse(input);
   const db = env.DB;
 

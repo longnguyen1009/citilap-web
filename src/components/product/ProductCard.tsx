@@ -154,7 +154,6 @@ function formatVnd(val?: string | number | null): string {
 
 export default function ProductCard({
   product,
-  badgeColor,
   rank,
   footerAction,
   showSpecs = true,
