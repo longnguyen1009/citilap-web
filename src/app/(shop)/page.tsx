@@ -85,11 +85,13 @@ export default async function Home() {
           settings={settings}
           flashSale={<FlashSaleSection settings={settings} />}
         />
-        <TestimonialSection
-          testimonials={settings?.testimonials ?? []}
-          sourceUrl={settings?.testimonialsSourceUrl}
-        />
-        <ContactSection settings={settings} />
+        <div className="defer-offscreen">
+          <TestimonialSection
+            testimonials={settings?.testimonials ?? []}
+            sourceUrl={settings?.testimonialsSourceUrl}
+          />
+          <ContactSection settings={settings} />
+        </div>
       </div>
     );
   }

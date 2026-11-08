@@ -1,6 +1,8 @@
 import 'server-only';
 import { cache } from 'react';
 
+import { cachedJson } from '@/server/cache/kv-cache';
+
 import { mediaEnvironment } from '@/server/media-http';
 import { MediaError } from '@/server/services/media-library.service';
 import { publicNavigation, publicCollection } from '@/server/services/navigation.service';
@@ -164,8 +166,12 @@ async function publishedOrNull<T>(action: () => Promise<T>): Promise<T | null> {
   }
 }
 
+/** Public CMS reads are cached in KV for 60s; admin publishes invalidate them (see bumpCmsVersion). */
+const PUBLIC_CMS_TTL_SECONDS = 60;
+
 export const getPublishedNavigation = cache(() => {
-  return publishedOrNull(async () => publicNavigation((await mediaEnvironment()).DB));
+  return cachedJson('public-navigation', PUBLIC_CMS_TTL_SECONDS, () =>
+    publishedOrNull(async () => publicNavigation((await mediaEnvironment()).DB)));
 });
 
 export function getPublishedStudio(slug: string) {
@@ -184,10 +190,10 @@ export async function getPublishedCollectionList() {
 }
 
 export const getPublishedHomepage = cache(async () => {
-  return publishedOrNull(async () => {
+  return cachedJson('public-homepage', PUBLIC_CMS_TTL_SECONDS, () => publishedOrNull(async () => {
     const { getPublicHomepage } = await import('@/server/services/site-builder.service');
     return getPublicHomepage((await mediaEnvironment()).DB);
-  });
+  }));
 });
 
 export async function getPublishedLandingPage(slug: string) {
@@ -198,10 +204,10 @@ export async function getPublishedLandingPage(slug: string) {
 }
 
 export const getStorefrontSettings = cache(async () => {
-  return publishedOrNull(async () => {
+  return cachedJson('public-settings', PUBLIC_CMS_TTL_SECONDS, () => publishedOrNull(async () => {
     const { getPublicStorefrontSettings } = await import('@/server/services/settings.service');
     return getPublicStorefrontSettings((await mediaEnvironment()).DB);
-  });
+  }));
 });
 
 export function classifyProductPublicationById(

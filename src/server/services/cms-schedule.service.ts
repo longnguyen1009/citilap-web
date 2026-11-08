@@ -70,4 +70,5 @@ export async function runSchedules(env:MediaEnvironment,now=Date.now()){
       console.log('CMS_SCHEDULE_STOP',id,state,code);
     }
   }
+  return jobs.length;
 }

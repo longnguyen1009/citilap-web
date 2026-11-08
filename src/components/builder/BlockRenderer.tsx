@@ -71,9 +71,9 @@ export default function BlockRenderer({
     return null;
   }
 
-  return (
-    <div className="site-builder-content space-y-2">
-      {sections.map((section) => {
+  // Sections after the first screens are skipped by the browser's rendering until they approach the viewport.
+  const DEFER_FROM_INDEX = 5;
+  const rendered = sections.map((section) => {
         if (!section.enabled) return null;
 
         switch (section.type) {
@@ -143,7 +143,15 @@ export default function BlockRenderer({
           default:
             return null;
         }
-      })}
+      });
+
+  return (
+    <div className="site-builder-content space-y-2">
+      {rendered.map((node, index) =>
+        node && index >= DEFER_FROM_INDEX ? (
+          <div key={sections[index].id} className="defer-offscreen">{node}</div>
+        ) : node,
+      )}
     </div>
   );
 }

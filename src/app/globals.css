@@ -317,3 +317,9 @@ textarea,
     scroll-behavior: auto !important;
   }
 }
+
+/* Below-the-fold sections: skip layout/paint until near the viewport (keeps remembered size via "auto"). */
+.defer-offscreen {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 900px;
+}

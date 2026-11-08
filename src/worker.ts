@@ -3,10 +3,12 @@ import { isImageOptimizationPath } from 'vinext/server/image-optimization';
 import { runSchedules } from './server/services/cms-schedule.service';
 import { serveLibraryImage, type MediaEnvironment } from './server/services/media-library.service';
 import { mediaFailure } from './server/media-http';
+import type { KvLike } from './server/cache/kv-cache';
+import { invalidatePublicCache, invalidatesPublicCache, isCacheableHtmlRequest, serveCachedHtml } from './server/cache/html-cache';
 
 const worker = {
   ...app,
-  async fetch(request: Request, env: MediaEnvironment & { ASSETS: { fetch(request: Request): Promise<Response> } }, ctx: { waitUntil(promise: Promise<unknown>): void }) {
+  async fetch(request: Request, env: MediaEnvironment & { ASSETS: { fetch(request: Request): Promise<Response> }; VINEXT_KV_CACHE?: KvLike }, ctx: { waitUntil(promise: Promise<unknown>): void }) {
     try {
     const url = new URL(request.url);
     const library = url.pathname.match(/^\/api\/library\/([a-zA-Z0-9-]+)$/);
@@ -31,8 +33,14 @@ const worker = {
       } };
       return app.fetch(request, { ...env, ASSETS: assets }, ctx);
     }
+      const kv = env.VINEXT_KV_CACHE;
+      if (kv && isCacheableHtmlRequest(request, url)) {
+        return await serveCachedHtml(kv, url, ctx, () => app.fetch(request, env, ctx));
+      }
       // Preserve Vinext's HTML/RSC cache policy, including private/no-store responses.
-      return await app.fetch(request, env, ctx);
+      const response = await app.fetch(request, env, ctx);
+      if (kv && invalidatesPublicCache(request, response)) ctx.waitUntil(invalidatePublicCache(kv));
+      return response;
     } catch (fatalError) {
       console.error('[Worker Fatal Error]', fatalError);
       return new Response('Hệ thống tạm thời bận. Vui lòng thử lại sau giây lát.', {
@@ -41,9 +49,10 @@ const worker = {
       });
     }
   },
-  async scheduled(_event: unknown, env: MediaEnvironment) {
+  async scheduled(_event: unknown, env: MediaEnvironment & { VINEXT_KV_CACHE?: KvLike }) {
     try {
-      await runSchedules(env);
+      // Scheduled publishes change public content: drop cached pages when any job ran.
+      if (await runSchedules(env)) await invalidatePublicCache(env.VINEXT_KV_CACHE);
     } catch (schedError) {
       console.error('[Worker Cron Error] runSchedules failed:', schedError);
     }
