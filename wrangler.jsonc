@@ -73,8 +73,8 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "citilap-db-prod",
-          "database_id": "94e07d52-27c1-4179-b5f4-af606221062c",
+          "database_name": "citilap-db-prod-v2",
+          "database_id": "54a43de9-8011-4d55-8f35-a9b724bc2090",
           "migrations_dir": "d1-migrations"
         }
       ],
