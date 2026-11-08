@@ -12,6 +12,5 @@ function run(command, args, env = process.env) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-run(npx, ['vite', 'build'], { ...process.env, CLOUDFLARE_ENV: target });
-run(npx, ['wrangler', 'deploy', '--config', 'dist/server/wrangler.json']);
+run(process.execPath, ['node_modules/vite/bin/vite.js', 'build'], { ...process.env, CLOUDFLARE_ENV: target });
+run(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'deploy', '--config', 'dist/server/wrangler.json']);

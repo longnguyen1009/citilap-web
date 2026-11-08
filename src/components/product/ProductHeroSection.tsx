@@ -188,7 +188,7 @@ export default function ProductHeroSection({
     if (v.sku) {
       const url = new URL(window.location.href);
       url.searchParams.set("sku", v.sku);
-      router.replace(`${url.pathname}${url.search}`, { scroll: false });
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
     }
   };
 
