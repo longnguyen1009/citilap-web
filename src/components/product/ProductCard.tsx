@@ -3,14 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Heart, ShieldCheck, Laptop, Scale } from "lucide-react";
+import { Heart, ShieldCheck, Laptop, Cpu, Scale, Gpu, MemoryStick, Monitor } from "lucide-react";
 import { useOptionalWishlist } from "@/context/WishlistContext";
 import { useOptionalCompare } from "@/context/CompareContext";
 import { Badge } from "@/components/ui/Badge";
+import { SpecChip } from "@/components/ui/SpecChip";
 import { ConditionBadge } from "@/components/ui/ConditionBadge";
-import { detectBrandName, getBrandCardTheme } from "@/components/ui/BrandLogo";
+import { StockBadge } from "@/components/ui/StockBadge";
+import { BrandLogo, detectBrandName, getBrandCardTheme } from "@/components/ui/BrandLogo";
 import { defaultWarrantyMonthsForCondition } from "@/contracts/cms/product-studio";
-import { productHref as getProductHref } from '@/lib/product-paths';
+import { productHref as getProductHref } from "@/lib/product-paths";
 
 export type ProductCardProduct = {
   href?: string;
@@ -63,9 +65,73 @@ function isMeaningfulSpec(val?: string | null): val is string {
 }
 
 /**
- * Readable spec formatters for Thế Giới Số-style vertical spec list
+ * Smart spec formatters for PC grid chips
  */
 function formatCpuSpec(val?: string): string {
+  if (!isMeaningfulSpec(val)) return "";
+  let s = val.split(/[\/,;]/)[0].trim();
+  s = s
+    .replace(/^Intel\s+/i, "")
+    .replace(/^AMD\s+/i, "")
+    .replace(/^Core\s+/i, "")
+    .replace(/Ryzen\s*(?:AI\s*)?(\d)\s*[-–—]?\s*/i, "R$1-")
+    .replace(/Ultra\s*(\d)\s*[-–—]?\s*/i, "U$1-")
+    .replace(/i(\d)\s*[-–—]?\s*(\d)/i, "i$1-$2")
+    .replace(/--+/g, "-")
+    .replace(/-+$/, "")
+    .trim();
+  return s;
+}
+
+function formatGpuSpec(val?: string): string {
+  if (!isMeaningfulSpec(val)) return "";
+  return val
+    .replace(/^NVIDIA\s+/i, "")
+    .replace(/^GeForce\s+/i, "")
+    .replace(/^Intel\s+/i, "")
+    .replace(/\s+Graphics/i, "")
+    .replace(/\s+\d+GB(\s+GDDR\d+)?/i, "")
+    .replace(/\s+Laptop\s+GPU/i, "")
+    .trim();
+}
+
+function formatRamSpec(val?: string): string {
+  if (!isMeaningfulSpec(val)) return "";
+  const match = val.match(/(\d+)\s*GB/i);
+  return match ? `${match[1]}GB` : val.split(" ")[0] || val;
+}
+
+function formatStorageSpec(val?: string): string {
+  if (!isMeaningfulSpec(val)) return "";
+  const matchTb = val.match(/(\d+)\s*TB/i);
+  if (matchTb) return `${matchTb[1]}TB`;
+  const matchGb = val.match(/(\d+)\s*GB/i);
+  if (matchGb) return `${matchGb[1]}GB`;
+  return val.replace(/SSD|NVMe|PCIe/gi, "").trim();
+}
+
+function formatDisplaySpec(val?: string): string {
+  if (!isMeaningfulSpec(val)) return "";
+  const sizeMatch = val.match(/^(\d+(?:\.\d+)?)\s*(?:inch|"|\s)/i) || val.match(/(\d+(?:\.\d+)?)\s*(?:inch|")/i);
+  const size = sizeMatch ? `${sizeMatch[1].replace(/\.0$/, "")}"` : "";
+
+  let res = "";
+  if (/4K|UHD/i.test(val)) res = "4K";
+  else if (/2\.5K/i.test(val)) res = "2.5K";
+  else if (/2K|QHD\+?/i.test(val)) res = "2K";
+  else if (/FHD\+?/i.test(val)) res = "FHD";
+  else if (/Retina/i.test(val)) res = "Retina";
+  else if (/OLED/i.test(val)) res = "OLED";
+
+  if (size && res) return `${size} ${res}`;
+  if (size) return size;
+  return val.replace(/\s*inch\b/gi, '"').trim();
+}
+
+/**
+ * Clean readable formatters for Smartphone (SP) vertical spec lines
+ */
+function formatMobileCpuSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
   return val
     .replace(/\([^)]*\)/g, "")
@@ -78,7 +144,7 @@ function formatCpuSpec(val?: string): string {
     .trim();
 }
 
-function formatGpuSpec(val?: string): string {
+function formatMobileGpuSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
   return val
     .replace(/\([^)]*\)/g, "")
@@ -93,7 +159,7 @@ function formatGpuSpec(val?: string): string {
     .trim();
 }
 
-function formatRamSpec(val?: string): string {
+function formatMobileRamSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
   return val
     .replace(/\([^)]*\)/g, "")
@@ -102,7 +168,7 @@ function formatRamSpec(val?: string): string {
     .trim();
 }
 
-function formatStorageSpec(val?: string): string {
+function formatMobileStorageSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
   return val
     .replace(/\([^)]*\)/g, "")
@@ -112,46 +178,53 @@ function formatStorageSpec(val?: string): string {
     .trim();
 }
 
-function formatDisplaySpec(val?: string): string {
+function formatMobileDisplaySpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
-  const cleaned = val
+  return val
     .replace(/\([^)]*\)/g, "")
     .replace(/\s*inch\b/gi, '"')
     .split(/[,;]/)[0]
     .replace(/\s+/g, " ")
     .trim();
-  return cleaned;
 }
 
-function formatWarrantyRibbon(val?: string, condition?: string): string {
+function formatWarranty(val?: string, condition?: string): string {
   const defaultMonths = defaultWarrantyMonthsForCondition(condition);
-  if (!val || !val.trim()) return `Bảo Hành ${defaultMonths} Tháng`;
+  const fallback = `BH ${defaultMonths} tháng`;
+  if (!val || !val.trim()) return fallback;
   const raw = val.trim();
   const isBrand = /hãng|manufacturer|brand/i.test(raw);
   const monthsMatch = raw.match(/(\d+)\s*(?:tháng|th|t\b)/i);
   if (monthsMatch) {
-    return isBrand ? `BH Hãng ${monthsMatch[1]} Tháng` : `Bảo Hành ${monthsMatch[1]} Tháng`;
+    return isBrand ? `BH Hãng ${monthsMatch[1]} tháng` : `BH ${monthsMatch[1]} tháng`;
   }
   const yearMatch = raw.match(/(\d+)\s*năm/i);
   if (yearMatch) {
     const m = parseInt(yearMatch[1], 10) * 12;
-    return isBrand ? `BH Hãng ${m} Tháng` : `Bảo Hành ${m} Tháng`;
+    return isBrand ? `BH Hãng ${m} tháng` : `BH ${m} tháng`;
   }
-  if (/^BH\s+hãng$/i.test(raw)) return `BH Hãng ${defaultMonths} Tháng`;
-  return `Bảo Hành ${defaultMonths} Tháng`;
+  if (/^BH\s+hãng$/i.test(raw)) return `BH Hãng ${defaultMonths} tháng`;
+  if (/^BH\s+/i.test(raw)) return raw;
+  return raw
+    .replace(/^Bảo hành\s*chính\s*hãng\s*/i, "BH Hãng ")
+    .replace(/^Bảo hành\s*/i, "BH ")
+    .replace(/\s*(1\s*đổi\s*1|tại|tiêu\s*chuẩn|toàn\s*diện).*$/i, "")
+    .trim();
 }
 
 function formatProductTitle(name: string): string {
   if (!name) return "";
-  return name.trim();
+  return name
+    .replace(/^\[(?:New\s*100%|Mới\s*100%)\]\s*/i, "[Mới 100%] ")
+    .replace(/^\[(?:Like\s*New\s*99%|LikeNew\s*99%)\]\s*/i, "[LikeNew 99%] ");
 }
 
 function formatVnd(val?: string | number | null): string {
   if (val === undefined || val === null || val === "") return "";
-  if (typeof val === "number") return `${val.toLocaleString("vi-VN")}₫`;
+  if (typeof val === "number") return `${val.toLocaleString("vi-VN")}đ`;
   const digits = String(val).replace(/\D/g, "");
   const parsed = parseInt(digits, 10);
-  if (!isNaN(parsed)) return `${parsed.toLocaleString("vi-VN")}₫`;
+  if (!isNaN(parsed)) return `${parsed.toLocaleString("vi-VN")}đ`;
   return String(val);
 }
 
@@ -202,89 +275,116 @@ export default function ProductCard({
 
   const variantQuery = product.sku ? `?sku=${encodeURIComponent(product.sku)}` : (product.variantId ? `?variant=${encodeURIComponent(product.variantId)}` : "");
   const productHref = getProductHref(product) + variantQuery;
-  const isOutOfStock = product.availability ? product.availability === 'UNAVAILABLE' : product.stock !== undefined && product.stock !== null && product.stock <= 0;
+  const isOutOfStock = product.availability ? product.availability === "UNAVAILABLE" : product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const inferredCondition =
     product.condition ||
     (/like\s*new|99%|cũ/i.test(product.name) ? "LIKE_NEW" : "NEW");
-  const warrantyRibbonText = formatWarrantyRibbon(
+  const warrantyText = formatWarranty(
     product.warranty,
     inferredCondition
   );
 
+  // Intelligent brand detection & delicate pastel styling (original PC styling)
   const detectedBrand = detectBrandName(product);
   const brandTheme = getBrandCardTheme(detectedBrand);
   const effectiveOldPrice = product.originalPrice ?? product.oldPrice;
   const displayName = formatProductTitle(product.name);
 
-  // Derive discount percent number
-  const discountPercentNum = (() => {
-    if (product.discount) {
-      const m = String(product.discount).match(/(\d+)/);
-      if (m) return parseInt(m[1], 10);
-    }
-    if (effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && Number(product.price) > 0) {
-      return Math.round((1 - Number(product.price) / Number(effectiveOldPrice)) * 100);
-    }
-    return 0;
-  })();
+  // Derive discount percent
+  const discountPercent = product.discount
+    ? (product.discount.startsWith("-") ? product.discount : `-${product.discount}`)
+    : (product.isOnSale && product.originalPrice && Number(product.originalPrice) > Number(product.price))
+    ? `-${Math.round((1 - Number(product.price) / Number(product.originalPrice)) * 100)}%`
+    : effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price)
+    ? `-${Math.round((1 - Number(product.price) / Number(effectiveOldPrice)) * 100)}%`
+    : null;
 
-  // Format key specs for vertical full-detail readability (only for laptops)
+  // Specs calculation (only for laptops)
   const isAccessory =
     Boolean(product.template && product.template !== "LAPTOP") ||
     Boolean(product.href && product.href.startsWith("/phu-kien/"));
+
+  // Desktop specs
   const cpu = isAccessory ? "" : formatCpuSpec(product.specs?.cpu);
+  const gpu = isAccessory ? "" : formatGpuSpec(product.specs?.gpu);
   const ram = isAccessory ? "" : formatRamSpec(product.specs?.ram);
   const ssd = isAccessory ? "" : formatStorageSpec(product.specs?.ssd);
-  const gpu = isAccessory ? "" : formatGpuSpec(product.specs?.gpu);
   const display = isAccessory ? "" : formatDisplaySpec(product.specs?.display);
-  const specRows = [
-    { label: "CPU", value: cpu },
-    { label: "RAM", value: ram },
-    { label: "SSD", value: ssd },
-    { label: "GPU", value: gpu },
-    { label: "Màn hình", value: display },
+  const hasDesktopSpecs = Boolean(cpu || gpu || ram || ssd || display);
+
+  // Mobile (SP) vertical specs
+  const mCpu = isAccessory ? "" : formatMobileCpuSpec(product.specs?.cpu);
+  const mRam = isAccessory ? "" : formatMobileRamSpec(product.specs?.ram);
+  const mSsd = isAccessory ? "" : formatMobileStorageSpec(product.specs?.ssd);
+  const mGpu = isAccessory ? "" : formatMobileGpuSpec(product.specs?.gpu);
+  const mDisplay = isAccessory ? "" : formatMobileDisplaySpec(product.specs?.display);
+  const mobileSpecRows = [
+    { label: "CPU", value: mCpu },
+    { label: "RAM", value: mRam },
+    { label: "SSD", value: mSsd },
+    { label: "GPU", value: mGpu },
+    { label: "Màn hình", value: mDisplay },
   ].filter((row) => Boolean(row.value));
-  const hasSpecs = specRows.length > 0;
+  const hasMobileSpecs = mobileSpecRows.length > 0;
 
   return (
     <article
-      className={`group/product relative flex flex-col h-full rounded-2xl border bg-white ${brandTheme.cardBorder} ${brandTheme.hoverBorder} shadow-xs hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
+      className={`group/product relative flex flex-col h-full rounded-2xl border-2 ${brandTheme.cardBg} ${brandTheme.cardBorder} ${brandTheme.hoverBorder} shadow-xs hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
     >
-      {/* Top Badges Bar: Discount + Condition (Left) & Warranty Ribbon (Right) */}
-      <div className="absolute top-0 left-0 right-0 z-20 flex items-start justify-between gap-1 p-1.5 sm:p-2 pointer-events-none">
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          <div className="flex items-center gap-1 flex-wrap">
-            {rank !== undefined && (
-              <Badge variant={rank <= 3 ? "rank-top" : "rank-other"} size="xs" className="text-[9.5px] px-1.5 py-0.5 rounded-full font-bold shrink-0">
-                #{rank}
-              </Badge>
-            )}
-            {discountPercentNum > 0 && (
-              <span className="inline-flex items-center bg-[#e11d48] text-white font-extrabold text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full leading-tight shadow-2xs select-none">
-                Giảm {discountPercentNum}%
-              </span>
-            )}
-          </div>
-          <ConditionBadge
-            condition={inferredCondition}
-            fallbackName={product.name}
-            size="xs"
-            className="text-[9.5px] sm:text-[10.5px] px-2 py-0.5 rounded-full font-bold leading-tight shadow-2xs"
-          />
+      {/* Top Badges Bar: Rank, Condition & Compare, Wishlist (compact, no overlap) */}
+      <div className="absolute top-1.5 left-1.5 right-1.5 sm:left-2 sm:right-2 z-20 flex items-center justify-between gap-1 pointer-events-none">
+        <div className="flex items-center gap-1 min-w-0 shrink">
+          {/* Rank Badge */}
+          {rank !== undefined && (
+            <Badge variant={rank <= 3 ? "rank-top" : "rank-other"} size="xs" className="text-[9px] px-1 py-0.5 rounded-[2px] font-bold shrink-0">
+              #{rank}
+            </Badge>
+          )}
+
+          {/* Condition Badge (Standardized Citilap Core: Mới 100%, LikeNew 99%) */}
+          <ConditionBadge condition={product.condition} fallbackName={product.name} size="xs" className="text-[8.5px] sm:text-[9.5px] px-1 sm:px-1.5 py-0.5 rounded-[2px] font-bold leading-tight truncate max-w-full" />
         </div>
 
-        {/* Top-Right Warranty Ribbon (Thế Giới Số style) */}
-        <div
-          className="inline-flex items-center gap-1 bg-[#001a9c] text-[#fde047] text-[10px] sm:text-[11px] font-extrabold px-2 sm:px-2.5 py-1 rounded-lg shadow-xs shrink-0 leading-none"
-          title={product.warranty || warrantyRibbonText}
-        >
-          <ShieldCheck className="w-3 h-3 text-[#fde047] shrink-0 hidden min-[380px]:inline" />
-          <span>{warrantyRibbonText}</span>
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 pointer-events-auto">
+          {/* Compare Button */}
+          <button
+            type="button"
+            onClick={toggleCompare}
+            aria-pressed={inCompare}
+            aria-label={
+              inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
+            }
+            title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
+            className={`relative w-9 h-9 sm:w-10 sm:h-10 -m-1 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 sm:before:w-8 sm:before:h-8 before:rounded-full before:shadow-xs before:transition-[background-color,border-color,transform] before:duration-150 ${
+              inCompare
+                ? "text-white before:bg-blue-600 before:border before:border-blue-600"
+                : "text-text-muted hover:text-blue-600 before:bg-white/95 before:backdrop-blur-xs hover:before:bg-blue-50/80 before:border before:border-border-default"
+            }`}
+          >
+            <Scale className="relative z-10 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
+          </button>
+
+          {/* Wishlist Button */}
+          <button
+            type="button"
+            onClick={toggleWishlist}
+            aria-pressed={liked}
+            aria-label={
+              liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
+            }
+            className={`relative w-9 h-9 sm:w-10 sm:h-10 -m-1 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 sm:before:w-8 sm:before:h-8 before:rounded-full before:shadow-xs before:transition-[background-color,border-color,transform] before:duration-150 ${
+              liked
+                ? "text-error before:bg-red-50 before:border before:border-red-200"
+                : "text-text-muted hover:text-error before:bg-white/95 before:backdrop-blur-xs hover:before:bg-red-50/80 before:border before:border-border-default"
+            }`}
+          >
+            <Heart className="relative z-10 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
+          </button>
         </div>
       </div>
 
       {/* Product Image Container */}
-      <div className="relative aspect-[4/3] w-full bg-white border-b border-slate-100 p-2.5 pt-11 pb-2 sm:p-3.5 sm:pt-12 sm:pb-2.5 flex items-center justify-center overflow-hidden">
+      <div className={`relative aspect-[4/3] w-full border-b border-black/[0.04] ${brandTheme.imageBg} p-2.5 pt-7 pb-1.5 sm:p-3.5 sm:pt-7 sm:pb-2 flex items-center justify-center overflow-hidden`}>
         <div className="relative block w-full h-full">
           {(() => {
             const rawImage = product.thumbnailUrl || product.image || (product as { primaryImage?: string }).primaryImage || null;
@@ -298,14 +398,14 @@ export default function ProductCard({
                 unoptimized={cardImage.includes('size=thumb') || cardImage.startsWith('/brand/')}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 onError={() => setImageError(true)}
-                className={`object-contain transition-transform duration-300 scale-[0.92] group-hover/product:scale-[0.97] motion-reduce:transform-none ${
+                className={`object-contain transition-transform duration-300 scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${
                   isOutOfStock ? "grayscale opacity-60" : ""
                 }`}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-                <Laptop className="w-12 h-12 stroke-1" />
-                <span className="text-[11px] font-medium text-text-muted mt-1">Ảnh đang cập nhật</span>
+                <Laptop className="w-14 h-14 stroke-1" />
+                <span className="text-caption font-medium text-text-muted mt-1">Ảnh đang cập nhật</span>
               </div>
             );
           })()}
@@ -319,139 +419,158 @@ export default function ProductCard({
             </div>
           )}
         </div>
-
-        {/* Floating Quick Actions (Compare & Wishlist) at bottom-right of image */}
-        <div className="absolute bottom-1.5 right-1.5 z-20 flex items-center gap-1 pointer-events-auto">
-          <button
-            type="button"
-            onClick={toggleCompare}
-            aria-pressed={inCompare}
-            aria-label={
-              inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
-            }
-            title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
-            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center cursor-pointer active:scale-95 shadow-xs border transition-colors ${
-              inCompare
-                ? "bg-blue-600 text-white border-blue-600"
-                : "bg-white/95 text-slate-500 hover:text-blue-600 border-slate-200 hover:bg-blue-50"
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleWishlist}
-            aria-pressed={liked}
-            aria-label={
-              liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
-            }
-            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center cursor-pointer active:scale-95 shadow-xs border transition-colors ${
-              liked
-                ? "bg-red-50 text-error border-red-200"
-                : "bg-white/95 text-slate-500 hover:text-error border-slate-200 hover:bg-red-50"
-            }`}
-          >
-            <Heart className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
-          </button>
-        </div>
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-col flex-1 p-2.5 sm:p-3.5 pt-2.5">
-        {/* Title */}
-        <h3 className="min-h-[36px] sm:min-h-[40px] text-[13px] sm:text-[14.5px] font-bold text-slate-900 leading-[1.38] line-clamp-2 overflow-hidden group-hover/product:text-blue-700 transition-colors">
-          <Link
-            href={productHref}
-            title={product.name}
-            className="after:absolute after:inset-0 after:z-10 focus:outline-hidden focus-visible:underline"
-          >
-            {displayName}
-          </Link>
-        </h3>
+      <div className="flex flex-col flex-1 p-2.5 sm:p-3 pt-2">
+        {/* Top Content: Brand Card (Left) & Old Struck Price + Discount % (Right) */}
+        <div className="flex flex-col">
+          {/* Row directly under image: Brand Card on left, Struck Old Price + Red Discount % on right */}
+          <div className="flex items-center justify-between gap-1.5 h-6 mb-1">
+            <div className="flex items-center min-w-0 truncate">
+              <BrandLogo brand={detectedBrand} series={product.series} />
+            </div>
 
-        {/* Inline Price Row: Red Sale Price + Gray Strikethrough Price */}
-        <div className="mt-1.5 flex items-baseline flex-wrap gap-x-2 gap-y-0.5">
-          <span className="text-[15px] sm:text-[17px] font-black text-[#d70018] tabular-nums tracking-tight">
-            {product.availability === "CONTACT" ? "Liên hệ" : formatVnd(product.price)}
-          </span>
-          {effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
-            <span className="text-[11.5px] sm:text-[13px] text-slate-400 line-through tabular-nums font-medium">
-              {formatVnd(effectiveOldPrice)}
-            </span>
+            {/* Struck Old Price + Red Discount % tag side-by-side */}
+            {effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[12.5px] sm:text-[14px] text-slate-500 line-through tabular-nums font-bold">
+                  {formatVnd(effectiveOldPrice)}
+                </span>
+                {discountPercent && (
+                  <span className="bg-[#D71920] text-white font-black text-[11px] sm:text-[12px] px-1.5 py-0.5 rounded-[3px] leading-none select-none tracking-tight shadow-xs">
+                    {discountPercent}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Title - fixed 2-line height so 1-line and 2-line titles occupy exact same space */}
+          <h3 className="h-10 sm:h-11 text-sm sm:text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 overflow-hidden group-hover/product:text-blue-700 transition-colors">
+            <Link
+              href={productHref}
+              title={product.name}
+              className="after:absolute after:inset-0 after:z-10 focus:outline-hidden focus-visible:underline"
+            >
+              {displayName}
+            </Link>
+          </h3>
+
+          {/* Red Price Card: Directly below title, horizontally centered */}
+          <div className="mt-2 mb-2 sm:mb-2.5">
+            <div className="w-full bg-[#D71920] hover:bg-[#c0141a] text-white font-extrabold py-1.5 sm:py-2 px-3 rounded-lg sm:rounded-xl shadow-xs flex items-center justify-center text-sm sm:text-base tracking-tight select-none transition-colors">
+              <span className="tabular-nums">
+                {product.availability === 'CONTACT' ? 'Liên hệ' : formatVnd(product.price)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Pinned Section: Cấu hình (Specs) & Bảo hành (Warranty) ALWAYS pinned to bottom */}
+        <div className="mt-auto flex flex-col justify-end pt-2">
+          {/* PC DISPLAY (>= 640px): 2-Column Compact Spec Chips Matrix */}
+          {showSpecs && hasDesktopSpecs && (
+            <div className="hidden sm:grid grid-cols-2 gap-1 text-caption text-text-secondary mb-2 pt-2 border-t border-black/[0.06] min-h-[52px]">
+              {cpu && (
+                <SpecChip
+                  icon={<Cpu className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  value={cpu}
+                  title={`CPU: ${product.specs?.cpu || cpu}`}
+                />
+              )}
+              {gpu && (
+                <SpecChip
+                  icon={<Gpu className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                  highlight
+                  value={gpu}
+                  title={`GPU: ${product.specs?.gpu || gpu}`}
+                />
+              )}
+              {(ram || ssd) && (
+                <SpecChip
+                  icon={<MemoryStick className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  value={
+                    <>
+                      <span className="font-semibold text-text-primary">{ram ? ram.replace(/GB$/i, "G") : "RAM"}</span>
+                      {ram && ssd && <span className="text-slate-400 mx-[1px]">/</span>}
+                      <span className="text-text-secondary">{ssd ? ssd.replace(/GB$/i, "G") : ""}</span>
+                    </>
+                  }
+                  title={`RAM: ${product.specs?.ram || ram} / SSD: ${product.specs?.ssd || ssd}`}
+                />
+              )}
+              {display && (
+                <SpecChip
+                  icon={<Monitor className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  value={display}
+                  title={`Màn hình: ${product.specs?.display || display}`}
+                />
+              )}
+            </div>
+          )}
+
+          {/* SMARTPHONE DISPLAY (< 640px): Full Readable Vertical Spec Lines (Thế Giới Số Style) */}
+          {showSpecs && hasMobileSpecs && (
+            <dl className="sm:hidden mb-2 pt-2 border-t border-black/[0.06] space-y-1 text-[11px] leading-snug text-slate-700">
+              {mobileSpecRows.map((row) => (
+                <div key={row.label} className="flex items-baseline gap-1 min-w-0">
+                  <dt className="font-bold text-slate-900 shrink-0">{row.label}:</dt>
+                  <dd className="text-slate-700 font-medium break-words min-w-0 line-clamp-1" title={row.value}>
+                    {row.value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {/* Footer Meta: Warranty & Stock Status */}
+          <div className="pt-2 border-t border-black/[0.06] flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1 text-caption">
+            {/* Warranty tag */}
+            <div
+              className="flex items-center gap-1 text-slate-700 font-medium truncate min-w-0"
+              title={product.warranty || warrantyText}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="truncate">{warrantyText}</span>
+            </div>
+
+            {/* Standardized Stock Indicator */}
+            {product.availability ? (
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold ${
+                  product.availability === 'AVAILABLE' && (product.stock === undefined || product.stock === null || product.stock > 0)
+                    ? 'text-emerald-700'
+                    : product.availability === 'PREORDER'
+                    ? 'text-blue-700'
+                    : product.availability === 'CONTACT'
+                    ? 'text-amber-700'
+                    : 'text-slate-500'
+                }`}
+              >
+                {product.availability === 'AVAILABLE' && (product.stock === undefined || product.stock === null || product.stock > 0) && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
+                )}
+                {product.availability === 'AVAILABLE'
+                  ? (product.stock !== undefined && product.stock !== null && product.stock <= 0 ? 'Tạm hết hàng' : 'Sẵn hàng')
+                  : ({
+                      PREORDER: 'Đặt trước',
+                      CONTACT: 'Liên hệ',
+                      UNAVAILABLE: 'Tạm hết hàng',
+                    } as Record<string, string>)[product.availability] || 'Sẵn hàng'}
+              </span>
+            ) : (
+              <StockBadge stock={product.stock} variant="indicator" />
+            )}
+          </div>
+
+          {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}
+          {footerAction && (
+            <div className="mt-2.5 pt-2 border-t border-black/[0.06] relative z-20">
+              {footerAction}
+            </div>
           )}
         </div>
-
-        {/* Stock Status Pill */}
-        <div className="mt-1.5">
-          {(() => {
-            const avail = product.availability || (isOutOfStock ? "UNAVAILABLE" : "AVAILABLE");
-            if (avail === "AVAILABLE" && !isOutOfStock) {
-              return (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[11px] font-bold leading-tight">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
-                  Còn hàng
-                </span>
-              );
-            }
-            if (avail === "PREORDER") {
-              return (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 text-[11px] font-bold leading-tight">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" aria-hidden="true" />
-                  Đặt trước
-                </span>
-              );
-            }
-            if (avail === "CONTACT") {
-              return (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200/70 text-[11px] font-bold leading-tight">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" aria-hidden="true" />
-                  Liên hệ
-                </span>
-              );
-            }
-            return (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-bold leading-tight">
-                <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" aria-hidden="true" />
-                Tạm hết hàng
-              </span>
-            );
-          })()}
-        </div>
-
-        {/* Flash Sale Progress Pill (when product is in Flash Sale) */}
-        {product.isFlashSale && (
-          <div className="mt-2 relative h-5 w-full rounded-full bg-rose-200/90 overflow-hidden flex items-center justify-center shadow-inner">
-            <div
-              className="absolute inset-y-0 left-0 w-3/5 bg-gradient-to-r from-[#e11d48] via-[#f97316] to-[#facc15] rounded-full"
-              aria-hidden="true"
-            />
-            <span className="relative z-10 text-[10.5px] font-extrabold text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
-              🔥 Giá Sốc Giờ Vàng
-            </span>
-          </div>
-        )}
-
-        {/* Detailed Specs List (Thế Giới Số Vertical Format) */}
-        {showSpecs && hasSpecs && (
-          <dl className="mt-2.5 pt-2 border-t border-slate-100 space-y-1 text-[11.5px] sm:text-[12.5px] leading-snug text-slate-700">
-            {specRows.map((row) => (
-              <div key={row.label} className="flex items-baseline gap-1 min-w-0">
-                <dt className="font-bold text-slate-900 shrink-0">{row.label}:</dt>
-                <dd className="text-slate-700 font-medium break-words min-w-0 line-clamp-1" title={row.value}>
-                  {row.value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        )}
-
-        {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}
-        {footerAction && (
-          <div className="mt-auto pt-2.5 border-t border-slate-100 relative z-20">
-            {footerAction}
-          </div>
-        )}
       </div>
     </article>
   );
