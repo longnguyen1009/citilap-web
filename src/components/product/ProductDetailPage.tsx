@@ -19,7 +19,6 @@ import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 import InspectionReports from "@/components/product/InspectionReports";
 import { ProductReviewsSection } from "@/components/product/ProductReviewsSection";
 import { ProductSpecsSidebarCard } from "@/components/product/ProductSpecsSidebarCard";
-import { listApprovedProductReviews } from "@/server/services/contact.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
   generateBreadcrumbJsonLd,
@@ -28,19 +27,20 @@ import {
   serializeJsonLd,
 } from "@/lib/seo-helpers";
 import {
-  getProductDetail,
   getRelatedProducts,
 } from "@/server/services/catalog.service";
 import {
   getPublishedNavigation,
   getPublishedStudio,
-  classifyProductPublication,
   getStorefrontSettings,
+  getCachedProductPublication,
+  getCachedProductDetail,
+  getCachedPricingContext,
+  getCachedProductReviews,
 } from "@/server/services/storefront-cms.service";
 import {
   calculateEffectivePrice,
   applyPricingToHomepageProducts,
-  getStorefrontPricingContext,
 } from "@/server/services/pricing.service";
 
 export interface ProductPageProps {
@@ -63,7 +63,7 @@ export async function generateMetadata({
       ? query.variant
       : undefined;
 
-  const pub = await classifyProductPublication(id);
+  const pub = await getCachedProductPublication(id);
   if (
     pub.kind === "NOT_FOUND" ||
     pub.kind === "DELETED" ||
@@ -77,15 +77,16 @@ export async function generateMetadata({
   }
 
   const resolvedSlug = pub.slug;
-  const product = await getProductDetail(resolvedSlug, skuParam);
+  const [product, studio] = await Promise.all([
+    getCachedProductDetail(resolvedSlug, skuParam),
+    pub.kind === "CMS_PUBLISHED" ? getPublishedStudio(resolvedSlug) : Promise.resolve(null),
+  ]);
   if (!product) {
     return {
       title: "Không tìm thấy sản phẩm | CITILAP.VN",
       description: "Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã ngừng kinh doanh.",
     };
   }
-
-  const studio = pub.kind === "CMS_PUBLISHED" ? await getPublishedStudio(resolvedSlug) : null;
   const displayName = studio?.name || product.name;
   const primaryImage = studio?.media.find((item) => item.kind === "IMAGE")?.url || product.primaryImageUrl;
   const title = studio?.seoTitle || product.seoTitle || `${displayName} | CITILAP.VN`;
@@ -134,15 +135,17 @@ export default async function ProductDetailPage({
       ? query.variant
       : undefined;
 
-  const navigation = await getPublishedNavigation();
-  const settings = await getStorefrontSettings();
   const evaluatedAt = new Date();
-  const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);
+  const [navigation, settings, pricingContext, pub] = await Promise.all([
+    getPublishedNavigation(),
+    getStorefrontSettings(),
+    getCachedPricingContext(),
+    getCachedProductPublication(id),
+  ]);
 
   // =========================================================================
   // CASE 2: CATALOG / STUDIO PRODUCT THỰC TẾ
   // =========================================================================
-  const pub = await classifyProductPublication(id);
   if (
     pub.kind === "NOT_FOUND" ||
     pub.kind === "DELETED" ||
@@ -153,7 +156,10 @@ export default async function ProductDetailPage({
   }
 
   const resolvedSlug = pub.slug;
-  const product = await getProductDetail(resolvedSlug, skuParam);
+  const [product, studio] = await Promise.all([
+    getCachedProductDetail(resolvedSlug, skuParam),
+    pub.kind === "CMS_PUBLISHED" ? getPublishedStudio(resolvedSlug) : Promise.resolve(null),
+  ]);
   if (!product) {
     notFound();
   }
@@ -161,7 +167,6 @@ export default async function ProductDetailPage({
   const category = navigation?.categories.find(c => c.id === product.categoryId);
   const categoryTrail = category && navigation ? categoryAncestors(category, navigation.categories) : [];
   const categoryUrl = category?.href || '/phan-loai';
-  const studio = pub.kind === "CMS_PUBLISHED" ? await getPublishedStudio(resolvedSlug) : null;
   const canonicalPath = productHref({ slug: resolvedSlug, template: studio?.template, kind: /phu-kien|linh-kien/.test(product.categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' });
 
   if (id !== resolvedSlug || `/${namespace}/${id}` !== canonicalPath) {
@@ -318,34 +323,52 @@ export default async function ProductDetailPage({
     adjustment: 0,
     recommended: true,
   }]).map(w => ({id:w.name,name:w.name,desc:w.description,priceDiff:w.adjustment,isDefault:w.recommended}));
-  const accessories = [];
-  for (const accessoryId of studio?.accessoryProductIds || []) {
-    const publication = await classifyProductPublication(accessoryId, {lookupType:'id'});
-    if (publication.kind !== 'CMS_PUBLISHED' && publication.kind !== 'LEGACY_ACTIVE') continue;
-    const accessory = await getProductDetail(publication.slug);
-    const authored = publication.kind === 'CMS_PUBLISHED' ? await getPublishedStudio(publication.slug) : null;
-    if (!accessory || (authored && !authored.canOrder)) continue;
-    const variant = authored?.variants[0] || accessory.variants[0];
-    const availability = authored?.variants[0]?.availability || authored?.availability;
-    if (availability && !['AVAILABLE','PREORDER'].includes(availability)) continue;
-    const resolved = calculateEffectivePrice(variant?.price ?? authored?.price ?? accessory.price, variant?.originalPrice ?? authored?.originalPrice ?? accessory.originalPrice, Boolean(authored?.isFlashSale ?? accessory.isFlashSale), true, pricingContext, evaluatedAt, {productId:accessory.id,variantId:variant?.id,isVariant:!!variant,variantOriginalPrice:variant?.originalPrice ?? null});
-    accessories.push({id:accessory.id,variantId:variant?.id,name:authored?.name || accessory.name,image:authored?.media.find(m => m.kind === 'IMAGE')?.url || accessory.primaryImageUrl || '/images/placeholder-laptop.svg',salePrice:resolved.effectivePrice,originalPrice:resolved.compareAtPrice || resolved.effectivePrice});
-  }
-
-  const approvedReviews = await listApprovedProductReviews([displayName, product.name]);
-
-  // Fetch related products
   const manualRelatedIds = (studio?.relatedProductIds || []).filter((rid) => rid && rid !== product.id);
-  const rawRelatedProducts = await getRelatedProducts(
-    product.id,
-    product.categoryId,
-    product.brandId,
-    4,
-    manualRelatedIds,
-    undefined,
-    pricingContext,
-    evaluatedAt
-  );
+  const [accessoriesRaw, approvedReviews, rawRelatedProducts] = await Promise.all([
+    Promise.all(
+      (studio?.accessoryProductIds || []).map(async (accessoryId) => {
+        const publication = await getCachedProductPublication(accessoryId, 'id');
+        if (publication.kind !== 'CMS_PUBLISHED' && publication.kind !== 'LEGACY_ACTIVE') return null;
+        const [accessory, authored] = await Promise.all([
+          getCachedProductDetail(publication.slug),
+          publication.kind === 'CMS_PUBLISHED' ? getPublishedStudio(publication.slug) : Promise.resolve(null),
+        ]);
+        if (!accessory || (authored && !authored.canOrder)) return null;
+        const variant = authored?.variants[0] || accessory.variants[0];
+        const availability = authored?.variants[0]?.availability || authored?.availability;
+        if (availability && !['AVAILABLE', 'PREORDER'].includes(availability)) return null;
+        const resolved = calculateEffectivePrice(
+          variant?.price ?? authored?.price ?? accessory.price,
+          variant?.originalPrice ?? authored?.originalPrice ?? accessory.originalPrice,
+          Boolean(authored?.isFlashSale ?? accessory.isFlashSale),
+          true,
+          pricingContext,
+          evaluatedAt,
+          { productId: accessory.id, variantId: variant?.id, isVariant: !!variant, variantOriginalPrice: variant?.originalPrice ?? null }
+        );
+        return {
+          id: accessory.id,
+          variantId: variant?.id,
+          name: authored?.name || accessory.name,
+          image: authored?.media.find((m) => m.kind === 'IMAGE')?.url || accessory.primaryImageUrl || '/images/placeholder-laptop.svg',
+          salePrice: resolved.effectivePrice,
+          originalPrice: resolved.compareAtPrice || resolved.effectivePrice,
+        };
+      })
+    ),
+    getCachedProductReviews([displayName, product.name]),
+    getRelatedProducts(
+      product.id,
+      product.categoryId,
+      product.brandId,
+      4,
+      manualRelatedIds,
+      undefined,
+      pricingContext,
+      evaluatedAt
+    ),
+  ]);
+  const accessories = accessoriesRaw.filter((item): item is NonNullable<typeof item> => item !== null);
   const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext, evaluatedAt);
 
   // Sanitize description

@@ -174,9 +174,10 @@ export const getPublishedNavigation = cache(() => {
     publishedOrNull(async () => publicNavigation((await mediaEnvironment()).DB)));
 });
 
-export function getPublishedStudio(slug: string) {
-  return publishedOrNull(async () => publicStudio((await mediaEnvironment()).DB, slug));
-}
+export const getPublishedStudio = cache((slug: string) => {
+  return cachedJson(`public-studio:${slug}`, PUBLIC_CMS_TTL_SECONDS, () =>
+    publishedOrNull(async () => publicStudio((await mediaEnvironment()).DB, slug)));
+});
 
 export async function getPublishedCollection(slug: string) {
   return cachedJson(`public-collection:${slug}`, PUBLIC_CMS_TTL_SECONDS, () =>
@@ -248,6 +249,43 @@ export const getCachedHomepageCatalog = cache(async () => {
   return cachedJson('public-homepage-catalog', PUBLIC_CMS_TTL_SECONDS, async () => {
     const { getHomepageCatalog } = await import('@/server/services/catalog.service');
     return getHomepageCatalog();
+  });
+});
+
+export const getCachedProductPublication = cache(async (identifier: string, lookupType: 'auto' | 'id' | 'slug' = 'auto') => {
+  return cachedJson(`public-pub:${lookupType}:${identifier}`, PUBLIC_CMS_TTL_SECONDS, () =>
+    classifyProductPublication(identifier, { lookupType }));
+});
+
+export const getCachedProductDetail = cache(async (slug: string, sku?: string) => {
+  return cachedJson(`public-product-detail:${slug}:${sku || ''}`, PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getProductDetail } = await import('@/server/services/catalog.service');
+    return getProductDetail(slug, sku);
+  });
+});
+
+export const getCachedPricingContext = cache(async () => {
+  return cachedJson('public-pricing-context', PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getStorefrontPricingContext } = await import('@/server/services/pricing.service');
+    const ctx = await getStorefrontPricingContext(undefined, new Date());
+    if (ctx.activeCampaign?.items instanceof Map) {
+      return {
+        ...ctx,
+        activeCampaign: {
+          ...ctx.activeCampaign,
+          items: Object.fromEntries(ctx.activeCampaign.items),
+        },
+      };
+    }
+    return ctx;
+  });
+});
+
+export const getCachedProductReviews = cache(async (names: string[]) => {
+  const key = [...new Set(names.filter(Boolean))].sort().join('|');
+  return cachedJson(`public-reviews:${key}`, PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { listApprovedProductReviews } = await import('@/server/services/contact.service');
+    return listApprovedProductReviews(names);
   });
 });
 

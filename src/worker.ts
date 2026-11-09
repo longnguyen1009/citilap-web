@@ -4,7 +4,7 @@ import { runSchedules } from './server/services/cms-schedule.service';
 import { serveLibraryImage, type MediaEnvironment } from './server/services/media-library.service';
 import { mediaFailure } from './server/media-http';
 import type { KvLike } from './server/cache/kv-cache';
-import { invalidatePublicCache, invalidatesPublicCache, isCacheableHtmlRequest, serveCachedHtml } from './server/cache/html-cache';
+import { invalidatePublicCache, invalidatesPublicCache, isCacheableHtmlRequest, isCacheableRscRequest, serveCachedHtml, serveCachedRsc } from './server/cache/html-cache';
 
 const worker = {
   ...app,
@@ -49,6 +49,9 @@ const worker = {
       const kv = env.VINEXT_KV_CACHE;
       if (isCacheableHtmlRequest(request, url)) {
         return await serveCachedHtml(kv, url, ctx, () => app.fetch(request, env, ctx));
+      }
+      if (isCacheableRscRequest(request, url)) {
+        return await serveCachedRsc(kv, request, url, ctx, (req) => app.fetch(req, env, ctx));
       }
       // Preserve Vinext's HTML/RSC cache policy, including private/no-store responses.
       const response = await app.fetch(request, env, ctx);

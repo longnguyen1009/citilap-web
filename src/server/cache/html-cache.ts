@@ -57,7 +57,9 @@ const NON_CACHEABLE_SINGLE_SEGMENTS = new Set([
 
 const FRESH_MS = 60_000;
 const STORE_TTL_SECONDS = 300;
-const MEM_HTML_MAX_ENTRIES = 32;
+const MEM_HTML_MAX_ENTRIES = 64;
+
+const CACHEABLE_SEARCH_PARAMS = new Set(['sku', 'variant', 'page']);
 
 /** Admin / content mutations that invalidate the public cache. */
 const MUTATION_PREFIXES = [
@@ -96,21 +98,44 @@ const memHtml = new Map<string, HtmlEntry>();
 
 function isCacheablePathname(pathname: string): boolean {
   if (CACHEABLE_EXACT_PATHS.has(pathname)) return true;
-  if ( NON_CACHEABLE_SINGLE_SEGMENTS.has(pathname)) return false;
+  if (NON_CACHEABLE_SINGLE_SEGMENTS.has(pathname)) return false;
   if (CACHEABLE_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
   // Single-segment catalog category slugs (e.g. /laptop-gaming, /macbook)
   if (/^\/[a-z0-9-]+$/.test(pathname)) return true;
   return false;
 }
 
+function hasOnlyCacheableSearchParams(url: URL, allowRscParam: boolean): boolean {
+  if (!url.search) return true;
+  for (const key of url.searchParams.keys()) {
+    if (allowRscParam && key === '_rsc') continue;
+    if (!CACHEABLE_SEARCH_PARAMS.has(key)) return false;
+  }
+  return true;
+}
+
 export function isCacheableHtmlRequest(request: Request, url: URL): boolean {
-  if (request.method !== 'GET' || url.search || !isCacheablePathname(url.pathname)) return false;
+  if (request.method !== 'GET' || !hasOnlyCacheableSearchParams(url, false) || !isCacheablePathname(url.pathname)) {
+    return false;
+  }
   const headers = request.headers;
   const accept = headers.get('accept') || '';
   if (!accept.includes('text/html') || accept.includes('text/x-component')) return false;
   if (headers.get('rsc') || headers.get('next-router-prefetch') || headers.get('purpose') === 'prefetch') return false;
   if ((headers.get('cookie') || '').includes('admin_session')) return false;
   return true;
+}
+
+export function isCacheableRscRequest(request: Request, url: URL): boolean {
+  if (request.method !== 'GET' || !hasOnlyCacheableSearchParams(url, true)) return false;
+  const headers = request.headers;
+  const isRsc = headers.get('rsc') === '1' || url.pathname.endsWith('.rsc');
+  if (!isRsc) return false;
+  if (headers.has('x-rsc-action') || headers.has('next-action')) return false;
+  if (headers.has('x-vinext-interception-context') || headers.has('x-vinext-interception-id')) return false;
+  if ((headers.get('cookie') || '').includes('admin_session')) return false;
+  const cleanPathname = url.pathname.endsWith('.rsc') ? url.pathname.slice(0, -4) || '/' : url.pathname;
+  return isCacheablePathname(cleanPathname);
 }
 
 export function invalidatesPublicCache(request: Request, response: Response): boolean {
@@ -140,13 +165,27 @@ function edgeCacheRequest(key: string): Request {
   return new Request(`https://cache.citilap.internal/${encodeURIComponent(key)}`);
 }
 
-async function store(kv: KvLike | undefined, key: string, response: Response): Promise<void> {
+async function store(kv: KvLike | undefined, key: string, response: Response, isRsc = false): Promise<void> {
   const contentType = response.headers.get('content-type') || '';
-  if (response.status !== 200 || !contentType.includes('text/html') || response.headers.has('set-cookie')) return;
+  if (response.status !== 200 || response.headers.has('set-cookie')) return;
+  if (isRsc) {
+    if (!contentType.includes('text/x-component') || response.headers.has('x-vinext-rsc-redirect')) return;
+  } else if (!contentType.includes('text/html')) {
+    return;
+  }
   const preserved: Record<string, string> = {};
-  for (const name of PRESERVED_HEADER_NAMES) {
-    const val = response.headers.get(name);
-    if (val) preserved[name] = val;
+  if (isRsc) {
+    for (const [name, val] of response.headers.entries()) {
+      const lower = name.toLowerCase();
+      if (lower.startsWith('x-vinext-') || lower.startsWith('x-nextjs-') || lower === 'vary') {
+        preserved[name] = val;
+      }
+    }
+  } else {
+    for (const name of PRESERVED_HEADER_NAMES) {
+      const val = response.headers.get(name);
+      if (val) preserved[name] = val;
+    }
   }
   const entry: HtmlEntry = { html: await response.text(), at: Date.now(), contentType, headers: preserved };
   if (memHtml.size >= MEM_HTML_MAX_ENTRIES) {
@@ -222,11 +261,11 @@ export async function serveCachedHtml(
 ): Promise<Response> {
   let key: string;
   try {
-    key = `citilap:html:${BUILD_ID}:${await cmsVersion(kv)}:${url.pathname}`;
+    key = `citilap:html:${BUILD_ID}:${await cmsVersion(kv)}:${url.pathname}${url.search}`;
     const entry = await readCachedEntry(kv, key);
     if (entry?.html) {
       if (Date.now() - entry.at <= FRESH_MS) return respond(entry, 'HIT');
-      ctx.waitUntil(render().then((fresh) => store(kv, key, fresh)).catch(() => undefined));
+      ctx.waitUntil(render().then((fresh) => store(kv, key, fresh, false)).catch(() => undefined));
       return respond(entry, 'STALE');
     }
   } catch (error) {
@@ -234,13 +273,48 @@ export async function serveCachedHtml(
     return render();
   }
   const response = await render();
-  ctx.waitUntil(store(kv, key, response.clone()).catch(() => undefined));
+  ctx.waitUntil(store(kv, key, response.clone(), false).catch(() => undefined));
   const headers = new Headers(response.headers);
   headers.set('x-citilap-cache', 'MISS');
   const contentType = headers.get('content-type') || '';
   if (response.status === 200 && contentType.includes('text/html') && !headers.has('set-cookie')) {
     headers.set('cache-control', 'public, max-age=0, must-revalidate');
   }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+export async function serveCachedRsc(
+  kv: KvLike | undefined,
+  request: Request,
+  url: URL,
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+  render: (req: Request) => Promise<Response>,
+): Promise<Response> {
+  // Strip client-specific reuse manifest so the cached RSC payload is self-contained for all clients.
+  const cleanHeaders = new Headers(request.headers);
+  cleanHeaders.delete('x-vinext-client-reuse-manifest');
+  const cleanRequest = new Request(request.url, { method: request.method, headers: cleanHeaders });
+
+  let key: string;
+  try {
+    const mode = cleanHeaders.get('x-vinext-rsc-render-mode') || 'nav';
+    const prefetch = cleanHeaders.get('next-router-prefetch') || '0';
+    const segPrefetch = cleanHeaders.get('next-router-segment-prefetch') || '0';
+    key = `citilap:rsc:${BUILD_ID}:${await cmsVersion(kv)}:${url.pathname}${url.search}:${mode}:${prefetch}:${segPrefetch}`;
+    const entry = await readCachedEntry(kv, key);
+    if (entry?.html) {
+      if (Date.now() - entry.at <= FRESH_MS) return respond(entry, 'HIT');
+      ctx.waitUntil(render(cleanRequest.clone()).then((fresh) => store(kv, key, fresh, true)).catch(() => undefined));
+      return respond(entry, 'STALE');
+    }
+  } catch (error) {
+    console.error('[cache] rsc read failed', error);
+    return render(cleanRequest);
+  }
+  const response = await render(cleanRequest);
+  ctx.waitUntil(store(kv, key, response.clone(), true).catch(() => undefined));
+  const headers = new Headers(response.headers);
+  headers.set('x-citilap-cache', 'MISS');
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 

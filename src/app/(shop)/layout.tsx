@@ -13,6 +13,7 @@ import {
 import PublicPriceRefresh from '@/components/product/PublicPriceRefresh';
 import StorefrontMetrics from '@/components/layout/StorefrontMetrics';
 import Analytics from '@/components/layout/Analytics';
+import NavigationProgress from '@/components/layout/NavigationProgress';
 
 export default async function ShopLayout({
   children,
@@ -41,6 +42,7 @@ export default async function ShopLayout({
 
   return (
     <StorefrontProviders><div className="flex flex-col min-h-screen">
+      <NavigationProgress />
       <PublicPriceRefresh nextChange={boundary.nextChange} version={boundary.token} serverTime={serverTime}/>
       <Header categories={categories} brands={brands} navigation={navigation} settings={settings} />
       <main className="flex-grow pb-16 md:pb-0">{children}</main>

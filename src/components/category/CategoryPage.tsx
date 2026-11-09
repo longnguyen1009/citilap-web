@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import CategoryCatalog from "@/components/category/CategoryCatalog";
-import { getPublishedNavigation } from "@/server/services/storefront-cms.service";
-import { getActiveCategories } from "@/server/services/catalog.service";
+import { getPublishedNavigation, getCachedActiveCategories } from "@/server/services/storefront-cms.service";
+import { cachedJson } from "@/server/cache/kv-cache";
 import { searchProducts } from "@/server/services/search.service";
 import { parseSearchParams } from "@/contracts/catalog/search";
 import { categoryAncestors } from "@/lib/category-paths";
@@ -61,10 +61,10 @@ const resolveCategory = cache(async (path: string) => {
   const navigation = await getPublishedNavigation();
   const categories = navigation?.categories
     ? [...navigation.categories]
-    : (await getActiveCategories()).map(c => ({ ...c, href: c.href!, description: c.description || "", alt: c.name }));
+    : (await getCachedActiveCategories()).map(c => ({ ...c, href: c.href!, description: c.description || "", alt: c.name }));
   let current = categories.find(c => c.href === path);
   if (!current && navigation?.categories) {
-    const active = (await getActiveCategories()).map(c => ({ ...c, href: c.href!, description: c.description || "", alt: c.name }));
+    const active = (await getCachedActiveCategories()).map(c => ({ ...c, href: c.href!, description: c.description || "", alt: c.name }));
     const fallback = active.find(c => c.href === path);
     if (fallback) {
       categories.push(fallback);
@@ -133,7 +133,15 @@ export default async function CategoryDetailPage({ params, searchParams }: Props
   }
 
   // The route owns category scope; query parameters cannot escape this branch.
-  const result = await searchProducts({ ...parsed.data, category: effectiveCategoryScope, limit: query.has("limit") ? parsed.data.limit : 24 });
+  const limitVal = query.has("limit") ? parsed.data.limit : 24;
+  const isDefaultView = query.size === 0 || (query.size === 1 && query.has("page"));
+  const result = isDefaultView
+    ? await cachedJson(
+        `public-cat-search:${effectiveCategoryScope.join(",")}:p${parsed.data.page}:l${limitVal}`,
+        60,
+        () => searchProducts({ ...parsed.data, category: effectiveCategoryScope, limit: limitVal })
+      )
+    : await searchProducts({ ...parsed.data, category: effectiveCategoryScope, limit: limitVal });
   if (result.page > Math.max(1, result.totalPages)) notFound();
   const facets = query.size ? (await searchProducts({ category: effectiveCategoryScope, limit: 1 })).facets : result.facets;
   const brandCounts = parsed.data.brand?.length
