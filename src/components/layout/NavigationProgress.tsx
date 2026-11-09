@@ -64,10 +64,6 @@ export default function NavigationProgress() {
 
   useEffect(() => {
     completeProgress();
-  });
-
-  useEffect(() => {
-    completeProgress();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 

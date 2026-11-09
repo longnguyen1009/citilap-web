@@ -48,6 +48,14 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Reuse prefetched / visited RSC payloads on the client so link clicks render instantly
+    // instead of re-requesting the page (dynamic default is 0s = refetch on every click).
+    staleTimes: {
+      dynamic: 60,
+      static: 300,
+    },
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
