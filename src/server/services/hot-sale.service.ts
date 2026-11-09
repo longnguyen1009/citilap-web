@@ -35,7 +35,10 @@ export async function getHotSaleCampaigns(context?: PriceEvaluationContext, at =
   })).filter(c => c.products.length);
   if (isFlashSaleActive(pricing, at)) {
     const products = (await getFlashSaleProducts(50, pricing, at)).filter(p => p.isOnSale && !tabs.some(t => new Date(t.startAt) <= at && t.products.some(item => item.id === p.id && item.variantId === p.variantId)));
-    if (products.length) tabs.push({ id: 'site-flash-sale', name: pricing.flashSaleTitle || 'FLASH SALE', startAt: pricing.flashSaleStartAt, endAt: pricing.flashSaleEndAt, products });
+    // Start time is optional for the site-wide flash sale; an empty value means "already running".
+    const startMs = Date.parse(pricing.flashSaleStartAt || '');
+    const startAt = Number.isNaN(startMs) ? at.toISOString() : new Date(startMs).toISOString();
+    if (products.length) tabs.push({ id: 'site-flash-sale', name: pricing.flashSaleTitle || 'FLASH SALE', startAt, endAt: pricing.flashSaleEndAt, products });
   }
   return tabs.sort((a, b) => Number(new Date(a.startAt) > at) - Number(new Date(b.startAt) > at));
 }

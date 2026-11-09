@@ -465,26 +465,38 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
   if (section.resolvedTabs?.length) return <ProductTabs title={data.title} subtitle={data.subtitle} tabs={section.resolvedTabs} eagerImages={eagerImages} />;
 
   return (
-    <section className="pb-8 sm:pb-12 md:pb-16" aria-label={data.title}>
+    <section className="pb-5 sm:pb-12 md:pb-16" aria-label={data.title}>
       <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px]">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           {/* Header */}
-          <div className={`${colorClass} px-3.5 sm:px-4 md:px-6 py-3 sm:py-3.5 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 text-white`}>
-            <div className="flex items-center gap-2.5 sm:gap-3">
-              <div className="p-2 rounded-xl bg-white/15 backdrop-blur-md shadow-2xs shrink-0">
-                {headerIconNode}
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-base sm:text-lg md:text-xl font-black uppercase tracking-tight leading-snug">{data.title}</h2>
-                  {data.badge && (
-                    <span className={`text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full ${data.badgeColor || 'bg-white/20 text-white'}`}>
-                      {data.badge}
-                    </span>
-                  )}
+          <div className={`${colorClass} px-3.5 sm:px-4 md:px-6 py-2.5 sm:py-3.5 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 text-white`}>
+            <div className="flex items-center justify-between gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/15 backdrop-blur-md shadow-2xs shrink-0">
+                  {headerIconNode}
                 </div>
-                {data.subtitle && <p className="text-[11px] sm:text-xs text-white/85 mt-0.5 line-clamp-1">{data.subtitle}</p>}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-[15px] sm:text-lg md:text-xl font-black uppercase tracking-tight leading-snug">{data.title}</h2>
+                    {data.badge && (
+                      <span className={`text-[10px] uppercase font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full ${data.badgeColor || 'bg-white/20 text-white'}`}>
+                        {data.badge}
+                      </span>
+                    )}
+                  </div>
+                  {data.subtitle && <p className="text-[11px] sm:text-xs text-white/85 mt-0.5 line-clamp-1">{data.subtitle}</p>}
+                </div>
               </div>
+
+              {data.viewAllLink && (
+                <Link
+                  href={data.viewAllLink}
+                  className="sm:hidden inline-flex items-center gap-0.5 text-xs font-bold text-white/95 hover:text-yellow-300 shrink-0 whitespace-nowrap"
+                >
+                  <span>Tất cả</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              )}
             </div>
 
             {/* Quick links */}
@@ -504,21 +516,22 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
           </div>
 
           {/* Product grid content */}
-          <div className="p-2.5 sm:p-4 md:p-6 bg-slate-50/30">
+          <div className="p-2 sm:p-4 md:p-6 bg-slate-50/30">
             {products.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
+              <div className="text-center py-10 sm:py-12 text-slate-500">
                 <p className="text-sm">Chưa có sản phẩm nào phù hợp trong danh mục này.</p>
               </div>
             ) : section.id === 'sec-hot-sale' ? <ProductCarousel products={products} label={data.title} /> : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 md:gap-5">
                 {products.map((p, idx) => {
-                  const hideOnMobile = Boolean(mobileLimit && idx >= mobileLimit);
+                  const effectiveMobileLimit = mobileLimit || 6;
+                  const hideOnMobile = Boolean(idx >= effectiveMobileLimit);
                   const cardNode = (
                     <ProductCard
                       key={p.id}
                       product={p}
                       rank={data.rankNumbering ? idx + 1 : undefined}
-                      imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'}
+                      imageLoading={eagerImages && idx < 4 ? 'eager' : 'lazy'}
                     />
                   );
                   return hideOnMobile ? (
@@ -533,10 +546,10 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
             )}
 
             {data.viewAllLink && (
-              <div className="mt-4 sm:mt-6 text-center">
+              <div className="mt-3 sm:mt-6 text-center">
                 <Link
                   href={data.viewAllLink}
-                  className="inline-flex items-center gap-1.5 px-5 sm:px-6 py-2.5 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
+                  className="inline-flex items-center justify-center gap-1.5 w-full sm:w-auto px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
                 >
                   Xem tất cả {data.title} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>

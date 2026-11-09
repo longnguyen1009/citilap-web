@@ -212,7 +212,7 @@ export function ProductCarousel({
       tabIndex={0}
       role="region"
       aria-label={`Sản phẩm ${label}`}
-      className={`sm:col-start-2 sm:row-start-1 grid ${oneAtATime ? 'auto-cols-[84%] sm:auto-cols-[calc((100%-12px)/2)]' : 'auto-cols-[84%] sm:auto-cols-[calc((100%-12px)/2)]'} grid-flow-col gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-1 pt-2 pb-3 sm:pb-4 md:auto-cols-[calc((100%-24px)/3)] lg:auto-cols-[calc((100%-48px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
+      className={`sm:col-start-2 sm:row-start-1 grid ${oneAtATime ? 'auto-cols-[calc((100%-8px)/2)] sm:auto-cols-[calc((100%-12px)/2)]' : 'auto-cols-[calc((100%-8px)/2)] sm:auto-cols-[calc((100%-12px)/2)]'} grid-flow-col gap-2 sm:gap-3 overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-0.5 sm:px-1 pt-1.5 sm:pt-2 pb-2 sm:pb-4 md:auto-cols-[calc((100%-24px)/3)] lg:auto-cols-[calc((100%-48px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
     >
       {products.map((p, idx) => {
         const hideOnMobile = Boolean(mobileLimit && mobileLimit > 0 && idx >= mobileLimit);
@@ -241,7 +241,7 @@ export function ProductCarousel({
     >
       <ChevronRight className="h-6 w-6" />
     </button>
-    <button type="button" aria-label={autoplay ? 'Tạm dừng tự cuộn sản phẩm' : 'Bật tự cuộn sản phẩm'} aria-pressed={!autoplay} onClick={() => setAutoplay(value => !value)} className="sm:col-start-2 min-h-9 justify-self-end rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600">
+    <button type="button" aria-label={autoplay ? 'Tạm dừng tự cuộn sản phẩm' : 'Bật tự cuộn sản phẩm'} aria-pressed={!autoplay} onClick={() => setAutoplay(value => !value)} className="sm:col-start-2 min-h-7 sm:min-h-9 justify-self-start sm:justify-self-end rounded-full border border-slate-200 bg-white/95 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600">
       {autoplay ? <Pause aria-hidden="true" className="mr-1 inline h-3 w-3" /> : <Play aria-hidden="true" className="mr-1 inline h-3 w-3" />}{autoplay ? 'Tạm dừng' : 'Tự cuộn'}
     </button>
   </div>;

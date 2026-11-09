@@ -231,8 +231,8 @@ export default function ProductHeroSection({
   };
 
   return (
-    <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-4 sm:p-6 lg:p-7 mb-8">
-      <div className="grid grid-cols-1 lg:grid-cols-12 lg:items-start gap-5 lg:gap-x-8 lg:gap-y-4">
+    <section className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm p-3 sm:p-6 lg:p-7 mb-5 sm:mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:items-start gap-4 sm:gap-5 lg:gap-x-8 lg:gap-y-4">
         {/* ========================================================= */}
         {/* KHỐI 1 (TRÁI TRÊN): GALLERY ẢNH                           */}
         {/* ========================================================= */}
@@ -251,10 +251,10 @@ export default function ProductHeroSection({
         {/* KHỐI 2 (PHẢI): TIÊU ĐỀ, GIÁ, CẤU HÌNH, MÀU, BH, CTA       */}
         {/* Hiển thị ngay dưới ảnh trên mobile để khách mua nhanh     */}
         {/* ========================================================= */}
-        <div className="lg:col-span-6 lg:row-span-2 flex flex-col space-y-4">
+        <div className="lg:col-span-6 lg:row-span-2 flex flex-col space-y-3.5 sm:space-y-4">
           {/* 1. TIÊU ĐỀ SẢN PHẨM & METADATA (ĐÁNH GIÁ, MODEL, THƯƠNG HIỆU) */}
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
+            <h1 className="text-lg sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
               {productName}
             </h1>
 
@@ -412,16 +412,16 @@ export default function ProductHeroSection({
 
           {/* 3. CHỌN CẤU HÌNH CARD 365 (ẨN NẾU <= 1 OPTION) */}
           {variants.length > 1 && (
-            <section aria-label="Chọn cấu hình" className="space-y-2.5">
+            <section aria-label="Chọn cấu hình" className="space-y-2 sm:space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
-                  <span>CHỌN CẤU HÌNH PHẦN CỨNG ({variants.length}):</span>
+                  <span>CHỌN CẤU HÌNH ({variants.length}):</span>
                 </label>
-                <span className="text-xs text-slate-500 font-medium">Bấm chọn đổi giá tức thì</span>
+                <span className="text-[11px] sm:text-xs text-slate-500 font-medium">Bấm chọn đổi giá</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-2.5">
                 {variants.map((item) => {
                   const isSelected = item.id === selectedVariant?.id;
                   return (
@@ -430,7 +430,7 @@ export default function ProductHeroSection({
                       type="button"
                       onClick={() => handleSelectVariant(item)}
                       aria-pressed={isSelected}
-                      className={`relative text-left p-3.5 rounded-2xl border-2 transition-all flex flex-col justify-between cursor-pointer select-none ${
+                      className={`relative text-left p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 transition-all flex flex-col justify-between cursor-pointer select-none ${
                         isSelected
                           ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/40 text-blue-950 shadow-xs ring-2 ring-blue-500/25"
                           : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/60 text-slate-800"
@@ -438,37 +438,37 @@ export default function ProductHeroSection({
                     >
                       {/* Checkmark badge */}
                       {isSelected && (
-                        <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-black shadow-2xs">
-                          <Check className="w-3 h-3 stroke-[3]" />
+                        <span className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px] sm:text-xs font-black shadow-2xs">
+                          <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[3]" />
                         </span>
                       )}
 
                       {/* Tag badge */}
                       {item.tag && (
-                        <span className="absolute -top-2.5 left-3 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-bold shadow-xs">
+                        <span className="absolute -top-2.5 left-2.5 sm:left-3 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-bold shadow-xs">
                           {item.tag}
                         </span>
                       )}
 
                       <div>
-                        <span className={`text-xs sm:text-sm font-black uppercase tracking-tight block pr-6 ${
+                        <span className={`text-[11px] sm:text-sm font-black uppercase tracking-tight block pr-5 sm:pr-6 leading-snug ${
                           isSelected ? "text-blue-950" : "text-slate-900"
                         }`}>
                           {item.name}
                         </span>
                         {item.subSpecs && (
-                          <p className="text-xs text-slate-500 line-clamp-1 mt-1 font-medium">
+                          <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 mt-0.5 sm:mt-1 font-medium">
                             {item.subSpecs}
                           </p>
                         )}
                       </div>
 
-                      <div className="pt-2.5 mt-2.5 border-t border-slate-200/70 flex items-baseline justify-between">
-                        <span className="text-sm font-black text-rose-600">
+                      <div className="pt-2 mt-2 sm:pt-2.5 sm:mt-2.5 border-t border-slate-200/70 flex flex-wrap items-baseline justify-between gap-1">
+                        <span className="text-xs sm:text-sm font-black text-rose-600">
                           {item.price.toLocaleString("vi-VN")}₫
                         </span>
                         {item.originalPrice && item.originalPrice > item.price && (
-                          <span className="text-xs text-slate-400 line-through">
+                          <span className="text-[10px] sm:text-xs text-slate-400 line-through">
                             {item.originalPrice.toLocaleString("vi-VN")}₫
                           </span>
                         )}
@@ -482,16 +482,16 @@ export default function ProductHeroSection({
 
           {/* 4. CHỌN MÀU SẮC CARD 365 (ẨN NẾU <= 1 OPTION) */}
           {colorOptions.length > 1 && (
-            <section aria-label="Chọn màu sắc" className="space-y-2.5">
+            <section aria-label="Chọn màu sắc" className="space-y-2 sm:space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-bold">2</span>
-                  <span>CHỌN MÀU SẮC PHIÊN BẢN ({colorOptions.length}):</span>
+                  <span>CHỌN MÀU SẮC ({colorOptions.length}):</span>
                 </label>
-                <span className="text-xs text-slate-500 font-medium">Đổi hình ảnh & phối màu</span>
+                <span className="text-[11px] sm:text-xs text-slate-500 font-medium">Đổi hình ảnh</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
                 {colorOptions.map((c, idx) => {
                   const isSelected = c.name === selectedColor?.name;
                   return (
@@ -499,7 +499,7 @@ export default function ProductHeroSection({
                       key={c.id}
                       type="button"
                       onClick={() => {const variant = variants.find(v => v.color === c.name && v.subSpecs === selectedVariant?.subSpecs) || variants.find(v => v.color === c.name);if (variantColors.length && variant) handleSelectVariant(variant);else setSelectedColorIndex(idx);}}
-                      className={`relative flex items-center justify-between p-3 rounded-2xl border-2 transition cursor-pointer select-none ${
+                      className={`relative flex items-center justify-between p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border-2 transition cursor-pointer select-none ${
                         isSelected
                           ? "border-blue-600 bg-blue-50/60 font-bold text-blue-950 ring-2 ring-blue-500/20"
                           : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
@@ -507,18 +507,18 @@ export default function ProductHeroSection({
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className="h-4 w-4 rounded-full border border-slate-300 shadow-2xs shrink-0"
+                          className="h-3.5 w-3.5 sm:h-4 sm:w-4 rounded-full border border-slate-300 shadow-2xs shrink-0"
                           style={{ backgroundColor: c.hex }}
                         />
                         <span className="text-xs sm:text-sm font-semibold truncate">{c.name}</span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {c.priceDiff > 0 && (
-                          <span className="text-xs font-bold text-rose-600">
+                          <span className="text-[10px] sm:text-xs font-bold text-rose-600">
                             +{c.priceDiff.toLocaleString("vi-VN")}₫
                           </span>
                         )}
-                        {isSelected && <Check className="w-4 h-4 text-blue-600 stroke-[2.5]" />}
+                        {isSelected && <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 stroke-[2.5]" />}
                       </div>
                     </button>
                   );
@@ -529,21 +529,21 @@ export default function ProductHeroSection({
 
           {/* 5. CHỌN GÓI BẢO HÀNH CARD 365 (ẨN NẾU <= 1 OPTION) */}
           {warranties.length > 1 && (
-            <section aria-label="Chọn bảo hành" className="space-y-2.5">
+            <section aria-label="Chọn bảo hành" className="space-y-2 sm:space-y-2.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">3</span>
-                  <span>CHỌN GÓI BẢO HÀNH & AN TÂM SỬ DỤNG:</span>
+                  <span>CHỌN GÓI BẢO HÀNH:</span>
                 </label>
                 <Link
                   href="/chinh-sach-bao-hanh"
-                  className="text-xs text-blue-600 hover:underline font-semibold"
+                  className="text-[11px] sm:text-xs text-blue-600 hover:underline font-semibold"
                 >
-                  Chi tiết điều khoản BH →
+                  Chi tiết BH →
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
                 {warranties.map((w, idx) => {
                   const isSelected = idx === selectedWarrantyIndex;
                   return (
@@ -551,7 +551,7 @@ export default function ProductHeroSection({
                       key={w.id}
                       type="button"
                       onClick={() => setSelectedWarrantyIndex(idx)}
-                      className={`relative rounded-2xl border-2 text-left p-3 transition flex flex-col justify-between cursor-pointer select-none ${
+                      className={`relative rounded-xl sm:rounded-2xl border-2 text-left p-2.5 sm:p-3 transition flex flex-col justify-between cursor-pointer select-none ${
                         isSelected
                           ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 shadow-2xs ring-2 ring-emerald-500/20"
                           : "border-slate-200 bg-white hover:border-emerald-400 text-slate-800"
@@ -559,14 +559,14 @@ export default function ProductHeroSection({
                     >
                       {/* Tag badge */}
                       {w.tag && (
-                        <span className="absolute -top-2.5 left-3 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[11px] font-bold shadow-xs">
+                        <span className="absolute -top-2.5 left-2.5 sm:left-3 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] sm:text-[11px] font-bold shadow-xs">
                           {w.tag}
                         </span>
                       )}
 
                       <div>
-                        <div className="flex items-start justify-between gap-1 mb-1">
-                          <span className={`text-xs sm:text-sm font-black ${isSelected ? "text-emerald-950" : "text-slate-900"}`}>
+                        <div className="flex items-start justify-between gap-1 mb-0.5 sm:mb-1">
+                          <span className={`text-[11px] sm:text-sm font-black leading-tight ${isSelected ? "text-emerald-950" : "text-slate-900"}`}>
                             {w.name}
                           </span>
                           {isSelected && (
@@ -576,18 +576,18 @@ export default function ProductHeroSection({
                           )}
                         </div>
                         {w.desc && (
-                          <p className="text-xs text-slate-500 line-clamp-2 leading-tight">
+                          <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-2 leading-tight">
                             {w.desc}
                           </p>
                         )}
                       </div>
 
-                      <div className="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between">
-                        <span className={`text-xs sm:text-sm font-bold ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
+                      <div className="mt-2 pt-1.5 sm:mt-2.5 sm:pt-2 border-t border-slate-200/70 flex items-center justify-between gap-1">
+                        <span className={`text-[11px] sm:text-sm font-bold ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
                           {w.priceDiff === 0 ? "Mặc định (0₫)" : `${w.priceDiff > 0 ? '+' : ''}${w.priceDiff.toLocaleString("vi-VN")}₫`}
                         </span>
                         {isSelected && (
-                          <span className="text-xs text-emerald-700 font-bold">Đã chọn</span>
+                          <span className="text-[10px] sm:text-xs text-emerald-700 font-bold hidden sm:inline">Đã chọn</span>
                         )}
                       </div>
                     </button>
@@ -615,13 +615,20 @@ export default function ProductHeroSection({
               type="button"
               onClick={() => orderable && setIsQuickCheckoutOpen(true)}
               disabled={!orderable}
-              className="w-full flex flex-col items-center justify-center py-3.5 px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black shadow-lg shadow-rose-600/25 transition cursor-pointer active:scale-[0.99]"
+              className="w-full flex flex-col items-center justify-center py-3 sm:py-3.5 px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black shadow-lg shadow-rose-600/25 transition cursor-pointer active:scale-[0.99]"
             >
-              <div className="flex items-center gap-2 text-base sm:text-lg">
-                <ShoppingCart className="w-5 h-5" />
-                <span>{orderable ? 'MUA NGAY - GIAO TẬN NƠI HOẶC NHẬN TẠI SHOP' : 'LIÊN HỆ ĐỂ ĐƯỢC TƯ VẤN'}</span>
+              <div className="flex items-center gap-2 text-sm sm:text-lg">
+                <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                {orderable ? (
+                  <>
+                    <span className="sm:hidden">MUA NGAY - GIAO TẬN NƠI</span>
+                    <span className="hidden sm:inline">MUA NGAY - GIAO TẬN NƠI HOẶC NHẬN TẠI SHOP</span>
+                  </>
+                ) : (
+                  <span>LIÊN HỆ ĐỂ ĐƯỢC TƯ VẤN</span>
+                )}
               </div>
-              <span className="text-xs font-normal text-rose-100 mt-0.5">
+              <span className="text-[11px] sm:text-xs font-normal text-rose-100 mt-0.5">
                 Kiểm tra máy chuẩn 100%, hài lòng mới thanh toán
               </span>
             </button>

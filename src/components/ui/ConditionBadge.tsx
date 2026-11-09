@@ -32,13 +32,13 @@ export const CONDITION_METAS: Record<ConditionCode, ConditionMeta> = {
   },
   USED: {
     code: "USED",
-    label: "Đã qua sử dụng",
+    label: "Máy cũ",
     variant: "condition-used",
     description: "Máy cũ chính hãng, đã kiểm tra kỹ thuật",
   },
   REFURBISHED: {
     code: "REFURBISHED",
-    label: "Hàng Refurbished",
+    label: "Refurbished",
     variant: "condition-like-new",
     description: "Hàng tân trang từ nhà sản xuất",
   },
@@ -50,7 +50,7 @@ export const CONDITION_METAS: Record<ConditionCode, ConditionMeta> = {
   },
   LIQUIDATION: {
     code: "LIQUIDATION",
-    label: "Hàng thanh lý",
+    label: "Xả kho",
     variant: "condition-used",
     description: "Hàng thanh lý xả kho giá tốt",
   },

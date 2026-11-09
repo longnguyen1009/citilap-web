@@ -318,18 +318,18 @@ export default function ProductCard({
   const mSsd = isAccessory ? "" : formatMobileStorageSpec(product.specs?.ssd);
   const mGpu = isAccessory ? "" : formatMobileGpuSpec(product.specs?.gpu);
   const mDisplay = isAccessory ? "" : formatMobileDisplaySpec(product.specs?.display);
+  const mMemoryLine = [mRam, mSsd].filter(Boolean).join(" / ");
   const mobileSpecRows = [
     { label: "CPU", value: mCpu },
-    { label: "RAM", value: mRam },
-    { label: "SSD", value: mSsd },
+    { label: mRam && mSsd ? "RAM/SSD" : mRam ? "RAM" : "SSD", value: mMemoryLine },
     { label: "GPU", value: mGpu },
-    { label: "Màn hình", value: mDisplay },
+    { label: "Màn", value: mDisplay },
   ].filter((row) => Boolean(row.value));
   const hasMobileSpecs = mobileSpecRows.length > 0;
 
   return (
     <article
-      className={`group/product relative flex flex-col h-full rounded-2xl border-2 ${brandTheme.cardBg} ${brandTheme.cardBorder} ${brandTheme.hoverBorder} shadow-xs hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
+      className={`group/product relative flex flex-col h-full rounded-xl sm:rounded-2xl border sm:border-2 ${brandTheme.cardBg} ${brandTheme.cardBorder} ${brandTheme.hoverBorder} shadow-2xs sm:shadow-xs hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
     >
       {/* Top Badges Bar: Rank, Condition & Compare, Wishlist (compact, no overlap) */}
       <div className="absolute top-1.5 left-1.5 right-1.5 sm:left-2 sm:right-2 z-20 flex items-center justify-between gap-1 pointer-events-none">
@@ -341,11 +341,11 @@ export default function ProductCard({
             </Badge>
           )}
 
-          {/* Condition Badge (Standardized Citilap Core: Mới 100%, LikeNew 99%) */}
-          <ConditionBadge condition={product.condition} fallbackName={product.name} size="xs" className="text-[8.5px] sm:text-[9.5px] px-1 sm:px-1.5 py-0.5 rounded-[2px] font-bold leading-tight truncate max-w-full" />
+          {/* Condition Badge (Standardized Citilap Core: Mới 100%, LikeNew 99%, Máy cũ) */}
+          <ConditionBadge condition={product.condition} fallbackName={product.name} size="xs" className="text-[8.5px] sm:text-[9.5px] px-1 sm:px-1.5 py-0.5 rounded-[3px] font-bold leading-tight truncate max-w-full shadow-2xs" />
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 pointer-events-auto">
+        <div className="flex items-center gap-0.5 sm:gap-2 shrink-0 pointer-events-auto">
           {/* Compare Button */}
           <button
             type="button"
@@ -355,13 +355,13 @@ export default function ProductCard({
               inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
             }
             title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
-            className={`relative w-9 h-9 sm:w-10 sm:h-10 -m-1 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 sm:before:w-8 sm:before:h-8 before:rounded-full before:shadow-xs before:transition-[background-color,border-color,transform] before:duration-150 ${
+            className={`relative w-7 h-7 sm:w-9 sm:h-9 -m-0.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-6 before:h-6 sm:before:w-7.5 sm:before:h-7.5 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 ${
               inCompare
                 ? "text-white before:bg-blue-600 before:border before:border-blue-600"
                 : "text-text-muted hover:text-blue-600 before:bg-white/95 before:backdrop-blur-xs hover:before:bg-blue-50/80 before:border before:border-border-default"
             }`}
           >
-            <Scale className="relative z-10 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" />
+            <Scale className="relative z-10 w-3 h-3 sm:w-4 sm:h-4" />
           </button>
 
           {/* Wishlist Button */}
@@ -372,19 +372,19 @@ export default function ProductCard({
             aria-label={
               liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
             }
-            className={`relative w-9 h-9 sm:w-10 sm:h-10 -m-1 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 sm:before:w-8 sm:before:h-8 before:rounded-full before:shadow-xs before:transition-[background-color,border-color,transform] before:duration-150 ${
+            className={`relative w-7 h-7 sm:w-9 sm:h-9 -m-0.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-6 before:h-6 sm:before:w-7.5 sm:before:h-7.5 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 ${
               liked
                 ? "text-error before:bg-red-50 before:border before:border-red-200"
                 : "text-text-muted hover:text-error before:bg-white/95 before:backdrop-blur-xs hover:before:bg-red-50/80 before:border before:border-border-default"
             }`}
           >
-            <Heart className="relative z-10 w-3.5 h-3.5 sm:w-[18px] sm:h-[18px]" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
+            <Heart className="relative z-10 w-3 h-3 sm:w-4 sm:h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
           </button>
         </div>
       </div>
 
       {/* Product Image Container */}
-      <div className={`relative aspect-[4/3] w-full border-b border-black/[0.04] ${brandTheme.imageBg} p-2.5 pt-7 pb-1.5 sm:p-3.5 sm:pt-7 sm:pb-2 flex items-center justify-center overflow-hidden`}>
+      <div className={`relative aspect-[16/11] sm:aspect-[4/3] w-full border-b border-black/[0.04] ${brandTheme.imageBg} p-2 pt-6 pb-1 sm:p-3.5 sm:pt-7 sm:pb-2 flex items-center justify-center overflow-hidden`}>
         <div className="relative block w-full h-full">
           {(() => {
             const rawImage = product.thumbnailUrl || product.image || (product as { primaryImage?: string }).primaryImage || null;
@@ -398,14 +398,14 @@ export default function ProductCard({
                 unoptimized={cardImage.includes('size=thumb') || cardImage.startsWith('/brand/')}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 onError={() => setImageError(true)}
-                className={`object-contain transition-transform duration-300 scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${
+                className={`object-contain transition-transform duration-300 scale-[0.9] sm:scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${
                   isOutOfStock ? "grayscale opacity-60" : ""
                 }`}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-                <Laptop className="w-14 h-14 stroke-1" />
-                <span className="text-caption font-medium text-text-muted mt-1">Ảnh đang cập nhật</span>
+                <Laptop className="w-11 h-11 sm:w-14 sm:h-14 stroke-1" />
+                <span className="text-[11px] sm:text-caption font-medium text-text-muted mt-0.5">Ảnh đang cập nhật</span>
               </div>
             );
           })()}
@@ -413,7 +413,7 @@ export default function ProductCard({
           {/* Out of stock overlay */}
           {isOutOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[1px] rounded-control z-10">
-              <span className="bg-slate-900/90 text-white text-xs font-bold px-3 py-1 rounded-control shadow-xs">
+              <span className="bg-slate-900/90 text-white text-[11px] sm:text-xs font-bold px-2.5 py-1 rounded-control shadow-xs">
                 Tạm hết hàng
               </span>
             </div>
@@ -422,23 +422,23 @@ export default function ProductCard({
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-col flex-1 p-2.5 sm:p-3 pt-2">
+      <div className="flex flex-col flex-1 p-2 sm:p-3 pt-1.5 sm:pt-2">
         {/* Top Content: Brand Card (Left) & Old Struck Price + Discount % (Right) */}
         <div className="flex flex-col">
           {/* Row directly under image: Brand Card on left, Struck Old Price + Red Discount % on right */}
-          <div className="flex items-center justify-between gap-1.5 h-6 mb-1">
-            <div className="flex items-center min-w-0 truncate">
+          <div className="flex items-center justify-between gap-1 min-h-5 sm:h-6 mb-1 min-w-0">
+            <div className="flex items-center min-w-0 shrink overflow-hidden">
               <BrandLogo brand={detectedBrand} series={product.series} />
             </div>
 
             {/* Struck Old Price + Red Discount % tag side-by-side */}
             {effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-[12.5px] sm:text-[14px] text-slate-500 line-through tabular-nums font-bold">
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[10.5px] sm:text-[13px] text-slate-500 line-through tabular-nums font-bold">
                   {formatVnd(effectiveOldPrice)}
                 </span>
                 {discountPercent && (
-                  <span className="bg-[#D71920] text-white font-black text-[11px] sm:text-[12px] px-1.5 py-0.5 rounded-[3px] leading-none select-none tracking-tight shadow-xs">
+                  <span className="bg-[#D71920] text-white font-black text-[9.5px] sm:text-[11.5px] px-1 sm:px-1.5 py-0.5 rounded-[3px] leading-none select-none tracking-tight shadow-2xs">
                     {discountPercent}
                   </span>
                 )}
@@ -447,7 +447,7 @@ export default function ProductCard({
           </div>
 
           {/* Title - fixed 2-line height so 1-line and 2-line titles occupy exact same space */}
-          <h3 className="h-10 sm:h-11 text-sm sm:text-[15px] font-semibold text-slate-900 leading-snug line-clamp-2 overflow-hidden group-hover/product:text-blue-700 transition-colors">
+          <h3 className="h-9 sm:h-11 text-[13px] sm:text-[15px] font-semibold text-slate-900 leading-[1.35] sm:leading-snug line-clamp-2 overflow-hidden group-hover/product:text-blue-700 transition-colors">
             <Link
               href={productHref}
               title={product.name}
@@ -458,8 +458,8 @@ export default function ProductCard({
           </h3>
 
           {/* Red Price Card: Directly below title, horizontally centered */}
-          <div className="mt-2 mb-2 sm:mb-2.5">
-            <div className="w-full bg-[#D71920] hover:bg-[#c0141a] text-white font-extrabold py-1.5 sm:py-2 px-3 rounded-lg sm:rounded-xl shadow-xs flex items-center justify-center text-sm sm:text-base tracking-tight select-none transition-colors">
+          <div className="mt-1.5 sm:mt-2 mb-1.5 sm:mb-2.5">
+            <div className="w-full bg-[#D71920] hover:bg-[#c0141a] text-white font-extrabold py-1 sm:py-2 px-2 sm:px-3 rounded-lg sm:rounded-xl shadow-2xs flex items-center justify-center text-[13px] sm:text-base tracking-tight select-none transition-colors">
               <span className="tabular-nums">
                 {product.availability === 'CONTACT' ? 'Liên hệ' : formatVnd(product.price)}
               </span>
@@ -468,7 +468,7 @@ export default function ProductCard({
         </div>
 
         {/* Bottom Pinned Section: Cấu hình (Specs) & Bảo hành (Warranty) ALWAYS pinned to bottom */}
-        <div className="mt-auto flex flex-col justify-end pt-2">
+        <div className="mt-auto flex flex-col justify-end pt-1.5 sm:pt-2">
           {/* PC DISPLAY (>= 640px): 2-Column Compact Spec Chips Matrix */}
           {showSpecs && hasDesktopSpecs && (
             <div className="hidden sm:grid grid-cols-2 gap-1 text-caption text-text-secondary mb-2 pt-2 border-t border-black/[0.06] min-h-[52px]">
@@ -510,9 +510,9 @@ export default function ProductCard({
             </div>
           )}
 
-          {/* SMARTPHONE DISPLAY (< 640px): Full Readable Vertical Spec Lines (Thế Giới Số Style) */}
+          {/* SMARTPHONE DISPLAY (< 640px): Compact Readable Vertical Spec Lines */}
           {showSpecs && hasMobileSpecs && (
-            <dl className="sm:hidden mb-2 pt-2 border-t border-black/[0.06] space-y-1 text-[11px] leading-snug text-slate-700">
+            <dl className="sm:hidden mb-1.5 pt-1.5 border-t border-black/[0.06] space-y-0.5 text-[10.5px] leading-snug text-slate-700">
               {mobileSpecRows.map((row) => (
                 <div key={row.label} className="flex items-baseline gap-1 min-w-0">
                   <dt className="font-bold text-slate-900 shrink-0">{row.label}:</dt>
@@ -525,20 +525,20 @@ export default function ProductCard({
           )}
 
           {/* Footer Meta: Warranty & Stock Status */}
-          <div className="pt-2 border-t border-black/[0.06] flex flex-wrap items-center justify-between gap-x-1.5 gap-y-1 text-caption">
+          <div className="pt-1.5 sm:pt-2 border-t border-black/[0.06] flex items-center justify-between gap-1 text-[10.5px] sm:text-caption">
             {/* Warranty tag */}
             <div
-              className="flex items-center gap-1 text-slate-700 font-medium truncate min-w-0"
+              className="flex items-center gap-0.5 sm:gap-1 text-slate-700 font-medium truncate min-w-0"
               title={product.warranty || warrantyText}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600 shrink-0" />
               <span className="truncate">{warrantyText}</span>
             </div>
 
             {/* Standardized Stock Indicator */}
             {product.availability ? (
               <span
-                className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold ${
+                className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold shrink-0 whitespace-nowrap ${
                   product.availability === 'AVAILABLE' && (product.stock === undefined || product.stock === null || product.stock > 0)
                     ? 'text-emerald-700'
                     : product.availability === 'PREORDER'
@@ -552,15 +552,15 @@ export default function ProductCard({
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
                 )}
                 {product.availability === 'AVAILABLE'
-                  ? (product.stock !== undefined && product.stock !== null && product.stock <= 0 ? 'Tạm hết hàng' : 'Sẵn hàng')
+                  ? (product.stock !== undefined && product.stock !== null && product.stock <= 0 ? 'Hết hàng' : 'Sẵn hàng')
                   : ({
                       PREORDER: 'Đặt trước',
                       CONTACT: 'Liên hệ',
-                      UNAVAILABLE: 'Tạm hết hàng',
+                      UNAVAILABLE: 'Hết hàng',
                     } as Record<string, string>)[product.availability] || 'Sẵn hàng'}
               </span>
             ) : (
-              <StockBadge stock={product.stock} variant="indicator" />
+              <StockBadge stock={product.stock} variant="indicator" className="shrink-0 whitespace-nowrap text-[10px] sm:text-caption" />
             )}
           </div>
 

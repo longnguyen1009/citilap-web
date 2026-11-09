@@ -63,35 +63,35 @@ export default function Footer({
   return (
     <footer className="bg-[#0b1221] text-gray-300">
       {/* 1. Value Proposition Features Bar */}
-      <div className="bg-[#0f172a] py-8 border-y border-gray-800">
-        <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="flex items-center gap-4">
-              <Truck className="w-10 h-10 text-blue-500 shrink-0" />
+      <div className="bg-[#0f172a] py-4 sm:py-8 border-y border-gray-800">
+        <div className="container mx-auto px-3 sm:px-4 max-w-[1370px]">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            <div className="flex items-start sm:items-center gap-2.5 sm:gap-4">
+              <Truck className="w-6 h-6 sm:w-10 sm:h-10 text-blue-500 shrink-0 mt-0.5 sm:mt-0" />
               <div>
-                <h4 className="font-bold text-white text-sm uppercase">Giao hàng toàn quốc</h4>
-                <p className="text-xs text-gray-400">Đồng kiểm khi nhận máy, đóng gói chống sốc an toàn</p>
+                <h4 className="font-bold text-white text-xs sm:text-sm uppercase leading-tight">Giao hàng toàn quốc</h4>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-2">Đồng kiểm khi nhận máy, đóng gói chống sốc an toàn</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <ShieldCheck className="w-10 h-10 text-blue-500 shrink-0" />
+            <div className="flex items-start sm:items-center gap-2.5 sm:gap-4">
+              <ShieldCheck className="w-6 h-6 sm:w-10 sm:h-10 text-blue-500 shrink-0 mt-0.5 sm:mt-0" />
               <div>
-                <h4 className="font-bold text-white text-sm uppercase">Bảo hành linh hoạt</h4>
-                <p className="text-xs text-gray-400">Gói 3 - 12 tháng minh bạch, hỗ trợ kỹ thuật trọn đời</p>
+                <h4 className="font-bold text-white text-xs sm:text-sm uppercase leading-tight">Bảo hành linh hoạt</h4>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-2">Gói 3 - 12 tháng minh bạch, hỗ trợ kỹ thuật trọn đời</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <RefreshCw className="w-10 h-10 text-blue-500 shrink-0" />
+            <div className="flex items-start sm:items-center gap-2.5 sm:gap-4">
+              <RefreshCw className="w-6 h-6 sm:w-10 sm:h-10 text-blue-500 shrink-0 mt-0.5 sm:mt-0" />
               <div>
-                <h4 className="font-bold text-white text-sm uppercase">Lỗi 1 đổi 1 trong 7 ngày</h4>
-                <p className="text-xs text-gray-400">Đổi máy mới ngay nếu phát sinh lỗi phần cứng</p>
+                <h4 className="font-bold text-white text-xs sm:text-sm uppercase leading-tight">Lỗi 1 đổi 1 (7 ngày)</h4>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-2">Đổi máy mới ngay nếu phát sinh lỗi phần cứng</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <Store className="w-10 h-10 text-blue-500 shrink-0" />
+            <div className="flex items-start sm:items-center gap-2.5 sm:gap-4">
+              <Store className="w-6 h-6 sm:w-10 sm:h-10 text-blue-500 shrink-0 mt-0.5 sm:mt-0" />
               <div>
-                <h4 className="font-bold text-white text-sm uppercase">Trải nghiệm thực tế</h4>
-                <p className="text-xs text-gray-400">Trải nghiệm & test máy trực tiếp tại showroom</p>
+                <h4 className="font-bold text-white text-xs sm:text-sm uppercase leading-tight">Trải nghiệm thực tế</h4>
+                <p className="text-[10px] sm:text-xs text-gray-400 mt-0.5 line-clamp-2">Trải nghiệm &amp; test máy trực tiếp tại showroom</p>
               </div>
             </div>
           </div>
@@ -99,13 +99,13 @@ export default function Footer({
       </div>
 
       {/* 2. Main Footer Navigation & Stores */}
-      <div className="pt-12 pb-8">
-        <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
+      <div className="pt-7 pb-5 sm:pt-12 sm:pb-8">
+        <div className="container mx-auto px-3.5 sm:px-4 max-w-[1370px]">
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-8 mb-5 sm:mb-8">
             {/* Column 1: Brand Info & Contacts */}
-            <div className="space-y-4">
+            <div className="col-span-2 md:col-span-1 space-y-3 sm:space-y-4">
               <Link href="/" className="flex flex-col">
-                <span className="text-3xl font-extrabold text-blue-500 leading-tight tracking-tight">
+                <span className="text-2xl sm:text-3xl font-extrabold text-blue-500 leading-tight tracking-tight">
                   {brandName}
                 </span>
                 <span className="text-gray-400 text-[10px] tracking-widest uppercase font-semibold mt-0.5">
@@ -116,8 +116,8 @@ export default function Footer({
                 Chuyên laptop gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng.
               </p>
 
-              <ul className="space-y-3 text-sm text-gray-400 pt-1">
-                <li className="flex gap-3 items-center">
+              <ul className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-400 pt-0.5 sm:pt-1">
+                <li className="flex gap-2.5 sm:gap-3 items-center">
                   <Phone className="w-4 h-4 text-blue-500 shrink-0" />
                   <a
                     href={telHref}
@@ -126,7 +126,7 @@ export default function Footer({
                     Hotline: {phone}
                   </a>
                 </li>
-                <li className="flex gap-3 items-center">
+                <li className="flex gap-2.5 sm:gap-3 items-center">
                   <Mail className="w-4 h-4 text-blue-500 shrink-0" />
                   <a
                     href={`mailto:${email}`}
@@ -135,7 +135,7 @@ export default function Footer({
                     {email}
                   </a>
                 </li>
-                <li className="flex gap-3 items-start">
+                <li className="flex gap-2.5 sm:gap-3 items-start">
                   <Clock className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
                   <div className="text-xs">
                     <p className="font-medium text-gray-300">{hours}</p>
@@ -144,13 +144,13 @@ export default function Footer({
               </ul>
 
               {/* Social links */}
-              <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
+              <div className="pt-1 sm:pt-2 flex flex-wrap items-center gap-2 text-xs">
                 {fb && (
                   <a
                     href={fb}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-[#1877F2] text-gray-300 hover:text-white font-medium transition"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-lg bg-gray-800 hover:bg-[#1877F2] text-gray-300 hover:text-white font-medium transition"
                   >
                     <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" />
@@ -163,7 +163,7 @@ export default function Footer({
                     href={tiktok}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white font-medium transition"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-lg bg-gray-800 hover:bg-pink-600 text-gray-300 hover:text-white font-medium transition"
                   >
                     <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
@@ -176,7 +176,7 @@ export default function Footer({
                     href={zalo}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-blue-500 text-gray-300 hover:text-white font-medium transition"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-lg bg-gray-800 hover:bg-blue-500 text-gray-300 hover:text-white font-medium transition"
                   >
                     <span className="flex h-3.5 w-3.5 items-center justify-center rounded-xs bg-blue-500 text-[9px] font-black text-white">
                       Z
@@ -189,7 +189,7 @@ export default function Footer({
                     href={youtube}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-red-600 text-gray-300 hover:text-white font-medium transition"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-lg bg-gray-800 hover:bg-red-600 text-gray-300 hover:text-white font-medium transition"
                   >
                     <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
@@ -201,12 +201,12 @@ export default function Footer({
             </div>
 
             {/* Column 2: Hệ thống Showroom */}
-            <div>
-              <h3 className="text-base font-bold mb-4 text-white uppercase tracking-wide flex items-center gap-2">
+            <div className="col-span-2 md:col-span-1">
+              <h3 className="text-sm sm:text-base font-bold mb-2.5 sm:mb-4 text-white uppercase tracking-wide flex items-center gap-2">
                 <Store className="w-4 h-4 text-blue-500" /> Hệ thống cơ sở
               </h3>
 
-              <div className="space-y-4 text-xs text-gray-400">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-3 sm:gap-4 text-xs text-gray-400">
                 {/* Cơ sở Hà Nội */}
                 <div className="border-l-2 border-blue-500 pl-3 space-y-1">
                   <div className="font-bold text-gray-200">{hanoi.name} (Trụ sở chính)</div>
@@ -243,12 +243,12 @@ export default function Footer({
                   </div>
                 )}
 
-                <div className="pt-1">
+                <div className="pt-0.5 sm:pt-1">
                   <Link
                     href="/he-thong-cua-hang"
                     className="text-blue-400 hover:text-blue-300 font-medium underline inline-flex items-center gap-1"
                   >
-                    Xem chi tiết giờ hoạt động & cơ sở →
+                    Xem chi tiết giờ hoạt động &amp; cơ sở →
                   </Link>
                 </div>
               </div>
@@ -286,9 +286,9 @@ export default function Footer({
                   },
                 ]
             ).map((group) => (
-              <div key={group.id}>
-                <h3 className="mb-4 text-base font-bold uppercase tracking-wide text-white">{group.title}</h3>
-                <ul className="space-y-2.5 text-sm text-gray-400">
+              <div key={group.id} className="col-span-1">
+                <h3 className="mb-2.5 sm:mb-4 text-xs sm:text-base font-bold uppercase tracking-wide text-white">{group.title}</h3>
+                <ul className="space-y-2 sm:space-y-2.5 text-xs sm:text-sm text-gray-400">
                   {group.links.map((item) => (
                     <li key={item.href}>
                       <Link href={item.href} className="transition hover:text-white">

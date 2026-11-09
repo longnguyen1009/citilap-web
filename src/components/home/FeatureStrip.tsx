@@ -40,26 +40,26 @@ export default function FeatureStrip({ settings: customSettings }: FeatureStripP
   ];
 
   return (
-    <section className="pb-10 pt-2" aria-label="Cam kết dịch vụ">
-      <div className="container mx-auto px-4 max-w-[1370px]">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <section className="pb-4 sm:pb-10 pt-1 sm:pt-2" aria-label="Cam kết dịch vụ">
+      <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px]">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
               <div
                 key={index}
-                className={`bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4.5 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-3 sm:gap-3.5 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition duration-300 group ${feature.bgHover}`}
+                className={`bg-white border border-slate-200/90 rounded-xl sm:rounded-2xl p-2 sm:p-4.5 flex flex-row items-center sm:items-start text-left gap-2 sm:gap-3.5 shadow-2xs sm:shadow-xs hover:shadow-md hover:-translate-y-0.5 transition duration-300 group ${feature.bgHover}`}
               >
                 <div
-                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-tr ${feature.color} text-white flex items-center justify-center shrink-0 shadow-md shadow-slate-200 group-hover:scale-105 transition duration-300`}
+                  className={`w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-gradient-to-tr ${feature.color} text-white flex items-center justify-center shrink-0 shadow-xs sm:shadow-md shadow-slate-200 group-hover:scale-105 transition duration-300`}
                 >
-                  <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <Icon className="w-4 h-4 sm:w-6 sm:h-6" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-blue-600 transition truncate">
+                  <h3 className="font-bold text-slate-900 text-xs sm:text-base group-hover:text-blue-600 transition truncate leading-tight">
                     {feature.title}
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-snug">
+                  <p className="text-[10.5px] sm:text-xs text-slate-500 mt-0.5 line-clamp-1 sm:line-clamp-2 leading-snug">
                     {feature.desc}
                   </p>
                 </div>

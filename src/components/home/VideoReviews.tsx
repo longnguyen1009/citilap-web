@@ -162,20 +162,20 @@ export default function VideoReviews({
   const isTikTokModal = activeVideo?.platform === 'tiktok';
 
   return (
-    <section className="pb-12" aria-label={title}>
-      <div className="container mx-auto max-w-[1370px] px-4">
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-7 shadow-xs overflow-hidden">
+    <section className="pb-5 sm:pb-12" aria-label={title}>
+      <div className="container mx-auto max-w-[1370px] px-2.5 sm:px-4">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-7 shadow-xs overflow-hidden">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-6 border-b border-slate-100">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2.5 sm:gap-4 pb-3.5 sm:pb-6 border-b border-slate-100">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 text-red-600 border border-red-200/60 text-[11px] font-bold uppercase tracking-wider mb-2">
-                <Sparkles className="w-3.5 h-3.5 shrink-0" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-red-50 text-red-600 border border-red-200/60 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider mb-1.5 sm:mb-2">
+                <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 <span>Góc Review &amp; Trải Nghiệm Thực Tế</span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black uppercase text-slate-900 tracking-tight">
+              <h2 className="text-base sm:text-2xl font-black uppercase text-slate-900 tracking-tight">
                 {title}
               </h2>
-              {subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">{subtitle}</p>}
+              {subtitle && <p className="text-[11px] sm:text-sm text-slate-500 mt-0.5 sm:mt-1 max-w-2xl line-clamp-2">{subtitle}</p>}
             </div>
 
             {/* Filter Tabs & Channel Links */}
@@ -185,7 +185,7 @@ export default function VideoReviews({
                   type="button"
                   aria-pressed={platform === 'all'}
                   onClick={() => setPlatform('all')}
-                  className={`min-h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                  className={`min-h-8 sm:min-h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition duration-150 cursor-pointer ${
                     platform === 'all'
                       ? 'bg-white text-slate-900 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -203,7 +203,7 @@ export default function VideoReviews({
                   type="button"
                   aria-pressed={platform === 'youtube'}
                   onClick={() => setPlatform('youtube')}
-                  className={`min-h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                  className={`min-h-8 sm:min-h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition duration-150 cursor-pointer ${
                     platform === 'youtube'
                       ? 'bg-red-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -222,7 +222,7 @@ export default function VideoReviews({
                   type="button"
                   aria-pressed={platform === 'tiktok'}
                   onClick={() => setPlatform('tiktok')}
-                  className={`min-h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition duration-150 cursor-pointer ${
+                  className={`min-h-8 sm:min-h-10 inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition duration-150 cursor-pointer ${
                     platform === 'tiktok'
                       ? 'bg-slate-950 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -242,7 +242,7 @@ export default function VideoReviews({
 
           {/* Main Video Showcase */}
           {activeVideos.length === 0 ? (
-            <div className="py-16 text-center">
+            <div className="py-10 sm:py-16 text-center">
               <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
                 <PlayCircle className="w-6 h-6" />
               </div>
@@ -251,8 +251,8 @@ export default function VideoReviews({
             </div>
           ) : platform === 'tiktok' ? (
             /* Dedicated TikTok Reels / Shorts Grid View (Portrait 9:16) */
-            <div className="pt-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="pt-3.5 sm:pt-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
                 {activeVideos.map((v, i) => (
                   <button
                     key={`${v.url}-${i}`}
@@ -273,31 +273,31 @@ export default function VideoReviews({
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-black/20" />
 
                     {/* Top Platform Tag */}
-                    <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-white border border-white/20 shadow-xs">
+                    <div className="absolute top-2.5 left-2.5 right-2.5 sm:top-3 sm:left-3 sm:right-3 flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] font-bold text-white border border-white/20 shadow-xs">
                         <TiktokIcon className="w-3 h-3 text-cyan-400" /> TikTok
                       </span>
-                      <span className="w-7 h-7 rounded-full bg-black/50 backdrop-blur-md text-white/80 flex items-center justify-center">
-                        <Volume2 className="w-3.5 h-3.5" />
+                      <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-black/50 backdrop-blur-md text-white/80 flex items-center justify-center">
+                        <Volume2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       </span>
                     </div>
 
                     {/* Center Play Button Overlay */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/40 flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:bg-red-600 group-hover:border-red-500">
-                        <Play className="w-5 h-5 fill-white ml-0.5" />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/20 backdrop-blur-md text-white border border-white/40 flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:bg-red-600 group-hover:border-red-500">
+                        <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-white ml-0.5" />
                       </div>
                     </div>
 
                     {/* Bottom Content */}
-                    <div className="relative p-3.5 z-10 space-y-1.5">
+                    <div className="relative p-2.5 sm:p-3.5 z-10 space-y-1">
                       <h3 className="text-xs sm:text-sm font-bold text-white leading-snug line-clamp-2 group-hover:text-cyan-300 transition-colors">
                         {v.title}
                       </h3>
-                      <div className="flex items-center justify-between text-[11px] text-white/70 pt-1">
-                        <span className="font-medium truncate max-w-[140px]">@citilapvn</span>
-                        <span className="text-[10px] text-cyan-300 font-semibold inline-flex items-center gap-0.5">
-                          Xem clip <ChevronRight className="w-3 h-3" />
+                      <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-white/70 pt-0.5">
+                        <span className="font-medium truncate max-w-[90px] sm:max-w-[140px]">@citilapvn</span>
+                        <span className="text-[10px] text-cyan-300 font-semibold inline-flex items-center gap-0.5 shrink-0">
+                          Xem <ChevronRight className="w-3 h-3" />
                         </span>
                       </div>
                     </div>
@@ -307,11 +307,11 @@ export default function VideoReviews({
             </div>
           ) : (
             /* Standard Showcase: Spotlight Hero Video + Interactive Playlist */
-            <div className="pt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="pt-3.5 sm:pt-6 grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-6 items-start">
               {/* Left Column: Spotlight Featured Video (7 cols) */}
               {spotlightVideo && (
                 <div className="lg:col-span-7">
-                  <div className="group relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-200/90 shadow-sm transition hover:shadow-md">
+                  <div className="group relative overflow-hidden rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-200/90 shadow-sm transition hover:shadow-md">
                     <button
                       type="button"
                       onClick={(e) => openVideoModal(spotlightVideo, e)}
@@ -328,22 +328,22 @@ export default function VideoReviews({
                       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent" />
 
                       {/* Top Badges */}
-                      <div className="absolute top-4 left-4 flex items-center gap-2">
+                      <div className="absolute top-2.5 left-2.5 sm:top-4 sm:left-4 flex items-center gap-1.5 sm:gap-2">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white shadow-sm ${
+                          className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-bold text-white shadow-sm ${
                             spotlightVideo.platform === 'tiktok'
                               ? 'bg-slate-900 border border-white/20'
                               : 'bg-red-600 border border-red-500'
                           }`}
                         >
                           {spotlightVideo.platform === 'tiktok' ? (
-                            <TiktokIcon className="w-3.5 h-3.5 text-cyan-300" />
+                            <TiktokIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-cyan-300" />
                           ) : (
-                            <YoutubeIcon className="w-3.5 h-3.5 text-white" />
+                            <YoutubeIcon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
                           )}
                           <span>{spotlightVideo.platform === 'tiktok' ? 'TikTok' : 'YouTube Review'}</span>
                         </span>
-                        <span className="px-2.5 py-1 rounded-full bg-amber-500/90 backdrop-blur-md text-[11px] font-bold text-white shadow-xs">
+                        <span className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-amber-500/90 backdrop-blur-md text-[10px] sm:text-[11px] font-bold text-white shadow-xs">
                           Nổi bật
                         </span>
                       </div>
@@ -351,23 +351,23 @@ export default function VideoReviews({
                       {/* Big Pulsing Center Play Button */}
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="relative flex items-center justify-center">
-                          <span className="absolute w-20 h-20 rounded-full bg-red-600/30 animate-ping" />
-                          <div className="w-16 h-16 rounded-full bg-red-600 text-white flex items-center justify-center shadow-2xl transition-transform duration-300 group-hover:scale-110">
-                            <Play className="w-7 h-7 fill-white ml-1" />
+                          <span className="absolute w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-red-600/30 animate-ping" />
+                          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-red-600 text-white flex items-center justify-center shadow-2xl transition-transform duration-300 group-hover:scale-110">
+                            <Play className="w-5 h-5 sm:w-7 sm:h-7 fill-white ml-0.5 sm:ml-1" />
                           </div>
                         </div>
                       </div>
 
                       {/* Bottom Info inside Poster */}
-                      <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-5 text-white">
-                        <h3 className="text-base sm:text-lg font-bold leading-snug line-clamp-2 text-white group-hover:text-red-400 transition-colors">
+                      <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-5 text-white">
+                        <h3 className="text-xs sm:text-lg font-bold leading-snug line-clamp-2 text-white group-hover:text-red-400 transition-colors">
                           {spotlightVideo.title}
                         </h3>
-                        <p className="text-xs text-slate-300 mt-1 flex items-center gap-2">
+                        <p className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 flex items-center gap-2">
                           <span>Nhấp để phát video</span>
                           <span>•</span>
                           <span className="inline-flex items-center gap-1 text-red-400 font-semibold">
-                            Xem ngay <ChevronRight className="w-3.5 h-3.5" />
+                            Xem ngay <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           </span>
                         </p>
                       </div>
@@ -375,13 +375,13 @@ export default function VideoReviews({
 
                     {/* Spotlight Meta / Product Link Bar */}
                     {spotlightVideo.href && (
-                      <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 flex items-center justify-between gap-3 text-xs">
-                        <span className="text-slate-600 font-medium">Sản phẩm liên quan trong video:</span>
+                      <div className="bg-slate-50 px-3 py-2 sm:px-4 sm:py-2.5 border-t border-slate-200 flex items-center justify-between gap-2 text-[11px] sm:text-xs">
+                        <span className="text-slate-600 font-medium truncate">Sản phẩm trong video:</span>
                         <Link
                           href={spotlightVideo.href}
-                          className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-700 bg-white border border-blue-200 px-3 py-1 rounded-lg transition"
+                          className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-700 bg-white border border-blue-200 px-2.5 py-1 rounded-lg transition shrink-0"
                         >
-                          Xem chi tiết máy <ArrowUpRight className="w-3.5 h-3.5" />
+                          Xem máy <ArrowUpRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         </Link>
                       </div>
                     )}
@@ -389,36 +389,35 @@ export default function VideoReviews({
                 </div>
               )}
 
-              {/* Right Column: Playlist Rail (5 cols) */}
-              <div className="lg:col-span-5 space-y-3">
-                <div className="flex items-center justify-between pb-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                    Danh sách video review ({activeVideos.length})
+              {/* Right Column: Playlist Rail (horizontal swipe on mobile, vertical rail on desktop) */}
+              <div className="lg:col-span-5 space-y-2 sm:space-y-3 min-w-0">
+                <div className="flex items-center justify-between pb-0.5 sm:pb-1">
+                  <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
+                    Danh sách video ({activeVideos.length})
                   </span>
-                  <span className="text-[11px] text-slate-400">Chọn video để xem</span>
+                  <span className="text-[10px] sm:text-[11px] text-slate-400">Vuốt ngang / chạm để xem</span>
                 </div>
 
-                <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1 scrollbar-thin">
+                <div className="flex lg:block overflow-x-auto lg:overflow-x-visible lg:overflow-y-auto gap-2.5 lg:space-y-2.5 pb-1 lg:pb-0 lg:max-h-[460px] lg:pr-1 snap-x snap-mandatory hide-scrollbar scrollbar-thin">
                   {activeVideos.map((v, idx) => {
                     const isSelected = spotlightVideo?.url === v.url;
                     return (
                       <div
                         key={`${v.url}-${idx}`}
-                        className={`group relative flex items-center gap-3 p-2.5 rounded-xl border transition-all duration-200 cursor-pointer ${
+                        className={`group relative flex flex-col lg:flex-row items-start lg:items-center gap-2 lg:gap-3 p-2 lg:p-2.5 rounded-xl border transition-all duration-200 cursor-pointer shrink-0 w-[168px] sm:w-[210px] lg:w-full snap-start ${
                           isSelected
                             ? 'bg-blue-50/70 border-blue-400 shadow-xs'
                             : 'bg-white border-slate-200/80 hover:bg-slate-50 hover:border-slate-300'
                         }`}
                         onClick={() => {
                           setSpotlightVideo(v);
-                          // On mobile, click directly plays modal; on desktop it spotlights and highlights
                           if (window.innerWidth < 1024) {
                             openVideoModal(v);
                           }
                         }}
                       >
                         {/* Thumbnail */}
-                        <div className="relative w-28 sm:w-32 aspect-video rounded-lg overflow-hidden bg-slate-900 shrink-0">
+                        <div className="relative w-full lg:w-32 aspect-video rounded-lg overflow-hidden bg-slate-900 shrink-0">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={v.thumbnail}
@@ -443,13 +442,13 @@ export default function VideoReviews({
                         </div>
 
                         {/* Title and Action */}
-                        <div className="min-w-0 flex-1">
-                          <h4 className={`text-xs sm:text-sm font-semibold line-clamp-2 leading-snug transition-colors ${
+                        <div className="min-w-0 flex-1 w-full">
+                          <h4 className={`text-[11px] sm:text-sm font-semibold line-clamp-2 leading-snug transition-colors ${
                             isSelected ? 'text-blue-900 font-bold' : 'text-slate-800 group-hover:text-blue-600'
                           }`}>
                             {v.title}
                           </h4>
-                          <div className="mt-1 flex items-center justify-between text-[11px]">
+                          <div className="mt-1 hidden lg:flex items-center justify-between text-[11px]">
                             <span className="text-slate-400 capitalize">
                               {v.platform === 'tiktok' ? 'Video ngắn TikTok' : 'YouTube Review'}
                             </span>
@@ -474,19 +473,19 @@ export default function VideoReviews({
           )}
 
           {/* Official Channels Action Banner */}
-          <div className="mt-8 pt-6 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="mt-4 sm:mt-8 pt-3.5 sm:pt-6 border-t border-slate-100 grid grid-cols-2 md:grid-cols-2 gap-2 sm:gap-4">
             {/* YouTube Channel Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-red-200/80 bg-gradient-to-br from-red-50/60 via-white to-red-50/30 p-4 sm:p-5 flex flex-col justify-between shadow-2xs hover:shadow-md transition">
-              <div className="flex items-start gap-3.5 mb-3">
-                <div className="w-11 h-11 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-md">
-                  <YoutubeIcon className="w-6 h-6" />
+            <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-red-200/80 bg-gradient-to-br from-red-50/60 via-white to-red-50/30 p-2.5 sm:p-5 flex flex-col justify-between shadow-2xs hover:shadow-md transition">
+              <div className="flex items-center sm:items-start gap-2 sm:gap-3.5 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <YoutubeIcon className="w-4 h-4 sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                  <h4 className="font-bold text-slate-900 text-sm sm:text-base">
-                    Kênh YouTube Review &amp; Trải Nghiệm
+                <div className="min-w-0">
+                  <h4 className="font-bold text-slate-900 text-xs sm:text-base leading-tight line-clamp-1">
+                    YouTube Review
                   </h4>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                    Đón xem các bài test hiệu năng gaming, benchmark nhiệt độ và tư vấn chọn laptop chuẩn xác.
+                  <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-1 sm:line-clamp-none">
+                    Test hiệu năng gaming &amp; tư vấn chọn máy chuẩn xác.
                   </p>
                 </div>
               </div>
@@ -494,29 +493,29 @@ export default function VideoReviews({
                 href={ytLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full sm:w-auto self-start bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition duration-150 shadow-xs cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 w-full sm:w-auto self-start bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-[11px] sm:text-xs uppercase px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl transition duration-150 shadow-xs cursor-pointer"
               >
-                <YoutubeIcon className="w-4 h-4" />
-                <span>Đăng ký Kênh YouTube</span>
-                <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                <YoutubeIcon className="w-3.5 h-3.5 hidden sm:block" />
+                <span>Kênh YouTube</span>
+                <ExternalLink className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </a>
             </div>
 
             {/* TikTok Channel Card */}
-            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-4 sm:p-5 flex flex-col justify-between text-white shadow-2xs hover:shadow-md transition">
-              <div className="flex items-start gap-3.5 mb-3">
-                <div className="w-11 h-11 rounded-xl bg-slate-800 text-cyan-400 border border-slate-700 flex items-center justify-center shrink-0 shadow-md">
-                  <TiktokIcon className="w-6 h-6" />
+            <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-2.5 sm:p-5 flex flex-col justify-between text-white shadow-2xs hover:shadow-md transition">
+              <div className="flex items-center sm:items-start gap-2 sm:gap-3.5 mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl bg-slate-800 text-cyan-400 border border-slate-700 flex items-center justify-center shrink-0 shadow-sm">
+                  <TiktokIcon className="w-4 h-4 sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                  <h4 className="font-bold text-white text-sm sm:text-base flex items-center gap-2">
-                    <span>Kênh TikTok @citilapvn</span>
-                    <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-semibold border border-cyan-500/30">
+                <div className="min-w-0">
+                  <h4 className="font-bold text-white text-xs sm:text-base flex items-center gap-1.5 leading-tight">
+                    <span className="truncate">TikTok @citilapvn</span>
+                    <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-semibold border border-cyan-500/30 shrink-0">
                       Official
                     </span>
                   </h4>
-                  <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
-                    Khám phá video unbox nhanh, mẹo vặt bảo quản máy và săn deal sốc công nghệ hàng ngày.
+                  <p className="text-[10px] sm:text-xs text-slate-300 mt-0.5 leading-relaxed line-clamp-1 sm:line-clamp-none">
+                    Unbox nhanh, mẹo bảo quản máy &amp; săn deal công nghệ.
                   </p>
                 </div>
               </div>
@@ -524,11 +523,11 @@ export default function VideoReviews({
                 href={tkLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 w-full sm:w-auto self-start bg-white hover:bg-slate-100 active:scale-95 text-slate-950 font-bold text-xs uppercase px-4 py-2.5 rounded-xl transition duration-150 shadow-xs cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 w-full sm:w-auto self-start bg-white hover:bg-slate-100 active:scale-95 text-slate-950 font-bold text-[11px] sm:text-xs uppercase px-2.5 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl transition duration-150 shadow-xs cursor-pointer"
               >
-                <TiktokIcon className="w-4 h-4 text-slate-950" />
-                <span>Follow TikTok @citilapvn</span>
-                <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                <TiktokIcon className="w-3.5 h-3.5 text-slate-950 hidden sm:block" />
+                <span>Follow TikTok</span>
+                <ExternalLink className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </a>
             </div>
           </div>

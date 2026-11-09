@@ -344,10 +344,10 @@ export function BrandLogo({ brand, series, className = "" }: BrandLogoProps) {
   const cardElement = renderCard();
 
   return (
-    <div className={`flex items-center gap-1.5 shrink-0 ${className}`}>
+    <div className={`flex items-center gap-1 sm:gap-1.5 min-w-0 shrink ${className}`}>
       {cardElement}
       {series && (
-        <span className="text-[10px] sm:text-[10.5px] font-semibold text-slate-500 uppercase tracking-wide truncate">
+        <span className="hidden sm:inline text-[10.5px] font-semibold text-slate-500 uppercase tracking-wide truncate">
           • {series}
         </span>
       )}
