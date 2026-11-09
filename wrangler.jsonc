@@ -70,6 +70,10 @@
       "images": { "binding": "IMAGES" },
       "name": "citilap-ecommerce-prod",
       "account_id": "8952957f4eed25a74e19a3e273c4a589",
+      "routes": [
+        { "pattern": "citilap.vn", "custom_domain": true },
+        { "pattern": "www.citilap.vn/*", "zone_name": "citilap.vn" }
+      ],
       "vars": {
         "APP_ENV": "production",
         "NEXT_PUBLIC_TURNSTILE_SITE_KEY": "0x4AAAAAAFZsbdPpsQAHD2eQ",
@@ -78,8 +82,8 @@
       "d1_databases": [
         {
           "binding": "DB",
-          "database_name": "citilap-db-prod",
-          "database_id": "94e07d52-27c1-4179-b5f4-af606221062c",
+          "database_name": "citilap-db-prod-v2",
+          "database_id": "54a43de9-8011-4d55-8f35-a9b724bc2090",
           "migrations_dir": "d1-migrations"
         }
       ],

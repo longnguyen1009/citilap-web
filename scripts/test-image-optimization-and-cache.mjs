@@ -115,10 +115,10 @@ try {
 
   // Verify R2 contains both detail and thumbnail
   const row = await api.getAsset(DB, asset.id);
-  assert.equal(row.storageKey, `library/${asset.id}.webp`);
+  assert.equal(row.storageKey, `library/products/${asset.id}.webp`);
   assert.equal(row.mimeType, 'image/webp');
 
-  const detailR2 = await PRODUCT_MEDIA.get(`library/${asset.id}.webp`);
+  const detailR2 = await PRODUCT_MEDIA.get(`library/products/${asset.id}.webp`);
   assert(detailR2 !== null, 'Detail R2 object must exist');
 
   const thumbR2 = await PRODUCT_MEDIA.get(`library/${asset.id}_thumb-v2.webp`);

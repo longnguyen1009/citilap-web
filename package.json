@@ -11,7 +11,7 @@
     "dev:cloudflare": "vite dev --port 3001",
     "build:cloudflare": "vite build",
     "cf:typegen": "wrangler types --include-runtime=false",
-    "cf:deploy": "vinext-cloudflare deploy",
+    "cf:deploy": "node scripts/deploy-cloudflare.mjs",
     "db:generate": "prisma generate && node scripts/post-prisma-generate.mjs",
     "db:migrate:local": "wrangler d1 migrations apply citilap-db-dev --local",
     "db:migrate:remote": "wrangler d1 migrations apply citilap-db-dev --remote",
