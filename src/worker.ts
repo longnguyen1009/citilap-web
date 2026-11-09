@@ -11,9 +11,9 @@ const worker = {
   async fetch(request: Request, env: MediaEnvironment & { ASSETS: { fetch(request: Request): Promise<Response> }; VINEXT_KV_CACHE?: KvLike }, ctx: { waitUntil(promise: Promise<unknown>): void }) {
     try {
     const url = new URL(request.url);
+    const cache = (globalThis.caches as CacheStorage & { default?: Cache } | undefined)?.default;
     const library = url.pathname.match(/^\/api\/library\/([a-zA-Z0-9-]+)$/);
-    if (request.method === 'GET' && library && url.searchParams.get('size') === 'thumb' && url.searchParams.get('v') === '2') {
-      const cache = (globalThis.caches as CacheStorage & { default?: Cache } | undefined)?.default;
+    if (request.method === 'GET' && library) {
       const key = new Request(url.toString());
       const hit = await cache?.match(key);
       if (hit) return hit;
@@ -23,7 +23,16 @@ const worker = {
       }
       return response;
     }
-    if (isImageOptimizationPath(new URL(request.url).pathname)) {
+    if (isImageOptimizationPath(url.pathname)) {
+      const accept = request.headers.get('Accept') || '';
+      const fmt = accept.includes('image/avif') ? 'avif' : accept.includes('image/webp') ? 'webp' : 'jpeg';
+      const cacheKeyUrl = new URL(url.toString());
+      cacheKeyUrl.searchParams.set('__fmt', fmt);
+      const cacheKey = new Request(cacheKeyUrl.toString());
+      if (request.method === 'GET' && cache) {
+        const hit = await cache.match(cacheKey);
+        if (hit) return hit;
+      }
       // Vinext reads image sources through ASSETS; library images live in R2.
       const assets = { async fetch(source: Request) {
         const match = new URL(source.url).pathname.match(/^\/api\/library\/([a-zA-Z0-9-]+)$/);
@@ -31,15 +40,19 @@ const worker = {
         try { return await serveLibraryImage(env, match[1], source); }
         catch (error) { return mediaFailure(error); }
       } };
-      return app.fetch(request, { ...env, ASSETS: assets }, ctx);
+      const response = await app.fetch(request, { ...env, ASSETS: assets }, ctx);
+      if (request.method === 'GET' && cache && response.status === 200 && response.headers.get('Cache-Control')?.includes('immutable')) {
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+      }
+      return response;
     }
       const kv = env.VINEXT_KV_CACHE;
-      if (kv && isCacheableHtmlRequest(request, url)) {
+      if (isCacheableHtmlRequest(request, url)) {
         return await serveCachedHtml(kv, url, ctx, () => app.fetch(request, env, ctx));
       }
       // Preserve Vinext's HTML/RSC cache policy, including private/no-store responses.
       const response = await app.fetch(request, env, ctx);
-      if (kv && invalidatesPublicCache(request, response)) ctx.waitUntil(invalidatePublicCache(kv));
+      if (invalidatesPublicCache(request, response)) ctx.waitUntil(invalidatePublicCache(kv));
       return response;
     } catch (fatalError) {
       console.error('[Worker Fatal Error]', fatalError);

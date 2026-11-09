@@ -1,14 +1,16 @@
-import { catalogState } from '@/server/services/catalog-state';
 import Header from "@/components/layout/Header";
 import StorefrontProviders from '@/components/layout/StorefrontProviders';
 import Footer from "@/components/layout/Footer";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import FloatingContactWidget from "@/components/layout/FloatingContactWidget";
-import { getActiveCategories, getActiveBrands } from "@/server/services/catalog.service";
-import { getPublishedNavigation, getStorefrontSettings } from "@/server/services/storefront-cms.service";
-import {mediaEnvironment} from '@/server/media-http';
+import {
+  getPublishedNavigation,
+  getStorefrontSettings,
+  getCachedActiveCategories,
+  getCachedActiveBrands,
+  getCachedCatalogState,
+} from "@/server/services/storefront-cms.service";
 import PublicPriceRefresh from '@/components/product/PublicPriceRefresh';
-import { connection } from 'next/server';
 import StorefrontMetrics from '@/components/layout/StorefrontMetrics';
 import Analytics from '@/components/layout/Analytics';
 
@@ -17,25 +19,23 @@ export default async function ShopLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await connection();
   // eslint-disable-next-line react-hooks/purity -- request-time server clock schedules public campaign refresh
   const serverTime=Date.now();
-  const {DB}=await mediaEnvironment();
   const [navigation, settings, boundary, categories, brands] = await Promise.all([
     getPublishedNavigation(),
     getStorefrontSettings(),
-    catalogState(DB, serverTime).catch((err) => {
+    getCachedCatalogState(serverTime).catch((err) => {
       // Never take the storefront down for the refresh signal; the client adopts the first live token.
       console.error("[ShopLayout] Failed to load catalog state from D1:", err);
       return { token: '', nextChange: null, serverTime };
     }),
-    getActiveCategories().catch((err) => {
+    getCachedActiveCategories().catch((err) => {
       console.error("[ShopLayout] Failed to load categories from D1:", err);
-      return [] as Awaited<ReturnType<typeof getActiveCategories>>;
+      return [] as Awaited<ReturnType<typeof getCachedActiveCategories>>;
     }),
-    getActiveBrands().catch((err) => {
+    getCachedActiveBrands().catch((err) => {
       console.error("[ShopLayout] Failed to load brands from D1:", err);
-      return [] as Awaited<ReturnType<typeof getActiveBrands>>;
+      return [] as Awaited<ReturnType<typeof getCachedActiveBrands>>;
     }),
   ]);
 

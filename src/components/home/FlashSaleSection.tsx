@@ -1,7 +1,11 @@
 import HotSaleCampaigns from './HotSaleCampaigns';
 import ProductTabs from './ProductTabs';
 import { getHotSaleCampaigns } from '@/server/services/hot-sale.service';
-import { getPublishedHomepage, getStorefrontSettings } from '@/server/services/storefront-cms.service';
+import {
+  getPublishedHomepage,
+  getStorefrontSettings,
+  getCachedHotSaleCampaigns,
+} from '@/server/services/storefront-cms.service';
 import { searchProducts } from '@/server/services/search.service';
 import type { PriceEvaluationContext } from '@/server/services/pricing.service';
 import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
@@ -43,14 +47,20 @@ export default async function FlashSaleSection({
   evaluatedAt = new Date(),
   showEmpty = false,
   settings: providedSettings,
+  initialCampaigns,
 }: {
   pricingContext?: PriceEvaluationContext;
   evaluatedAt?: Date;
   showEmpty?: boolean;
   settings?: PublicStorefrontSettings | null;
+  initialCampaigns?: Awaited<ReturnType<typeof getHotSaleCampaigns>>;
 } = {}) {
   const [campaigns, resolvedSettings] = await Promise.all([
-    getHotSaleCampaigns(pricingContext, evaluatedAt),
+    initialCampaigns !== undefined
+      ? Promise.resolve(initialCampaigns)
+      : pricingContext
+        ? getHotSaleCampaigns(pricingContext, evaluatedAt)
+        : getCachedHotSaleCampaigns().catch(() => getHotSaleCampaigns(undefined, evaluatedAt)),
     providedSettings !== undefined
       ? Promise.resolve(providedSettings)
       : getStorefrontSettings().catch(() => null),

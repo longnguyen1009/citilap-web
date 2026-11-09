@@ -86,7 +86,7 @@ export default function HotSaleCampaigns({
           </div>
           <FlashSaleCountdown key={campaign.id} startAt={campaign.startAt} endAt={campaign.endAt} saleStyle />
         </div>
-        <ProductCarousel key={campaign.id} products={campaign.products} label={campaign.name} oneAtATime />
+        <ProductCarousel key={campaign.id} products={campaign.products} label={campaign.name} oneAtATime eagerImages />
         <p className="px-2 pb-1 pt-3 text-center text-xs font-semibold text-white sm:text-sm">Giá ưu đãi áp dụng đúng cấu hình trong khung giờ đã chọn · Giờ Việt Nam (GMT+7)</p>
       </div>
     </div>

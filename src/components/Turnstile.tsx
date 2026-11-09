@@ -25,7 +25,7 @@ function Challenge({ action, onToken }: { action: string; onToken: (token: strin
     return () => api.remove(id);
   }, [ready, action, onToken]);
   return <div className="my-3 min-h-[65px]">
-    <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" onReady={() => setReady(true)} onError={() => setFailed(true)} />
+    <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="lazyOnload" onReady={() => setReady(true)} onError={() => setFailed(true)} />
     <div ref={container} />
     {failed && <p role="alert">Không thể tải xác thực bảo mật. Kiểm tra kết nối rồi tải lại trang.</p>}
   </div>;

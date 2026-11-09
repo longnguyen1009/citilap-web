@@ -27,9 +27,12 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
           <Image
             src={settings.heroBgImage}
             alt={`${settings.heroTitle} ${settings.heroHighlight}`}
-            fill
-            className="object-cover"
+            width={1920}
+            height={600}
+            className="absolute inset-0 w-full h-full object-cover"
             priority
+            fetchPriority="high"
+            unoptimized={settings.heroBgImage.startsWith("/brand/")}
             sizes="100vw"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent flex items-center">
@@ -76,8 +79,11 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
               <Image
                 src={settings.subBanner1Image}
                 alt={settings.subBanner1Title}
-                fill
-                className="object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
+                width={800}
+                height={300}
+                loading="eager"
+                unoptimized={settings.subBanner1Image.startsWith("/brand/")}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-blue-950/90 via-blue-900/60 to-transparent flex items-center p-5 sm:p-7 md:p-8">
@@ -104,8 +110,11 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
               <Image
                 src={settings.subBanner2Image}
                 alt={settings.subBanner2Title}
-                fill
-                className="object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
+                width={800}
+                height={300}
+                loading="eager"
+                unoptimized={settings.subBanner2Image.startsWith("/brand/")}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
                 sizes="(max-width: 768px) 100vw, 50vw"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-red-950/90 via-red-900/60 to-transparent flex items-center p-5 sm:p-7 md:p-8">

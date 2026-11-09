@@ -260,9 +260,13 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                     <Image
                       src={slide.imageUrl}
                       alt={slide.title || 'Slide quảng cáo'}
-                      fill
+                      width={1920}
+                      height={600}
                       priority={idx === 0}
-                      className="object-cover"
+                      fetchPriority={idx === 0 ? 'high' : 'low'}
+                      loading={idx === 0 ? 'eager' : 'lazy'}
+                      unoptimized={slide.imageUrl.startsWith('/brand/')}
+                      className="absolute inset-0 w-full h-full object-cover"
                       sizes="(max-width: 768px) 100vw, 1370px"
                       onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
                     />

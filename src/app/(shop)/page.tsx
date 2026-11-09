@@ -1,7 +1,5 @@
 import { businessProfile } from "@/config/business-profile";
-import { getStorefrontPricingContext } from '@/server/services/pricing.service';
 import { serializeJsonLd } from '@/lib/seo-helpers';
-import { Suspense } from "react";
 import { Metadata } from "next";
 import {
   Sparkles,
@@ -22,42 +20,33 @@ import VideoReviews from "@/components/home/VideoReviews";
 import TestimonialSection from "@/components/home/TestimonialSection";
 import ContactSection from "@/components/home/ContactSection";
 import BrandSection from "@/components/home/BrandSection";
-import { getPublishedNavigation, getPublishedHomepage, getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import {
+  getPublishedNavigation,
+  getPublishedHomepage,
+  getStorefrontSettings,
+  getCachedHotSaleCampaigns,
+  getCachedHomepageCatalog,
+} from "@/server/services/storefront-cms.service";
 import BlockRenderer from "@/components/builder/BlockRenderer";
-import { ProductGridSkeleton } from "@/components/ui/Skeleton";
 
 export const revalidate = 60;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const {mediaEnvironment}=await import('@/server/media-http');
-  const {seoDefaults}=await import('@/server/services/seo.service');
-  const defaults=await seoDefaults((await mediaEnvironment()).DB);
-  const home=await getPublishedHomepage();
-  const title=home?.seo.title || defaults.title,description=home?.seo.description || defaults.description;
+  const [settings, home] = await Promise.all([
+    getStorefrontSettings(),
+    getPublishedHomepage(),
+  ]);
+  const title = home?.seo.title || settings?.defaultSeoTitle || `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`;
+  const description = home?.seo.description || settings?.defaultSeoDescription || `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`;
   return {title,description,alternates:{canonical:`${businessProfile.canonicalSiteUrl}`},openGraph:{title,description,url:`${businessProfile.canonicalSiteUrl}`}};
 }
 
-// Reusable standard skeleton for section suspense boundaries
-function ProductSectionSkeleton() {
-  return (
-    <section className="pb-16" aria-busy="true">
-      <div className="container mx-auto px-4 max-w-[1370px]">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="h-16 bg-slate-100 skeleton"></div>
-          <div className="p-4 md:p-6 bg-slate-50/30">
-            <ProductGridSkeleton count={5} />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export default async function Home() {
-  const [navigation, cmsHomepage, settings] = await Promise.all([
+  const [navigation, cmsHomepage, settings, hotSaleCampaigns] = await Promise.all([
     getPublishedNavigation(),
     getPublishedHomepage(),
     getStorefrontSettings(),
+    getCachedHotSaleCampaigns().catch(() => undefined),
   ]);
 
   const jsonLd = {
@@ -83,7 +72,7 @@ export default async function Home() {
         <BlockRenderer
           sections={cmsHomepage.sections}
           settings={settings}
-          flashSale={<FlashSaleSection settings={settings} />}
+          flashSale={<FlashSaleSection settings={settings} initialCampaigns={hotSaleCampaigns} />}
         />
         <div className="defer-offscreen">
           <TestimonialSection
@@ -96,8 +85,7 @@ export default async function Home() {
     );
   }
 
-  const evaluatedAt = new Date();
-  const pricingContext = await getStorefrontPricingContext(undefined, evaluatedAt);
+  const catalog = await getCachedHomepageCatalog().catch(() => null);
   return (
     <div className="bg-surface-subtle min-h-screen">
       <script
@@ -115,31 +103,30 @@ export default async function Home() {
       <CategoryGridSection navigation={navigation} />
 
       {/* 4. FLASH SALE */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <FlashSaleSection pricingContext={pricingContext} evaluatedAt={evaluatedAt} settings={settings} />
-      </Suspense>
+      <FlashSaleSection settings={settings} initialCampaigns={hotSaleCampaigns} />
 
       {/* 4. HÀNG MỚI VỀ */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
-          title="Hàng Mới Về - Bắt Trend Công Nghệ"
-          icon={Sparkles}
-          colorClass="bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800"
-          links={[
-            { label: "Gaming Mới", href: "/laptop-gaming?sort=newest" },
-            { label: "Ultrabook Mới", href: "/laptop-van-phong?sort=newest" },
-            { label: "Apple M3", href: "/macbook" },
-            { label: "Đồ Hoạ Mới", href: "/laptop-workstation?sort=newest" },
-          ]}
-          slug="laptop-moi"
-          sectionKey="new"
-          badgeColor="bg-indigo-600 text-white shadow-xs"
-        />
-      </Suspense>
+      <ProductSection
+        products={catalog?.newArrivals}
+        eagerImages
+        title="Hàng Mới Về - Bắt Trend Công Nghệ"
+        icon={Sparkles}
+        colorClass="bg-gradient-to-r from-indigo-700 via-indigo-600 to-indigo-800"
+        links={[
+          { label: "Gaming Mới", href: "/laptop-gaming?sort=newest" },
+          { label: "Ultrabook Mới", href: "/laptop-van-phong?sort=newest" },
+          { label: "Apple M3", href: "/macbook" },
+          { label: "Đồ Hoạ Mới", href: "/laptop-workstation?sort=newest" },
+        ]}
+        slug="laptop-moi"
+        sectionKey="new"
+        badgeColor="bg-indigo-600 text-white shadow-xs"
+      />
 
-      {/* 5. LAPTOP GAMING */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
+      <div className="defer-offscreen">
+        {/* 5. LAPTOP GAMING */}
+        <ProductSection
+          products={catalog?.gaming}
           title="Laptop Gaming - Chiến Thần Đồ Hoạ"
           icon={Zap}
           colorClass="bg-gradient-to-r from-red-700 via-red-600 to-red-800"
@@ -152,11 +139,10 @@ export default async function Home() {
           slug="laptop-gaming"
           sectionKey="gaming"
         />
-      </Suspense>
 
-      {/* 6. ULTRABOOK CAO CẤP */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
+        {/* 6. ULTRABOOK CAO CẤP */}
+        <ProductSection
+          products={catalog?.ultrabook}
           title="Ultrabook Cao Cấp - Doanh Nhân"
           icon={Briefcase}
           colorClass="bg-gradient-to-r from-blue-700 via-blue-600 to-blue-800"
@@ -170,11 +156,10 @@ export default async function Home() {
           sectionKey="ultrabook"
           badgeColor="bg-blue-600 text-white shadow-xs"
         />
-      </Suspense>
 
-      {/* 7. MÁY TRẠM WORKSTATION */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
+        {/* 7. MÁY TRẠM WORKSTATION */}
+        <ProductSection
+          products={catalog?.workstation}
           title="Máy Trạm Workstation - Đồ Hoạ Chuyên Nghiệp"
           icon={Server}
           colorClass="bg-gradient-to-r from-gray-800 via-gray-700 to-gray-900"
@@ -188,11 +173,10 @@ export default async function Home() {
           sectionKey="workstation"
           badgeColor="bg-gray-800 text-white shadow-xs"
         />
-      </Suspense>
 
-      {/* 8. PHỤ KIỆN LAPTOP & SETUP CÔNG NGHỆ */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
+        {/* 8. PHỤ KIỆN LAPTOP & SETUP CÔNG NGHỆ */}
+        <ProductSection
+          products={catalog?.accessories}
           title="Phụ Kiện Laptop & Đồ Chơi Công Nghệ"
           icon={Headphones}
           colorClass="bg-gradient-to-r from-emerald-700 via-emerald-600 to-emerald-800"
@@ -206,11 +190,10 @@ export default async function Home() {
           sectionKey="accessories"
           badgeColor="bg-emerald-600 text-white shadow-xs"
         />
-      </Suspense>
 
-      {/* 9. BÁN CHẠY NHẤT */}
-      <Suspense fallback={<ProductSectionSkeleton />}>
-        <ProductSection pricingContext={pricingContext} evaluatedAt={evaluatedAt}
+        {/* 9. BÁN CHẠY NHẤT */}
+        <ProductSection
+          products={catalog?.bestSelling}
           title="Bán Chạy Nhất - Được Yêu Thích"
           icon={TrendingUp}
           colorClass="bg-gradient-to-r from-orange-600 via-orange-500 to-orange-700"
@@ -225,29 +208,29 @@ export default async function Home() {
           badgeColor="bg-orange-600 text-white shadow-xs"
           rank={true}
         />
-      </Suspense>
 
-      {/* 11. GÓC CITILAP MEDIA */}
-      <MediaSection />
+        {/* 11. GÓC CITILAP MEDIA */}
+        <MediaSection />
 
-      {/* 12. GÓC REVIEW & TRẢI NGHIỆM VIDEO */}
-      <VideoReviews
-        title="Góc Review & Đánh Giá Thực Tế"
-        subtitle="Tổng hợp video đánh giá chi tiết, test hiệu năng & quy trình kiểm định laptop từ YouTube và TikTok"
-        videos={settings?.reviewVideos ?? []}
-        fallbackVideos={settings?.reviewVideos}
-        youtubeChannelUrl={settings?.youtubeUrl}
-        tiktokChannelUrl={settings?.tiktokUrl}
-      />
+        {/* 12. GÓC REVIEW & TRẢI NGHIỆM VIDEO */}
+        <VideoReviews
+          title="Góc Review & Đánh Giá Thực Tế"
+          subtitle="Tổng hợp video đánh giá chi tiết, test hiệu năng & quy trình kiểm định laptop từ YouTube và TikTok"
+          videos={settings?.reviewVideos ?? []}
+          fallbackVideos={settings?.reviewVideos}
+          youtubeChannelUrl={settings?.youtubeUrl}
+          tiktokChannelUrl={settings?.tiktokUrl}
+        />
 
-      {/* 13. ĐÁNH GIÁ KHÁCH HÀNG */}
-      <TestimonialSection testimonials={settings?.testimonials ?? []} sourceUrl={settings?.testimonialsSourceUrl} />
+        {/* 13. ĐÁNH GIÁ KHÁCH HÀNG */}
+        <TestimonialSection testimonials={settings?.testimonials ?? []} sourceUrl={settings?.testimonialsSourceUrl} />
 
-      {/* 13. TƯ VẤN CHỌN MÁY */}
-      <ContactSection settings={settings} />
+        {/* 13. TƯ VẤN CHỌN MÁY */}
+        <ContactSection settings={settings} />
 
-      {/* 14. KHÁM PHÁ THEO THƯƠNG HIỆU */}
-      <BrandSection />
+        {/* 14. KHÁM PHÁ THEO THƯƠNG HIỆU */}
+        <BrandSection />
+      </div>
     </div>
   );
 }

@@ -53,6 +53,7 @@ export interface ProductCardProps {
   footerAction?: React.ReactNode;
   showSpecs?: boolean;
   className?: string;
+  imageLoading?: "eager" | "lazy";
 }
 
 /**
@@ -158,6 +159,7 @@ export default function ProductCard({
   footerAction,
   showSpecs = true,
   className = "",
+  imageLoading = "lazy",
 }: ProductCardProps) {
   const wishlistCtx = useOptionalWishlist();
   const compareCtx = useOptionalCompare();
@@ -297,6 +299,8 @@ export default function ProductCard({
                 src={cardImage}
                 alt={product.name}
                 fill
+                loading={imageLoading}
+                unoptimized={cardImage.includes('size=thumb') || cardImage.startsWith('/brand/')}
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                 onError={() => setImageError(true)}
                 className={`object-contain transition-transform duration-300 scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${

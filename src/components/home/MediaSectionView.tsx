@@ -115,15 +115,19 @@ export default function MediaSectionView({
                   className="group flex min-w-0 snap-start flex-col rounded-2xl border border-slate-200/90 bg-white p-2.5 shadow-xs transition duration-200 hover:-translate-y-0.5 hover:border-blue-500 hover:shadow-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden"
                 >
                   <div className="relative aspect-[16/10] shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                    {post.coverImage ? (
-                      <Image
-                        src={post.coverImage.thumbnailUrl || post.coverImage.url}
-                        alt={post.coverImage.alt || post.title}
-                        fill
-                        sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 260px"
-                        className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
-                      />
-                    ) : (
+                    {post.coverImage ? (() => {
+                      const coverSrc = post.coverImage.thumbnailUrl || post.coverImage.url;
+                      return (
+                        <Image
+                          src={coverSrc}
+                          alt={post.coverImage.alt || post.title}
+                          fill
+                          unoptimized={coverSrc.includes('size=thumb') || coverSrc.startsWith('/brand/')}
+                          sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 260px"
+                          className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
+                        />
+                      );
+                    })() : (
                       <BookOpen className="m-auto h-full w-8 text-slate-400" />
                     )}
                   </div>

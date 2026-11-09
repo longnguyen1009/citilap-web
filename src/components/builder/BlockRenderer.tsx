@@ -72,8 +72,11 @@ export default function BlockRenderer({
   }
 
   // Sections after the first screens are skipped by the browser's rendering until they approach the viewport.
-  const DEFER_FROM_INDEX = 5;
-  const rendered = sections.map((section) => {
+  const DEFER_FROM_INDEX = 3;
+  const firstProductGridIndex = sections.findIndex(
+    (s) => s.enabled && s.type === 'product_grid' && (s.id !== 'sec-hot-sale' || flashSale === undefined)
+  );
+  const rendered = sections.map((section, sectionIndex) => {
         if (!section.enabled) return null;
 
         switch (section.type) {
@@ -83,7 +86,7 @@ export default function BlockRenderer({
           case 'slider':
             return <SliderBlock key={section.id} data={section.data} />;
 
-          case 'product_grid':
+          case 'product_grid': {
             if (section.id === 'sec-hot-sale' && flashSale !== undefined) {
               const d = section.data as { title?: string };
               return (
@@ -93,7 +96,8 @@ export default function BlockRenderer({
                 </div>
               );
             }
-            return <ProductGridBlock key={section.id} section={section} />;
+            return <ProductGridBlock key={section.id} section={section} eagerImages={sectionIndex === firstProductGridIndex} />;
+          }
 
           case 'featured_categories':
             return <FeaturedCategoriesBlock key={section.id} section={section} />;
@@ -235,9 +239,12 @@ function BannerBlock({ data }: { data: any }) {
         <Image
           src={imageUrl}
           alt={data.title || 'Hero banner'}
-          fill
-          className="object-cover"
+          width={1920}
+          height={600}
+          className="absolute inset-0 w-full h-full object-cover"
           priority
+          fetchPriority="high"
+          unoptimized={imageUrl.startsWith('/brand/')}
           sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent flex items-center">
@@ -302,7 +309,7 @@ function resolveProductGridIcon(sectionId: string, colorTheme?: string, customIc
   return Sparkles;
 }
 
-function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
+function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedSectionItem; eagerImages?: boolean }) {
   const data = section.data as ProductGridSectionData;
   const limit = data.ruleCriteria?.limit && data.ruleCriteria.limit > 0 ? data.ruleCriteria.limit : 48;
   const products = (section.resolvedProducts || []).slice(0, limit);
@@ -312,7 +319,7 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
     resolveProductGridIcon(section.id, data.colorTheme, data.icon),
     { className: 'w-5 h-5 text-yellow-300' }
   );
-  if (section.resolvedTabs?.length) return <ProductTabs title={data.title} subtitle={data.subtitle} tabs={section.resolvedTabs} />;
+  if (section.resolvedTabs?.length) return <ProductTabs title={data.title} subtitle={data.subtitle} tabs={section.resolvedTabs} eagerImages={eagerImages} />;
 
   return (
     <section className="pb-12 md:pb-16" aria-label={data.title}>
@@ -366,6 +373,7 @@ function ProductGridBlock({ section }: { section: ResolvedSectionItem }) {
                     key={p.id}
                     product={p}
                     rank={data.rankNumbering ? idx + 1 : undefined}
+                    imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'}
                   />
                 ))}
               </div>
@@ -458,9 +466,20 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
               }
             >
               <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white transition group-hover:scale-105 motion-reduce:group-hover:scale-100 ${data.layout === 'board' ? 'h-14 w-14' : 'mb-2 h-16 w-20 sm:mb-3 sm:h-20 sm:w-24'}`}>
-                {c.image ? (
-                  <Image src={c.image} alt={c.name} fill className="object-contain p-1" sizes="80px" />
-                ) : (
+                {c.image ? (() => {
+                  const catImg = c.image.startsWith('/api/library/') && !c.image.includes('?') ? `${c.image}?size=thumb&v=2` : c.image;
+                  return (
+                    <Image
+                      src={catImg}
+                      alt={c.name}
+                      fill
+                      loading={index < 5 ? 'eager' : 'lazy'}
+                      unoptimized={catImg.includes('size=thumb') || catImg.startsWith('/brand/')}
+                      className="object-contain p-1"
+                      sizes="80px"
+                    />
+                  );
+                })() : (
                   <Store className="w-6 h-6 text-slate-400" />
                 )}
               </div>

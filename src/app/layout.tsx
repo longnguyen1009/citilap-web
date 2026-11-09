@@ -84,12 +84,14 @@ const baseMetadata: Metadata = {
 };
 
 export async function generateMetadata(): Promise<Metadata> {
-  const {mediaEnvironment}=await import('@/server/media-http');
-  const { getPublicStorefrontSettings } = await import('@/server/services/settings.service');
-  const settings = await getPublicStorefrontSettings((await mediaEnvironment()).DB);
-  const defaults = { title: settings.defaultSeoTitle, description: settings.defaultSeoDescription };
+  const { getStorefrontSettings } = await import('@/server/services/storefront-cms.service');
+  const settings = await getStorefrontSettings();
+  const defaults = {
+    title: settings?.defaultSeoTitle || `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
+    description: settings?.defaultSeoDescription || (baseMetadata.description as string),
+  };
   return {...baseMetadata,title:{default:defaults.title,template:'%s | CitiLap'},description:defaults.description,alternates:undefined,
-    icons: { icon: settings.faviconUrl || '/brand/citilap-mark.svg', apple: '/brand/citilap-mark.png' },
+    icons: { icon: settings?.faviconUrl || '/brand/citilap-mark.svg', apple: '/brand/citilap-mark.png' },
     openGraph:{...baseMetadata.openGraph,title:defaults.title,description:defaults.description},twitter:{...baseMetadata.twitter,title:defaults.title,description:defaults.description}};
 }
 

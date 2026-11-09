@@ -24,10 +24,12 @@ export default function ProductTabs({
   title,
   subtitle,
   tabs: rawTabs,
+  eagerImages = false,
 }: {
   title: string;
   subtitle?: string;
   tabs: Tab[];
+  eagerImages?: boolean;
 }) {
   const tabs = rawTabs.filter((t) => t.enabled !== false);
   const [active, setActive] = useState(0);
@@ -108,7 +110,7 @@ export default function ProductTabs({
             className="rounded-b-2xl border-2 border-blue-500 bg-gradient-to-b from-blue-50 via-white to-white px-3 pb-4 pt-5 sm:px-5 sm:pb-5 sm:pt-6 shadow-xs focus-visible:outline-hidden"
           >
             {tab.products.length ? (
-              <ProductCarousel key={tab.id} products={tab.products} label={tab.label} />
+              <ProductCarousel key={tab.id} products={tab.products} label={tab.label} eagerImages={eagerImages} />
             ) : (
               <p className="rounded-xl bg-white px-4 py-10 text-center text-sm text-slate-600">
                 {tab.id === 'clearance'
@@ -135,7 +137,7 @@ export default function ProductTabs({
   );
 }
 
-export function ProductCarousel({ products, label, oneAtATime = false }: { products: ProductCardProduct[]; label: string; oneAtATime?: boolean }) {
+export function ProductCarousel({ products, label, oneAtATime = false, eagerImages = false }: { products: ProductCardProduct[]; label: string; oneAtATime?: boolean; eagerImages?: boolean }) {
   const container = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
   const [autoplay, setAutoplay] = useState(true);
@@ -184,7 +186,7 @@ export function ProductCarousel({ products, label, oneAtATime = false }: { produ
       aria-label={`Sản phẩm ${label}`}
       className={`sm:col-start-2 sm:row-start-1 grid ${oneAtATime ? 'auto-cols-[78%] min-[420px]:auto-cols-[calc((100%-10px)/2)]' : 'auto-cols-[85%] min-[480px]:auto-cols-[calc((100%-10px)/2)]'} grid-flow-col gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-1 pt-2 pb-3 sm:pb-4 md:auto-cols-[calc((100%-24px)/3)] lg:auto-cols-[calc((100%-48px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
     >
-      {products.map(p => <div key={`${p.id}:${p.variantId || ''}`} className="min-w-0 snap-start"><ProductCard product={p} /></div>)}
+      {products.map((p, idx) => <div key={`${p.id}:${p.variantId || ''}`} className="min-w-0 snap-start"><ProductCard product={p} imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'} /></div>)}
     </div>
     <button
       type="button"

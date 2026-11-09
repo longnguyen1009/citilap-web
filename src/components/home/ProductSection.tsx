@@ -19,6 +19,7 @@ interface ProductSectionProps {
   fallback?: ProductCardProduct[]; // Deprecated, kept only for type safety during transition
   badgeColor?: string;
   rank?: boolean;
+  eagerImages?: boolean;
   pricingContext?: PriceEvaluationContext | null;
   evaluatedAt?: Date;
 }
@@ -33,6 +34,7 @@ export default async function ProductSection({
   products: initialProducts,
   badgeColor,
   rank = false,
+  eagerImages = false,
   pricingContext,
   evaluatedAt,
 }: ProductSectionProps) {
@@ -88,7 +90,8 @@ export default async function ProductSection({
                       key={`${p.id}-row1`} 
                       product={p} 
                       badgeColor={badgeColor} 
-                      rank={rank ? i + 1 : undefined} 
+                      rank={rank ? i + 1 : undefined}
+                      imageLoading={eagerImages ? "eager" : "lazy"}
                     />
                   ))}
                 </div>

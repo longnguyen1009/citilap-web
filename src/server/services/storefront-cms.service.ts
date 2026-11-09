@@ -179,14 +179,16 @@ export function getPublishedStudio(slug: string) {
 }
 
 export async function getPublishedCollection(slug: string) {
-  return publishedOrNull(async () => publicCollection((await mediaEnvironment()).DB, slug));
+  return cachedJson(`public-collection:${slug}`, PUBLIC_CMS_TTL_SECONDS, () =>
+    publishedOrNull(async () => publicCollection((await mediaEnvironment()).DB, slug)));
 }
 
 export async function getPublishedCollectionList() {
-  return publishedOrNull(async () => {
-    const { publicCollectionList } = await import('@/server/services/navigation.service');
-    return publicCollectionList((await mediaEnvironment()).DB);
-  });
+  return cachedJson('public-collections', PUBLIC_CMS_TTL_SECONDS, () =>
+    publishedOrNull(async () => {
+      const { publicCollectionList } = await import('@/server/services/navigation.service');
+      return publicCollectionList((await mediaEnvironment()).DB);
+    }));
 }
 
 export const getPublishedHomepage = cache(async () => {
@@ -197,10 +199,11 @@ export const getPublishedHomepage = cache(async () => {
 });
 
 export async function getPublishedLandingPage(slug: string) {
-  return publishedOrNull(async () => {
-    const { getPublicLandingPage } = await import('@/server/services/site-builder.service');
-    return getPublicLandingPage((await mediaEnvironment()).DB, slug);
-  });
+  return cachedJson(`public-landing:${slug}`, PUBLIC_CMS_TTL_SECONDS, () =>
+    publishedOrNull(async () => {
+      const { getPublicLandingPage } = await import('@/server/services/site-builder.service');
+      return getPublicLandingPage((await mediaEnvironment()).DB, slug);
+    }));
 }
 
 export const getStorefrontSettings = cache(async () => {
@@ -208,6 +211,44 @@ export const getStorefrontSettings = cache(async () => {
     const { getPublicStorefrontSettings } = await import('@/server/services/settings.service');
     return getPublicStorefrontSettings((await mediaEnvironment()).DB);
   }));
+});
+
+export const getCachedActiveCategories = cache(async () => {
+  return cachedJson('public-categories', PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getActiveCategories } = await import('@/server/services/catalog.service');
+    return getActiveCategories();
+  });
+});
+
+export const getCachedActiveBrands = cache(async () => {
+  return cachedJson('public-brands', PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getActiveBrands } = await import('@/server/services/catalog.service');
+    return getActiveBrands();
+  });
+});
+
+export const getCachedCatalogState = cache(async (now = Date.now()) => {
+  const { catalogState } = await import('@/server/services/catalog-state');
+  const { DB } = await mediaEnvironment();
+  const cached = await cachedJson('public-catalog-state', PUBLIC_CMS_TTL_SECONDS, () => catalogState(DB, now));
+  if (cached.nextChange !== null && cached.nextChange <= now) {
+    return catalogState(DB, now);
+  }
+  return { ...cached, serverTime: now };
+});
+
+export const getCachedHotSaleCampaigns = cache(async () => {
+  return cachedJson('public-hot-sale-campaigns', PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getHotSaleCampaigns } = await import('@/server/services/hot-sale.service');
+    return getHotSaleCampaigns();
+  });
+});
+
+export const getCachedHomepageCatalog = cache(async () => {
+  return cachedJson('public-homepage-catalog', PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getHomepageCatalog } = await import('@/server/services/catalog.service');
+    return getHomepageCatalog();
+  });
 });
 
 export function classifyProductPublicationById(
