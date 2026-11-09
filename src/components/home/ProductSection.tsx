@@ -51,8 +51,8 @@ export default async function ProductSection({
   }
 
   return (
-    <section className="pb-16">
-      <div className="container mx-auto px-4 max-w-[1370px]">
+    <section className="pb-12 md:pb-16">
+      <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px]">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <SectionHeader
             title={title}
@@ -61,7 +61,7 @@ export default async function ProductSection({
             links={links}
             slug={slug}
           />
-          <div className="p-4 md:p-6 bg-slate-50/30">
+          <div className="p-2.5 sm:p-4 md:p-6 bg-slate-50/30">
             {isError ? (
               <ErrorState
                 title="Không thể tải danh sách sản phẩm"
@@ -84,7 +84,7 @@ export default async function ProductSection({
               />
             ) : (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5 mb-4 md:mb-5">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 md:gap-5 mb-2.5 sm:mb-4 md:mb-5">
                   {products.slice(0, 5).map((p, i) => (
                     <ProductCard 
                       key={`${p.id}-row1`} 
@@ -96,7 +96,7 @@ export default async function ProductSection({
                   ))}
                 </div>
                 {products.length > 5 && (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 md:gap-5">
                     {products.slice(5, 10).map((p, i) => (
                       <ProductCard 
                         key={`${p.id}-row2`} 

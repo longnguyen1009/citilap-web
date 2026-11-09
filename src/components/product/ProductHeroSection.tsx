@@ -89,6 +89,7 @@ export interface ProductHeroSectionProps {
   settings?: PublicStorefrontSettings | null;
   reviewCount?: number;
   averageRating?: string;
+  hasSpecs?: boolean;
 }
 
 export default function ProductHeroSection({
@@ -114,6 +115,7 @@ export default function ProductHeroSection({
   settings,
   reviewCount = 0,
   averageRating = "0.0",
+  hasSpecs = true,
 }: ProductHeroSectionProps) {
   const router = useRouter();
   const { addToCart } = useCart();
@@ -274,33 +276,45 @@ export default function ProductHeroSection({
                   </>
                 )}
               </a>
-              <span className="text-slate-300">•</span>
-              <span>
-                Mã model:{" "}
-                <strong className="text-slate-800 font-semibold font-mono">
-                  {modelCode}
-                </strong>
-              </span>
-              <span className="text-slate-300">•</span>
-              <span>
-                Thương hiệu:{" "}
-                <strong className="text-blue-600 font-semibold">{brandName}</strong>
-              </span>
-              <span className="text-slate-300">•</span>
-              <a
-                href="#thong-so-ky-thuat"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    window.dispatchEvent(new CustomEvent("citilap:open-full-specs"));
-                  }
-                }}
-                className="text-blue-600 hover:underline font-semibold flex items-center gap-1"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Xem cấu hình chi tiết
-              </a>
+              {modelCode && modelCode.trim() && (
+                <>
+                  <span className="text-slate-300" aria-hidden="true">•</span>
+                  <span>
+                    Mã model:{" "}
+                    <strong className="text-slate-800 font-semibold font-mono">
+                      {modelCode.trim()}
+                    </strong>
+                  </span>
+                </>
+              )}
+              {brandName && brandName.trim() && (
+                <>
+                  <span className="text-slate-300" aria-hidden="true">•</span>
+                  <span>
+                    Thương hiệu:{" "}
+                    <strong className="text-blue-600 font-semibold">{brandName.trim()}</strong>
+                  </span>
+                </>
+              )}
+              {hasSpecs && (
+                <>
+                  <span className="text-slate-300" aria-hidden="true">•</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("citilap:open-full-specs"));
+                      }
+                    }}
+                    className="text-blue-600 hover:underline font-semibold inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>Xem cấu hình chi tiết</span>
+                  </button>
+                </>
+              )}
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"

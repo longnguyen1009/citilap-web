@@ -756,7 +756,7 @@ export default function CategoryCatalog({
 
         {/* Product Cards Grid */}
         {result.products.length ? (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {result.products.map((product) => (
               <ProductCard key={product.id} product={product} showSpecs={!isAccessory} />
             ))}

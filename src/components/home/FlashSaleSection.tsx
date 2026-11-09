@@ -67,6 +67,7 @@ export default async function FlashSaleSection({
   ]);
 
   const bannerImage = resolvedSettings?.hotSaleBannerImage?.trim() || undefined;
+  const mobileBannerImage = resolvedSettings?.hotSaleMobileBannerImage?.trim() || undefined;
   const bannerLink = resolvedSettings?.hotSaleBannerLink?.trim() || '/hot-sale';
   const bannerAlt = resolvedSettings?.flashSaleTitle || 'HOT SALE';
 
@@ -80,10 +81,10 @@ export default async function FlashSaleSection({
     return (
       <div className="mb-8 space-y-6">
         <div className="container mx-auto max-w-[1370px] px-4 space-y-4">
-          {bannerImage && (
+          {(bannerImage || mobileBannerImage) && (
             <div className="overflow-hidden rounded-2xl shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={bannerImage} alt={bannerAlt} className="w-full h-auto max-h-[180px] object-cover" />
+              <img loading="lazy" decoding="async" src={mobileBannerImage || bannerImage} alt={bannerAlt} className="w-full h-auto max-h-[180px] object-cover" />
             </div>
           )}
           <p className="rounded-xl border border-red-100 bg-white p-6 text-center text-sm text-slate-600">
@@ -103,6 +104,7 @@ export default async function FlashSaleSection({
       <HotSaleCampaigns
         campaigns={campaigns}
         bannerImage={bannerImage}
+        mobileBannerImage={mobileBannerImage}
         bannerLink={bannerLink}
         bannerAlt={bannerAlt}
       />

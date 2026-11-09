@@ -16,12 +16,16 @@ export function resolveProductWarranty(published: string | null | undefined, nam
   // Allow synthesized default 0đ warranty when product has no custom warranty packages configured
   if (list.length === 0) {
     const wType = document?.warrantyType === 'BRAND' ? 'BRAND' : 'SHOP';
-    const wMonths = Number(document?.warrantyMonths) || 12;
+    const defaultMonths = document?.condition && document.condition !== 'NEW' ? 3 : 6;
+    const wMonths = Number(document?.warrantyMonths) || defaultMonths;
     const defaultName = wType === 'BRAND'
       ? `Bảo hành Chính hãng ${wMonths} tháng`
       : `Bảo hành ${wMonths} tháng tại CitiLap`;
-    if (name === defaultName) {
-      return { name: defaultName, description: '', adjustment: 0 };
+    if (
+      name === defaultName ||
+      /^Bảo hành (?:Chính hãng )?(?:3|6|12|24) tháng(?: tại CitiLap)?$/i.test(name.trim())
+    ) {
+      return { name, description: '', adjustment: 0 };
     }
   }
   throw new Error('WARRANTY_UNAVAILABLE');

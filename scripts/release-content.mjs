@@ -4,7 +4,7 @@ const contact = ['Liên hệ CitiLap', 'Gọi 0899.188.186 hoặc gửi email co
 
 export const pages = [
   ['chinh-sach-bao-hanh', 'WARRANTY', 'Chính sách bảo hành', [
-    ['Thời hạn và phạm vi', 'CitiLap áp dụng gói bảo hành tiêu chuẩn 12 tháng cho laptop mới, 6 tháng cho laptop đã qua sử dụng và 6 tháng cho linh kiện, phụ kiện do cửa hàng bán. Thời hạn được tính từ ngày giao hàng và ghi trên chứng từ mua hàng. Nếu sản phẩm có gói khác được thỏa thuận bằng văn bản hoặc thời hạn bảo hành hãng dài hơn, thông tin ghi trên chứng từ được ưu tiên áp dụng.'],
+    ['Thời hạn và phạm vi', 'CitiLap áp dụng gói bảo hành tiêu chuẩn 6 tháng cho laptop mới, 3 tháng cho laptop Like New / đã qua sử dụng và 6 tháng cho linh kiện, phụ kiện do cửa hàng bán. Thời hạn được tính từ ngày giao hàng và ghi trên chứng từ mua hàng. Nếu sản phẩm có gói khác được thỏa thuận bằng văn bản hoặc thời hạn bảo hành hãng dài hơn, thông tin ghi trên chứng từ được ưu tiên áp dụng.'],
     ['Lỗi được tiếp nhận', 'Bảo hành đối với lỗi kỹ thuật phần cứng phát sinh trong điều kiện sử dụng bình thường. Khách hàng cung cấp mã đơn hoặc chứng từ mua hàng và thông tin nhận diện thiết bị. Không bắt buộc giữ hộp sản phẩm để tiếp nhận bảo hành; cửa hàng kiểm tra số serial và tình trạng thực tế khi nhận máy.'],
     ['Trường hợp ngoài phạm vi', 'Hao mòn tự nhiên, suy giảm dung lượng pin theo sử dụng, hư hỏng do va đập, chất lỏng, nguồn điện không phù hợp, tự ý sửa chữa gây ra lỗi và lỗi phần mềm không thuộc phạm vi bảo hành phần cứng tiêu chuẩn. Cửa hàng giải thích kết quả kiểm tra và báo giá trước nếu khách hàng yêu cầu sửa chữa có phí. Chính sách không loại trừ quyền hợp pháp của người tiêu dùng.'],
     ['Tiếp nhận và xử lý', 'Tiếp nhận tại cơ sở Hà Nội hoặc Bắc Ninh đang hoạt động; khách ở xa liên hệ hotline để nhận hướng dẫn gửi máy. Cửa hàng lập phiếu ghi tình trạng, phụ kiện đi kèm và lịch hẹn phản hồi. Thời gian xử lý phụ thuộc lỗi và linh kiện; mọi thay đổi lịch hẹn được thông báo cho khách. Không tự ý thay linh kiện có phí khi chưa được đồng ý.'],
@@ -59,7 +59,7 @@ pages.push({ schemaVersion: 1, slug: 'cau-hoi-thuong-gap', pageType: 'CUSTOM', t
   ['Vì sao sản phẩm hiển thị Liên hệ?', 'Giá phụ thuộc cấu hình và tình trạng chiếc máy có thể cung cấp. Gửi tên mẫu máy, nhu cầu và ngân sách để nhận báo giá cụ thể; việc gửi yêu cầu không làm phát sinh nghĩa vụ thanh toán.'],
   ['Có thể xem máy ở đâu?', 'Khách có thể hẹn xem máy tại Hà Nội hoặc Bắc Ninh. Liên hệ trước để cửa hàng chuẩn bị đúng mẫu và xác nhận lịch. Cơ sở TP. Hồ Chí Minh đang tạm ngừng phục vụ.'],
   ['Có giao hàng toàn quốc không?', 'CitiLap hỗ trợ giao hàng đến địa chỉ đơn vị vận chuyển phục vụ. Phí và lịch giao được báo trước khi xác nhận đơn; miễn phí trong bán kính 10 km quanh cơ sở Hà Nội theo điều kiện giao nhận.'],
-  ['Máy được bảo hành bao lâu?', 'Gói tiêu chuẩn là 12 tháng cho laptop mới, 6 tháng cho máy đã qua sử dụng và phụ kiện. Gói cụ thể ghi trên xác nhận mua hàng. Lỗi phần cứng do nhà sản xuất trong 7 ngày đầu được tiếp nhận theo chính sách đổi trả.'],
+  ['Máy được bảo hành bao lâu?', 'Gói tiêu chuẩn mặc định là 6 tháng cho laptop mới, 3 tháng cho máy Like New / đã qua sử dụng. Gói cụ thể ghi trên xác nhận mua hàng. Lỗi phần cứng do nhà sản xuất trong 7 ngày đầu được tiếp nhận theo chính sách đổi trả.'],
   ['Có chuyển khoản trực tiếp trên website không?', 'Website hiện nhận yêu cầu tư vấn; không yêu cầu thông tin thẻ hay mã OTP. Chỉ chuyển khoản sau khi đối chiếu thông tin thụ hưởng qua kênh chính thức và xác nhận đơn.'], contact,
 ]) });
 

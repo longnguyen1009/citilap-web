@@ -800,13 +800,22 @@ export default function SettingsPage() {
 
               <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3">
                 <h2 className="font-bold text-slate-900 text-xs">Banner HOT SALE ngang trên Storefront</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <label className={labelCls}>
-                    Ảnh banner ngang (1600×160)
+                    Ảnh banner ngang trên PC (1600×160)
                     <input
                       value={settings.hotSaleBannerImage}
                       onChange={e => update('hotSaleBannerImage', e.target.value)}
                       placeholder="/api/library/... hoặc https://..."
+                      className={`mt-1 font-normal ${inputCls}`}
+                    />
+                  </label>
+                  <label className={labelCls}>
+                    Ảnh banner riêng trên Smartphone SP (Tùy chọn)
+                    <input
+                      value={settings.hotSaleMobileBannerImage || ''}
+                      onChange={e => update('hotSaleMobileBannerImage', e.target.value)}
+                      placeholder="Để trống nếu dùng chung ảnh PC"
                       className={`mt-1 font-normal ${inputCls}`}
                     />
                   </label>
@@ -933,11 +942,22 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className={labelCls}>Ảnh nền Hero (URL)</label>
+                    <label className={labelCls}>Ảnh nền Hero trên PC (URL)</label>
                     <input
                       type="text"
                       value={settings.heroBgImage}
                       onChange={(e) => update("heroBgImage", e.target.value)}
+                      className={inputCls}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Ảnh nền Hero riêng trên Smartphone SP (URL)</label>
+                    <input
+                      type="text"
+                      value={settings.heroMobileBgImage || ""}
+                      onChange={(e) => update("heroMobileBgImage", e.target.value)}
+                      placeholder="/brand/citilap-hero-mobile.webp"
                       className={inputCls}
                     />
                   </div>

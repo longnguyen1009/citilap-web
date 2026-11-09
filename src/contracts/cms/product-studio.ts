@@ -199,11 +199,27 @@ export const warrantyTypeLabels = {
 
 export const warrantyMonthsOptions = [3, 6, 12, 18, 24, 36] as const;
 
+export function defaultWarrantyMonthsForCondition(condition?: string | null): number {
+  if (!condition) return 6;
+  const normalized = String(condition).toUpperCase().trim();
+  if (
+    normalized === 'LIKE_NEW' ||
+    normalized === 'USED' ||
+    normalized === 'REFURBISHED' ||
+    normalized === 'LIQUIDATION'
+  ) {
+    return 3;
+  }
+  return 6;
+}
+
 export function formatShortWarrantyBadge(
   warrantyType?: 'SHOP' | 'BRAND' | string | null,
   warrantyMonths?: number | null,
-  fallbackText?: string | null
+  fallbackText?: string | null,
+  condition?: string | null
 ): string {
+  const defaultMonths = defaultWarrantyMonthsForCondition(condition);
   if (warrantyType && warrantyMonths && warrantyMonths > 0) {
     return warrantyType === 'BRAND'
       ? `BH Hãng ${warrantyMonths} tháng`
@@ -216,7 +232,7 @@ export function formatShortWarrantyBadge(
     if (monthsMatch) {
       return isBrand ? `BH Hãng ${monthsMatch[1]} tháng` : `BH ${monthsMatch[1]} tháng`;
     }
-    if (/^BH\s+hãng$/i.test(raw)) return 'BH Hãng 12 tháng';
+    if (/^BH\s+hãng$/i.test(raw)) return `BH Hãng ${defaultMonths} tháng`;
     if (/^BH\s+/i.test(raw)) return raw;
     return raw
       .replace(/^Bảo hành\s*chính\s*hãng\s*/i, 'BH Hãng ')
@@ -224,7 +240,8 @@ export function formatShortWarrantyBadge(
       .replace(/\s*(?:tại\s*CitiLap|tiêu\s*chuẩn|1\s*đổi\s*1|toàn\s*diện).*$/i, '')
       .trim();
   }
-  return warrantyType === 'BRAND' ? 'BH Hãng 12 tháng' : 'BH 12 tháng';
+  const months = warrantyMonths && warrantyMonths > 0 ? warrantyMonths : defaultMonths;
+  return warrantyType === 'BRAND' ? `BH Hãng ${months} tháng` : `BH ${months} tháng`;
 }
 
 export const productDocumentSchema = z.object({
@@ -237,7 +254,7 @@ export const productDocumentSchema = z.object({
   template: z.enum(['LAPTOP', 'MOUSE', 'KEYBOARD', 'HEADPHONE', 'CHARGER', 'HUB', 'BAG', 'MONITOR', 'ACCESSORY', 'TECH']),
   condition: z.enum(['NEW', 'LIKE_NEW', 'USED', 'REFURBISHED', 'LIQUIDATION']).default('NEW'),
   warrantyType: z.enum(['SHOP', 'BRAND']).default('SHOP'),
-  warrantyMonths: z.number().int().min(1).max(60).default(12),
+  warrantyMonths: z.number().int().min(1).max(60).default(6),
   stock: z.number().int().min(0).max(1_000_000).default(0),
   isNewArrival: z.boolean().default(false),
   isBestSeller: z.boolean().default(false),
@@ -329,7 +346,7 @@ export function blankProduct(template: ProductTemplate = 'LAPTOP'): ProductDocum
     template,
     condition: 'NEW',
     warrantyType: 'SHOP',
-    warrantyMonths: 12,
+    warrantyMonths: 6,
     stock: 1,
     isNewArrival: false,
     isBestSeller: false,

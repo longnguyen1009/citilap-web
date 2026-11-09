@@ -260,26 +260,36 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
     const specRows: CompareSpecRow[] = [];
 
     // Base attributes: Brand, Condition, Warranty
+    const isPlaceholderValue = (val: string | undefined | null) => {
+      if (!val) return true;
+      const trimmed = val.trim();
+      return !trimmed || /^(chưa cập nhật|đang cập nhật|n\/a|-|—)$/i.test(trimmed);
+    };
+
     const baseAttrs: { key: string; label: string; getValue: (p: CompareProductItem) => string }[] = [
-      { key: "__brand", label: "Thương hiệu", getValue: (p) => p.brand || "Chưa cập nhật" },
-      { key: "__condition", label: "Tình trạng", getValue: (p) => p.conditionLabel || "Chưa cập nhật" },
-      { key: "__warranty", label: "Bảo hành", getValue: (p) => p.warranty || "Theo chính sách Citilap" },
+      { key: "__brand", label: "Thương hiệu", getValue: (p) => (!isPlaceholderValue(p.brand) ? p.brand! : "—") },
+      { key: "__condition", label: "Tình trạng", getValue: (p) => (!isPlaceholderValue(p.conditionLabel) ? p.conditionLabel! : "—") },
+      { key: "__warranty", label: "Bảo hành", getValue: (p) => (!isPlaceholderValue(p.warranty) ? p.warranty! : p.condition === "NEW" ? "BH 6 tháng" : "BH 3 tháng") },
     ];
 
     for (const attr of baseAttrs) {
       const values: Record<string, string> = {};
       const uniqueVals = new Set<string>();
+      let hasAnyValue = false;
       for (const p of products) {
         const val = attr.getValue(p);
         values[p.id] = val;
+        if (!isPlaceholderValue(val)) hasAnyValue = true;
         uniqueVals.add(val);
       }
-      specRows.push({
-        key: attr.key,
-        label: attr.label,
-        values,
-        isDifferent: uniqueVals.size > 1,
-      });
+      if (hasAnyValue) {
+        specRows.push({
+          key: attr.key,
+          label: attr.label,
+          values,
+          isDifferent: uniqueVals.size > 1,
+        });
+      }
     }
 
     // Exclude attributes explicitly configured with isComparable === false
@@ -296,9 +306,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<CompareApi
 
       for (const p of products) {
         const specs = productSpecsMap.get(p.id) || {};
-        const val = specs[key] || "Chưa cập nhật";
+        const rawVal = specs[key];
+        const val = !isPlaceholderValue(rawVal) ? rawVal.trim() : "—";
         values[p.id] = val;
-        if (val !== "Chưa cập nhật") hasAnyValue = true;
+        if (val !== "—") hasAnyValue = true;
         uniqueVals.add(val);
       }
 

@@ -14,7 +14,7 @@ export const DEFAULT_HOMEPAGE_BOOTSTRAP = {
   slug: '',
   seo: {
     title: 'CitiLap - Laptop Gaming & Ultrabook Cao Cấp Giá Tốt',
-    description: 'CitiLap chuyên cung cấp Laptop Gaming, Ultrabook, Máy Trạm (Workstation) và Like New tuyển chọn kỹ lưỡng. Bảo hành 12 tháng, đổi mới 7 ngày.',
+    description: 'CitiLap chuyên cung cấp Laptop Gaming, Ultrabook, Máy Trạm (Workstation) và Like New tuyển chọn kỹ lưỡng. Bảo hành tiêu chuẩn 6 tháng (máy New) & 3 tháng (máy Like New), đổi mới 7 ngày.',
     ogImageAssetId: null,
   },
   sections: [

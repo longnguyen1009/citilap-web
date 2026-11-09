@@ -857,7 +857,8 @@ export function mapD1ProductToHomepageProduct(
     warranty: formatShortWarrantyBadge(
       published?.warrantyType,
       published?.warrantyMonths,
-      row.warranty || published?.warranties?.find((w: { recommended?: boolean }) => w.recommended)?.name || published?.warranties?.[0]?.name || null
+      row.warranty || published?.warranties?.find((w: { recommended?: boolean }) => w.recommended)?.name || published?.warranties?.[0]?.name || null,
+      effectiveCondition
     ),
     primaryImage: resolvedImage,
     image: resolvedImage,
@@ -1920,19 +1921,29 @@ export async function getProductDetail(
     }
     if (physicalItems.length > 0) fullSpecs.push({ group: "Thiết kế & Pin", items: physicalItems });
 
-    const generalItems: ProductDetailSpecItem[] = [
-      { label: "Thương hiệu", value: product.brandRel?.name || product.brand || "Đang cập nhật" },
-    ];
-    if (product.series) generalItems.push({ label: "Dòng sản phẩm", value: product.series });
-    if (product.model) generalItems.push({ label: "Model / Mã máy", value: product.model });
-    if (activeVariant?.sku) generalItems.push({ label: "SKU phiên bản", value: activeVariant.sku });
+    const generalItems: ProductDetailSpecItem[] = [];
+    const resolvedBrandName = (product.brandRel?.name || published?.brand || product.brand || "").trim();
+    if (resolvedBrandName) {
+      generalItems.push({ label: "Thương hiệu", value: resolvedBrandName });
+    }
+    if (product.series?.trim()) generalItems.push({ label: "Dòng sản phẩm", value: product.series.trim() });
+    if (product.model?.trim()) generalItems.push({ label: "Model / Mã máy", value: product.model.trim() });
+    if (activeVariant?.sku?.trim()) generalItems.push({ label: "SKU phiên bản", value: activeVariant.sku.trim() });
     generalItems.push({ label: "Tình trạng máy", value: conditionDisplayLabels[activeCondition] || activeCondition });
-    if (product.warranty) generalItems.push({ label: "Chế độ bảo hành", value: product.warranty });
-    if (product.origin) generalItems.push({ label: "Xuất xứ", value: product.origin });
+    const resolvedDetailWarranty = formatShortWarrantyBadge(
+      published?.warrantyType,
+      published?.warrantyMonths,
+      product.warranty || published?.warranties?.find((w: { recommended?: boolean }) => w.recommended)?.name || published?.warranties?.[0]?.name || null,
+      activeCondition
+    );
+    if (resolvedDetailWarranty) generalItems.push({ label: "Chế độ bảo hành", value: resolvedDetailWarranty });
+    if (product.origin?.trim()) generalItems.push({ label: "Xuất xứ", value: product.origin.trim() });
     if (parsedSpecs.os || parsedSpecs["HĐH"] || parsedSpecs["Hệ điều hành"]) {
       generalItems.push({ label: "Hệ điều hành", value: parsedSpecs.os || parsedSpecs["HĐH"] || parsedSpecs["Hệ điều hành"] });
     }
-    fullSpecs.push({ group: "Thông tin chung & Bảo hành", items: generalItems });
+    if (generalItems.length > 0) {
+      fullSpecs.push({ group: "Thông tin chung & Bảo hành", items: generalItems });
+    }
 
     // 4. Resolve Images from ProductImage (metadata for Cloudflare R2)
     const images: ProductDetailImage[] = [];
@@ -2025,11 +2036,7 @@ export async function getProductDetail(
       categoryId: product.categoryId,
       model: product.model || null,
       series: product.series || null,
-      warranty: formatShortWarrantyBadge(
-        published?.warrantyType,
-        published?.warrantyMonths,
-        product.warranty || published?.warranties?.find((w: { recommended?: boolean }) => w.recommended)?.name || published?.warranties?.[0]?.name || null
-      ),
+      warranty: resolvedDetailWarranty,
       condition: activeCondition,
       conditionLabel: conditionDisplayLabels[activeCondition] || activeCondition,
       origin: product.origin || null,

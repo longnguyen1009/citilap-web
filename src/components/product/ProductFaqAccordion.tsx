@@ -16,7 +16,7 @@ const DEFAULT_PRODUCT_FAQS: Array<{ q: string; a: string }> = [
   },
   {
     q: 'Tình trạng máy và chế độ bảo hành, đổi trả tại CitiLap như thế nào?',
-    a: 'CitiLap cam kết minh bạch tình trạng sản phẩm, mainboard nguyên bản 100%. Mọi sản phẩm đều được hưởng chế độ bảo hành phần cứng 12 tháng và chính sách lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu phát sinh lỗi phần cứng từ nhà sản xuất.',
+    a: 'CitiLap cam kết minh bạch tình trạng sản phẩm, mainboard nguyên bản 100%. Mọi sản phẩm đều được hưởng chế độ bảo hành phần cứng mặc định 6 tháng (máy New) và 3 tháng (máy Like New), cùng chính sách lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu phát sinh lỗi phần cứng từ nhà sản xuất.',
   },
   {
     q: 'Mua hàng từ xa (Ship COD) có được kiểm tra máy trước khi thanh toán không?',

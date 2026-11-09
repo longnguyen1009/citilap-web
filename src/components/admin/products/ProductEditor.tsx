@@ -64,6 +64,7 @@ import {
   conditionLabels,
   warrantyTypeLabels,
   warrantyMonthsOptions,
+  defaultWarrantyMonthsForCondition,
   formatShortWarrantyBadge,
   formatSpecKeyLabel,
   blankProduct,
@@ -918,7 +919,15 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                 <select
                   id="product-condition"
                   value={doc.condition || 'NEW'}
-                  onChange={e => updateDoc('condition', e.target.value as ProductDocument['condition'])}
+                  onChange={e => {
+                    const nextCondition = e.target.value as ProductDocument['condition'];
+                    const prevDefault = defaultWarrantyMonthsForCondition(doc.condition);
+                    const nextDefault = defaultWarrantyMonthsForCondition(nextCondition);
+                    updateDoc('condition', nextCondition);
+                    if (!doc.warrantyMonths || doc.warrantyMonths === prevDefault) {
+                      updateDoc('warrantyMonths', nextDefault);
+                    }
+                  }}
                   className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white cursor-pointer"
                 >
                   {Object.entries(conditionLabels).map(([key, label]) => (
@@ -974,7 +983,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   <span className="text-slate-500">Hiển thị trên Card sản phẩm:</span>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 font-semibold text-slate-700 shadow-2xs">
                     <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                    {formatShortWarrantyBadge(doc.warrantyType || 'SHOP', doc.warrantyMonths || 12)}
+                    {formatShortWarrantyBadge(doc.warrantyType || 'SHOP', doc.warrantyMonths || defaultWarrantyMonthsForCondition(doc.condition), null, doc.condition)}
                   </span>
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 font-semibold text-emerald-700 shadow-2xs">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -1015,17 +1024,17 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   <div className="flex items-center gap-1.5">
                     <select
                       id="product-warranty-months"
-                      value={warrantyMonthsOptions.includes((doc.warrantyMonths || 12) as (typeof warrantyMonthsOptions)[number]) ? String(doc.warrantyMonths || 12) : '__custom__'}
+                      value={warrantyMonthsOptions.includes((doc.warrantyMonths || defaultWarrantyMonthsForCondition(doc.condition)) as (typeof warrantyMonthsOptions)[number]) ? String(doc.warrantyMonths || defaultWarrantyMonthsForCondition(doc.condition)) : '__custom__'}
                       onChange={e => {
                         if (e.target.value !== '__custom__') {
-                          updateDoc('warrantyMonths', parseInt(e.target.value, 10) || 12);
+                          updateDoc('warrantyMonths', parseInt(e.target.value, 10) || defaultWarrantyMonthsForCondition(doc.condition));
                         }
                       }}
                       className="flex-1 text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 cursor-pointer"
                     >
                       {warrantyMonthsOptions.map(m => (
                         <option key={m} value={m}>
-                          {m} tháng ({formatShortWarrantyBadge(doc.warrantyType || 'SHOP', m)})
+                          {m} tháng ({formatShortWarrantyBadge(doc.warrantyType || 'SHOP', m, null, doc.condition)})
                         </option>
                       ))}
                       <option value="__custom__">Số tháng khác...</option>
@@ -1035,8 +1044,8 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                       min={1}
                       max={120}
                       aria-label="Số tháng bảo hành"
-                      value={doc.warrantyMonths ?? 12}
-                      onChange={e => updateDoc('warrantyMonths', Math.min(120, Math.max(1, parseInt(e.target.value, 10) || 12)))}
+                      value={doc.warrantyMonths ?? defaultWarrantyMonthsForCondition(doc.condition)}
+                      onChange={e => updateDoc('warrantyMonths', Math.min(120, Math.max(1, parseInt(e.target.value, 10) || defaultWarrantyMonthsForCondition(doc.condition))))}
                       className="w-20 text-sm text-center font-semibold border border-slate-300 rounded-lg px-2 py-2 bg-white"
                       title="Nhập số tháng bảo hành"
                     />

@@ -323,3 +323,13 @@ textarea,
   content-visibility: auto;
   contain-intrinsic-size: auto none auto 900px;
 }
+
+/* Prevent scroll chaining from modal dialogs to the page underneath */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}

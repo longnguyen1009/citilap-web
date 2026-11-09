@@ -8,7 +8,9 @@ type Tab = {
   id: string;
   label: string;
   href: string;
+  deviceVisibility?: 'all' | 'desktop' | 'mobile';
   limit?: number;
+  mobileLimit?: number | null;
   enabled?: boolean;
   products: ProductCardProduct[];
 };
@@ -55,8 +57,8 @@ export default function ProductTabs({
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   }
   return (
-    <section className="pb-12 md:pb-16" aria-label={title}>
-      <div className="container mx-auto max-w-[1370px] px-4">
+    <section className="pb-8 sm:pb-12 md:pb-16" aria-label={title}>
+      <div className="container mx-auto max-w-[1370px] px-2.5 sm:px-4">
         {subtitle && (
           <div className="mb-3">
             <h2 className="text-lg sm:text-xl font-black uppercase text-slate-900">{title}</h2>
@@ -65,52 +67,66 @@ export default function ProductTabs({
         )}
         <div>
           <div role="tablist" aria-label={title} className="relative z-10 -mb-0.5 flex gap-1.5 overflow-x-auto overscroll-x-contain hide-scrollbar">
-            {tabs.map((t, index) => (
-              <button
-                key={t.id}
-                id={`${prefix}-tab-${t.id}`}
-                role="tab"
-                type="button"
-                aria-selected={safeIndex === index}
-                aria-controls={`${prefix}-panel`}
-                tabIndex={safeIndex === index ? 0 : -1}
-                onClick={() => select(index)}
-                onKeyDown={(e) => {
-                  const next =
-                    e.key === 'ArrowRight'
-                      ? (index + 1) % tabs.length
-                      : e.key === 'ArrowLeft'
-                        ? (index - 1 + tabs.length) % tabs.length
-                        : e.key === 'Home'
-                          ? 0
-                          : e.key === 'End'
-                            ? tabs.length - 1
-                            : -1;
-                  if (next >= 0) {
-                    e.preventDefault();
-                    select(next);
-                    document.getElementById(`${prefix}-tab-${tabs[next].id}`)?.focus();
-                  }
-                }}
-                className={`min-w-36 flex-1 rounded-t-2xl border-2 px-3 py-3.5 sm:py-4 text-sm font-black uppercase transition sm:text-base lg:text-lg cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
-                  safeIndex === index
-                    ? 'border-blue-500 border-b-blue-50 bg-blue-50 text-blue-700 shadow-2xs'
-                    : 'border-slate-200/90 border-b-blue-500 bg-white text-slate-700 hover:bg-blue-50/60 hover:text-blue-700'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+            {tabs.map((t, index) => {
+              const visCls =
+                t.deviceVisibility === 'desktop'
+                  ? 'hidden md:inline-flex'
+                  : t.deviceVisibility === 'mobile'
+                    ? 'md:hidden'
+                    : '';
+              return (
+                <button
+                  key={t.id}
+                  id={`${prefix}-tab-${t.id}`}
+                  role="tab"
+                  type="button"
+                  aria-selected={safeIndex === index}
+                  aria-controls={`${prefix}-panel`}
+                  tabIndex={safeIndex === index ? 0 : -1}
+                  onClick={() => select(index)}
+                  onKeyDown={(e) => {
+                    const next =
+                      e.key === 'ArrowRight'
+                        ? (index + 1) % tabs.length
+                        : e.key === 'ArrowLeft'
+                          ? (index - 1 + tabs.length) % tabs.length
+                          : e.key === 'Home'
+                            ? 0
+                            : e.key === 'End'
+                              ? tabs.length - 1
+                              : -1;
+                    if (next >= 0) {
+                      e.preventDefault();
+                      select(next);
+                      document.getElementById(`${prefix}-tab-${tabs[next].id}`)?.focus();
+                    }
+                  }}
+                  className={`${visCls} min-w-32 sm:min-w-36 flex-1 rounded-t-2xl border-2 px-2.5 sm:px-3 py-3 sm:py-4 text-xs font-black uppercase transition sm:text-base lg:text-lg cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
+                    safeIndex === index
+                      ? 'border-blue-500 border-b-blue-50 bg-blue-50 text-blue-700 shadow-2xs'
+                      : 'border-slate-200/90 border-b-blue-500 bg-white text-slate-700 hover:bg-blue-50/60 hover:text-blue-700'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
           <div
             role="tabpanel"
             id={`${prefix}-panel`}
             aria-labelledby={`${prefix}-tab-${tab.id}`}
             tabIndex={0}
-            className="rounded-b-2xl border-2 border-blue-500 bg-gradient-to-b from-blue-50 via-white to-white px-3 pb-4 pt-5 sm:px-5 sm:pb-5 sm:pt-6 shadow-xs focus-visible:outline-hidden"
+            className="rounded-b-2xl border-2 border-blue-500 bg-gradient-to-b from-blue-50 via-white to-white px-2.5 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-6 shadow-xs focus-visible:outline-hidden"
           >
             {tab.products.length ? (
-              <ProductCarousel key={tab.id} products={tab.products} label={tab.label} eagerImages={eagerImages} />
+              <ProductCarousel
+                key={tab.id}
+                products={tab.products}
+                label={tab.label}
+                mobileLimit={tab.mobileLimit}
+                eagerImages={eagerImages}
+              />
             ) : (
               <p className="rounded-xl bg-white px-4 py-10 text-center text-sm text-slate-600">
                 {tab.id === 'clearance'
@@ -137,7 +153,19 @@ export default function ProductTabs({
   );
 }
 
-export function ProductCarousel({ products, label, oneAtATime = false, eagerImages = false }: { products: ProductCardProduct[]; label: string; oneAtATime?: boolean; eagerImages?: boolean }) {
+export function ProductCarousel({
+  products,
+  label,
+  oneAtATime = false,
+  mobileLimit = null,
+  eagerImages = false,
+}: {
+  products: ProductCardProduct[];
+  label: string;
+  oneAtATime?: boolean;
+  mobileLimit?: number | null;
+  eagerImages?: boolean;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
   const [autoplay, setAutoplay] = useState(true);
@@ -184,9 +212,16 @@ export function ProductCarousel({ products, label, oneAtATime = false, eagerImag
       tabIndex={0}
       role="region"
       aria-label={`Sản phẩm ${label}`}
-      className={`sm:col-start-2 sm:row-start-1 grid ${oneAtATime ? 'auto-cols-[78%] min-[420px]:auto-cols-[calc((100%-10px)/2)]' : 'auto-cols-[85%] min-[480px]:auto-cols-[calc((100%-10px)/2)]'} grid-flow-col gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-1 pt-2 pb-3 sm:pb-4 md:auto-cols-[calc((100%-24px)/3)] lg:auto-cols-[calc((100%-48px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
+      className={`sm:col-start-2 sm:row-start-1 grid ${oneAtATime ? 'auto-cols-[84%] sm:auto-cols-[calc((100%-12px)/2)]' : 'auto-cols-[84%] sm:auto-cols-[calc((100%-12px)/2)]'} grid-flow-col gap-2.5 sm:gap-3 overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-1 pt-2 pb-3 sm:pb-4 md:auto-cols-[calc((100%-24px)/3)] lg:auto-cols-[calc((100%-48px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
     >
-      {products.map((p, idx) => <div key={`${p.id}:${p.variantId || ''}`} className="min-w-0 snap-start"><ProductCard product={p} imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'} /></div>)}
+      {products.map((p, idx) => {
+        const hideOnMobile = Boolean(mobileLimit && mobileLimit > 0 && idx >= mobileLimit);
+        return (
+          <div key={`${p.id}:${p.variantId || ''}`} className={`min-w-0 snap-start h-full ${hideOnMobile ? 'hidden sm:block' : ''}`}>
+            <ProductCard product={p} imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'} />
+          </div>
+        );
+      })}
     </div>
     <button
       type="button"

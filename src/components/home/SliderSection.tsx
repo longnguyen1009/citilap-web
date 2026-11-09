@@ -9,8 +9,11 @@ export interface SlideItem {
   id: string;
   title: string;
   subtitle?: string;
+  mobileTitle?: string;
+  mobileSubtitle?: string;
   badge?: string;
   imageUrl: string;
+  mobileImageUrl?: string;
   link?: string;
   buttonText?: string;
 }
@@ -256,21 +259,46 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                     />
                   )}
 
-                  {!isImageBroken && slide.imageUrl ? (
-                    <Image
-                      src={slide.imageUrl}
-                      alt={slide.title || 'Slide quảng cáo'}
-                      width={1920}
-                      height={600}
-                      priority={idx === 0}
-                      fetchPriority={idx === 0 ? 'high' : 'low'}
-                      loading={idx === 0 ? 'eager' : 'lazy'}
-                      unoptimized={slide.imageUrl.startsWith('/brand/')}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      sizes="(max-width: 768px) 100vw, 1370px"
-                      onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
-                    />
-                  ) : (
+                  {!isImageBroken && slide.imageUrl ? (() => {
+                    const mobileSlideImg =
+                      slide.mobileImageUrl?.trim() ||
+                      (slide.imageUrl === '/brand/citilap-hero.webp' || slide.imageUrl === '/brand/marketing-banner.webp'
+                        ? '/brand/citilap-hero-mobile.webp'
+                        : '');
+                    const hasSeparateMobileSlide = Boolean(mobileSlideImg && mobileSlideImg !== slide.imageUrl);
+                    return (
+                      <>
+                        {hasSeparateMobileSlide && (
+                          <Image
+                            src={mobileSlideImg}
+                            alt={slide.mobileTitle || slide.title || 'Slide quảng cáo'}
+                            width={800}
+                            height={540}
+                            priority={idx === 0}
+                            fetchPriority={idx === 0 ? 'high' : 'low'}
+                            loading={idx === 0 ? 'eager' : 'lazy'}
+                            unoptimized={mobileSlideImg.startsWith('/brand/')}
+                            className="sm:hidden absolute inset-0 w-full h-full object-cover object-right"
+                            sizes="100vw"
+                            onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
+                          />
+                        )}
+                        <Image
+                          src={slide.imageUrl}
+                          alt={slide.title || 'Slide quảng cáo'}
+                          width={1920}
+                          height={600}
+                          priority={idx === 0}
+                          fetchPriority={idx === 0 ? 'high' : 'low'}
+                          loading={idx === 0 ? 'eager' : 'lazy'}
+                          unoptimized={slide.imageUrl.startsWith('/brand/')}
+                          className={`${hasSeparateMobileSlide ? 'hidden sm:block ' : ''}absolute inset-0 w-full h-full object-cover`}
+                          sizes="(max-width: 768px) 100vw, 1370px"
+                          onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
+                        />
+                      </>
+                    );
+                  })() : (
                     <div className="w-full h-full bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center text-slate-500">
                       <div className="text-center p-4">
                         <p className="text-xs sm:text-sm font-semibold">{slide.title || 'Hình ảnh đang cập nhật'}</p>
@@ -279,19 +307,33 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                   )}
 
                   {/* Gradient backdrop for readable typography */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex flex-col justify-end p-6 sm:p-10 text-white z-[6] pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex flex-col justify-end p-5 sm:p-10 text-white z-[6] pointer-events-none">
                     <div className="max-w-2xl">
                       {slide.badge && (
-                        <span className="inline-block px-3 py-1 mb-2.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                        <span className="inline-block px-2.5 sm:px-3 py-1 mb-2 sm:mb-2.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30">
                           {slide.badge}
                         </span>
                       )}
-                      <h3 className="font-black text-xl sm:text-3xl md:text-4xl drop-shadow-md tracking-tight leading-tight">
-                        {slide.title}
+                      <h3 className="font-black text-lg sm:text-3xl md:text-4xl drop-shadow-md tracking-tight leading-tight">
+                        {slide.mobileTitle ? (
+                          <>
+                            <span className="sm:hidden">{slide.mobileTitle}</span>
+                            <span className="hidden sm:inline">{slide.title}</span>
+                          </>
+                        ) : (
+                          slide.title
+                        )}
                       </h3>
-                      {slide.subtitle && (
-                        <p className="text-xs sm:text-base text-slate-200 mt-1.5 sm:mt-2 line-clamp-2 leading-relaxed">
-                          {slide.subtitle}
+                      {(slide.subtitle || slide.mobileSubtitle) && (
+                        <p className="text-xs sm:text-base text-slate-200 mt-1 sm:mt-2 line-clamp-2 leading-relaxed">
+                          {slide.mobileSubtitle ? (
+                            <>
+                              <span className="sm:hidden">{slide.mobileSubtitle}</span>
+                              <span className="hidden sm:inline">{slide.subtitle}</span>
+                            </>
+                          ) : (
+                            slide.subtitle
+                          )}
                         </p>
                       )}
 

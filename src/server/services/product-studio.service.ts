@@ -1,7 +1,7 @@
 import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
-import { blankProduct, formatShortWarrantyBadge, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
+import { blankProduct, defaultWarrantyMonthsForCondition, formatShortWarrantyBadge, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
 import { sanitizeHtml } from '../../lib/sanitize-html';
 import { MediaError, mediaDetail, getAsset, resolveMediaPresentation, type MediaEnvironment } from './media-library.service';
 
@@ -447,7 +447,8 @@ function normalizeStudioDocument(rawDoc: ProductDocument, legacyStock?: number |
   if (!Number.isInteger(d.warrantyMonths) || d.warrantyMonths < 1) {
     const rawW = String(legacyWarranty || d.warranties?.[0]?.name || '');
     const m = rawW.match(/(\d+)\s*(?:tháng|t\b)/i);
-    d.warrantyMonths = m ? Math.min(60, Math.max(1, parseInt(m[1], 10))) : 12;
+    const defaultMonths = defaultWarrantyMonthsForCondition(d.condition);
+    d.warrantyMonths = m ? Math.min(60, Math.max(1, parseInt(m[1], 10))) : defaultMonths;
   }
   if (!Number.isInteger(d.stock) || d.stock < 0) {
     d.stock = typeof legacyStock === 'number' && legacyStock >= 0 ? legacyStock : 1;
@@ -513,7 +514,8 @@ export async function studioDetail(db: D1Database, id: string) {
   const rawW = String(p.warranty || '');
   d.warrantyType = /hãng|brand|manufacturer/i.test(rawW) ? 'BRAND' : 'SHOP';
   const wMonthsMatch = rawW.match(/(\d+)\s*(?:tháng|t\b)/i);
-  d.warrantyMonths = wMonthsMatch ? Math.min(60, Math.max(1, parseInt(wMonthsMatch[1], 10))) : 12;
+  const defaultMonths = defaultWarrantyMonthsForCondition((p.condition as string) || 'NEW');
+  d.warrantyMonths = wMonthsMatch ? Math.min(60, Math.max(1, parseInt(wMonthsMatch[1], 10))) : defaultMonths;
   try { d.tags = String(p.tags || '').startsWith('[') ? JSON.parse(String(p.tags)) : String(p.tags || '').split(',').map(tag => tag.trim()).filter(Boolean); } catch { d.tags = []; }
 
   // Determine template from category or specs
@@ -695,7 +697,8 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     const effectiveWarrantyBadge = formatShortWarrantyBadge(
       d.warrantyType,
       d.warrantyMonths,
-      d.warranties.find(w => w.recommended)?.name || d.warranties[0]?.name || null
+      d.warranties.find(w => w.recommended)?.name || d.warranties[0]?.name || null,
+      effectiveCondition
     );
     const totalVariantStock = d.variants.reduce((sum, v) => sum + (typeof v.stock === 'number' && v.stock >= 0 ? v.stock : 0), 0);
     const effectiveProductStock = d.variants.length > 0 && d.variants.some(v => typeof v.stock === 'number')

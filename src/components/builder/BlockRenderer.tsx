@@ -79,46 +79,64 @@ export default function BlockRenderer({
   const rendered = sections.map((section, sectionIndex) => {
         if (!section.enabled) return null;
 
+        const visibilityClass =
+          section.deviceVisibility === 'desktop'
+            ? 'hidden md:block'
+            : section.deviceVisibility === 'mobile'
+              ? 'md:hidden'
+              : '';
+
+        let blockNode: ReactNode = null;
         switch (section.type) {
           case 'banner':
-            return <BannerBlock key={section.id} data={section.data} />;
+            blockNode = <BannerBlock key={section.id} data={section.data} />;
+            break;
 
           case 'slider':
-            return <SliderBlock key={section.id} data={section.data} />;
+            blockNode = <SliderBlock key={section.id} data={section.data} />;
+            break;
 
           case 'product_grid': {
             if (section.id === 'sec-hot-sale' && flashSale !== undefined) {
               const d = section.data as { title?: string };
-              return (
+              blockNode = (
                 <div key={section.id} className="hot-sale-wrapper" aria-label={d?.title || 'HOT SALE'}>
                   {d?.title && <div className="sr-only">{d.title}</div>}
                   {flashSale}
                 </div>
               );
+              break;
             }
-            return <ProductGridBlock key={section.id} section={section} eagerImages={sectionIndex === firstProductGridIndex} />;
+            blockNode = <ProductGridBlock key={section.id} section={section} eagerImages={sectionIndex === firstProductGridIndex} />;
+            break;
           }
 
           case 'featured_categories':
-            return <FeaturedCategoriesBlock key={section.id} section={section} />;
+            blockNode = <FeaturedCategoriesBlock key={section.id} section={section} />;
+            break;
 
           case 'featured_brands':
-            return <FeaturedBrandsBlock key={section.id} section={section} />;
+            blockNode = <FeaturedBrandsBlock key={section.id} section={section} />;
+            break;
 
           case 'featured_collection':
-            return <FeaturedCollectionBlock key={section.id} section={section} />;
+            blockNode = <FeaturedCollectionBlock key={section.id} section={section} />;
+            break;
 
           case 'news_reviews':
-            return <NewsReviewsBlock key={section.id} section={section} />;
+            blockNode = <NewsReviewsBlock key={section.id} section={section} />;
+            break;
 
           case 'intro':
-            return <IntroBlock key={section.id} data={section.data} settings={settings} />;
+            blockNode = <IntroBlock key={section.id} data={section.data} settings={settings} />;
+            break;
 
           case 'cta':
-            return <CtaBlock key={section.id} data={section.data} />;
+            blockNode = <CtaBlock key={section.id} data={section.data} />;
+            break;
           case 'video_reviews': {
             const vData = videoReviewsSectionDataSchema.parse(section.data);
-            return (
+            blockNode = (
               <VideoReviews
                 key={section.id}
                 title={vData.title}
@@ -130,10 +148,11 @@ export default function BlockRenderer({
                 tiktokChannelUrl={vData.tiktokUrl || settings?.tiktokUrl}
               />
             );
+            break;
           }
           case 'customer_gallery': {
             const data = customerGallerySectionDataSchema.parse(section.data);
-            return (
+            blockNode = (
               <CustomerGallery
                 key={section.id}
                 title={data.title}
@@ -142,11 +161,21 @@ export default function BlockRenderer({
                 images={data.images}
               />
             );
+            break;
           }
 
           default:
             return null;
         }
+
+        if (!blockNode) return null;
+        return visibilityClass ? (
+          <div key={section.id} className={visibilityClass}>
+            {blockNode}
+          </div>
+        ) : (
+          blockNode
+        );
       });
 
   return (
@@ -166,19 +195,51 @@ import SliderSection from '@/components/home/SliderSection';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function BannerBlock({ data }: { data: any }) {
   const imageUrl = data.imageUrl || '/brand/marketing-banner.webp';
+  const mobileImageUrl =
+    data.mobileImageUrl?.trim() ||
+    (imageUrl === '/brand/citilap-hero.webp' || imageUrl === '/brand/marketing-banner.webp'
+      ? '/brand/citilap-hero-mobile.webp'
+      : '');
+  const hasSeparateMobileImage = Boolean(mobileImageUrl && mobileImageUrl !== imageUrl);
   const layout = data.layout || 'hero';
+  const mobileTitle = data.mobileTitle?.trim() || '';
+  const mobileSubtitle = data.mobileSubtitle?.trim() || '';
+  const hideOverlayOnMobile = Boolean(data.hideOverlayOnMobile);
 
   if (layout === 'fullwidth') {
+    const imageContent = (
+      <>
+        {hasSeparateMobileImage && (
+          <Image
+            src={mobileImageUrl}
+            alt={mobileTitle || data.title || 'Banner'}
+            fill
+            unoptimized={mobileImageUrl.startsWith('/brand/')}
+            className="sm:hidden object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none"
+            sizes="100vw"
+          />
+        )}
+        <Image
+          src={imageUrl}
+          alt={data.title || 'Banner'}
+          fill
+          unoptimized={imageUrl.startsWith('/brand/')}
+          className={`${hasSeparateMobileImage ? 'hidden sm:block ' : ''}object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none`}
+          sizes="100vw"
+        />
+      </>
+    );
+
     return (
       <section className="w-full relative overflow-hidden" aria-label={data.title || 'Banner'}>
-        <div className="container mx-auto px-4 max-w-[1370px] py-3 md:py-4">
+        <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px] py-2.5 md:py-4">
           <div className="relative w-full h-[140px] sm:h-[180px] md:h-[220px] rounded-2xl overflow-hidden shadow-xs border border-slate-200">
             {data.link ? (
               <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden" aria-label={data.title || 'Banner'}>
-                <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none" sizes="100vw" />
+                {imageContent}
               </Link>
             ) : (
-              <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover" sizes="100vw" />
+              imageContent
             )}
           </div>
         </div>
@@ -187,23 +248,66 @@ function BannerBlock({ data }: { data: any }) {
   }
 
   if (layout === 'split') {
+    const splitImages = (
+      <>
+        {hasSeparateMobileImage && (
+          <Image
+            src={mobileImageUrl}
+            alt={mobileTitle || data.title || 'Banner'}
+            fill
+            unoptimized={mobileImageUrl.startsWith('/brand/')}
+            className="sm:hidden object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none"
+            sizes="100vw"
+          />
+        )}
+        <Image
+          src={imageUrl}
+          alt={data.title || 'Banner'}
+          fill
+          unoptimized={imageUrl.startsWith('/brand/')}
+          className={`${hasSeparateMobileImage ? 'hidden sm:block ' : ''}object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none`}
+          sizes="(max-width: 768px) 100vw, 50vw"
+        />
+      </>
+    );
+
     return (
-      <section className="py-8 md:py-12 bg-white border-y border-slate-100" aria-label={data.title || 'Banner'}>
-        <div className="container mx-auto px-4 max-w-[1370px]">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-slate-900 rounded-3xl overflow-hidden p-6 md:p-12 text-white">
-            <div className="space-y-4">
+      <section className="py-6 md:py-12 bg-white border-y border-slate-100" aria-label={data.title || 'Banner'}>
+        <div className="container mx-auto px-3 sm:px-4 max-w-[1370px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-center bg-slate-900 rounded-3xl overflow-hidden p-5 sm:p-6 md:p-12 text-white">
+            <div className={`space-y-3.5 sm:space-y-4 ${hideOverlayOnMobile ? 'hidden sm:block' : ''}`}>
               {data.badge && (
                 <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
                   {data.badge}
                 </span>
               )}
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">{data.title}</h2>
-              {data.subtitle && <p className="text-slate-300 text-sm sm:text-base leading-relaxed">{data.subtitle}</p>}
-              <div className="pt-2 flex flex-wrap gap-3">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
+                {mobileTitle ? (
+                  <>
+                    <span className="sm:hidden">{mobileTitle}</span>
+                    <span className="hidden sm:inline">{data.title}</span>
+                  </>
+                ) : (
+                  data.title
+                )}
+              </h2>
+              {(data.subtitle || mobileSubtitle) && (
+                <p className="text-slate-300 text-xs sm:text-base leading-relaxed">
+                  {mobileSubtitle ? (
+                    <>
+                      <span className="sm:hidden">{mobileSubtitle}</span>
+                      <span className="hidden sm:inline">{data.subtitle}</span>
+                    </>
+                  ) : (
+                    data.subtitle
+                  )}
+                </p>
+              )}
+              <div className="pt-1 sm:pt-2 flex flex-wrap gap-2.5 sm:gap-3">
                 {data.link && data.buttonText && (
                   <Link
                     href={data.link}
-                    className="inline-flex items-center px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.buttonText}
                   </Link>
@@ -211,20 +315,20 @@ function BannerBlock({ data }: { data: any }) {
                 {data.secondaryLink && data.secondaryButtonText && (
                   <Link
                     href={data.secondaryLink}
-                    className="inline-flex items-center px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 text-white font-semibold text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 text-white font-semibold text-xs sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.secondaryButtonText}
                   </Link>
                 )}
               </div>
             </div>
-            <div className="relative h-64 md:h-80 rounded-2xl overflow-hidden group">
+            <div className="relative h-56 sm:h-64 md:h-80 rounded-2xl overflow-hidden group">
               {data.link ? (
                 <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-2xl overflow-hidden" aria-label={data.title || 'Banner'}>
-                  <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none" sizes="(max-width: 768px) 100vw, 50vw" />
+                  {splitImages}
                 </Link>
               ) : (
-                <Image src={imageUrl} alt={data.title || 'Banner'} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+                splitImages
               )}
             </div>
           </div>
@@ -235,41 +339,79 @@ function BannerBlock({ data }: { data: any }) {
 
   return (
     <section className="bg-[#0f172a] relative overflow-hidden" aria-label={data.title || 'Hero Banner'}>
-      <div className="w-full relative h-[260px] sm:h-[280px] lg:h-[300px]">
+      <div className="w-full relative h-[225px] sm:h-[270px] lg:h-[300px]">
+        {hasSeparateMobileImage && (
+          <Image
+            src={mobileImageUrl}
+            alt={mobileTitle || data.title || 'Hero banner'}
+            width={800}
+            height={540}
+            className="sm:hidden absolute inset-0 w-full h-full object-cover object-right"
+            priority
+            fetchPriority="high"
+            unoptimized={mobileImageUrl.startsWith('/brand/')}
+            sizes="100vw"
+          />
+        )}
         <Image
           src={imageUrl}
           alt={data.title || 'Hero banner'}
           width={1920}
           height={600}
-          className="absolute inset-0 w-full h-full object-cover"
+          className={`${hasSeparateMobileImage ? 'hidden sm:block ' : ''}absolute inset-0 w-full h-full object-cover`}
           priority
           fetchPriority="high"
           unoptimized={imageUrl.startsWith('/brand/')}
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent flex items-center">
-          <div className="container mx-auto px-4 max-w-[1370px]">
+        {hideOverlayOnMobile && data.link && (
+          <Link
+            href={data.link}
+            aria-label={mobileTitle || data.title || 'Hero Banner'}
+            className="sm:hidden absolute inset-0 z-10"
+          />
+        )}
+        <div
+          className={`absolute inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent ${
+            hideOverlayOnMobile ? 'hidden sm:flex' : 'flex'
+          } items-center`}
+        >
+          <div className="container mx-auto px-3.5 sm:px-4 max-w-[1370px]">
             <div className="max-w-2xl text-white">
               {data.badge && (
-                <div className="inline-block border border-blue-500/50 rounded-lg px-3.5 py-1.5 mb-3 sm:mb-4 backdrop-blur-md bg-blue-900/40 shadow-lg">
-                  <span className="text-blue-400 font-black text-xs sm:text-sm tracking-widest uppercase">
+                <div className="inline-block border border-blue-500/50 rounded-lg px-2.5 sm:px-3.5 py-1 sm:py-1.5 mb-2 sm:mb-4 backdrop-blur-md bg-blue-900/40 shadow-lg max-w-full">
+                  <span className="text-blue-300 sm:text-blue-400 font-black text-[10px] sm:text-sm tracking-wider sm:tracking-widest uppercase line-clamp-1">
                     {data.badge}
                   </span>
                 </div>
               )}
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-400 drop-shadow-sm leading-tight">
-                {data.title}
+              <h1 className="text-xl sm:text-4xl lg:text-5xl font-black mb-1.5 sm:mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-300 drop-shadow-sm leading-tight">
+                {mobileTitle ? (
+                  <>
+                    <span className="sm:hidden">{mobileTitle}</span>
+                    <span className="hidden sm:inline">{data.title}</span>
+                  </>
+                ) : (
+                  data.title
+                )}
               </h1>
-              {data.subtitle && (
-                <p className="text-xs sm:text-base font-bold text-yellow-400 mb-4 tracking-wide drop-shadow-md">
-                  {data.subtitle}
+              {(data.subtitle || mobileSubtitle) && (
+                <p className="text-xs sm:text-base font-bold text-yellow-400 mb-3 sm:mb-4 tracking-wide drop-shadow-md line-clamp-2">
+                  {mobileSubtitle ? (
+                    <>
+                      <span className="sm:hidden">{mobileSubtitle}</span>
+                      <span className="hidden sm:inline">{data.subtitle}</span>
+                    </>
+                  ) : (
+                    data.subtitle
+                  )}
                 </p>
               )}
-              <div className="flex flex-wrap gap-3 sm:gap-4">
+              <div className="flex flex-wrap gap-2 sm:gap-4">
                 {data.link && data.buttonText && (
                   <Link
                     href={data.link}
-                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-full uppercase text-[11px] sm:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.buttonText}
                   </Link>
@@ -277,7 +419,7 @@ function BannerBlock({ data }: { data: any }) {
                 {data.secondaryLink && data.secondaryButtonText && (
                   <Link
                     href={data.secondaryLink}
-                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2.5 sm:py-3 px-6 sm:px-8 rounded-full uppercase text-xs sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-full uppercase text-[11px] sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.secondaryButtonText}
                   </Link>
@@ -312,6 +454,7 @@ function resolveProductGridIcon(sectionId: string, colorTheme?: string, customIc
 function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedSectionItem; eagerImages?: boolean }) {
   const data = section.data as ProductGridSectionData;
   const limit = data.ruleCriteria?.limit && data.ruleCriteria.limit > 0 ? data.ruleCriteria.limit : 48;
+  const mobileLimit = data.mobileLimit && data.mobileLimit > 0 ? data.mobileLimit : null;
   const products = (section.resolvedProducts || []).slice(0, limit);
   const colorClass = THEME_GRADIENT_MAP[data.colorTheme] || THEME_GRADIENT_MAP.blue;
   const links = Array.isArray(data.links) ? data.links.filter((l) => l && l.label && l.href) : [];
@@ -322,36 +465,36 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
   if (section.resolvedTabs?.length) return <ProductTabs title={data.title} subtitle={data.subtitle} tabs={section.resolvedTabs} eagerImages={eagerImages} />;
 
   return (
-    <section className="pb-12 md:pb-16" aria-label={data.title}>
-      <div className="container mx-auto px-4 max-w-[1370px]">
+    <section className="pb-8 sm:pb-12 md:pb-16" aria-label={data.title}>
+      <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px]">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           {/* Header */}
-          <div className={`${colorClass} px-4 md:px-6 py-3.5 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-white`}>
-            <div className="flex items-center gap-3">
+          <div className={`${colorClass} px-3.5 sm:px-4 md:px-6 py-3 sm:py-3.5 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 text-white`}>
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <div className="p-2 rounded-xl bg-white/15 backdrop-blur-md shadow-2xs shrink-0">
                 {headerIconNode}
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">{data.title}</h2>
+                  <h2 className="text-base sm:text-lg md:text-xl font-black uppercase tracking-tight leading-snug">{data.title}</h2>
                   {data.badge && (
                     <span className={`text-[10px] uppercase font-extrabold px-2.5 py-0.5 rounded-full ${data.badgeColor || 'bg-white/20 text-white'}`}>
                       {data.badge}
                     </span>
                   )}
                 </div>
-                {data.subtitle && <p className="text-xs text-white/85 mt-0.5">{data.subtitle}</p>}
+                {data.subtitle && <p className="text-[11px] sm:text-xs text-white/85 mt-0.5 line-clamp-1">{data.subtitle}</p>}
               </div>
             </div>
 
             {/* Quick links */}
             {links.length > 0 && (
-              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain pb-1 sm:max-w-[62%] sm:pb-0 hide-scrollbar text-xs">
+              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain pb-0.5 sm:max-w-[62%] sm:pb-0 hide-scrollbar text-xs">
                 {links.map((link: { label: string; href: string }, idx: number) => (
                   <Link
                     key={idx}
                     href={link.href}
-                    className="px-3 py-1.5 rounded-full bg-white/15 hover:bg-white hover:text-slate-900 border border-white/15 transition whitespace-nowrap text-white font-semibold shadow-2xs"
+                    className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-white/15 hover:bg-white hover:text-slate-900 border border-white/15 transition whitespace-nowrap text-white font-semibold shadow-2xs text-[11px] sm:text-xs"
                   >
                     {link.label}
                   </Link>
@@ -361,29 +504,39 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
           </div>
 
           {/* Product grid content */}
-          <div className="p-4 md:p-6 bg-slate-50/30">
+          <div className="p-2.5 sm:p-4 md:p-6 bg-slate-50/30">
             {products.length === 0 ? (
               <div className="text-center py-12 text-slate-500">
                 <p className="text-sm">Chưa có sản phẩm nào phù hợp trong danh mục này.</p>
               </div>
             ) : section.id === 'sec-hot-sale' ? <ProductCarousel products={products} label={data.title} /> : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
-                {products.map((p, idx) => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    rank={data.rankNumbering ? idx + 1 : undefined}
-                    imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'}
-                  />
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 md:gap-5">
+                {products.map((p, idx) => {
+                  const hideOnMobile = Boolean(mobileLimit && idx >= mobileLimit);
+                  const cardNode = (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      rank={data.rankNumbering ? idx + 1 : undefined}
+                      imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'}
+                    />
+                  );
+                  return hideOnMobile ? (
+                    <div key={p.id} className="hidden sm:block h-full">
+                      {cardNode}
+                    </div>
+                  ) : (
+                    cardNode
+                  );
+                })}
               </div>
             )}
 
             {data.viewAllLink && (
-              <div className="mt-6 text-center">
+              <div className="mt-4 sm:mt-6 text-center">
                 <Link
                   href={data.viewAllLink}
-                  className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
+                  className="inline-flex items-center gap-1.5 px-5 sm:px-6 py-2.5 rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
                 >
                   Xem tất cả {data.title} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>

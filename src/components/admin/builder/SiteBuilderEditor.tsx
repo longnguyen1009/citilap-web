@@ -520,7 +520,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
     setSections(next);
   };
 
-  const updateSelectedSectionMeta = (patch: Partial<Pick<SectionItem, 'name' | 'enabled'>>) => {
+  const updateSelectedSectionMeta = (patch: Partial<Pick<SectionItem, 'name' | 'enabled' | 'deviceVisibility'>>) => {
     if (!selectedSectionId) return;
     setSections((prev) =>
       prev.map((s) => (s.id === selectedSectionId ? ({ ...s, ...patch } as SectionItem) : s))
@@ -1082,7 +1082,10 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                               {sec.name || meta.label}
                             </div>
                             <div className="text-[10px] text-slate-500 truncate">
-                              {blockSummary} {!sec.enabled && '• Đang ẩn'}
+                              {blockSummary}
+                              {sec.deviceVisibility === 'desktop' && ' • Chỉ PC'}
+                              {sec.deviceVisibility === 'mobile' && ' • Chỉ SP'}
+                              {!sec.enabled && ' • Đang ẩn'}
                             </div>
                           </div>
                         </div>
@@ -1316,16 +1319,34 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                   </div>
                 </div>
 
-                {/* Common Section Name field */}
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Tên khối nội dung (Quản trị)</label>
-                  <input
-                    type="text"
-                    value={selectedSection.name}
-                    onChange={(e) => updateSelectedSectionMeta({ name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium"
-                    placeholder="Nhập tên khối quản trị"
-                  />
+                {/* Common Section Name & Device Visibility fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1 text-xs">Tên khối nội dung (Quản trị)</label>
+                    <input
+                      type="text"
+                      value={selectedSection.name}
+                      onChange={(e) => updateSelectedSectionMeta({ name: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium"
+                      placeholder="Nhập tên khối quản trị"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1 text-xs">Hiển thị theo thiết bị (PC / Smartphone SP)</label>
+                    <select
+                      value={selectedSection.deviceVisibility || 'all'}
+                      onChange={(e) =>
+                        updateSelectedSectionMeta({
+                          deviceVisibility: e.target.value as 'all' | 'desktop' | 'mobile',
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-medium bg-white"
+                    >
+                      <option value="all">Tất cả thiết bị (PC &amp; Smartphone SP)</option>
+                      <option value="desktop">Chỉ hiển thị trên PC (Ẩn trên Smartphone SP)</option>
+                      <option value="mobile">Chỉ hiển thị trên Smartphone SP (Ẩn trên PC)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* FORM FIELDS BY TYPE */}
@@ -1335,6 +1356,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
                       onPickMedia={() => setMediaPickerTarget('banner_image')}
+                      onPickMobileMedia={() => setMediaPickerTarget('banner_mobile_image')}
                     />
                   )}
                   {selectedSection.data.type === 'slider' && (
@@ -1342,6 +1364,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
                       onPickMedia={(slideIdx) => setMediaPickerTarget(`slide_image:${slideIdx}`)}
+                      onPickMobileMedia={(slideIdx) => setMediaPickerTarget(`slide_mobile_image:${slideIdx}`)}
                     />
                   )}
                   {selectedSection.data.type === 'product_grid' && (
@@ -1431,6 +1454,8 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
               onSelect={(asset) => {
               if (mediaPickerTarget === 'banner_image' && selectedSection?.data.type === 'banner') {
                 updateSelectedSectionData({ imageUrl: asset.url || '', imageAssetId: asset.id });
+              } else if (mediaPickerTarget === 'banner_mobile_image' && selectedSection?.data.type === 'banner') {
+                updateSelectedSectionData({ mobileImageUrl: asset.url || '', mobileImageAssetId: asset.id });
               } else if (mediaPickerTarget === 'og_image') {
                 setOgImageAssetId(asset.id);
               } else if (mediaPickerTarget === 'cta_bg_image' && selectedSection?.data.type === 'cta') {
@@ -1454,6 +1479,13 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                 const slides = [...(selectedSection.data.slides || [])];
                 if (slides[sIdx]) {
                   slides[sIdx] = { ...slides[sIdx], imageUrl: asset.url || '', imageAssetId: asset.id };
+                  updateSelectedSectionData({ slides });
+                }
+              } else if (mediaPickerTarget.startsWith('slide_mobile_image:') && selectedSection?.data.type === 'slider') {
+                const sIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                const slides = [...(selectedSection.data.slides || [])];
+                if (slides[sIdx]) {
+                  slides[sIdx] = { ...slides[sIdx], mobileImageUrl: asset.url || '', mobileImageAssetId: asset.id };
                   updateSelectedSectionData({ slides });
                 }
               } else if (mediaPickerTarget.startsWith('video_thumb:') && selectedSection?.data.type === 'video_reviews') {
@@ -2028,16 +2060,18 @@ function BannerForm({
   data,
   update,
   onPickMedia,
+  onPickMobileMedia,
 }: {
   data: BannerData;
   update: (p: Partial<BannerData>) => void;
   onPickMedia: () => void;
+  onPickMobileMedia: () => void;
 }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề banner</label>
+          <label className="font-bold text-slate-700 block mb-1">Tiêu đề banner (PC / Mặc định)</label>
           <input
             type="text"
             value={data.title || ''}
@@ -2083,14 +2117,14 @@ function BannerForm({
           </select>
         </div>
         <div>
-          <label className="font-bold text-slate-700 block mb-1">Ảnh Banner (URL)</label>
+          <label className="font-bold text-slate-700 block mb-1">Ảnh Banner trên PC (URL)</label>
           <div className="flex gap-2">
             <input
               type="text"
               value={data.imageUrl || ''}
               onChange={(e) => update({ imageUrl: e.target.value })}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-              placeholder="https://..."
+              placeholder="/brand/citilap-hero.webp hoặc https://..."
             />
             <button
               type="button"
@@ -2109,6 +2143,80 @@ function BannerForm({
           <img src={data.imageUrl} alt="Banner Preview" className="w-full h-full object-cover" />
         </div>
       )}
+
+      {/* Smartphone (SP) Custom Content & Image */}
+      <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/40 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 font-bold text-blue-900 text-xs">
+            <Smartphone className="w-4 h-4 text-blue-600" />
+            <span>Tùy chỉnh riêng cho Smartphone (SP)</span>
+          </div>
+          <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={Boolean(data.hideOverlayOnMobile)}
+              onChange={(e) => update({ hideOverlayOnMobile: e.target.checked })}
+              className="rounded text-blue-600"
+            />
+            <span>Ẩn chữ đè lên ảnh trên SP</span>
+          </label>
+        </div>
+
+        <div>
+          <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+            Ảnh Banner riêng cho Smartphone (SP) — để trống sẽ tự dùng ảnh tối ưu cho SP
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={data.mobileImageUrl || ''}
+              onChange={(e) => update({ mobileImageUrl: e.target.value })}
+              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+              placeholder="/brand/citilap-hero-mobile.webp hoặc chọn ảnh từ thư viện..."
+            />
+            <button
+              type="button"
+              onClick={onPickMobileMedia}
+              className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
+            >
+              Chọn ảnh SP
+            </button>
+          </div>
+          {data.mobileImageUrl && (
+            <div className="mt-2 h-28 w-44 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={data.mobileImageUrl} alt="Mobile Banner Preview" className="w-full h-full object-cover" />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+              Tiêu đề ngắn gọn trên SP (tùy chọn)
+            </label>
+            <input
+              type="text"
+              value={data.mobileTitle || ''}
+              onChange={(e) => update({ mobileTitle: e.target.value })}
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+              placeholder="Để trống nếu dùng chung tiêu đề PC"
+            />
+          </div>
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
+              Mô tả ngắn trên SP (tùy chọn)
+            </label>
+            <input
+              type="text"
+              value={data.mobileSubtitle || ''}
+              onChange={(e) => update({ mobileSubtitle: e.target.value })}
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+              placeholder="Để trống nếu dùng chung mô tả PC"
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
         <div>
@@ -2163,10 +2271,12 @@ function SliderForm({
   data,
   update,
   onPickMedia,
+  onPickMobileMedia,
 }: {
   data: SliderData;
   update: (p: Partial<SliderData>) => void;
   onPickMedia: (slideIdx: number) => void;
+  onPickMobileMedia: (slideIdx: number) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -2318,7 +2428,7 @@ function SliderForm({
             </div>
 
             <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Ảnh nền / banner (URL)</label>
+              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Ảnh nền / banner trên PC (URL)</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -2328,7 +2438,7 @@ function SliderForm({
                     next[sIdx] = { ...next[sIdx], imageUrl: e.target.value };
                     update({ slides: next });
                   }}
-                  placeholder="URL hình ảnh"
+                  placeholder="URL hình ảnh PC"
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
                 />
                 <button
@@ -2343,6 +2453,38 @@ function SliderForm({
                 <div className="mt-2 h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 max-w-xs">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={slide.imageUrl} alt={slide.title || 'Slide preview'} className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="text-[11px] font-semibold text-blue-700 block mb-0.5">
+                Ảnh riêng trên Smartphone SP (Tùy chọn)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={slide.mobileImageUrl || ''}
+                  onChange={(e) => {
+                    const next = [...data.slides];
+                    next[sIdx] = { ...next[sIdx], mobileImageUrl: e.target.value };
+                    update({ slides: next });
+                  }}
+                  placeholder="Để trống nếu dùng chung ảnh PC"
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => onPickMobileMedia(sIdx)}
+                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
+                >
+                  Chọn ảnh SP
+                </button>
+              </div>
+              {slide.mobileImageUrl && (
+                <div className="mt-2 h-20 w-36 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={slide.mobileImageUrl} alt={slide.title || 'Slide SP preview'} className="w-full h-full object-cover" />
                 </div>
               )}
             </div>
@@ -3094,25 +3236,46 @@ function ProductGridForm({
               Chọn tự động theo tiêu chí hoặc tự tay chọn từng sản phẩm
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-700">Hiển thị tối đa:</span>
-            <input
-              type="number"
-              min={1}
-              max={48}
-              value={data.ruleCriteria?.limit || 10}
-              onChange={(e) => {
-                const limitVal = Math.min(48, Math.max(1, parseInt(e.target.value) || 10));
-                update({
-                  ruleCriteria: {
-                    ...(data.ruleCriteria || {}),
-                    limit: limitVal,
-                  },
-                });
-              }}
-              className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-xs font-bold text-center bg-white"
-            />
-            <span className="text-xs text-slate-500">sản phẩm</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-slate-700">Tối đa (PC):</span>
+              <input
+                type="number"
+                min={1}
+                max={48}
+                value={data.ruleCriteria?.limit || 10}
+                onChange={(e) => {
+                  const limitVal = Math.min(48, Math.max(1, parseInt(e.target.value) || 10));
+                  update({
+                    ruleCriteria: {
+                      ...(data.ruleCriteria || {}),
+                      limit: limitVal,
+                    },
+                  });
+                }}
+                className="w-14 px-2 py-1 border border-slate-300 rounded-lg text-xs font-bold text-center bg-white"
+              />
+              <span className="text-xs text-slate-500">SP</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Smartphone className="w-3.5 h-3.5 text-blue-600" />
+              <span className="text-xs font-bold text-blue-700">Trên SP:</span>
+              <input
+                type="number"
+                min={1}
+                max={48}
+                value={data.mobileLimit ?? ''}
+                placeholder="Tất cả"
+                onChange={(e) => {
+                  const raw = e.target.value.trim();
+                  update({
+                    mobileLimit: raw ? Math.min(48, Math.max(1, parseInt(raw) || 4)) : null,
+                  });
+                }}
+                className="w-16 px-2 py-1 border border-blue-200 rounded-lg text-xs font-bold text-center bg-white"
+              />
+              <span className="text-xs text-slate-500">SP</span>
+            </div>
           </div>
         </div>
 

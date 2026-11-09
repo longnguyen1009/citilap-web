@@ -3,7 +3,7 @@ import { ShieldCheck } from 'lucide-react';
 const DEFAULT_TRUST_ITEMS = [
   'Lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu phát sinh lỗi phần cứng',
   'Cam kết máy nguyên zin 100%, kiểm tra trực tiếp tại Showroom',
-  'Bảo hành phần cứng từ 3 – 12 tháng theo gói tiêu chuẩn CitiLap',
+  'Bảo hành tiêu chuẩn 6 tháng (máy New) & 3 tháng (máy Like New) tại CitiLap',
   'Hỗ trợ cài đặt phần mềm, vệ sinh tra keo tản nhiệt miễn phí',
 ];
 

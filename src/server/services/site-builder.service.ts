@@ -308,12 +308,16 @@ export async function writeLandingPage(
   const assetIds = new Set<string>();
   if (d.seo.ogImageAssetId) assetIds.add(d.seo.ogImageAssetId);
   for (const sec of d.sections) {
-    if (sec.type === 'banner' && 'imageAssetId' in sec.data && sec.data.imageAssetId) {
-      assetIds.add(sec.data.imageAssetId);
+    if (sec.type === 'banner' && 'imageAssetId' in sec.data) {
+      if (sec.data.imageAssetId) assetIds.add(sec.data.imageAssetId);
+      if ('mobileImageAssetId' in sec.data && sec.data.mobileImageAssetId) {
+        assetIds.add(sec.data.mobileImageAssetId);
+      }
     }
     if (sec.type === 'slider' && 'slides' in sec.data) {
       for (const slide of sec.data.slides) {
         if (slide.imageAssetId) assetIds.add(slide.imageAssetId);
+        if (slide.mobileImageAssetId) assetIds.add(slide.mobileImageAssetId);
       }
     }
   }
@@ -469,7 +473,15 @@ export async function getLandingPageRevisions(db: D1Database, id: string) {
 export interface ResolvedSectionItem extends SectionItem {
   resolvedPosts?: Awaited<ReturnType<typeof publicPostList>>['items'];
   resolvedProducts?: HomepageProduct[];
-  resolvedTabs?: { id: string; label: string; href: string; products: HomepageProduct[] }[];
+  resolvedTabs?: {
+    id: string;
+    label: string;
+    href: string;
+    deviceVisibility?: 'all' | 'desktop' | 'mobile';
+    limit?: number;
+    mobileLimit?: number | null;
+    products: HomepageProduct[];
+  }[];
   resolvedCategories?: Awaited<ReturnType<typeof getActiveCategories>>;
   resolvedBrands?: Awaited<ReturnType<typeof getActiveBrands>>;
   resolvedCollection?: Awaited<ReturnType<typeof publicCollection>>;

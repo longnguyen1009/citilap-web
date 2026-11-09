@@ -56,9 +56,14 @@ export type ProductRuleCriteria = z.infer<typeof productRuleCriteriaSchema>;
 export const bannerSectionDataSchema = z.object({
   title: text(200).default(''),
   subtitle: text(300).default(''),
+  mobileTitle: text(200).optional(),
+  mobileSubtitle: text(300).optional(),
   badge: text(100).default(''),
   imageUrl: safeUrlOrPath.default(''),
   imageAssetId: z.string().max(128).nullable().default(null),
+  mobileImageUrl: safeUrlOrPath.optional(),
+  mobileImageAssetId: z.string().max(128).nullable().optional(),
+  hideOverlayOnMobile: z.boolean().optional(),
   link: safeUrlOrPath.default(''),
   buttonText: text(60).default(''),
   secondaryLink: safeUrlOrPath.default(''),
@@ -71,9 +76,13 @@ export const slideItemSchema = z.object({
   id: z.string().max(128),
   title: text(200).default(''),
   subtitle: text(300).default(''),
+  mobileTitle: text(200).optional(),
+  mobileSubtitle: text(300).optional(),
   badge: text(100).default(''),
   imageUrl: safeUrlOrPath.default(''),
   imageAssetId: z.string().max(128).nullable().default(null),
+  mobileImageUrl: safeUrlOrPath.optional(),
+  mobileImageAssetId: z.string().max(128).nullable().optional(),
   link: safeUrlOrPath.default(''),
   buttonText: text(60).default(''),
 });
@@ -96,7 +105,9 @@ export const productGridTabItemSchema = z.object({
   productIds: z.array(z.string().max(128)).max(48).default([]),
   href: safeUrlOrPath.default(''),
   enabled: z.boolean().optional(),
+  deviceVisibility: z.enum(['all', 'desktop', 'mobile']).optional(),
   limit: z.number().int().min(1).max(48).optional(),
+  mobileLimit: z.number().int().min(1).max(48).nullable().optional(),
   sourceMode: z.enum(['manual', 'rule']).optional(),
   ruleCriteria: productRuleCriteriaSchema.optional(),
 });
@@ -123,6 +134,7 @@ export const productGridSectionDataSchema = z.object({
     sort: 'newest',
     limit: 12,
   }),
+  mobileLimit: z.number().int().min(1).max(48).nullable().optional(),
   rankNumbering: z.boolean().default(false), // Cho khối Bán chạy nhất
   viewAllLink: safeUrlOrPath.default(''),
 });
@@ -270,6 +282,7 @@ export const sectionItemSchema = z.object({
   type: z.enum(SECTION_TYPES),
   name: text(120).min(1, 'Tên khối không được để trống'),
   enabled: z.boolean().default(true),
+  deviceVisibility: z.enum(['all', 'desktop', 'mobile']).optional(),
   data: z.discriminatedUnion('type', [
     z.object({ type: z.literal('banner'), ...bannerSectionDataSchema.shape }),
     z.object({ type: z.literal('slider'), ...sliderSectionDataSchema.shape }),

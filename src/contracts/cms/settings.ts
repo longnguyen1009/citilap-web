@@ -219,6 +219,7 @@ export const adminSettingsDocumentSchema = z.object({
 
   // Flash sale
   hotSaleBannerImage: safeUrlOrPath.default(""),
+  hotSaleMobileBannerImage: safeUrlOrPath.default(""),
   hotSaleBannerLink: safeUrlOrPath.default("/hot-sale"),
   flashSaleEnabled: z.union([z.boolean(), z.number().transform((n) => n !== 0)]).default(false),
   flashSaleTitle: safeText(120),
@@ -231,6 +232,7 @@ export const adminSettingsDocumentSchema = z.object({
   heroHighlight: safeText(100),
   heroSlogan: safeText(200),
   heroBgImage: safeUrlOrPath,
+  heroMobileBgImage: safeUrlOrPath.default(""),
   heroCtaPrimaryText: safeText(50),
   heroCtaPrimaryLink: safeUrlOrPath,
   heroCtaSecondaryText: safeText(50),
@@ -336,6 +338,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
 
   flashSaleEnabled: true,
   hotSaleBannerImage: "",
+  hotSaleMobileBannerImage: "",
   hotSaleBannerLink: "/hot-sale",
   flashSaleTitle: "Giá Sốc Giờ Vàng",
   flashSaleStartAt: "",
@@ -346,6 +349,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   heroHighlight: "GAMING",
   heroSlogan: "✩ HIỆU NĂNG MẠNH MẼ - CHIẾN GAME CỰC ĐỈNH ✩",
   heroBgImage: "/brand/marketing-banner.webp",
+  heroMobileBgImage: "/brand/citilap-hero-mobile.webp",
   heroCtaPrimaryText: "Khám Phá Ngay",
   heroCtaPrimaryLink: "/laptop-gaming",
   heroCtaSecondaryText: "Xem Ưu Đãi",
@@ -390,6 +394,7 @@ export const publicStorefrontSettingsSchema = z.object({
   productShippingItems: z.array(z.string()).default([]),
   productBanners: z.array(productBannerSchema).default([]),
   hotSaleBannerImage: z.string().default(""),
+  hotSaleMobileBannerImage: z.string().default(""),
   hotSaleBannerLink: z.string().default("/hot-sale"),
   storeName: z.string(),
   storeEmail: z.string(),
@@ -436,6 +441,7 @@ export const publicStorefrontSettingsSchema = z.object({
   heroHighlight: z.string(),
   heroSlogan: z.string(),
   heroBgImage: z.string(),
+  heroMobileBgImage: z.string().default(""),
   heroCtaPrimaryText: z.string(),
   heroCtaPrimaryLink: z.string(),
   heroCtaSecondaryText: z.string(),

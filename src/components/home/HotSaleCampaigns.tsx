@@ -18,11 +18,13 @@ const timeLabel = (value: string) => {
 export default function HotSaleCampaigns({
   campaigns,
   bannerImage,
+  mobileBannerImage,
   bannerLink,
   bannerAlt,
 }: {
   campaigns: Campaign[];
   bannerImage?: string;
+  mobileBannerImage?: string;
   bannerLink?: string;
   bannerAlt?: string;
 }) {
@@ -44,24 +46,47 @@ export default function HotSaleCampaigns({
   const slots = groups[groupIndex].slots;
   const days = [...new Set(slots.map(c => dayKey(c.startAt)))];
   const single = groups.length === 1;
-  const pill = (active: boolean) => `shrink-0 min-h-11 inline-flex items-center justify-center rounded-full border-[3px] border-white px-4 py-2 text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-5 ${active ? 'bg-white text-red-700' : 'bg-transparent text-white hover:bg-white/10'}`;
+  const pill = (active: boolean) => `shrink-0 min-h-10 sm:min-h-11 inline-flex items-center justify-center rounded-full border-2 sm:border-[3px] border-white px-3.5 py-1.5 text-xs sm:text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:px-5 ${active ? 'bg-white text-red-700' : 'bg-transparent text-white hover:bg-white/10'}`;
   function selectGroup(index: number, now: number) {
     const items = groups[index].slots;
     setSelected((items.find(c => Date.parse(c.startAt) <= now && Date.parse(c.endAt) > now) || items[0]).id);
     document.getElementById(`${prefix}-tab-${index}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   }
-  return <section aria-label="HOT SALE" className="pb-10">
-    <div className="container mx-auto max-w-[1370px] px-4">
+  const hasSeparateMobileBanner = Boolean(mobileBannerImage && bannerImage && mobileBannerImage !== bannerImage);
+  const bannerNode = (
+    <>
+      {mobileBannerImage && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          loading="lazy"
+          decoding="async"
+          src={mobileBannerImage}
+          alt={bannerAlt || 'HOT SALE'}
+          className={`${bannerImage && hasSeparateMobileBanner ? 'sm:hidden ' : ''}w-full h-auto max-h-[180px] object-cover`}
+        />
+      )}
       {bannerImage && (
-        <div className="mb-4 overflow-hidden rounded-2xl shadow-sm">
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          loading="lazy"
+          decoding="async"
+          src={bannerImage}
+          alt={bannerAlt || 'HOT SALE'}
+          className={`${hasSeparateMobileBanner ? 'hidden sm:block ' : ''}w-full h-auto max-h-[180px] object-cover`}
+        />
+      )}
+    </>
+  );
+  return <section aria-label="HOT SALE" className="pb-8 sm:pb-10">
+    <div className="container mx-auto max-w-[1370px] px-2.5 sm:px-4">
+      {(bannerImage || mobileBannerImage) && (
+        <div className="mb-3.5 sm:mb-4 overflow-hidden rounded-2xl shadow-sm">
           {bannerLink ? (
             <a href={bannerLink} className="block hover:opacity-95 transition">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={bannerImage} alt={bannerAlt || 'HOT SALE'} className="w-full h-auto max-h-[180px] object-cover" />
+              {bannerNode}
             </a>
           ) : (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img loading="lazy" decoding="async" src={bannerImage} alt={bannerAlt || 'HOT SALE'} className="w-full h-auto max-h-[180px] object-cover" />
+            bannerNode
           )}
         </div>
       )}

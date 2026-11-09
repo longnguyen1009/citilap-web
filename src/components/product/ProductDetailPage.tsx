@@ -310,16 +310,23 @@ export default async function ProductDetailPage({
 
   // Color is part of each authored SKU; pricing comes from that variant.
   const heroColors: never[] = [];
+  const activeConditionCode = studioVariant?.condition || selectedVariant?.options?.condition || studio?.condition || product.condition || "NEW";
+  const activeConditionLabel = conditionLabelMap[activeConditionCode] || product.conditionLabel || "Mới 100% Fullbox";
+  const activeSku = studioVariant?.sku || selectedVariant?.sku || undefined;
+  const activeVariantId = studioVariant?.id || selectedVariant?.id || undefined;
+  const fallbackWarrantyMonths = activeConditionCode && activeConditionCode !== 'NEW' ? 3 : 6;
+  const effectiveWarrantyMonths = studio?.warrantyMonths || fallbackWarrantyMonths;
+
   const defaultWarrantyName = studio
     ? (studio.warrantyType === 'BRAND'
-        ? `Bảo hành Chính hãng ${studio.warrantyMonths || 12} tháng`
-        : `Bảo hành ${studio.warrantyMonths || 12} tháng tại CitiLap`)
-    : (product.warranty || 'Bảo hành 12 tháng tại CitiLap');
+        ? `Bảo hành Chính hãng ${effectiveWarrantyMonths} tháng`
+        : `Bảo hành ${effectiveWarrantyMonths} tháng tại CitiLap`)
+    : (product.warranty || `Bảo hành ${effectiveWarrantyMonths} tháng tại CitiLap`);
   const heroWarranties = (studio?.warranties?.length ? studio.warranties : [{
     name: defaultWarrantyName,
     description: studio?.warrantyType === 'BRAND'
-      ? `Bảo hành chính hãng ${studio?.warrantyMonths || 12} tháng trên toàn quốc, hỗ trợ phần mềm trọn đời tại CitiLap.`
-      : `Bảo hành phần cứng ${studio?.warrantyMonths || 12} tháng tại CitiLap, lỗi 1 đổi 1 trong 7 ngày đầu tiên.`,
+      ? `Bảo hành chính hãng ${effectiveWarrantyMonths} tháng trên toàn quốc, hỗ trợ phần mềm trọn đời tại CitiLap.`
+      : `Bảo hành phần cứng ${effectiveWarrantyMonths} tháng tại CitiLap, lỗi 1 đổi 1 trong 7 ngày đầu tiên.`,
     adjustment: 0,
     recommended: true,
   }]).map(w => ({id:w.name,name:w.name,desc:w.description,priceDiff:w.adjustment,isDefault:w.recommended}));
@@ -376,13 +383,21 @@ export default async function ProductDetailPage({
     studio ? (studio.contentHtml || studio.description) : (product.contentHtml || product.description || "")
   );
 
-  const rawStructuredSpecs: Array<{ key: string; value: string }> = studio
-    ? studio.specs.filter((s) => s.value).map((s) => ({ key: s.key, value: s.value }))
-    : product.fullSpecs.flatMap((g) => g.items.map((item) => ({ key: item.label, value: item.value })));
+  const isMeaningfulSpecValue = (val?: string | null): val is string => {
+    if (!val) return false;
+    const t = val.trim();
+    if (!t) return false;
+    return !/^(n\/a|đang cập nhật|chưa cập nhật|null|undefined|-|—)$/i.test(t);
+  };
+
+  const rawStructuredSpecs: Array<{ key: string; value: string }> = (studio
+    ? studio.specs.map((s) => ({ key: s.key.trim(), value: s.value.trim() }))
+    : product.fullSpecs.flatMap((g) => g.items.map((item) => ({ key: item.label.trim(), value: item.value.trim() })))
+  ).filter((s) => s.key && isMeaningfulSpecValue(s.value));
 
   const structuredSpecs: Array<{ key: string; value: string }> = [...rawStructuredSpecs];
   const upsertStructuredSpec = (pattern: RegExp, defaultKey: string, val?: string | null) => {
-    if (!val || !val.trim()) return;
+    if (!isMeaningfulSpecValue(val)) return;
     const idx = structuredSpecs.findIndex((s) => pattern.test(s.key.trim()));
     if (idx >= 0) {
       structuredSpecs[idx] = { ...structuredSpecs[idx], value: val.trim() };
@@ -409,11 +424,6 @@ export default async function ProductDetailPage({
     upsertStructuredSpec(/^(tình trạng|tình trạng máy|condition)$/i, "Tình trạng", vCondLabel);
     upsertStructuredSpec(/^(sku|mã sku|sku phiên bản)$/i, "SKU", vSku);
   }
-
-  const activeConditionCode = studioVariant?.condition || selectedVariant?.options?.condition || studio?.condition || product.condition || "NEW";
-  const activeConditionLabel = conditionLabelMap[activeConditionCode] || product.conditionLabel || "Mới 100% Fullbox";
-  const activeSku = studioVariant?.sku || selectedVariant?.sku || undefined;
-  const activeVariantId = studioVariant?.id || selectedVariant?.id || undefined;
 
   const findSpecVal = (pattern: RegExp) =>
     structuredSpecs.find((s) => pattern.test(s.key))?.value;
@@ -478,7 +488,8 @@ export default async function ProductDetailPage({
       heroWarranties.find((w) => w.isDefault)?.name ||
         heroWarranties[0]?.name ||
         product.warranty ||
-        null
+        null,
+      activeConditionCode
     ),
     availability: activeAvailability,
     stock: product.stock ?? 0,
@@ -539,8 +550,8 @@ export default async function ProductDetailPage({
           productId={product.id}
           productSlug={product.slug}
           productName={displayName}
-          modelCode={product.model || (studio?.specs.find(s => s.key.toLowerCase().includes('model') || s.key.toLowerCase().includes('mã'))?.value) || ''}
-          brandName={studio?.brand || product.brand || ''}
+          modelCode={(product.model || findSpecVal(/^(model|mã\s*model|mã\s*máy|part\s*number|model\s*\/\s*mã\s*máy)$/i) || '').trim()}
+          brandName={(studio?.brand || product.brand || '').trim()}
           images={galleryImages}
           coverImage={cover}
           discountBadge={studio ? undefined : product.discount}
@@ -558,6 +569,7 @@ export default async function ProductDetailPage({
           canOrder={studio ? studio.canOrder : true}
           reviewCount={approvedReviews.length}
           averageRating={approvedReviews.length ? (approvedReviews.reduce((sum, review) => sum + review.rating, 0) / approvedReviews.length).toFixed(1) : "0.0"}
+          hasSpecs={structuredSpecs.length > 0}
         />
 
         {/* 2. MIDDLE SECTION: SPECIFICATIONS, CONTENT, FAQ, SHOWROOMS & REVIEWS */}
@@ -601,6 +613,8 @@ export default async function ProductDetailPage({
                   value: spec.value,
                 }))}
                 sku={activeSku || product.model || undefined}
+                warrantyMonths={effectiveWarrantyMonths}
+                warrantyText={recentlyViewedItem.warranty}
               />
             </section>
 
