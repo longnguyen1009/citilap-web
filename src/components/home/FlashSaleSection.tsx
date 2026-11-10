@@ -34,10 +34,10 @@ async function resolveFallbackProductTabs() {
   return {
     title: 'Sản phẩm nổi bật',
     tabs: [
-      { id: 'new-arrivals', label: 'LAPTOP MỚI VỀ', href: '/search?category=laptop&sort=newest', products: newArrivals.products },
-      { id: 'new-laptops', label: 'LAPTOP MỚI', href: '/search?category=laptop-moi', products: newLaptops.products },
-      { id: 'likenew', label: 'LAPTOP LIKENEW', href: '/search?category=laptop-likenew', products: likeNewLaptops.products },
-      { id: 'clearance', label: 'XẢ HÀNG GIÁ SỐC', href: '/hot-sale', products: clearanceLaptops.products },
+      { id: 'new-arrivals', label: 'HÀNG MỚI VỀ', href: '/search?category=laptop&sort=newest', products: newArrivals.products },
+      { id: 'new-laptops', label: 'MỚI 100% FULLBOX', href: '/search?category=laptop-moi', products: newLaptops.products },
+      { id: 'likenew', label: 'LIKENEW 99%', href: '/search?category=laptop-likenew', products: likeNewLaptops.products },
+      { id: 'clearance', label: 'XẢ KHO GIÁ SỐC', href: '/hot-sale', products: clearanceLaptops.products },
     ],
   };
 }

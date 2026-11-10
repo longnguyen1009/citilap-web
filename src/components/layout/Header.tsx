@@ -448,8 +448,9 @@ export default function Header({ categories = [], brands = [], navigation, setti
 
               <div className="relative flex-1 min-w-0">
                 <SearchAutocomplete
-                  placeholder="Bạn cần tìm máy gì..."
-                  mobilePlaceholder="Tìm laptop, phụ kiện"
+                  key={pathname}
+                  placeholder="Tìm laptop, dòng máy, CPU, GPU..."
+                  mobilePlaceholder="Tìm laptop, mã máy..."
                   className="w-full"
                   size="md"
                 />

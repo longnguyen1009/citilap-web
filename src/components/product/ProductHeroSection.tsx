@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import {
@@ -13,6 +13,12 @@ import {
   ArrowRight,
   Heart,
   Scale,
+  Cpu,
+  Gpu,
+  MemoryStick,
+  HardDrive,
+  Monitor,
+  Sparkles,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useOptionalWishlist } from "@/context/WishlistContext";
@@ -66,12 +72,20 @@ export interface HeroWarrantyItem {
   isDefault?: boolean;
 }
 
+export interface HeroKeySpecItem {
+  key: string;
+  label: string;
+  value: string;
+}
+
 export interface ProductHeroSectionProps {
   productId: string;
   productSlug: string;
   productName: string;
   modelCode: string;
+  productionYear?: string;
   brandName: string;
+  keySpecs?: HeroKeySpecItem[];
   images: Array<{ url: string; alt?: string | null; isPrimary?: boolean; variantId?: string | null }>;
   coverImage: string;
   discountBadge?: string;
@@ -97,7 +111,9 @@ export default function ProductHeroSection({
   productSlug,
   productName,
   modelCode,
+  productionYear,
   brandName,
+  keySpecs = [],
   images,
   coverImage,
   discountBadge,
@@ -123,6 +139,7 @@ export default function ProductHeroSection({
   const compareCtx = useOptionalCompare();
   const isLiked = wishlistCtx?.isInWishlist(productId) ?? false;
   const isInCompare = compareCtx?.isInCompare(productId) ?? false;
+  const primaryBuyActionRef = useRef<HTMLDivElement>(null);
 
   // 1. Variant state
   const initialVariant =
@@ -259,64 +276,73 @@ export default function ProductHeroSection({
               {productName}
             </h1>
 
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs sm:text-sm text-slate-600">
-              <a
-                href="#danh-gia-khach-hang"
-                className="inline-flex min-h-11 items-center gap-1 text-amber-500 font-bold hover:underline"
-              >
-                {reviewCount > 0 ? (
-                  <>
-                    <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
-                    <span className="text-slate-800 ml-0.5">{averageRating}</span>
-                    <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
-                  </>
-                ) : (
-                  <>
-                    <span aria-hidden="true">★</span>
-                    <span className="text-slate-600 font-medium">Gửi đánh giá</span>
-                  </>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 min-w-0">
+                <a
+                  href="#danh-gia-khach-hang"
+                  className="inline-flex min-h-11 items-center gap-1 text-amber-500 font-bold hover:underline"
+                >
+                  {reviewCount > 0 ? (
+                    <>
+                      <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
+                      <span className="text-slate-800 ml-0.5">{averageRating}</span>
+                      <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span aria-hidden="true">★</span>
+                      <span className="text-slate-600 font-medium">Gửi đánh giá</span>
+                    </>
+                  )}
+                </a>
+                {brandName && brandName.trim() && (
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                    <span>
+                      Hãng:{" "}
+                      <strong className="text-blue-600 font-semibold">{brandName.trim()}</strong>
+                    </span>
+                  </span>
                 )}
-              </a>
-              {modelCode && modelCode.trim() && (
-                <>
-                  <span className="text-slate-300" aria-hidden="true">•</span>
-                  <span>
-                    Mã model:{" "}
-                    <strong className="text-slate-800 font-semibold font-mono">
-                      {modelCode.trim()}
-                    </strong>
+                {modelCode && modelCode.trim() && (
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                    <span>
+                      Mã model:{" "}
+                      <strong className="text-slate-800 font-semibold font-mono">
+                        {modelCode.trim()}
+                      </strong>
+                    </span>
                   </span>
-                </>
-              )}
-              {brandName && brandName.trim() && (
-                <>
-                  <span className="text-slate-300" aria-hidden="true">•</span>
-                  <span>
-                    Thương hiệu:{" "}
-                    <strong className="text-blue-600 font-semibold">{brandName.trim()}</strong>
+                )}
+                {!modelCode?.trim() && productionYear && productionYear.trim() && (
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                    <span>
+                      Năm SX:{" "}
+                      <strong className="text-slate-800 font-semibold">
+                        {productionYear.trim()}
+                      </strong>
+                    </span>
                   </span>
-                </>
-              )}
-              {hasSpecs && (
-                <>
-                  <span className="text-slate-300" aria-hidden="true">•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.dispatchEvent(new CustomEvent("citilap:open-full-specs"));
-                      }
-                    }}
-                    className="min-h-11 text-blue-600 hover:underline font-semibold inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <span>Xem cấu hình chi tiết</span>
-                  </button>
-                </>
-              )}
-              <div className="flex items-center gap-2 ml-auto">
+                )}
+                {hasSpecs && (
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          window.dispatchEvent(new CustomEvent("citilap:open-full-specs"));
+                        }
+                      }}
+                      className="min-h-11 text-blue-600 hover:underline font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span>Xem cấu hình chi tiết</span>
+                    </button>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -362,6 +388,38 @@ export default function ProductHeroSection({
                 </button>
               </div>
             </div>
+
+            {/* Dải thông số chính ngay dưới tiêu đề để khách xem nhanh không cần cuộn */}
+            {(() => {
+              const liveSpecs = [
+                { key: "cpu", label: "CPU", value: selectedVariant?.cpu || keySpecs.find((k) => k.key === "cpu")?.value, icon: Cpu },
+                { key: "gpu", label: "GPU", value: selectedVariant?.gpu || keySpecs.find((k) => k.key === "gpu")?.value, icon: Gpu },
+                { key: "ram", label: "RAM", value: selectedVariant?.ram || keySpecs.find((k) => k.key === "ram")?.value, icon: MemoryStick },
+                { key: "storage", label: "Ổ cứng", value: selectedVariant?.storage || keySpecs.find((k) => k.key === "storage")?.value, icon: HardDrive },
+                { key: "display", label: "Màn hình", value: selectedVariant?.display || keySpecs.find((k) => k.key === "display")?.value, icon: Monitor },
+                { key: "extra", label: "Khác", value: keySpecs.find((k) => k.key === "extra")?.value, icon: Sparkles },
+              ].filter((s): s is { key: string; label: string; value: string; icon: typeof Cpu } => Boolean(s.value && s.value.trim()));
+              if (liveSpecs.length === 0) return null;
+              return (
+                <div
+                  aria-label="Thông số chính"
+                  className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2"
+                >
+                  {liveSpecs.slice(0, 6).map((spec) => {
+                    const Icon = spec.icon;
+                    return (
+                      <div key={spec.key} className="flex items-start gap-1.5 rounded-lg bg-white px-2.5 py-1.5 border border-slate-100 shadow-2xs min-w-0">
+                        <Icon className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div className="min-w-0 leading-tight">
+                          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{spec.label}</span>
+                          <span className="block text-xs font-semibold text-slate-800 break-words">{spec.value}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           {/* 2. KHỐI GIÁ NẰM TRÊN ĐẦU (DỄ THEO DÕI NHẤT) */}
@@ -458,7 +516,7 @@ export default function ProductHeroSection({
                           {item.name}
                         </span>
                         {item.subSpecs && (
-                          <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1 mt-0.5 sm:mt-1 font-medium">
+                          <p className="text-[11px] sm:text-xs text-slate-500 break-words mt-0.5 sm:mt-1 font-medium leading-snug">
                             {item.subSpecs}
                           </p>
                         )}
@@ -610,7 +668,11 @@ export default function ProductHeroSection({
           </div>}
 
           {/* 7. CỤM NÚT HÀNH ĐỘNG MUA HÀNG (STICKY COMPACT SURFACE TRÊN PC KHI ĐỦ ĐỘ CAO) */}
-          <div className="space-y-2.5 pt-1 lg:sticky lg:top-[calc(var(--storefront-header-height,4.5rem)+16px)] lg:bg-white/95 lg:backdrop-blur-xs lg:py-2 lg:rounded-2xl">
+          <div
+            ref={primaryBuyActionRef}
+            data-pdp-primary-actions="true"
+            className="space-y-2.5 pt-1 lg:sticky lg:top-[calc(var(--storefront-header-height,4.5rem)+16px)] lg:bg-white/95 lg:backdrop-blur-xs lg:py-2 lg:rounded-2xl"
+          >
             {/* Nút Hero Mua Ngay (MỞ MODAL ĐẶT HÀNG NHANH) */}
             <button
               type="button"
@@ -618,19 +680,18 @@ export default function ProductHeroSection({
               disabled={!orderable}
               className="w-full min-h-11 flex flex-col items-center justify-center py-3 sm:py-3.5 px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-700 hover:to-red-700 disabled:from-slate-300 disabled:to-slate-400 disabled:text-slate-600 disabled:shadow-none disabled:cursor-not-allowed text-white font-black shadow-lg shadow-rose-600/25 transition cursor-pointer active:scale-[0.99]"
             >
-              <div className="flex items-center gap-2 text-sm sm:text-lg">
+              <div className="flex items-center gap-2 text-base sm:text-lg tracking-tight">
                 <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
                 {orderable ? (
-                  <>
-                    <span className="sm:hidden">MUA NGAY - GIAO TẬN NƠI</span>
-                    <span className="hidden sm:inline">MUA NGAY - GIAO TẬN NƠI HOẶC NHẬN TẠI SHOP</span>
-                  </>
+                  <span>MUA NGAY</span>
                 ) : (
                   <span>LIÊN HỆ ĐỂ ĐƯỢC TƯ VẤN</span>
                 )}
               </div>
               <span className="text-[11px] sm:text-xs font-normal text-rose-100 mt-0.5">
-                Kiểm tra máy chuẩn 100%, hài lòng mới thanh toán
+                {orderable
+                  ? "Giao tận nơi hoặc nhận tại shop · Kiểm tra máy hài lòng mới thanh toán"
+                  : "Kiểm tra tình trạng kho và cấu hình tương đương"}
               </span>
             </button>
 
@@ -718,6 +779,7 @@ export default function ProductHeroSection({
         totalPrice={totalPrice}
         phone={phone}
         orderable={orderable}
+        observeTargetRef={primaryBuyActionRef}
         onAddToCart={() => handleAddToCart(false)}
         onBuyNow={() => orderable && setIsQuickCheckoutOpen(true)}
       />

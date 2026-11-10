@@ -19,6 +19,7 @@ import RecentlyViewedSection from "@/components/product/RecentlyViewedSection";
 import InspectionReports from "@/components/product/InspectionReports";
 import { ProductReviewsSection } from "@/components/product/ProductReviewsSection";
 import { ProductSpecsSidebarCard } from "@/components/product/ProductSpecsSidebarCard";
+import { resolveConditionMeta } from "@/components/ui/ConditionBadge";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
   generateBreadcrumbJsonLd,
@@ -223,10 +224,15 @@ export default async function ProductDetailPage({
 
   const conditionLabelMap: Record<string, string> = {
     NEW: "Mới 100%",
+    OUTLET: "New Outlet",
     LIKE_NEW: "Like New (99%)",
     USED: "Đã qua sử dụng",
     REFURBISHED: "Refurbished",
     LIQUIDATION: "Hàng thanh lý",
+  };
+  const resolveDisplayConditionLabel = (rawCond?: string | null, fallbackTitle?: string) => {
+    const meta = resolveConditionMeta(rawCond, fallbackTitle || displayName);
+    return conditionLabelMap[meta.code] || meta.label;
   };
 
   // Build hero variants list
@@ -260,7 +266,7 @@ export default async function ProductDetailPage({
           price: vp.effectivePrice,
           originalPrice: vp.compareAtPrice,
           condition: vCond,
-          conditionLabel: conditionLabelMap[vCond] || vCond,
+          conditionLabel: resolveDisplayConditionLabel(vCond, v.name || displayName),
           cpu: vCpu,
           ram: v.ram || null,
           storage: v.storage || null,
@@ -297,7 +303,7 @@ export default async function ProductDetailPage({
           price: vp.effectivePrice,
           originalPrice: vp.compareAtPrice,
           condition: vCond,
-          conditionLabel: conditionLabelMap[vCond] || vCond,
+          conditionLabel: resolveDisplayConditionLabel(vCond, v.name || displayName),
           cpu: v.cpu || product.specs.cpu || null,
           ram: v.ram || null,
           storage: v.storage || null,
@@ -310,8 +316,10 @@ export default async function ProductDetailPage({
 
   // Color is part of each authored SKU; pricing comes from that variant.
   const heroColors: never[] = [];
-  const activeConditionCode = studioVariant?.condition || selectedVariant?.options?.condition || studio?.condition || product.condition || "NEW";
-  const activeConditionLabel = conditionLabelMap[activeConditionCode] || product.conditionLabel || "Mới 100% Fullbox";
+  const rawConditionCode = studioVariant?.condition || selectedVariant?.options?.condition || studio?.condition || product.condition || "NEW";
+  const resolvedConditionMeta = resolveConditionMeta(rawConditionCode, displayName);
+  const activeConditionCode = resolvedConditionMeta.code === "OUTLET" ? "NEW" : resolvedConditionMeta.code;
+  const activeConditionLabel = resolveDisplayConditionLabel(rawConditionCode, displayName);
   const activeSku = studioVariant?.sku || selectedVariant?.sku || undefined;
   const activeVariantId = studioVariant?.id || selectedVariant?.id || undefined;
   const fallbackWarrantyMonths = activeConditionCode && activeConditionCode !== 'NEW' ? 3 : 6;
@@ -413,7 +421,7 @@ export default async function ProductDetailPage({
     const vGpu = studioVariant?.gpu || selectedVariant?.gpu || product.specs.gpu;
     const vDisplay = studioVariant?.options?.['Màn hình'] || studioVariant?.options?.display || selectedVariant?.display || product.specs.display;
     const vCondCode = studioVariant?.condition || selectedVariant?.options?.condition || studio?.condition || product.condition || "NEW";
-    const vCondLabel = conditionLabelMap[vCondCode] || vCondCode;
+    const vCondLabel = resolveDisplayConditionLabel(vCondCode, displayName);
     const vSku = studioVariant?.sku || selectedVariant?.sku;
 
     upsertStructuredSpec(/^(cpu|bộ xử lý|vi xử lý|model cpu)$/i, "CPU", vCpu);
@@ -427,6 +435,26 @@ export default async function ProductDetailPage({
 
   const findSpecVal = (pattern: RegExp) =>
     structuredSpecs.find((s) => pattern.test(s.key))?.value;
+
+  const rawModelCandidate = (
+    product.model ||
+    findSpecVal(/^(model|mã\s*model|mã\s*máy|part\s*number|model\s*\/\s*mã\s*máy)$/i) ||
+    ""
+  ).trim();
+  const isYearOnlyModel = /^(19|20)\d{2}$/.test(rawModelCandidate);
+  const resolvedModelCode = isYearOnlyModel ? "" : rawModelCandidate;
+  const resolvedProductionYear =
+    findSpecVal(/^(năm\s*sản\s*xuất|năm\s*ra\s*mắt|năm\s*sx|release\s*year|year)$/i) ||
+    (isYearOnlyModel ? rawModelCandidate : "");
+
+  const heroKeySpecs = [
+    { key: "cpu", label: "CPU", value: studioVariant?.options?.CPU || studioVariant?.options?.cpu || selectedVariant?.cpu || product.specs.cpu || findSpecVal(/^(cpu|bộ xử lý|vi xử lý|model cpu)$/i) },
+    { key: "gpu", label: "GPU", value: studioVariant?.gpu || selectedVariant?.gpu || product.specs.gpu || findSpecVal(/^(gpu|card đồ họa|vga|đồ họa|card đồ họa \(gpu\))$/i) },
+    { key: "ram", label: "RAM", value: studioVariant?.ram || selectedVariant?.ram || product.specs.ram || findSpecVal(/^(ram|dung lượng ram)$/i) },
+    { key: "storage", label: "Ổ cứng", value: studioVariant?.storage || selectedVariant?.storage || product.specs.ssd || findSpecVal(/^(ssd|ổ cứng|storage|dung lượng ổ cứng)$/i) },
+    { key: "display", label: "Màn hình", value: studioVariant?.options?.['Màn hình'] || studioVariant?.options?.display || selectedVariant?.display || product.specs.display || findSpecVal(/^(màn hình|display|thông số màn hình)$/i) },
+    { key: "extra", label: "Pin / Trọng lượng", value: [findSpecVal(/^(pin|dung lượng pin|battery)$/i), findSpecVal(/^(trọng lượng|khối lượng|weight)$/i)].filter(isMeaningfulSpecValue).join(" · ") },
+  ].filter((item): item is { key: string; label: string; value: string } => isMeaningfulSpecValue(item.value));
 
   const canOrderProduct = studio ? studio.canOrder : true;
   const isProductInStock = (product.stock ?? 0) > 0;
@@ -522,21 +550,24 @@ export default async function ProductDetailPage({
       {/* Breadcrumb Navigation */}
       <nav aria-label="Đường dẫn trang" className="bg-white border-b border-gray-200">
         <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
-          <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-1 font-medium flex-wrap gap-y-0.5">
-            <li>
+          <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-0.5 font-medium overflow-x-auto overscroll-x-contain whitespace-nowrap hide-scrollbar">
+            <li className="shrink-0">
               <Link href="/" className="inline-flex min-h-11 items-center hover:text-blue-600 transition">
                 Trang chủ
               </Link>
             </li>
-            {categoryTrail.map(c => (
-              <li key={c.id} className="flex items-center">
-                <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
-                <Link href={c.href} className="inline-flex min-h-11 items-center hover:text-blue-600 transition">{c.name}</Link>
-              </li>
-            ))}
-            <li className="flex items-center min-w-0 max-w-full">
-              <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
-              <span className="py-1.5 text-gray-900 font-semibold truncate max-w-[260px] sm:max-w-md" aria-current="page">
+            {categoryTrail.map((c, idx) => {
+              const isLastCat = idx === categoryTrail.length - 1;
+              return (
+                <li key={c.id} className={`${isLastCat ? "flex" : "hidden sm:flex"} items-center shrink-0`}>
+                  <ChevronRight className="w-3.5 h-3.5 mx-1 sm:mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
+                  <Link href={c.href} className="inline-flex min-h-11 items-center hover:text-blue-600 transition">{c.name}</Link>
+                </li>
+              );
+            })}
+            <li className="flex items-center min-w-0">
+              <ChevronRight className="w-3.5 h-3.5 mx-1 sm:mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
+              <span className="py-1.5 text-gray-900 font-semibold truncate max-w-[180px] sm:max-w-md" aria-current="page">
                 {displayName}
               </span>
             </li>
@@ -545,15 +576,17 @@ export default async function ProductDetailPage({
       </nav>
 
       {/* Main Content Container */}
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 mt-4 sm:mt-6">
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 mt-3 sm:mt-5">
         {/* 1. TOP HERO SECTION: GALLERY, BADGES, DEAL COMBO, PURCHASING, CARDS 365 */}
         <ProductHeroSection
           key={product.id}
           productId={product.id}
           productSlug={product.slug}
           productName={displayName}
-          modelCode={(product.model || findSpecVal(/^(model|mã\s*model|mã\s*máy|part\s*number|model\s*\/\s*mã\s*máy)$/i) || '').trim()}
+          modelCode={resolvedModelCode}
+          productionYear={resolvedProductionYear}
           brandName={(studio?.brand || product.brand || '').trim()}
+          keySpecs={heroKeySpecs}
           images={galleryImages}
           coverImage={cover}
           discountBadge={studio ? undefined : product.discount}

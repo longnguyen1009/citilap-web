@@ -34,6 +34,26 @@ import VideoReviews from '@/components/home/VideoReviews';
 import CustomerGallery from '@/components/home/CustomerGallery';
 import { customerGallerySectionDataSchema, videoReviewsSectionDataSchema } from '@/contracts/cms/site-builder';
 import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
+import type { ProductCardProduct } from '@/components/product/ProductCard';
+
+function dedupeSectionProducts(products: ProductCardProduct[]): ProductCardProduct[] {
+  const seenKeys = new Set<string>();
+  const result: ProductCardProduct[] = [];
+  for (const product of products) {
+    const baseName = (product.name || '')
+      .toLowerCase()
+      .replace(/^\[[^\]]+\]\s*/g, '')
+      .replace(/\s*[-–|]\s*(bạc|xám|đen|trắng|hồng|vàng|xanh|silver|space gray|gray|grey|black|white|pink|blush|gold|indigo|citrus|midnight|starlight)\s*$/i, '')
+      .replace(/\s*\((bạc|xám|đen|trắng|hồng|vàng|xanh|silver|space gray|gray|grey|black|white|pink|blush|gold|indigo|citrus|midnight|starlight)\)\s*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const key = baseName || String(product.id);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    result.push(product);
+  }
+  return result;
+}
 
 const ICON_MAP: Record<string, LucideIcon> = {
   sparkles: Sparkles,
@@ -429,6 +449,33 @@ function BannerBlock({ data }: { data: any }) {
           </div>
         </div>
       </div>
+
+      {/* Quick Need & Budget Pills right below Hero Banner */}
+      <div className="bg-slate-900/95 border-t border-white/10 py-2">
+        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+          <nav aria-label="Chọn nhanh theo nhu cầu và tầm giá" className="flex flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain hide-scrollbar">
+            <span className="text-[11px] font-bold text-slate-400 shrink-0 mr-0.5 hidden sm:inline">Chọn nhanh:</span>
+            {[
+              { label: 'Laptop Văn phòng', href: '/laptop-van-phong' },
+              { label: 'Laptop Gaming', href: '/laptop-gaming' },
+              { label: 'Đồ họa · Kỹ thuật', href: '/laptop-workstation' },
+              { label: 'Mỏng nhẹ', href: '/search?tag=mong-nhe' },
+              { label: 'Dưới 15 triệu', href: '/search?pricePreset=under-15&maxPrice=15000000' },
+              { label: '15 – 20 triệu', href: '/search?pricePreset=15-20&minPrice=15000000&maxPrice=20000000' },
+              { label: '20 – 30 triệu', href: '/search?pricePreset=20-30&minPrice=20000000&maxPrice=30000000' },
+              { label: 'LikeNew 99%', href: '/search?category=laptop-likenew' },
+            ].map((chip) => (
+              <Link
+                key={chip.href}
+                href={chip.href}
+                className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-semibold text-slate-100 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition whitespace-nowrap"
+              >
+                {chip.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      </div>
     </section>
   );
 }
@@ -455,7 +502,7 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
   const data = section.data as ProductGridSectionData;
   const limit = data.ruleCriteria?.limit && data.ruleCriteria.limit > 0 ? data.ruleCriteria.limit : 48;
   const mobileLimit = data.mobileLimit && data.mobileLimit > 0 ? data.mobileLimit : null;
-  const products = (section.resolvedProducts || []).slice(0, limit);
+  const products = dedupeSectionProducts(section.resolvedProducts || []).slice(0, limit);
   const colorClass = THEME_GRADIENT_MAP[data.colorTheme] || THEME_GRADIENT_MAP.blue;
   const links = Array.isArray(data.links) ? data.links.filter((l) => l && l.label && l.href) : [];
   const headerIconNode = createElement(
@@ -714,7 +761,8 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
   const data = (section.data || {}) as { title?: string; subtitle?: string; limit?: number; viewAllLink?: string };
 
   if (!col) return null;
-  const displayProducts = data.limit && data.limit > 0 ? (col.products || []).slice(0, data.limit) : (col.products || []);
+  const dedupedColProducts = dedupeSectionProducts(col.products || []);
+  const displayProducts = data.limit && data.limit > 0 ? dedupedColProducts.slice(0, data.limit) : dedupedColProducts;
   const targetHref = data.viewAllLink || `/collection/${col.slug}`;
 
   return (
@@ -792,16 +840,16 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
   }
 
   return (
-    <section className="py-2.5 md:py-4 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
+    <section className="py-2 md:py-3.5 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
       <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
         {d.title && (
-          <div className="text-center mb-3 md:mb-4">
+          <div className="text-center mb-2.5 md:mb-4">
             <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black text-slate-900 leading-snug">{d.title}</h2>
             {d.subtitle && <p className="text-[12px] md:text-[13px] text-slate-500 mt-0.5">{d.subtitle}</p>}
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
+        <div className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
           {activeFeatures.map((item) => {
             const Icon = ICON_MAP[item.icon] || Star;
             const cardContent = (
@@ -817,7 +865,7 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
                     <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 shrink-0 transition group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0" />
                   )}
                 </div>
-                <p className="text-[11px] md:text-[12px] text-slate-600 leading-snug">{item.description}</p>
+                <p className="text-[11px] md:text-[12px] text-slate-600 leading-snug line-clamp-2">{item.description}</p>
               </>
             );
             if (item.href) {
@@ -825,7 +873,7 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
                 <Link
                   key={item.id}
                   href={item.href}
-                  className="group min-h-11 p-2 md:p-3 lg:p-3.5 rounded-lg lg:rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-1 hover:bg-blue-50/50 hover:border-blue-200 transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
+                  className="w-[220px] sm:w-[240px] md:w-auto shrink-0 snap-start group min-h-11 p-2 md:p-3 lg:p-3.5 rounded-lg lg:rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-1 hover:bg-blue-50/50 hover:border-blue-200 transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                 >
                   {cardContent}
                 </Link>
@@ -834,7 +882,7 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
             return (
               <div
                 key={item.id}
-                className="group p-2 md:p-3 lg:p-3.5 rounded-lg lg:rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-1 hover:bg-blue-50/40 hover:border-blue-200 transition motion-reduce:transition-none"
+                className="w-[220px] sm:w-[240px] md:w-auto shrink-0 snap-start group p-2 md:p-3 lg:p-3.5 rounded-lg lg:rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-1 hover:bg-blue-50/40 hover:border-blue-200 transition motion-reduce:transition-none"
               >
                 {cardContent}
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import Image from "next/image";
 import { Phone, ShoppingCart, X } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
@@ -13,6 +13,7 @@ interface ProductFloatingBarProps {
   totalPrice: number;
   phone?: string;
   orderable?: boolean;
+  observeTargetRef?: RefObject<HTMLElement | null>;
   onAddToCart?: () => void;
   onBuyNow: () => void;
 }
@@ -25,9 +26,11 @@ export default function ProductFloatingBar({
   totalPrice,
   phone = businessProfile.displayPhone,
   orderable = true,
+  observeTargetRef,
   onAddToCart,
   onBuyNow,
 }: ProductFloatingBarProps) {
+  const [isPrimaryVisible, setIsPrimaryVisible] = useState(false);
   const [isScrolledPast, setIsScrolledPast] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
@@ -37,7 +40,18 @@ export default function ProductFloatingBar({
     const updateLayout = () => {
       const mobile = mq.matches || window.innerWidth < 768;
       setIsMobileViewport(mobile);
-      setIsScrolledPast(window.scrollY > 450);
+      const targetEl =
+        observeTargetRef?.current ||
+        document.querySelector<HTMLElement>('[data-pdp-primary-actions="true"]');
+      if (targetEl) {
+        const rect = targetEl.getBoundingClientRect();
+        const inView = rect.top < window.innerHeight - 60 && rect.bottom > 80;
+        setIsPrimaryVisible(inView);
+        setIsScrolledPast(!inView && rect.bottom <= 80);
+      } else {
+        setIsPrimaryVisible(false);
+        setIsScrolledPast(window.scrollY > 450);
+      }
       // Resizing a PC-dismissed bar to SP (<768px) resets dismiss so SP critical actions are never inaccessible
       if (mobile) {
         setIsDismissed(false);
@@ -48,14 +62,27 @@ export default function ProductFloatingBar({
     window.addEventListener("scroll", updateLayout, { passive: true });
     window.addEventListener("resize", updateLayout, { passive: true });
     mq.addEventListener("change", updateLayout);
+
+    let observer: IntersectionObserver | null = null;
+    const targetEl =
+      observeTargetRef?.current ||
+      document.querySelector<HTMLElement>('[data-pdp-primary-actions="true"]');
+    if (targetEl && typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(() => updateLayout(), {
+        threshold: [0, 0.2, 0.5, 1],
+      });
+      observer.observe(targetEl);
+    }
+
     return () => {
+      observer?.disconnect();
       window.removeEventListener("scroll", updateLayout);
       window.removeEventListener("resize", updateLayout);
       mq.removeEventListener("change", updateLayout);
     };
-  }, []);
+  }, [observeTargetRef]);
 
-  const active = isMobileViewport || (isScrolledPast && !isDismissed);
+  const active = isMobileViewport ? !isPrimaryVisible : isScrolledPast && !isDismissed;
 
   useEffect(() => {
     if (active) {
@@ -82,10 +109,10 @@ export default function ProductFloatingBar({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 md:px-6 py-2 md:py-2.5 safe-area-bottom z-40 shadow-[0_-8px_24px_-4px_rgba(15,23,42,0.12)] transition-all duration-300 motion-reduce:transition-none ease-out max-md:translate-y-0 max-md:opacity-100 max-md:pointer-events-auto ${
-        isScrolledPast
-          ? "md:translate-y-0 md:opacity-100 md:pointer-events-auto"
-          : "md:translate-y-full md:opacity-0 md:pointer-events-none"
+      className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 md:px-6 py-2 md:py-2.5 safe-area-bottom z-40 shadow-[0_-8px_24px_-4px_rgba(15,23,42,0.12)] transition-all duration-300 motion-reduce:transition-none ease-out ${
+        active
+          ? "translate-y-0 opacity-100 pointer-events-auto"
+          : "translate-y-full opacity-0 pointer-events-none"
       }`}
     >
       <div className="w-full min-w-0 max-w-7xl mx-auto flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between md:gap-4">

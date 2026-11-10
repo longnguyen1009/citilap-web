@@ -8,6 +8,8 @@ interface CatalogFilterPanelProps {
   activeCount: number;
   resetHref: string;
   currentUrlKey: string;
+  resultCount?: number;
+  toolbarRightSlot?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -18,11 +20,11 @@ interface CatalogFilterPanelProps {
 export default function CatalogFilterPanel({
   activeCount,
   resetHref,
-  currentUrlKey,
+  resultCount,
+  toolbarRightSlot,
   children,
 }: CatalogFilterPanelProps) {
-  const [openUrlKey, setOpenUrlKey] = useState<string | null>(null);
-  const isOpen = openUrlKey !== null && openUrlKey === currentUrlKey;
+  const [isOpen, setIsOpen] = useState(false);
 
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -31,12 +33,12 @@ export default function CatalogFilterPanel({
 
   const openDrawer = () => {
     closeReasonRef.current = "user";
-    setOpenUrlKey(currentUrlKey);
+    setIsOpen(true);
   };
 
   const closeDrawer = () => {
     closeReasonRef.current = "user";
-    setOpenUrlKey(null);
+    setIsOpen(false);
   };
 
   useEffect(() => {
@@ -61,13 +63,13 @@ export default function CatalogFilterPanel({
         (opener && window.getComputedStyle(opener).display === "none")
       ) {
         closeReasonRef.current = "resize";
-        setOpenUrlKey(null);
+        setIsOpen(false);
       }
     };
 
     const handlePopState = () => {
       closeReasonRef.current = "navigate";
-      setOpenUrlKey(null);
+      setIsOpen(false);
     };
 
     window.addEventListener("resize", handleResize);
@@ -94,38 +96,46 @@ export default function CatalogFilterPanel({
         <style>{`@media (max-width: 1023.98px) { aside[data-catalog-sidebar="true"] { display: block !important; width: 100% !important; } }`}</style>
       </noscript>
 
-      {/* SP (<768px) & Tablet (768–1023px): Single 'Bộ lọc' trigger bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-xs lg:hidden">
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={openDrawer}
-          aria-haspopup="dialog"
-          aria-expanded={isOpen}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-4 py-2 text-xs sm:text-sm font-bold text-slate-800 hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-700 transition cursor-pointer select-none shadow-2xs"
-        >
-          <SlidersHorizontal size={16} className="text-blue-600 shrink-0" aria-hidden="true" />
-          <span>Bộ lọc</span>
-          {activeCount > 0 && (
-            <span className="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-black text-white">
-              {activeCount}
+      {/* SP (<768px) & Tablet (768–1023px): Unified 'Bộ lọc' + Sort/Count toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-white p-2 sm:p-2.5 shadow-xs lg:hidden">
+        <div className="flex items-center gap-2">
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={openDrawer}
+            aria-haspopup="dialog"
+            aria-expanded={isOpen}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-800 hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-700 transition cursor-pointer select-none shadow-2xs"
+          >
+            <SlidersHorizontal size={16} className="text-blue-600 shrink-0" aria-hidden="true" />
+            <span>Bộ lọc</span>
+            {activeCount > 0 && (
+              <span className="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-blue-600 px-1.5 text-[11px] font-black text-white">
+                {activeCount}
+              </span>
+            )}
+          </button>
+
+          {typeof resultCount === "number" && !toolbarRightSlot && (
+            <span className="text-xs text-slate-600">
+              <strong className="font-bold text-slate-900">{resultCount}</strong> sản phẩm
             </span>
           )}
-        </button>
+        </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] sm:text-xs text-slate-500">
-            Chọn bộ lọc để cập nhật kết quả
-          </span>
-          {activeCount > 0 && (
+        <div className="flex items-center gap-2 ml-auto">
+          {toolbarRightSlot ? (
+            toolbarRightSlot
+          ) : activeCount > 0 ? (
             <Link
               href={resetHref}
+              scroll={false}
               className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
             >
               <RotateCcw size={13} aria-hidden="true" />
               <span>Xóa lọc</span>
             </Link>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -141,19 +151,12 @@ export default function CatalogFilterPanel({
         }}
         onClose={() => {
           if (isOpen) {
-            setOpenUrlKey(null);
+            setIsOpen(false);
           }
         }}
         onClick={(event) => {
           if (event.target === event.currentTarget) {
             closeDrawer();
-            return;
-          }
-          if (event.target instanceof Element && event.target.closest("a[href]")) {
-            closeReasonRef.current = "navigate";
-            window.setTimeout(() => {
-              setOpenUrlKey(null);
-            }, 0);
           }
         }}
         className="fixed inset-0 z-50 m-0 hidden h-dvh max-h-dvh w-full max-w-none bg-transparent p-0 overscroll-contain open:flex lg:open:hidden"
@@ -179,7 +182,7 @@ export default function CatalogFilterPanel({
                 )}
               </div>
               <p className="mt-0.5 text-xs text-slate-500">
-                Chọn bộ lọc để cập nhật kết quả
+                Chọn nhiều tiêu chí rồi bấm Xem kết quả
               </p>
             </div>
 
@@ -202,23 +205,26 @@ export default function CatalogFilterPanel({
             {activeCount > 0 ? (
               <Link
                 href={resetHref}
-                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 transition"
+                scroll={false}
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50/70 px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 transition shrink-0"
               >
                 <RotateCcw size={13} aria-hidden="true" />
-                <span>Xóa tất cả ({activeCount})</span>
+                <span>Thiết lập lại ({activeCount})</span>
               </Link>
             ) : (
               <span className="text-xs text-slate-500">
-                Chọn bộ lọc để cập nhật kết quả
+                Chưa chọn bộ lọc
               </span>
             )}
 
             <button
               type="button"
               onClick={closeDrawer}
-              className="ml-auto inline-flex min-h-11 items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
+              className="ml-auto inline-flex min-h-11 flex-1 sm:flex-initial items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-xs sm:text-sm font-bold text-white hover:bg-blue-700 transition cursor-pointer shadow-xs"
             >
-              Đóng
+              {typeof resultCount === "number"
+                ? `Xem ${resultCount} sản phẩm`
+                : "Xem kết quả"}
             </button>
           </div>
         </div>

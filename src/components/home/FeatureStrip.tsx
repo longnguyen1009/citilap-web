@@ -40,15 +40,15 @@ export default function FeatureStrip({ settings: customSettings }: FeatureStripP
   ];
 
   return (
-    <section className="py-2.5 md:py-4" aria-label="Cam kết dịch vụ">
+    <section className="py-2 md:py-3.5" aria-label="Cam kết dịch vụ">
       <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
+        <div className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
               <div
                 key={index}
-                className={`bg-white border border-slate-200/80 rounded-lg lg:rounded-xl p-2 md:p-3 lg:p-3.5 flex flex-col justify-start text-left gap-1 shadow-2xs hover:shadow-xs transition duration-200 motion-reduce:transition-none group ${feature.bgHover}`}
+                className={`w-[220px] sm:w-[240px] md:w-auto shrink-0 snap-start bg-white border border-slate-200/80 rounded-lg lg:rounded-xl p-2 md:p-3 lg:p-3.5 flex flex-col justify-start text-left gap-1 shadow-2xs hover:shadow-xs transition duration-200 motion-reduce:transition-none group ${feature.bgHover}`}
               >
                 <div className="flex items-center gap-1.5 lg:gap-2 min-w-0">
                   <div
@@ -60,7 +60,7 @@ export default function FeatureStrip({ settings: customSettings }: FeatureStripP
                     {feature.title}
                   </h3>
                 </div>
-                <p className="text-[11px] md:text-[12px] text-slate-600 leading-snug">
+                <p className="text-[11px] md:text-[12px] text-slate-600 leading-snug line-clamp-2">
                   {feature.desc}
                 </p>
               </div>

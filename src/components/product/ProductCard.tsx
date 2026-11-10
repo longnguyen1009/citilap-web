@@ -8,7 +8,7 @@ import { useOptionalWishlist } from "@/context/WishlistContext";
 import { useOptionalCompare } from "@/context/CompareContext";
 import { Badge } from "@/components/ui/Badge";
 import { SpecChip } from "@/components/ui/SpecChip";
-import { ConditionBadge } from "@/components/ui/ConditionBadge";
+import { ConditionBadge, resolveConditionMeta } from "@/components/ui/ConditionBadge";
 import { StockBadge } from "@/components/ui/StockBadge";
 import { BrandLogo, detectBrandName, getBrandCardTheme } from "@/components/ui/BrandLogo";
 import { defaultWarrantyMonthsForCondition } from "@/contracts/cms/product-studio";
@@ -70,16 +70,21 @@ function isMeaningfulSpec(val?: string | null): val is string {
  */
 function formatCpuSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
-  let s = val.split(/[\/,;]/)[0].trim();
+  let s = val.split(/[\/,;]/)[0].replace(/\([^)]*\)/g, "").trim();
   s = s
-    .replace(/^Intel\s+/i, "")
-    .replace(/^AMD\s+/i, "")
-    .replace(/^Core\s+/i, "")
-    .replace(/Ryzen\s*(?:AI\s*)?(\d)\s*[-–—]?\s*/i, "R$1-")
-    .replace(/Ultra\s*(\d)\s*[-–—]?\s*/i, "U$1-")
-    .replace(/i(\d)\s*[-–—]?\s*(\d)/i, "i$1-$2")
+    .replace(/^(?:Intel|AMD|Apple|Qualcomm)\s+/i, "")
+    .replace(/^(?:Core|Processor)\s+/i, "")
+    .replace(/Snapdragon\s*X\s*Elite[^ ]*/i, "X Elite")
+    .replace(/Snapdragon\s*X\s*Plus[^ ]*/i, "X Plus")
+    .replace(/Ryzen\s*AI\s*(\d)\s*(?:PRO\s*)?(?:HX\s*)?(\d+\w*)?/i, (_, g1, g2) => (g2 ? `AI ${g1}-${g2}` : `AI ${g1}`))
+    .replace(/Ryzen\s*(\d)\s*(?:PRO\s*)?[-–—]?\s*(\d+\w*)?/i, (_, g1, g2) => (g2 ? `R${g1}-${g2}` : `R${g1}`))
+    .replace(/Ultra\s*(\d)\s*[-–—]?\s*(\d+\w*)?/i, (_, g1, g2) => (g2 ? `U${g1}-${g2}` : `U${g1}`))
+    .replace(/Core\s*(\d)\s*[-–—]?\s*(\d+\w*)/i, "C$1-$2")
+    .replace(/i(\d)\s*[-–—]?\s*(\d+\w*)?/i, (_, g1, g2) => (g2 ? `i${g1}-${g2}` : `i${g1}`))
+    .replace(/\bProcessor\b/gi, "")
     .replace(/--+/g, "-")
     .replace(/-+$/, "")
+    .replace(/\s+/g, " ")
     .trim();
   return s;
 }
@@ -87,12 +92,18 @@ function formatCpuSpec(val?: string): string {
 function formatGpuSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
   return val
-    .replace(/^NVIDIA\s+/i, "")
-    .replace(/^GeForce\s+/i, "")
-    .replace(/^Intel\s+/i, "")
-    .replace(/\s+Graphics/i, "")
-    .replace(/\s+\d+GB(\s+GDDR\d+)?/i, "")
+    .replace(/\([^)]*\)/g, "")
+    .split(/[\/,;]/)[0]
+    .replace(/^(?:NVIDIA|AMD|Intel|Qualcomm|Apple)\s+/i, "")
+    .replace(/^(?:GeForce|Radeon|Arc|Iris|Adreno)\s+/i, (m) => (/Iris|Arc|Adreno/i.test(m) ? m : ""))
+    .replace(/\bNvidia\s+GeForce\s+/i, "")
+    .replace(/\bGeForce\s+/i, "")
+    .replace(/\bRadeon\s+/i, "")
+    .replace(/\s+Graphics\b/i, "")
+    .replace(/\s+\d+\s*GB(\s+GDDR\d+)?/i, "")
     .replace(/\s+Laptop\s+GPU/i, "")
+    .replace(/\s+Ada\s+Generation/i, " Ada")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -107,7 +118,11 @@ function formatStorageSpec(val?: string): string {
   const matchTb = val.match(/(\d+)\s*TB/i);
   if (matchTb) return `${matchTb[1]}TB`;
   const matchGb = val.match(/(\d+)\s*GB/i);
-  if (matchGb) return `${matchGb[1]}GB`;
+  if (matchGb) {
+    const n = parseInt(matchGb[1], 10);
+    if (n >= 1024 && n % 1024 === 0) return `${n / 1024}TB`;
+    return `${n}GB`;
+  }
   return val.replace(/SSD|NVMe|PCIe/gi, "").trim();
 }
 
@@ -118,33 +133,25 @@ function formatDisplaySpec(val?: string): string {
 
   let res = "";
   if (/4K|UHD/i.test(val)) res = "4K";
-  else if (/2\.5K/i.test(val)) res = "2.5K";
-  else if (/2K|QHD\+?/i.test(val)) res = "2K";
-  else if (/FHD\+?/i.test(val)) res = "FHD";
+  else if (/3\.2K|3K|2\.8K|2\.5K/i.test(val)) {
+    const m = val.match(/(3\.2K|3K|2\.8K|2\.5K)/i);
+    res = m ? m[1].toUpperCase() : "2.5K";
+  } else if (/2K|QHD\+?|\bWQXGA\b/i.test(val)) res = "2K";
+  else if (/FHD\+?|\bWUXGA\b/i.test(val)) res = "FHD";
   else if (/Retina/i.test(val)) res = "Retina";
   else if (/OLED/i.test(val)) res = "OLED";
 
-  if (size && res) return `${size} ${res}`;
-  if (size) return size;
+  const hzMatch = val.match(/(\d{2,3})\s*Hz/i);
+  const hz = hzMatch && parseInt(hzMatch[1], 10) >= 90 ? `${hzMatch[1]}Hz` : "";
+
+  const parts = [size, res, hz].filter(Boolean);
+  if (parts.length > 0) return parts.join(" ");
   return val.replace(/\s*inch\b/gi, '"').trim();
 }
 
 /**
- * Clean readable formatters for Smartphone (SP) vertical spec lines
+ * Clean readable formatters for Smartphone (SP) spec lines
  */
-function formatMobileCpuSpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .split(/[\/,;]/)[0]
-    .replace(/®|™/g, "")
-    .replace(/^Intel\s+/i, "")
-    .replace(/^AMD\s+/i, "")
-    .replace(/\bProcessor\b/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function formatMobileRamSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
   return val
@@ -160,16 +167,6 @@ function formatMobileStorageSpec(val?: string): string {
     .replace(/\([^)]*\)/g, "")
     .split(/[\/,;]/)[0]
     .replace(/^Ổ\s*cứng\s*/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function formatMobileDisplaySpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\s*inch\b/gi, '"')
-    .split(/[,;]/)[0]
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -264,9 +261,8 @@ export default function ProductCard({
   const variantQuery = product.sku ? `?sku=${encodeURIComponent(product.sku)}` : (product.variantId ? `?variant=${encodeURIComponent(product.variantId)}` : "");
   const productHref = getProductHref(product) + variantQuery;
   const isOutOfStock = product.availability ? product.availability === "UNAVAILABLE" : product.stock !== undefined && product.stock !== null && product.stock <= 0;
-  const inferredCondition =
-    product.condition ||
-    (/like\s*new|99%|cũ/i.test(product.name) ? "LIKE_NEW" : "NEW");
+  const resolvedMeta = resolveConditionMeta(product.condition, product.name);
+  const inferredCondition = resolvedMeta.code === "OUTLET" ? "NEW" : resolvedMeta.code;
   const warrantyText = formatWarranty(
     product.warranty,
     inferredCondition
@@ -300,11 +296,9 @@ export default function ProductCard({
   const display = isAccessory ? "" : formatDisplaySpec(product.specs?.display);
   const hasDesktopSpecs = Boolean(cpu || gpu || ram || ssd || display);
 
-  // Mobile (SP < 768px) compact horizontal spec badges
-  const mCpu = isAccessory ? "" : formatMobileCpuSpec(product.specs?.cpu);
+  // Mobile (SP < 768px) compact spec badges
   const mRam = isAccessory ? "" : formatMobileRamSpec(product.specs?.ram);
   const mSsd = isAccessory ? "" : formatMobileStorageSpec(product.specs?.ssd);
-  const mDisplay = isAccessory ? "" : formatMobileDisplaySpec(product.specs?.display);
   const spRamBadge = ram ? ram.replace(/GB$/i, "G") : mRam;
   const spSsdBadge = ssd ? ssd.replace(/GB$/i, "G") : mSsd;
   const spMemoryBadge = [spRamBadge, spSsdBadge].filter(Boolean).join("/");
@@ -314,18 +308,6 @@ export default function ProductCard({
   ]
     .filter(Boolean)
     .join(" / ");
-  const mobileSpecPills = [
-    spMemoryBadge
-      ? { key: "mem", text: spMemoryBadge, title: spMemoryTitle || spMemoryBadge }
-      : null,
-    cpu || mCpu
-      ? { key: "cpu", text: cpu || mCpu, title: `CPU: ${product.specs?.cpu || mCpu || cpu}` }
-      : null,
-    display || mDisplay
-      ? { key: "display", text: display || mDisplay, title: `Màn hình: ${product.specs?.display || mDisplay || display}` }
-      : null,
-  ].filter((pill): pill is { key: string; text: string; title: string } => Boolean(pill));
-  const hasMobileSpecs = mobileSpecPills.length > 0;
 
   return (
     <article
@@ -519,44 +501,42 @@ export default function ProductCard({
             </Link>
           </h3>
 
-          {/* Red Price Card: Directly below title, horizontally centered */}
-          <div className={isFlash ? "mt-1 md:mt-2 mb-1 md:mb-2.5" : "mt-1.5 md:mt-2 mb-1.5 md:mb-2.5"}>
-            <div
-              className={`w-full bg-[#D71920] hover:bg-[#c0141a] text-white font-extrabold ${
-                isFlash
-                  ? "py-1 md:py-2 px-1 md:px-3 rounded-md md:rounded-xl text-[13px] md:text-base"
-                  : "py-1 md:py-2 px-2 md:px-3 rounded-lg md:rounded-xl text-[13px] md:text-base"
-              } shadow-2xs flex items-center justify-center text-center tracking-tight select-none transition-colors`}
-            >
-              <span className="tabular-nums">
+          {/* Price Display: Clear typographic hierarchy (not a button-like pill) */}
+          <div className={isFlash ? "mt-1 md:mt-1.5 mb-1 md:mb-2" : "mt-1.5 md:mt-2 mb-1 md:mb-2"}>
+            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+              <span
+                className={`font-black text-[#D71920] tracking-tight tabular-nums leading-none ${
+                  isFlash
+                    ? "text-[14px] sm:text-[15px] md:text-[17px]"
+                    : "text-[15px] sm:text-[16px] md:text-[18px]"
+                }`}
+              >
                 {product.availability === 'CONTACT' ? 'Liên hệ' : formatVnd(product.price)}
               </span>
-            </div>
-            {isFlash && effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
-              <div className="md:hidden mt-0.5 text-center leading-tight">
-                <span className="text-[10px] text-slate-500 line-through tabular-nums font-medium">
+              {isFlash && effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
+                <span className="md:hidden text-[10px] text-slate-400 line-through tabular-nums font-medium">
                   {formatVnd(effectiveOldPrice)}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
         {/* Bottom Pinned Section: Cấu hình (Specs) & Bảo hành (Warranty) ALWAYS pinned to bottom */}
-        <div className="mt-auto flex flex-col justify-end pt-1 md:pt-2">
-          {/* TABLET / PC DISPLAY (>= 768px): 2-Column Compact Spec Chips Matrix */}
+        <div className="mt-auto flex flex-col justify-end pt-1 md:pt-1.5">
+          {/* TABLET / PC DISPLAY (>= 768px): 2-Column Compact Spec Chips Matrix without truncation */}
           {showSpecs && hasDesktopSpecs && (
-            <div className="hidden md:grid grid-cols-2 gap-1 text-caption text-text-secondary mb-2 pt-2 border-t border-black/[0.06] min-h-[52px]">
+            <div className="hidden md:grid grid-cols-2 gap-1 text-[11px] text-text-secondary mb-2 pt-2 border-t border-black/[0.06] min-h-[52px]">
               {cpu && (
                 <SpecChip
-                  icon={<Cpu className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  icon={<Cpu className="w-3 h-3 text-slate-500 shrink-0" />}
                   value={cpu}
                   title={`CPU: ${product.specs?.cpu || cpu}`}
                 />
               )}
               {gpu && (
                 <SpecChip
-                  icon={<Gpu className="w-3.5 h-3.5 text-blue-600 shrink-0" />}
+                  icon={<Gpu className="w-3 h-3 text-blue-600 shrink-0" />}
                   highlight
                   value={gpu}
                   title={`GPU: ${product.specs?.gpu || gpu}`}
@@ -564,7 +544,7 @@ export default function ProductCard({
               )}
               {(ram || ssd) && (
                 <SpecChip
-                  icon={<MemoryStick className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  icon={<MemoryStick className="w-3 h-3 text-slate-500 shrink-0" />}
                   value={
                     <>
                       <span className="font-semibold text-text-primary">{ram ? ram.replace(/GB$/i, "G") : "RAM"}</span>
@@ -577,7 +557,7 @@ export default function ProductCard({
               )}
               {display && (
                 <SpecChip
-                  icon={<Monitor className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
+                  icon={<Monitor className="w-3 h-3 text-slate-500 shrink-0" />}
                   value={display}
                   title={`Màn hình: ${product.specs?.display || display}`}
                 />
@@ -585,18 +565,45 @@ export default function ProductCard({
             </div>
           )}
 
-          {/* SMARTPHONE DISPLAY (< 768px): One Compact Horizontal Row of Spec Badges (Hidden on Flash SP) */}
-          {!isFlash && showSpecs && hasMobileSpecs && (
-            <div className="md:hidden mb-1.5 pt-1.5 border-t border-black/[0.06] flex items-center gap-1 overflow-hidden min-w-0">
-              {mobileSpecPills.map((pill) => (
+          {/* SMARTPHONE DISPLAY (< 768px): 2x2 Compact Spec Matrix (Hidden on Flash SP) */}
+          {!isFlash && showSpecs && hasDesktopSpecs && (
+            <div className="md:hidden mb-1.5 pt-1.5 border-t border-black/[0.06] grid grid-cols-2 gap-1 min-w-0">
+              {cpu && (
                 <span
-                  key={pill.key}
-                  title={pill.title}
-                  className="inline-flex items-center rounded bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 leading-tight truncate min-w-0 max-w-full"
+                  title={`CPU: ${product.specs?.cpu || cpu}`}
+                  className="inline-flex items-center gap-1 rounded bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 leading-tight whitespace-nowrap overflow-hidden"
                 >
-                  {pill.text}
+                  <Cpu className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                  <span>{cpu}</span>
                 </span>
-              ))}
+              )}
+              {gpu && (
+                <span
+                  title={`GPU: ${product.specs?.gpu || gpu}`}
+                  className="inline-flex items-center gap-1 rounded bg-blue-50/70 border border-blue-200/70 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 leading-tight whitespace-nowrap overflow-hidden"
+                >
+                  <Gpu className="w-2.5 h-2.5 text-blue-600 shrink-0" />
+                  <span>{gpu}</span>
+                </span>
+              )}
+              {spMemoryBadge && (
+                <span
+                  title={spMemoryTitle || spMemoryBadge}
+                  className="inline-flex items-center gap-1 rounded bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 leading-tight whitespace-nowrap overflow-hidden"
+                >
+                  <MemoryStick className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                  <span>{spMemoryBadge}</span>
+                </span>
+              )}
+              {display && (
+                <span
+                  title={`Màn hình: ${product.specs?.display || display}`}
+                  className="inline-flex items-center gap-1 rounded bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 leading-tight whitespace-nowrap overflow-hidden"
+                >
+                  <Monitor className="w-2.5 h-2.5 text-slate-500 shrink-0" />
+                  <span>{display}</span>
+                </span>
+              )}
             </div>
           )}
 

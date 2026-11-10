@@ -20,7 +20,9 @@ import {
   Cpu,
   Layers,
   Calendar,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck,
+  HardDrive
 } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import EmptyState from "@/components/ui/EmptyState";
@@ -181,20 +183,44 @@ export default function CategoryCatalog({
     ? facets.years 
     : DEFAULT_YEARS.map(y => ({ value: y, label: `Năm ${y}`, count: 0 }));
 
-  // Cấu hình các nhóm lọc chuyên biệt chi tiết đúng 1 hàng
+  const conditionOptions: FacetOption<string>[] = (facets.conditions || []).map((c) => {
+    const condLabels: Record<string, string> = {
+      NEW: "Mới 100% Fullbox",
+      LIKE_NEW: "LikeNew 99%",
+      USED: "Đã qua sử dụng",
+      REFURBISHED: "Refurbished",
+    };
+    return {
+      value: c.value,
+      label: condLabels[String(c.value)] || c.label,
+      count: c.count,
+    };
+  });
+
+  // Cấu hình các nhóm lọc chuyên biệt chi tiết
   const filterGroups: { key: string; label: string; icon?: React.ReactNode; options: FacetOption<string | number>[] }[] = isAccessory ? [
     { key: "type", label: "Loại phụ kiện", icon: <Layers size={14} />, options: ACCESSORY_TYPES.map(t => ({ value: t.slug, label: t.shortName, count: 0 })) },
     { key: "connection", label: "Chuẩn kết nối", icon: <Cable size={14} />, options: facets.connections || [] },
     { key: "power", label: "Công suất", icon: <Zap size={14} />, options: facets.powers || [] },
   ] : [
-    { key: "year", label: "Năm sản xuất", icon: <Calendar size={14} />, options: facetYears },
+    ...(conditionOptions.length > 0 && !["laptop-moi", "laptop-likenew"].includes(category.slug)
+      ? [{ key: "condition", label: "Tình trạng", icon: <ShieldCheck size={14} />, options: conditionOptions }]
+      : []),
+    ...(level2Categories.length > 0 && facets.brands.length > 0
+      ? [{ key: "brand", label: "Hãng sản xuất", icon: <Laptop size={14} />, options: facets.brands }]
+      : []),
     { key: "cpu", label: "CPU", icon: <Cpu size={14} />, options: facets.cpuSeries },
     { key: "gpu", label: "Card đồ họa", icon: <Laptop size={14} />, options: facets.gpuSeries },
     { key: "ram", label: "Dung lượng RAM", icon: <Layers size={14} />, options: facets.ramOptions },
+    ...(facets.storageOptions && facets.storageOptions.length > 0
+      ? [{ key: "storage", label: "Ổ cứng SSD", icon: <HardDrive size={14} />, options: facets.storageOptions }]
+      : []),
+    { key: "year", label: "Năm sản xuất", icon: <Calendar size={14} />, options: facetYears },
   ];
 
   const fallbackLabel = (key: string, value: string) => 
     key === "tag" ? NEED_LABELS[catalogNeedTag(value)] || value 
+    : key === "condition" ? ({ NEW: "Mới 100%", LIKE_NEW: "LikeNew 99%", USED: "Đã qua SD", REFURBISHED: "Refurbished" }[value] || value)
     : key === "year" ? `Năm ${value}`
     : key === "ram" ? `${value}GB` 
     : key === "storage" ? (Number(value) >= 1024 ? `${Number(value)/1024}TB` : `${value}GB`) 
@@ -259,12 +285,22 @@ export default function CategoryCatalog({
   const pages = [...new Set([1, result.page - 1, result.page, result.page + 1, result.totalPages])].filter(page => page > 0 && page <= result.totalPages).sort((a, b) => a - b);
   const currentUrlKey = url(params);
 
+  const visibleNeeds = STANDARD_NEEDS.filter((need) => {
+    const slugLower = category.slug.toLowerCase();
+    if (need.key === "gaming" && slugLower.includes("gaming")) return false;
+    if (need.key === "van-phong" && slugLower.includes("van-phong")) return false;
+    if (need.key === "do-hoa" && (slugLower.includes("workstation") || slugLower.includes("do-hoa"))) return false;
+    if (need.key === "mong-nhe" && slugLower.includes("mong-nhe")) return false;
+    return true;
+  });
+
   // Shared server-rendered filter options JSX (zero duplicate IDs, reused by PC sidebar + SP/tablet drawer)
   const filterPanelContent = (
     <div className="space-y-2.5" data-filter-inflow="true">
       {/* 1. Nút Sẵn hàng */}
       <Link
         href={toggle("inStock", "1", false)}
+        scroll={false}
         aria-current={selected("inStock", "1") ? "true" : undefined}
         className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition select-none ${
           selected("inStock", "1")
@@ -308,6 +344,7 @@ export default function CategoryCatalog({
             <div className="flex justify-end">
               <Link
                 href={toggle("pricePreset", params.get("pricePreset")!, false)}
+                scroll={false}
                 className="inline-flex min-h-11 items-center px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:underline"
               >
                 Bỏ chọn
@@ -322,6 +359,7 @@ export default function CategoryCatalog({
                 <Link
                   key={p.value}
                   href={toggle("pricePreset", p.value, false)}
+                  scroll={false}
                   aria-current={isPresetActive ? "true" : undefined}
                   className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition cursor-pointer select-none ${
                     isPresetActive
@@ -342,7 +380,7 @@ export default function CategoryCatalog({
         </div>
       </details>
 
-      {/* 3. In-flow details: Năm sản xuất, CPU, Card đồ họa, Dung lượng RAM / Phụ kiện */}
+      {/* 3. In-flow details: Tình trạng, Hãng, CPU, Card đồ họa, RAM, Ổ cứng, Năm SX / Phụ kiện */}
       {filterGroups.map((group, index) => {
         const options = selectedOptions(group);
         const activeCount = options.length;
@@ -376,6 +414,7 @@ export default function CategoryCatalog({
                 <div className="flex justify-end">
                   <Link
                     href={remove(group.options.map(o => [group.key, String(o.value)]))}
+                    scroll={false}
                     className="inline-flex min-h-11 items-center px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:underline"
                   >
                     Bỏ chọn ({activeCount})
@@ -392,6 +431,7 @@ export default function CategoryCatalog({
                     <Link
                       key={String(option.value)}
                       href={targetHref}
+                      scroll={false}
                       aria-current={isOptionChecked ? "true" : undefined}
                       className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-xs transition cursor-pointer select-none ${
                         isOptionChecked
@@ -428,10 +468,27 @@ export default function CategoryCatalog({
   return (
     <div className="min-w-0 space-y-3 sm:space-y-4" data-catalog-kind={isAccessory ? "accessory" : "laptop"}>
       <CategoryFilterBehavior />
-      <h1 className="sr-only">{category.name}</h1>
 
-      {/* 1. KHỐI PHÂN LOẠI CON & NHU CẦU SỬ DỤNG (Compact top category rails, giữ nguyên tên/link/counts) */}
+      {/* 1. KHỐI HEADER DANH MỤC, PHÂN LOẠI CON & NHU CẦU SỬ DỤNG */}
       <section aria-label="Phân loại con và Nhu cầu" className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2.5 sm:space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight">
+              {category.name}
+            </h1>
+            <span className="text-xs font-semibold text-slate-500 shrink-0">
+              ({result.totalCount} sản phẩm)
+            </span>
+          </div>
+
+          <Link
+            href="/chon-laptop"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-blue-200/80 bg-blue-50/80 px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100/80 transition ml-auto"
+          >
+            <Sparkles size={13} className="text-amber-500 shrink-0" aria-hidden="true" />
+            <span>Tư vấn chọn máy</span>
+          </Link>
+        </div>
 
         {/* Phần Phân loại con Cấp 2 (Dòng máy của danh mục cha - vuốt ngang mượt trên mobile, wrap trên desktop) */}
         {level2Categories.length > 0 ? (
@@ -583,44 +640,45 @@ export default function CategoryCatalog({
           <div className="border-t border-slate-100" />
         )}
 
-        {/* Phần Nhu cầu sử dụng */}
-        {!isAccessory && (
-          <div className="space-y-2">
-            <h2 className="text-base sm:text-lg lg:text-sm font-black tracking-tight lg:uppercase lg:tracking-wider text-slate-800 flex items-center gap-1.5">
-              <Sparkles size={15} className="text-blue-600 shrink-0" aria-hidden="true" />
-              <span>Nhu cầu sử dụng</span>
+        {/* Phần Nhu cầu sử dụng (ẩn thẻ trùng với danh mục hiện tại) */}
+        {!isAccessory && visibleNeeds.length > 0 && (
+          <div className="space-y-1.5">
+            <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-blue-600 shrink-0" aria-hidden="true" />
+              <span>Lọc theo nhu cầu</span>
             </h2>
 
-            <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2">
-              {STANDARD_NEEDS.map((need) => {
+            <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:flex-wrap gap-1.5 sm:gap-2">
+              {visibleNeeds.map((need) => {
                 const checked = selected("tag", need.key);
                 return (
                   <Link
                     key={need.key}
                     href={toggle("tag", need.key)}
+                    scroll={false}
                     aria-current={checked ? "true" : undefined}
-                    className={`group relative flex w-[74px] md:w-auto shrink-0 snap-start min-h-[56px] sm:min-h-[70px] flex-col items-center justify-center rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none ${
+                    className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[58px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[96px] md:w-[104px] transition text-center select-none ${
                       checked
                         ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
                         : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"
                     }`}
                   >
                     {checked && (
-                      <span className="absolute right-1 top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
+                      <span className="hidden sm:flex absolute right-1 top-1 h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
                         ✓
                       </span>
                     )}
 
-                    <div className="flex h-5 sm:h-7 items-center justify-center">
+                    <div className="flex h-4 sm:h-6 items-center justify-center shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img loading="lazy" decoding="async"
                         src={need.image}
                         alt={need.label}
-                        className="max-h-5 sm:max-h-7 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs"
+                        className="max-h-4 sm:max-h-6 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs"
                       />
                     </div>
 
-                    <span className={`text-[10px] sm:text-xs font-bold leading-tight mt-1 line-clamp-2 max-w-full ${
+                    <span className={`text-[11px] sm:text-xs font-bold leading-tight whitespace-nowrap sm:whitespace-normal sm:line-clamp-2 max-w-full ${
                       checked ? "text-blue-900 font-black" : "text-slate-800"
                     }`}>
                       {need.label}
@@ -635,11 +693,12 @@ export default function CategoryCatalog({
       </section>
 
       {/* 2. KHỐI LỌC SIDEBAR PC (240px) + DRAWER SP/TABLET & CỘT KẾT QUẢ SẢN PHẨM */}
-      <div className="space-y-3 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 lg:items-start lg:space-y-0">
+      <div className="space-y-2.5 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 lg:items-start lg:space-y-0">
         <CatalogFilterPanel
           activeCount={chips.length}
           resetHref={category.href}
           currentUrlKey={currentUrlKey}
+          resultCount={result.totalCount}
         >
           {filterPanelContent}
         </CatalogFilterPanel>
@@ -657,8 +716,9 @@ export default function CategoryCatalog({
                   <Link
                     key={i}
                     href={chip.href}
+                    scroll={false}
                     aria-label={`Xóa tiêu chí ${chip.text}`}
-                    className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition shadow-2xs group"
+                    className="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition shadow-2xs group"
                   >
                     <span className="break-words">{chip.text}</span>
                     <X size={13} className="shrink-0 text-blue-500 group-hover:text-rose-600" aria-hidden="true" />
@@ -668,7 +728,8 @@ export default function CategoryCatalog({
 
               <Link
                 href={category.href}
-                className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100/70 hover:text-rose-800 transition shrink-0"
+                scroll={false}
+                className="inline-flex min-h-10 items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-100/70 hover:text-rose-800 transition shrink-0"
               >
                 <RotateCcw size={12} aria-hidden="true" />
                 <span>Xóa tất cả</span>
@@ -678,15 +739,15 @@ export default function CategoryCatalog({
 
           {/* Product Listing Grid, GET Search Form & Sorting Bar */}
           <section aria-label="Kết quả sản phẩm" className="min-w-0 space-y-3 sm:space-y-4">
-            <div className="flex flex-col gap-2.5 bg-white p-3 sm:px-4 sm:py-3 rounded-xl md:rounded-2xl border border-slate-200/90 shadow-xs">
+            <div className="flex flex-col gap-2.5 bg-white p-2.5 sm:px-4 sm:py-3 rounded-xl md:rounded-2xl border border-slate-200/90 shadow-xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <p role="status" className="text-xs sm:text-sm text-slate-600">
-                  Tìm thấy <strong className="font-bold text-slate-900">{result.totalCount}</strong> sản phẩm
+                <p role="status" className="hidden sm:block text-xs sm:text-sm text-slate-600">
+                  Hiển thị <strong className="font-bold text-slate-900">{result.products.length}</strong> / <strong className="font-bold text-slate-900">{result.totalCount}</strong> sản phẩm
                   {result.query && <> khớp với “<span className="text-blue-600 font-bold">{result.query}</span>”</>}
                 </p>
 
-                {/* Ô Searchbox GET giữ nguyên hidden params, font 16px trên SP và control 44px */}
-                <div className="w-full sm:w-auto">
+                {/* Ô Searchbox GET lọc nhanh trong danh mục (ẩn mặc định trên SP trừ khi đang có từ khóa để tiết kiệm chiều dọc, hiển thị trên sm+) */}
+                <div className={`w-full sm:w-auto ${result.query ? "block" : "hidden sm:block"}`}>
                   <form action={category.href} method="get" className="relative flex items-center gap-1.5">
                     {hidden(["q", "page"])}
                     <div className="relative flex min-w-0 flex-1 items-center sm:w-60 md:w-68">
@@ -695,8 +756,8 @@ export default function CategoryCatalog({
                         name="q"
                         aria-label="Tìm sản phẩm trong danh mục"
                         defaultValue={result.query || ""}
-                        placeholder="Tìm tên máy, mã model, CPU..."
-                        className={`h-11 min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 ${result.query ? "pr-11" : "pr-3"} text-base md:text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none transition shadow-2xs`}
+                        placeholder={`Tìm nhanh trong ${category.name}...`}
+                        className={`h-10 min-h-10 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 ${result.query ? "pr-10" : "pr-3"} text-base md:text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none transition shadow-2xs`}
                       />
                       <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" aria-hidden="true" />
                       {result.query && (
@@ -704,7 +765,7 @@ export default function CategoryCatalog({
                           href={toggle("q", result.query, false)}
                           title="Xóa tìm kiếm"
                           aria-label="Xóa từ khóa tìm kiếm"
-                          className="absolute right-0 inline-flex h-11 w-11 min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-slate-600 rounded-xl"
+                          className="absolute right-0 inline-flex h-10 w-10 min-h-10 min-w-10 items-center justify-center text-slate-400 hover:text-slate-600 rounded-xl"
                         >
                           <X size={15} aria-hidden="true" />
                         </Link>
@@ -714,16 +775,16 @@ export default function CategoryCatalog({
                       type="submit"
                       title="Tìm kiếm"
                       aria-label="Tìm kiếm"
-                      className="inline-flex h-11 min-h-11 min-w-11 px-3.5 items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-2xs font-bold text-xs shrink-0 cursor-pointer"
+                      className="inline-flex h-10 min-h-10 min-w-10 px-3 items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-2xs font-bold text-xs shrink-0 cursor-pointer"
                     >
                       <Search size={15} aria-hidden="true" />
-                      <span className="hidden md:inline">Tìm</span>
+                      <span className="hidden md:inline">Lọc</span>
                     </button>
                   </form>
                 </div>
               </div>
 
-              <nav aria-label="Sắp xếp sản phẩm" className="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pt-2 border-t border-slate-100 sm:mx-0 sm:px-0">
+              <nav aria-label="Sắp xếp sản phẩm" className="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 sm:pt-2 sm:border-t sm:border-slate-100 sm:mx-0 sm:px-0">
                 <span className="mr-1 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0 whitespace-nowrap">
                   <ArrowUpDown size={13} aria-hidden="true" />
                   Sắp xếp:
@@ -737,8 +798,9 @@ export default function CategoryCatalog({
                     <Link
                       key={s.value}
                       href={url(next)}
+                      scroll={false}
                       aria-current={isSortActive ? "true" : undefined}
-                      className={`inline-flex min-h-11 items-center shrink-0 whitespace-nowrap snap-start rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      className={`inline-flex min-h-10 items-center shrink-0 whitespace-nowrap snap-start rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                         isSortActive
                           ? "bg-slate-900 text-white shadow-xs font-bold"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"

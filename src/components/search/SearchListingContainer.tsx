@@ -33,7 +33,6 @@ import EmptyState from "@/components/ui/EmptyState";
 import CategorySortSelect, { type SortOptionItem } from "@/components/category/CategorySortSelect";
 import CategoryPagination from "@/components/category/CategoryPagination";
 import CatalogFilterPanel from "@/components/category/CatalogFilterPanel";
-import SearchAutocomplete from "./SearchAutocomplete";
 import type { SearchResult } from "@/server/services/search.service";
 import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
 import { NEED_LABELS, catalogNeedTag } from "@/lib/catalog-needs";
@@ -243,7 +242,33 @@ export default function SearchListingContainer({
         map.set(lowerVal, { value: b.value, label: b.label, count: b.count || 0 });
       }
     }
-    return [...map.values()];
+    const items = [...map.values()];
+    const hasPositiveCount = items.some((b) => b.count > 0);
+    if (query && hasPositiveCount) {
+      return items
+        .filter((b) => b.count > 0 || activeBrands.includes(b.value))
+        .sort((a, b) => b.count - a.count);
+    }
+    return items;
+  })();
+
+  const suggestedQueries = (() => {
+    const normalized = (query || "").toLowerCase().trim();
+    const typoRules: Array<{ test: RegExp; suggestions: string[] }> = [
+      { test: /mac\s*bo|macbok|macc|mac\s*air|mac\s*pro|aple/i, suggestions: ["MacBook Air", "MacBook Pro", "MacBook M3"] },
+      { test: /think\s*pad|thinpad|thinhpad|lenvo|lenovo/i, suggestions: ["ThinkPad", "Lenovo Legion", "Lenovo LOQ"] },
+      { test: /legon|leigon|legion/i, suggestions: ["Lenovo Legion", "Lenovo LOQ", "Laptop Gaming"] },
+      { test: /zeph|rog|tuf|asu|zenbok/i, suggestions: ["Asus ROG", "Asus TUF", "Asus Zenbook"] },
+      { test: /del|xps|latitu|inspir|alien/i, suggestions: ["Dell XPS", "Dell Latitude", "Dell Inspiron"] },
+      { test: /omen|victus|elitebok|zbook/i, suggestions: ["HP Victus", "HP Omen", "HP EliteBook"] },
+      { test: /nitro|predator|swif|aspire/i, suggestions: ["Acer Nitro", "Acer Predator", "Acer Swift"] },
+    ];
+    for (const rule of typoRules) {
+      if (rule.test.test(normalized)) {
+        return rule.suggestions.filter((s) => s.toLowerCase() !== normalized);
+      }
+    }
+    return ["MacBook Air", "ThinkPad", "Lenovo Legion", "Asus ROG", "Dell XPS"];
   })();
 
   const priceSummaryLabel = activePricePreset
@@ -811,238 +836,265 @@ export default function SearchListingContainer({
   );
 
   return (
-    <div className="min-w-0 space-y-3 sm:space-y-4">
-      {/* 1. KHỐI PHÂN LOẠI NHANH: PHẠM VI, THƯƠNG HIỆU & NHU CẦU (1 Card đồng nhất, gọn gàng) */}
+    <div className="min-w-0 space-y-2.5 sm:space-y-3.5">
+      {/* 1. KHỐI TÓM TẮT TÌM KIẾM & PHÂN LOẠI NHANH (Gọn trên 1 dải cuộn ngang ở SP để sản phẩm hiển thị ngay trong màn hình đầu) */}
       <section
         aria-label="Phân loại sản phẩm, thương hiệu và nhu cầu"
-        className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2.5 sm:space-y-3"
+        className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2 sm:space-y-2.5"
       >
-        {/* Hàng 1: Segmented Scope Tabs + Tổng số kết quả + Link Tư vấn */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-          <div className="inline-flex flex-wrap items-center gap-1 rounded-xl bg-slate-100/90 p-1">
-            {scopeCards.map((sc) => {
-              const Icon = sc.icon;
-              const active = currentScope === sc.id;
-              return (
-                <button
-                  key={sc.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => setScopeCategory(sc.slug)}
-                  className={`inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    active
-                      ? "bg-blue-600 text-white shadow-2xs"
-                      : "text-slate-700 hover:text-blue-600 hover:bg-white/70"
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-white" : "text-blue-600"}`} aria-hidden="true" />
-                  <span>{sc.label}</span>
-                </button>
-              );
-            })}
+        {/* Hàng 1: Tổng số kết quả + Segmented Scope Tabs + Link Tư vấn */}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div role="status" className="text-xs sm:text-sm text-slate-700">
+            {query ? (
+              <>
+                Tìm thấy <strong className="font-black text-slate-900">{initialData.totalCount}</strong> sản phẩm cho &ldquo;
+                <strong className="text-blue-600 font-bold">{query}</strong>&rdquo;
+              </>
+            ) : (
+              <>
+                Hiển thị <strong className="font-black text-slate-900">{initialData.totalCount}</strong> sản phẩm
+              </>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 ml-auto">
-            <div role="status" className="text-xs text-slate-600">
-              {query ? (
-                <>
-                  Tìm thấy <strong className="text-slate-900">{initialData.totalCount}</strong> sản phẩm cho &quot;
-                  <strong className="text-blue-600">{query}</strong>&quot;
-                </>
-              ) : (
-                <>
-                  Tìm thấy <strong className="text-slate-900">{initialData.totalCount}</strong> sản phẩm
-                </>
-              )}
-            </div>
-
-            <Link
-              href="/chon-laptop"
-              className="inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50/90 hover:bg-blue-100/80 border border-blue-200/80 text-xs font-bold text-blue-700 transition"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden="true" />
-              <span>Tư vấn chọn máy</span>
-            </Link>
-          </div>
+          <Link
+            href="/chon-laptop"
+            className="inline-flex min-h-9 sm:min-h-10 items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100/80 border border-blue-200/80 text-xs font-bold text-blue-700 transition ml-auto"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden="true" />
+            <span>Tư vấn chọn máy</span>
+          </Link>
         </div>
 
-        {/* Hàng 2: Lưới Card Logo Thương hiệu (compact 4 cột trên SP tới 767px, 8 cột từ md) */}
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
-          {brandItems.map((b) => {
-            const active = activeBrands.includes(b.value);
+        {/* Scope Tabs (Cuộn ngang gọn trên 1 hàng ở SP) */}
+        <div className="flex flex-nowrap items-center gap-1 overflow-x-auto overscroll-x-contain hide-scrollbar rounded-xl bg-slate-100/90 p-1">
+          {scopeCards.map((sc) => {
+            const Icon = sc.icon;
+            const active = currentScope === sc.id;
             return (
               <button
-                key={b.value}
+                key={sc.id}
                 type="button"
                 aria-pressed={active}
-                onClick={() => toggleMultiParam("brand", b.value)}
-                title={b.count > 0 ? `${b.label} (${b.count} sản phẩm)` : b.label}
-                className={`group relative flex min-h-11 h-12 items-center justify-center overflow-hidden rounded-xl border px-1.5 sm:px-2.5 transition cursor-pointer select-none ${
+                onClick={() => setScopeCategory(sc.slug)}
+                className={`inline-flex min-h-10 shrink-0 whitespace-nowrap items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                   active
-                    ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-2xs"
-                    : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white"
+                    ? "bg-blue-600 text-white shadow-2xs"
+                    : "text-slate-700 hover:text-blue-600 hover:bg-white/70"
                 }`}
               >
-                {b.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={b.logo}
-                    alt={b.label}
-                    className="max-h-4 sm:max-h-5 max-w-full w-auto object-contain transition-transform group-hover:scale-105"
-                  />
-                ) : (
-                  <span className="text-[11px] font-black uppercase text-slate-700 break-words text-center leading-tight">{b.label}</span>
-                )}
-                {b.count > 0 && (
-                  <span
-                    className={`absolute right-1.5 top-1 text-[10px] font-bold px-1 rounded-full leading-tight ${
-                      active ? "bg-blue-600 text-white" : "text-slate-400"
-                    }`}
-                  >
-                    {b.count}
-                  </span>
-                )}
+                <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-white" : "text-blue-600"}`} aria-hidden="true" />
+                <span>{sc.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Hàng 3: Lưới Card Nhu cầu sử dụng (compact 4 cột trên SP tới 767px, 8 cột từ md, ẩn khi chọn Phụ kiện) */}
-        {!isAccessoryScope && (
-          <div className="grid grid-cols-4 md:grid-cols-8 gap-2 pt-1">
-            {NEED_CARDS.map((need) => {
-              const active = activeTags.some((t) => catalogNeedTag(t) === need.value);
-              return (
-                <button
-                  key={need.value}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => toggleMultiParam("tag", need.value)}
-                  className={`group relative flex min-h-[56px] flex-col items-center justify-center rounded-xl border py-2 px-1.5 transition cursor-pointer select-none ${
-                    active
-                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/50 text-blue-900 ring-2 ring-blue-500/20 shadow-2xs"
-                      : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white text-slate-700"
-                  }`}
-                >
-                  {active && (
-                    <span className="absolute right-1 top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white text-[9px] font-black">
-                      ✓
-                    </span>
-                  )}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={need.icon}
-                    alt={need.label}
-                    className="h-6 w-6 object-contain transition-transform group-hover:scale-110"
-                  />
-                  <span className={`mt-1 text-[11px] leading-tight text-center break-words max-w-full ${active ? "font-black text-blue-900" : "font-bold text-slate-700"}`}>
-                    {need.label}
-                  </span>
-                </button>
-              );
-            })}
+        {(initialData.totalCount > 0 || totalActiveFilters > 0) && (
+          <>
+            {/* Hàng 2: Thương hiệu (1 hàng cuộn ngang trên SP, 8 cột từ md; ẩn hãng 0 kết quả khi có từ khóa) */}
+            {brandItems.length > 0 && (
+              <div className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 md:mx-0 md:px-0 md:grid md:grid-cols-8 gap-1.5 sm:gap-2 pt-0.5">
+                {brandItems.map((b) => {
+                  const active = activeBrands.includes(b.value);
+                  return (
+                    <button
+                      key={b.value}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => toggleMultiParam("brand", b.value)}
+                      title={b.count > 0 ? `${b.label} (${b.count} sản phẩm)` : b.label}
+                      className={`group relative flex w-[84px] md:w-auto shrink-0 snap-start min-h-11 h-11 items-center justify-center overflow-hidden rounded-xl border px-2 transition cursor-pointer select-none ${
+                        active
+                          ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-2xs"
+                          : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white"
+                      }`}
+                    >
+                      {b.logo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={b.logo}
+                          alt={b.label}
+                          className="max-h-4 sm:max-h-4.5 max-w-[54px] sm:max-w-full w-auto object-contain transition-transform group-hover:scale-105"
+                        />
+                      ) : (
+                        <span className="text-[11px] font-black uppercase text-slate-700 break-words text-center leading-tight">{b.label}</span>
+                      )}
+                      {b.count > 0 && (
+                        <span
+                          className={`ml-1 text-[10px] font-bold px-1 rounded-full leading-tight ${
+                            active ? "bg-blue-600 text-white" : "text-slate-400"
+                          }`}
+                        >
+                          {b.count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Hàng 3: Nhu cầu sử dụng (1 hàng cuộn ngang gọn trên SP, 8 cột trên PC, ẩn khi chọn Phụ kiện) */}
+            {!isAccessoryScope && (
+              <div className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 md:mx-0 md:px-0 md:grid md:grid-cols-8 gap-1.5 sm:gap-2">
+                {NEED_CARDS.map((need) => {
+                  const active = activeTags.some((t) => catalogNeedTag(t) === need.value);
+                  return (
+                    <button
+                      key={need.value}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => toggleMultiParam("tag", need.value)}
+                      className={`group relative flex shrink-0 snap-start min-h-10 md:min-h-[54px] flex-row md:flex-col items-center justify-center gap-1.5 md:gap-1 rounded-xl border py-1.5 px-2.5 md:px-1.5 transition cursor-pointer select-none ${
+                        active
+                          ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/50 text-blue-900 ring-2 ring-blue-500/20 shadow-2xs"
+                          : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white text-slate-700"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={need.icon}
+                        alt={need.label}
+                        className="h-4 w-4 md:h-5 md:w-5 shrink-0 object-contain transition-transform group-hover:scale-110"
+                      />
+                      <span className={`text-[11px] leading-tight whitespace-nowrap md:whitespace-normal text-center ${active ? "font-black text-blue-900" : "font-bold text-slate-700"}`}>
+                        {need.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Chips tiêu chí đang chọn hiển thị ngay trong khối đầu */}
+        {chips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+            <span className="text-xs font-bold text-slate-600 mr-1">Đang lọc:</span>
+            {chips.map((chip, idx) => (
+              <button
+                key={`${chip.key}-${chip.value}-${idx}`}
+                type="button"
+                onClick={() => removeChip(chip.key, chip.value)}
+                aria-label={`Xóa lọc ${chip.label}`}
+                className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-xl border border-blue-200/90 bg-blue-50/80 px-2.5 py-1 text-xs font-semibold text-blue-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer group"
+              >
+                <span className="break-words">{chip.label}</span>
+                <X className="w-3.5 h-3.5 shrink-0 text-blue-500 group-hover:text-rose-600" aria-hidden="true" />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="ml-auto inline-flex min-h-9 items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition cursor-pointer px-2.5 py-1"
+            >
+              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Xóa tất cả</span>
+            </button>
           </div>
         )}
       </section>
 
       {/* 2. KHỐI LỌC SIDEBAR PC (240px) + DRAWER SP/TABLET & CỘT KẾT QUẢ SẢN PHẨM */}
-      <div className="space-y-3 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 lg:items-start lg:space-y-0">
+      <div className="space-y-2.5 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 lg:items-start lg:space-y-0">
         <CatalogFilterPanel
-          key={currentUrlKey}
           activeCount={totalActiveFilters}
           resetHref={resetHref}
           currentUrlKey={currentUrlKey}
+          resultCount={initialData.totalCount}
+          toolbarRightSlot={
+            <div className="shrink-0 [&_select]:min-h-11 [&_select]:text-xs sm:[&_select]:text-sm">
+              <CategorySortSelect
+                options={SEARCH_SORT_OPTIONS}
+                defaultSort={query ? "relevance" : "newest"}
+              />
+            </div>
+          }
         >
           {filterPanelContent}
         </CatalogFilterPanel>
 
         <div className="min-w-0 space-y-3 sm:space-y-4">
-          {/* Thanh tìm kiếm từ khóa, sắp xếp & chips tiêu chí đang chọn (Ngoài drawer) */}
-          <section
-            aria-label="Bộ lọc chi tiết và sắp xếp"
-            className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-3 sm:px-3.5 sm:py-3 shadow-xs space-y-2.5"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <div className="flex-1 min-w-0">
-                <SearchAutocomplete
-                  initialQuery={query}
-                  placeholder="Tìm tên máy, CPU, GPU..."
-                  size="sm"
-                  className="w-full"
-                  inputClassName="!text-base md:!text-xs"
-                />
-              </div>
+          {/* Thanh sắp xếp trên PC (Trên SP đã gộp chung vào hàng Bộ lọc để tiết kiệm chiều dọc) */}
+          {initialData.products.length > 0 && (
+            <section
+              aria-label="Sắp xếp kết quả"
+              className="hidden lg:flex items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white px-4 py-2.5 shadow-xs"
+            >
+              <p className="text-xs text-slate-600">
+                Hiển thị <strong className="font-bold text-slate-900">{initialData.products.length}</strong> /{" "}
+                <strong className="font-bold text-slate-900">{initialData.totalCount}</strong> sản phẩm
+              </p>
 
-              <div className="shrink-0 [&_select]:min-h-11 [&_select]:text-base md:[&_select]:text-xs">
+              <div className="shrink-0 [&_select]:min-h-10 [&_select]:text-xs">
                 <CategorySortSelect
                   options={SEARCH_SORT_OPTIONS}
                   defaultSort={query ? "relevance" : "newest"}
                 />
               </div>
-            </div>
-
-            {chips.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-                <span className="text-xs font-bold text-slate-600 mr-1">Đang chọn:</span>
-                {chips.map((chip, idx) => (
-                  <button
-                    key={`${chip.key}-${chip.value}-${idx}`}
-                    type="button"
-                    onClick={() => removeChip(chip.key, chip.value)}
-                    aria-label={`Xóa lọc ${chip.label}`}
-                    className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-blue-200/90 bg-blue-50/80 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer group"
-                  >
-                    <span className="break-words">{chip.label}</span>
-                    <X className="w-3.5 h-3.5 shrink-0 text-blue-500 group-hover:text-rose-600" aria-hidden="true" />
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={clearAllFilters}
-                  className="ml-auto inline-flex min-h-11 items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition cursor-pointer px-3 py-1.5"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Xóa tất cả</span>
-                </button>
-              </div>
-            )}
-          </section>
+            </section>
+          )}
 
           {/* 3. LƯỚI KẾT QUẢ SẢN PHẨM (SP 2 cột, Tablet 3 cột, PC lg 3 cột / xl 4 cột khi có sidebar 240px) */}
           <section aria-label="Kết quả sản phẩm" className="min-w-0">
             {initialData.products.length === 0 ? (
-              <div className="bg-surface-card border border-border-default rounded-2xl p-8 sm:p-10 text-center">
+              <div className="bg-surface-card border border-border-default rounded-2xl p-6 sm:p-10 text-center space-y-5">
                 <EmptyState
                   icon={<Inbox className="w-8 h-8 stroke-1.5" aria-hidden="true" />}
                   title="Không tìm thấy sản phẩm phù hợp"
                   description={
                     query
-                      ? `Rất tiếc, không có sản phẩm nào khớp với từ khóa "${query}". Bạn có thể thử tìm kiếm bằng từ khóa ngắn hơn hoặc kiểm tra lỗi chính tả.`
+                      ? `Rất tiếc, không có sản phẩm nào khớp với từ khóa "${query}". Bạn có thể chọn một trong các từ khóa gợi ý bên dưới:`
                       : "Không tìm thấy sản phẩm nào với các bộ lọc bạn đã chọn."
                   }
                   action={
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4 flex-wrap">
-                      {totalActiveFilters > 0 && (
-                        <Link
-                          href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
-                          className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 rounded-xl bg-brand-primary text-text-inverse font-bold text-body-sm hover:bg-brand-primary-hover transition"
-                        >
-                          Xóa tất cả bộ lọc
-                        </Link>
+                    <div className="space-y-4 mt-2">
+                      {suggestedQueries.length > 0 && (
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <span className="text-xs font-bold text-slate-500">Có phải bạn muốn tìm:</span>
+                          {suggestedQueries.map((suggestion) => (
+                            <Link
+                              key={suggestion}
+                              href={`/search?q=${encodeURIComponent(suggestion)}`}
+                              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition"
+                            >
+                              <span>{suggestion}</span>
+                            </Link>
+                          ))}
+                        </div>
                       )}
-                      <Link
-                        href="/chon-laptop"
-                        className="inline-flex min-h-11 items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-body-sm hover:bg-blue-100 transition"
-                      >
-                        <Sparkles className="w-4 h-4 text-blue-600" aria-hidden="true" />
-                        <span>Tư vấn chọn laptop phù hợp</span>
-                      </Link>
-                      <Link
-                        href="/phan-loai"
-                        className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 rounded-xl border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
-                      >
-                        Khám phá tất cả danh mục
-                      </Link>
+
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 flex-wrap pt-1">
+                        {totalActiveFilters > 0 && (
+                          <Link
+                            href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
+                            className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 rounded-xl bg-brand-primary text-text-inverse font-bold text-body-sm hover:bg-brand-primary-hover transition"
+                          >
+                            Xóa tất cả bộ lọc
+                          </Link>
+                        )}
+                        <Link
+                          href="/chon-laptop"
+                          className="inline-flex min-h-11 items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-body-sm hover:bg-blue-100 transition"
+                        >
+                          <Sparkles className="w-4 h-4 text-blue-600" aria-hidden="true" />
+                          <span>Tư vấn chọn laptop phù hợp</span>
+                        </Link>
+                        <Link
+                          href="/laptop-gaming"
+                          className="inline-flex min-h-11 items-center justify-center px-4 py-2.5 rounded-xl border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
+                        >
+                          Laptop Gaming
+                        </Link>
+                        <Link
+                          href="/laptop-van-phong"
+                          className="inline-flex min-h-11 items-center justify-center px-4 py-2.5 rounded-xl border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
+                        >
+                          Laptop Văn phòng
+                        </Link>
+                      </div>
                     </div>
                   }
                 />

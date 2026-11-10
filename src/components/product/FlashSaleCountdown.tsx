@@ -75,10 +75,27 @@ export default function FlashSaleCountdown({
 
   // Server render or unmounted fallback: render calm placeholder to avoid hydration mismatch
   if (!mounted) {
+    if (saleStyle) {
+      return (
+        <div className={`flex max-w-full flex-wrap items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-white ${className}`}>
+          <span className="text-xs font-bold uppercase sm:text-lg">Kết thúc trong:</span>
+          <div className="flex items-center gap-1 text-sm font-black sm:gap-2 sm:text-2xl">
+            {["--", "--", "--", "--"].map((val, idx) => (
+              <span key={idx} className="contents">
+                {idx > 0 && <span aria-hidden="true">:</span>}
+                <span className="min-w-6.5 sm:min-w-10 rounded bg-white px-1 sm:px-2 py-0.5 sm:py-1 text-center text-black tabular-nums">
+                  {val}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      );
+    }
     return (
-      <div className={`flex items-center gap-3 bg-gray-50 px-4 py-2 rounded-full border border-gray-200 text-sm text-gray-500 ${className}`}>
-        <Clock className="w-4 h-4 text-gray-400" />
-        <span>Đang tải thời gian...</span>
+      <div className={`flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-200 text-xs text-gray-500 ${className}`}>
+        <Clock className="w-3.5 h-3.5 text-gray-400" />
+        <span>Đang cập nhật...</span>
       </div>
     );
   }

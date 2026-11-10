@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useId } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard, { type ProductCardProduct } from '@/components/product/ProductCard';
 
 type Tab = {
@@ -22,6 +22,34 @@ function normalizeTabHref(tab: Tab): string {
   return tab.href;
 }
 
+function formatTabLabel(tab: Tab): string {
+  const upper = tab.label.trim().toUpperCase();
+  if (tab.id === 'new-arrivals' || upper === 'LAPTOP MỚI VỀ') return 'HÀNG MỚI VỀ';
+  if (tab.id === 'new' || tab.id === 'new-laptops' || upper === 'LAPTOP MỚI') return 'MỚI 100% FULLBOX';
+  if (tab.id === 'like-new' || tab.id === 'likenew' || upper === 'LAPTOP LIKENEW') return 'LIKENEW 99%';
+  if (tab.id === 'clearance' || upper === 'XẢ HÀNG GIÁ SỐC') return 'XẢ KHO GIÁ SỐC';
+  return tab.label;
+}
+
+function deduplicateListingProducts(products: ProductCardProduct[]): ProductCardProduct[] {
+  const seenKeys = new Set<string>();
+  const result: ProductCardProduct[] = [];
+  for (const product of products) {
+    const baseName = (product.name || '')
+      .toLowerCase()
+      .replace(/^\[[^\]]+\]\s*/g, '')
+      .replace(/\s*[-–|]\s*(bạc|xám|đen|trắng|hồng|vàng|xanh|silver|space gray|gray|grey|black|white|pink|blush|gold|indigo|citrus|midnight|starlight)\s*$/i, '')
+      .replace(/\s*\((bạc|xám|đen|trắng|hồng|vàng|xanh|silver|space gray|gray|grey|black|white|pink|blush|gold|indigo|citrus|midnight|starlight)\)\s*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const key = baseName || String(product.id);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    result.push(product);
+  }
+  return result;
+}
+
 export default function ProductTabs({
   title,
   subtitle,
@@ -33,7 +61,9 @@ export default function ProductTabs({
   tabs: Tab[];
   eagerImages?: boolean;
 }) {
-  const tabs = rawTabs.filter((t) => t.enabled !== false);
+  const tabs = rawTabs
+    .filter((t) => t.enabled !== false)
+    .map((t) => ({ ...t, label: formatTabLabel(t) }));
   const [active, setActive] = useState(0);
   const prefix = useId();
   const safeIndex = active < tabs.length ? active : 0;
@@ -41,10 +71,12 @@ export default function ProductTabs({
   if (!rawTab) return null;
   const isLaptopTab =
     ['new-arrivals', 'new', 'new-laptops', 'like-new', 'likenew', 'clearance'].includes(rawTab.id) ||
-    /laptop/i.test(rawTab.label);
-  const filteredProducts = isLaptopTab
-    ? rawTab.products.filter((p) => p.template !== 'ACCESSORY' && !p.href?.startsWith('/phu-kien/'))
-    : rawTab.products;
+    /laptop|mới|likenew/i.test(rawTab.label);
+  const filteredProducts = deduplicateListingProducts(
+    isLaptopTab
+      ? rawTab.products.filter((p) => p.template !== 'ACCESSORY' && !p.href?.startsWith('/phu-kien/'))
+      : rawTab.products
+  );
   const tab = {
     ...rawTab,
     href: normalizeTabHref(rawTab),
@@ -154,7 +186,7 @@ export default function ProductTabs({
 }
 
 export function ProductCarousel({
-  products,
+  products: rawProducts,
   label,
   oneAtATime = false,
   mobileLimit = null,
@@ -168,10 +200,10 @@ export function ProductCarousel({
   eagerImages?: boolean;
   cardVariant?: 'default' | 'flash';
 }) {
+  const products = deduplicateListingProducts(rawProducts);
   const isFlash = cardVariant === 'flash';
   const container = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
-  const [autoplay, setAutoplay] = useState(true);
   const [bounds, setBounds] = useState({ start: true, end: false });
   const getStep = (el: HTMLElement) => (el.firstElementChild?.getBoundingClientRect().width || 0) + (parseFloat(getComputedStyle(el).columnGap) || 0);
   function move(direction: number) {
@@ -180,23 +212,6 @@ export function ProductCarousel({
     const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
     el.scrollBy({ left: direction * getStep(el), behavior });
   }
-  useEffect(() => {
-    const root = container.current, el = rail.current;
-    if (!root || !el || !autoplay) return;
-    let visible = false, touching = false;
-    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { threshold: 0.15 });
-    observer.observe(root);
-    const down = () => { touching = true; }, up = () => { touching = false; };
-    root.addEventListener('pointerdown', down);
-    window.addEventListener('pointerup', up);
-    window.addEventListener('pointercancel', up);
-    const timer = setInterval(() => {
-      if (!visible || touching || document.hidden || root.matches(':hover, :focus-within') || matchMedia('(prefers-reduced-motion: reduce)').matches || el.scrollWidth <= el.clientWidth + 1) return;
-      const left = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2 ? 0 : el.scrollLeft + getStep(el);
-      el.scrollTo({ left, behavior: 'smooth' });
-    }, 5000);
-    return () => { clearInterval(timer); observer.disconnect(); root.removeEventListener('pointerdown', down); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
-  }, [autoplay, products]);
   useEffect(() => {
     const el = rail.current;
     if (!el) return;
@@ -220,7 +235,7 @@ export function ProductCarousel({
       tabIndex={0}
       role="region"
       aria-label={`Sản phẩm ${label}`}
-      className={`md:col-start-2 md:row-start-1 grid ${spColsClass} grid-flow-col overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-0.5 md:px-1 pt-1.5 md:pt-2 pb-2 md:pb-4 md:gap-3 md:auto-cols-[calc((100%-24px)/3)] lg:gap-4 lg:auto-cols-[calc((100%-48px)/4)] xl:auto-cols-[calc((100%-64px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
+      className={`md:col-start-2 md:row-start-1 grid ${spColsClass} grid-flow-col overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-0.5 md:px-1 pt-1.5 md:pt-2 pb-2 md:pb-3 md:gap-3 md:auto-cols-[calc((100%-24px)/3)] lg:gap-4 lg:auto-cols-[calc((100%-48px)/4)] xl:auto-cols-[calc((100%-64px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
     >
       {products.map((p, idx) => {
         const hideOnMobile = Boolean(mobileLimit && mobileLimit > 0 && idx >= mobileLimit);
@@ -248,9 +263,6 @@ export function ProductCarousel({
       className="hidden md:flex md:col-start-3 md:row-start-1 min-h-11 min-w-11 h-14 w-full cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
     >
       <ChevronRight className="h-6 w-6" />
-    </button>
-    <button type="button" aria-label={autoplay ? 'Tạm dừng tự cuộn sản phẩm' : 'Bật tự cuộn sản phẩm'} aria-pressed={!autoplay} onClick={() => setAutoplay(value => !value)} className="md:col-start-2 min-h-11 justify-self-start md:justify-self-end rounded-full border border-slate-200 bg-white/95 px-3 md:px-3.5 py-1.5 text-[11px] md:text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600">
-      {autoplay ? <Pause aria-hidden="true" className="mr-1 inline h-3 w-3" /> : <Play aria-hidden="true" className="mr-1 inline h-3 w-3" />}{autoplay ? 'Tạm dừng' : 'Tự cuộn'}
     </button>
   </div>;
 }

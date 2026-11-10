@@ -34,8 +34,8 @@ export interface SearchAutocompleteProps {
 
 export default function SearchAutocomplete({
   initialQuery = "",
-  placeholder = "Tìm kiếm theo tên máy, CPU, GPU, thương hiệu...",
-  mobilePlaceholder = "Tìm kiếm...",
+  placeholder = "Tìm laptop, dòng máy, CPU, GPU...",
+  mobilePlaceholder = "Tìm laptop, mã máy...",
   className = "",
   inputClassName = "",
   size = "md",
@@ -53,7 +53,19 @@ export default function SearchAutocomplete({
   const [categorySuggestions, setCategorySuggestions] = useState<Array<{ id: string; name: string; slug: string; href?: string }>>([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.slice(0, 6);
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
   const [showDiscovery, setShowDiscovery] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,20 +81,27 @@ export default function SearchAutocomplete({
     setQuery(initialQuery);
   }
 
+  useEffect(() => {
+    if (initialQuery) return;
+    const syncUrlQuery = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlQ = (params.get("q") || "").trim();
+        setQuery(urlQ);
+      } catch {
+        // ignore
+      }
+    };
+    syncUrlQuery();
+    window.addEventListener("popstate", syncUrlQuery);
+    return () => window.removeEventListener("popstate", syncUrlQuery);
+  }, [initialQuery]);
+
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 640);
     checkMobile();
-    try {
-      const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setRecentSearches(parsed.slice(0, 6));
-      }
-    } catch {
-      // ignore
-    }
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
   }, []);

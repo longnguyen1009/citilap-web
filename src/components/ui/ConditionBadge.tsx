@@ -3,6 +3,7 @@ import { Badge, type BadgeSize } from "./Badge";
 
 export type ConditionCode =
   | "NEW"
+  | "OUTLET"
   | "LIKE_NEW"
   | "USED"
   | "REFURBISHED"
@@ -23,6 +24,12 @@ export const CONDITION_METAS: Record<ConditionCode, ConditionMeta> = {
     label: "Mới 100%",
     variant: "condition-new",
     description: "Máy mới nguyên hộp, chính hãng",
+  },
+  OUTLET: {
+    code: "OUTLET",
+    label: "New Outlet",
+    variant: "condition-like-new",
+    description: "Máy mới Outlet chính hãng, giá tiết kiệm",
   },
   LIKE_NEW: {
     code: "LIKE_NEW",
@@ -64,48 +71,61 @@ export const CONDITION_METAS: Record<ConditionCode, ConditionMeta> = {
 
 /**
  * Standard mapper: converts condition code or legacy string to ConditionMeta.
- * Legacy name inference is isolated strictly inside this fallback helper.
+ * Prioritizes explicit title prefixes ([New Outlet], [Like New]) when DB condition is generic NEW.
  */
 export function resolveConditionMeta(
   condition?: string | null,
   fallbackName?: string
 ): ConditionMeta {
+  const nameLower = (fallbackName || "").toLowerCase();
+  const condLower = (condition || "").toLowerCase();
+
+  // 1. Explicit title prefix or condition keyword for Outlet / Like New
+  if (
+    condLower.includes("outlet") ||
+    /^\s*\[\s*(?:new\s*)?outlet/i.test(fallbackName || "") ||
+    nameLower.includes("new outlet")
+  ) {
+    return CONDITION_METAS.OUTLET;
+  }
+
+  if (
+    condLower.includes("99%") ||
+    condLower.includes("like new") ||
+    condLower.includes("likenew") ||
+    /^\s*\[\s*like\s*new/i.test(fallbackName || "") ||
+    nameLower.includes("like new") ||
+    nameLower.includes("likenew") ||
+    nameLower.includes("99%") ||
+    nameLower.includes("lướt")
+  ) {
+    return CONDITION_METAS.LIKE_NEW;
+  }
+
+  if (nameLower.includes("98%") || condLower.includes("98%")) {
+    return {
+      code: "LIKE_NEW",
+      label: "LikeNew 98%",
+      variant: "condition-like-new",
+    };
+  }
+
   if (condition) {
     const normalized = condition.toUpperCase().trim() as ConditionCode;
     if (CONDITION_METAS[normalized]) {
       return CONDITION_METAS[normalized];
     }
-    // Check known keywords in legacy string
-    if (condition.includes("99%") || condition.toLowerCase().includes("like new") || condition.toLowerCase().includes("likenew")) {
-      return CONDITION_METAS.LIKE_NEW;
-    }
-    if (condition.includes("100%") || condition.toLowerCase().includes("mới") || condition.toLowerCase().includes("new")) {
+    if (condition.includes("100%") || condLower.includes("mới") || condLower.includes("new")) {
       return CONDITION_METAS.NEW;
     }
-    if (condition.toLowerCase().includes("cũ") || condition.toLowerCase().includes("used")) {
+    if (condLower.includes("cũ") || condLower.includes("used")) {
       return CONDITION_METAS.USED;
     }
-    // Custom label fallback
     return {
       code: "USED",
       label: condition,
       variant: "condition-used",
     };
-  }
-
-  // Isolated legacy fallback for unmigrated mock items
-  if (fallbackName) {
-    const lower = fallbackName.toLowerCase();
-    if (lower.includes("like new") || lower.includes("likenew") || lower.includes("99%") || lower.includes("lướt")) {
-      return CONDITION_METAS.LIKE_NEW;
-    }
-    if (lower.includes("98%")) {
-      return {
-        code: "LIKE_NEW",
-        label: "LikeNew 98%",
-        variant: "condition-like-new",
-      };
-    }
   }
 
   return CONDITION_METAS.NEW;
