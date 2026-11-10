@@ -55,6 +55,7 @@ export interface ProductCardProps {
   showSpecs?: boolean;
   className?: string;
   imageLoading?: "eager" | "lazy";
+  variant?: "default" | "flash";
 }
 
 function isMeaningfulSpec(val?: string | null): val is string {
@@ -144,21 +145,6 @@ function formatMobileCpuSpec(val?: string): string {
     .trim();
 }
 
-function formatMobileGpuSpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .split(/[\/,;]/)[0]
-    .replace(/®|™/g, "")
-    .replace(/^NVIDIA\s+GeForce\s+/i, "")
-    .replace(/^NVIDIA\s+/i, "")
-    .replace(/^GeForce\s+/i, "")
-    .replace(/\bLaptop\s+GPU\b/gi, "")
-    .replace(/\s+GDDR\d+[A-Z]*/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function formatMobileRamSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
   return val
@@ -235,7 +221,9 @@ export default function ProductCard({
   showSpecs = true,
   className = "",
   imageLoading = "lazy",
+  variant = "default",
 }: ProductCardProps) {
+  const isFlash = variant === "flash";
   const wishlistCtx = useOptionalWishlist();
   const compareCtx = useOptionalCompare();
   const liked = wishlistCtx?.isInWishlist(product.id) ?? false;
@@ -312,28 +300,40 @@ export default function ProductCard({
   const display = isAccessory ? "" : formatDisplaySpec(product.specs?.display);
   const hasDesktopSpecs = Boolean(cpu || gpu || ram || ssd || display);
 
-  // Mobile (SP) vertical specs
+  // Mobile (SP < 768px) compact horizontal spec badges
   const mCpu = isAccessory ? "" : formatMobileCpuSpec(product.specs?.cpu);
   const mRam = isAccessory ? "" : formatMobileRamSpec(product.specs?.ram);
   const mSsd = isAccessory ? "" : formatMobileStorageSpec(product.specs?.ssd);
-  const mGpu = isAccessory ? "" : formatMobileGpuSpec(product.specs?.gpu);
   const mDisplay = isAccessory ? "" : formatMobileDisplaySpec(product.specs?.display);
-  const mMemoryLine = [mRam, mSsd].filter(Boolean).join(" / ");
-  const mobileSpecRows = [
-    { label: "CPU", value: mCpu },
-    { label: mRam && mSsd ? "RAM/SSD" : mRam ? "RAM" : "SSD", value: mMemoryLine },
-    { label: "GPU", value: mGpu },
-    { label: "Màn", value: mDisplay },
-  ].filter((row) => Boolean(row.value));
-  const hasMobileSpecs = mobileSpecRows.length > 0;
+  const spRamBadge = ram ? ram.replace(/GB$/i, "G") : mRam;
+  const spSsdBadge = ssd ? ssd.replace(/GB$/i, "G") : mSsd;
+  const spMemoryBadge = [spRamBadge, spSsdBadge].filter(Boolean).join("/");
+  const spMemoryTitle = [
+    product.specs?.ram ? `RAM: ${product.specs?.ram}` : mRam,
+    product.specs?.ssd ? `SSD: ${product.specs?.ssd}` : mSsd,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+  const mobileSpecPills = [
+    spMemoryBadge
+      ? { key: "mem", text: spMemoryBadge, title: spMemoryTitle || spMemoryBadge }
+      : null,
+    cpu || mCpu
+      ? { key: "cpu", text: cpu || mCpu, title: `CPU: ${product.specs?.cpu || mCpu || cpu}` }
+      : null,
+    display || mDisplay
+      ? { key: "display", text: display || mDisplay, title: `Màn hình: ${product.specs?.display || mDisplay || display}` }
+      : null,
+  ].filter((pill): pill is { key: string; text: string; title: string } => Boolean(pill));
+  const hasMobileSpecs = mobileSpecPills.length > 0;
 
   return (
     <article
-      className={`group/product relative flex flex-col h-full rounded-xl sm:rounded-2xl border sm:border-2 ${brandTheme.cardBg} ${brandTheme.cardBorder} ${brandTheme.hoverBorder} shadow-2xs sm:shadow-xs hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
+      className={`group/product relative flex flex-col h-full rounded-lg md:rounded-xl lg:rounded-2xl border md:border-2 ${brandTheme.cardBg} ${brandTheme.cardBorder} ${brandTheme.hoverBorder} shadow-2xs md:shadow-xs hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-inset focus-within:ring-blue-600/40 transition-[border-color,box-shadow,transform] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 overflow-hidden ${className}`}
     >
       {/* Top Badges Bar: Rank, Condition & Compare, Wishlist (compact, no overlap) */}
-      <div className="absolute top-1.5 left-1.5 right-1.5 sm:left-2 sm:right-2 z-20 flex items-center justify-between gap-1 pointer-events-none">
-        <div className="flex items-center gap-1 min-w-0 shrink">
+      <div className="absolute top-0 left-0 right-0 md:top-1 md:left-1.5 md:right-1.5 z-20 flex items-start justify-between gap-1 pointer-events-none">
+        <div className="flex flex-wrap items-center gap-1 min-w-0 shrink pt-1.5 pl-1.5 md:pt-1 md:pl-0.5">
           {/* Rank Badge */}
           {rank !== undefined && (
             <Badge variant={rank <= 3 ? "rank-top" : "rank-other"} size="xs" className="text-[9px] px-1 py-0.5 rounded-[2px] font-bold shrink-0">
@@ -341,12 +341,24 @@ export default function ProductCard({
             </Badge>
           )}
 
+          {/* Real Discount Badge in top-left corner on Flash SP so 120px card has zero overlap */}
+          {isFlash && discountPercent && (
+            <span className="md:hidden bg-[#D71920] text-white font-black text-[10px] px-1.5 py-0.5 rounded-[4px] leading-none select-none tracking-tight shadow-2xs shrink-0">
+              {discountPercent}
+            </span>
+          )}
+
           {/* Condition Badge (Standardized Citilap Core: Mới 100%, LikeNew 99%, Máy cũ) */}
-          <ConditionBadge condition={product.condition} fallbackName={product.name} size="xs" className="text-[8.5px] sm:text-[9.5px] px-1 sm:px-1.5 py-0.5 rounded-[3px] font-bold leading-tight truncate max-w-full shadow-2xs" />
+          <ConditionBadge
+            condition={product.condition}
+            fallbackName={product.name}
+            size="xs"
+            className={`${isFlash ? "hidden md:inline-flex " : ""}text-[8.5px] md:text-[9.5px] px-1 md:px-1.5 py-0.5 rounded-[3px] font-bold leading-tight truncate max-w-full shadow-2xs`}
+          />
         </div>
 
-        <div className="flex items-center gap-0.5 sm:gap-2 shrink-0 pointer-events-auto">
-          {/* Compare Button */}
+        <div className={`${isFlash ? "hidden md:flex" : "flex"} items-center gap-0 shrink-0 pointer-events-auto`}>
+          {/* Compare Button (44x44px non-overlapping hit target) */}
           <button
             type="button"
             onClick={toggleCompare}
@@ -355,16 +367,16 @@ export default function ProductCard({
               inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
             }
             title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
-            className={`relative w-7 h-7 sm:w-9 sm:h-9 -m-0.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-6 before:h-6 sm:before:w-7.5 sm:before:h-7.5 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 ${
+            className={`relative min-w-11 min-h-11 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 md:before:w-7.5 md:before:h-7.5 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 motion-reduce:before:transition-none ${
               inCompare
                 ? "text-white before:bg-blue-600 before:border before:border-blue-600"
                 : "text-text-muted hover:text-blue-600 before:bg-white/95 before:backdrop-blur-xs hover:before:bg-blue-50/80 before:border before:border-border-default"
             }`}
           >
-            <Scale className="relative z-10 w-3 h-3 sm:w-4 sm:h-4" />
+            <Scale className="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" />
           </button>
 
-          {/* Wishlist Button */}
+          {/* Wishlist Button (44x44px non-overlapping hit target) */}
           <button
             type="button"
             onClick={toggleWishlist}
@@ -372,19 +384,25 @@ export default function ProductCard({
             aria-label={
               liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
             }
-            className={`relative w-7 h-7 sm:w-9 sm:h-9 -m-0.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-6 before:h-6 sm:before:w-7.5 sm:before:h-7.5 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 ${
+            className={`relative min-w-11 min-h-11 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 md:before:w-7.5 md:before:h-7.5 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 motion-reduce:before:transition-none ${
               liked
                 ? "text-error before:bg-red-50 before:border before:border-red-200"
                 : "text-text-muted hover:text-error before:bg-white/95 before:backdrop-blur-xs hover:before:bg-red-50/80 before:border before:border-border-default"
             }`}
           >
-            <Heart className="relative z-10 w-3 h-3 sm:w-4 sm:h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
+            <Heart className="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
           </button>
         </div>
       </div>
 
       {/* Product Image Container */}
-      <div className={`relative aspect-[16/11] sm:aspect-[4/3] w-full border-b border-black/[0.04] ${brandTheme.imageBg} p-2 pt-6 pb-1 sm:p-3.5 sm:pt-7 sm:pb-2 flex items-center justify-center overflow-hidden`}>
+      <div
+        className={`relative ${
+          isFlash
+            ? "aspect-square md:aspect-[4/3] p-2 pt-6 pb-1.5 md:p-3.5 md:pt-8 md:pb-2"
+            : "aspect-[16/11] md:aspect-[4/3] p-2 pt-8 pb-1 md:p-3.5 md:pt-8 md:pb-2"
+        } w-full border-b border-black/[0.04] ${brandTheme.imageBg} flex items-center justify-center overflow-hidden`}
+      >
         <div className="relative block w-full h-full">
           {(() => {
             const rawImage = product.thumbnailUrl || product.image || (product as { primaryImage?: string }).primaryImage || null;
@@ -396,16 +414,16 @@ export default function ProductCard({
                 fill
                 loading={imageLoading}
                 unoptimized={cardImage.includes('size=thumb') || cardImage.startsWith('/brand/')}
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, 20vw"
                 onError={() => setImageError(true)}
-                className={`object-contain transition-transform duration-300 scale-[0.9] sm:scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${
+                className={`object-contain transition-transform duration-300 scale-[0.9] md:scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${
                   isOutOfStock ? "grayscale opacity-60" : ""
                 }`}
               />
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-                <Laptop className="w-11 h-11 sm:w-14 sm:h-14 stroke-1" />
-                <span className="text-[11px] sm:text-caption font-medium text-text-muted mt-0.5">Ảnh đang cập nhật</span>
+                <Laptop className="w-10 h-10 md:w-14 md:h-14 stroke-1" />
+                <span className="text-[10px] md:text-caption font-medium text-text-muted mt-0.5 text-center px-1">Ảnh đang cập nhật</span>
               </div>
             );
           })()}
@@ -413,7 +431,7 @@ export default function ProductCard({
           {/* Out of stock overlay */}
           {isOutOfStock && (
             <div className="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-[1px] rounded-control z-10">
-              <span className="bg-slate-900/90 text-white text-[11px] sm:text-xs font-bold px-2.5 py-1 rounded-control shadow-xs">
+              <span className="bg-slate-900/90 text-white text-[10px] md:text-xs font-bold px-2 py-1 rounded-control shadow-xs">
                 Tạm hết hàng
               </span>
             </div>
@@ -421,12 +439,50 @@ export default function ProductCard({
         </div>
       </div>
 
+      {/* Flash SP dedicated 44px non-overlapping action row directly below square image */}
+      {isFlash && (
+        <div className="md:hidden relative z-20 flex items-center justify-end gap-0 h-11 px-1 border-b border-black/[0.04] bg-white/90">
+          <button
+            type="button"
+            onClick={toggleCompare}
+            aria-pressed={inCompare}
+            aria-label={
+              inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
+            }
+            title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
+            className={`relative min-w-11 min-h-11 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 motion-reduce:before:transition-none ${
+              inCompare
+                ? "text-white before:bg-blue-600 before:border before:border-blue-600"
+                : "text-text-muted hover:text-blue-600 before:bg-white before:border before:border-border-default"
+            }`}
+          >
+            <Scale className="relative z-10 w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleWishlist}
+            aria-pressed={liked}
+            aria-label={
+              liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
+            }
+            className={`relative min-w-11 min-h-11 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden before:content-[''] before:absolute before:w-7 before:h-7 before:rounded-full before:shadow-2xs before:transition-[background-color,border-color,transform] before:duration-150 motion-reduce:before:transition-none ${
+              liked
+                ? "text-error before:bg-red-50 before:border before:border-red-200"
+                : "text-text-muted hover:text-error before:bg-white before:border before:border-border-default"
+            }`}
+          >
+            <Heart className="relative z-10 w-3.5 h-3.5" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
+          </button>
+        </div>
+      )}
+
       {/* Card Body */}
-      <div className="flex flex-col flex-1 p-2 sm:p-3 pt-1.5 sm:pt-2">
+      <div className={`flex flex-col flex-1 ${isFlash ? "p-2 md:p-3 pt-1.5 md:pt-2" : "p-2.5 md:p-3 pt-2 md:pt-2"}`}>
         {/* Top Content: Brand Card (Left) & Old Struck Price + Discount % (Right) */}
         <div className="flex flex-col">
           {/* Row directly under image: Brand Card on left, Struck Old Price + Red Discount % on right */}
-          <div className="flex items-center justify-between gap-1 min-h-5 sm:h-6 mb-1 min-w-0">
+          <div className={`${isFlash ? "hidden md:flex" : "flex"} items-center justify-between gap-1 min-h-5 md:h-6 mb-1 min-w-0`}>
             <div className="flex items-center min-w-0 shrink overflow-hidden">
               <BrandLogo brand={detectedBrand} series={product.series} />
             </div>
@@ -434,11 +490,11 @@ export default function ProductCard({
             {/* Struck Old Price + Red Discount % tag side-by-side */}
             {effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
               <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[10.5px] sm:text-[13px] text-slate-500 line-through tabular-nums font-bold">
+                <span className="text-[10.5px] md:text-[13px] text-slate-500 line-through tabular-nums font-bold">
                   {formatVnd(effectiveOldPrice)}
                 </span>
                 {discountPercent && (
-                  <span className="bg-[#D71920] text-white font-black text-[9.5px] sm:text-[11.5px] px-1 sm:px-1.5 py-0.5 rounded-[3px] leading-none select-none tracking-tight shadow-2xs">
+                  <span className="bg-[#D71920] text-white font-black text-[9.5px] md:text-[11.5px] px-1 md:px-1.5 py-0.5 rounded-[3px] leading-none select-none tracking-tight shadow-2xs">
                     {discountPercent}
                   </span>
                 )}
@@ -447,7 +503,13 @@ export default function ProductCard({
           </div>
 
           {/* Title - fixed 2-line height so 1-line and 2-line titles occupy exact same space */}
-          <h3 className="h-9 sm:h-11 text-[13px] sm:text-[15px] font-semibold text-slate-900 leading-[1.35] sm:leading-snug line-clamp-2 overflow-hidden group-hover/product:text-blue-700 transition-colors">
+          <h3
+            className={`${
+              isFlash
+                ? "h-[33px] md:h-11 text-[12px] md:text-[15px] leading-[1.35] md:leading-snug"
+                : "h-9 md:h-11 text-[13px] md:text-[15px] leading-[1.35] md:leading-snug"
+            } font-semibold text-slate-900 line-clamp-2 overflow-hidden group-hover/product:text-blue-700 transition-colors`}
+          >
             <Link
               href={productHref}
               title={product.name}
@@ -458,20 +520,33 @@ export default function ProductCard({
           </h3>
 
           {/* Red Price Card: Directly below title, horizontally centered */}
-          <div className="mt-1.5 sm:mt-2 mb-1.5 sm:mb-2.5">
-            <div className="w-full bg-[#D71920] hover:bg-[#c0141a] text-white font-extrabold py-1 sm:py-2 px-2 sm:px-3 rounded-lg sm:rounded-xl shadow-2xs flex items-center justify-center text-[13px] sm:text-base tracking-tight select-none transition-colors">
+          <div className={isFlash ? "mt-1 md:mt-2 mb-1 md:mb-2.5" : "mt-1.5 md:mt-2 mb-1.5 md:mb-2.5"}>
+            <div
+              className={`w-full bg-[#D71920] hover:bg-[#c0141a] text-white font-extrabold ${
+                isFlash
+                  ? "py-1 md:py-2 px-1 md:px-3 rounded-md md:rounded-xl text-[13px] md:text-base"
+                  : "py-1 md:py-2 px-2 md:px-3 rounded-lg md:rounded-xl text-[13px] md:text-base"
+              } shadow-2xs flex items-center justify-center text-center tracking-tight select-none transition-colors`}
+            >
               <span className="tabular-nums">
                 {product.availability === 'CONTACT' ? 'Liên hệ' : formatVnd(product.price)}
               </span>
             </div>
+            {isFlash && effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
+              <div className="md:hidden mt-0.5 text-center leading-tight">
+                <span className="text-[10px] text-slate-500 line-through tabular-nums font-medium">
+                  {formatVnd(effectiveOldPrice)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Bottom Pinned Section: Cấu hình (Specs) & Bảo hành (Warranty) ALWAYS pinned to bottom */}
-        <div className="mt-auto flex flex-col justify-end pt-1.5 sm:pt-2">
-          {/* PC DISPLAY (>= 640px): 2-Column Compact Spec Chips Matrix */}
+        <div className="mt-auto flex flex-col justify-end pt-1 md:pt-2">
+          {/* TABLET / PC DISPLAY (>= 768px): 2-Column Compact Spec Chips Matrix */}
           {showSpecs && hasDesktopSpecs && (
-            <div className="hidden sm:grid grid-cols-2 gap-1 text-caption text-text-secondary mb-2 pt-2 border-t border-black/[0.06] min-h-[52px]">
+            <div className="hidden md:grid grid-cols-2 gap-1 text-caption text-text-secondary mb-2 pt-2 border-t border-black/[0.06] min-h-[52px]">
               {cpu && (
                 <SpecChip
                   icon={<Cpu className="w-3.5 h-3.5 text-slate-500 shrink-0" />}
@@ -510,35 +585,38 @@ export default function ProductCard({
             </div>
           )}
 
-          {/* SMARTPHONE DISPLAY (< 640px): Compact Readable Vertical Spec Lines */}
-          {showSpecs && hasMobileSpecs && (
-            <dl className="sm:hidden mb-1.5 pt-1.5 border-t border-black/[0.06] space-y-0.5 text-[10.5px] leading-snug text-slate-700">
-              {mobileSpecRows.map((row) => (
-                <div key={row.label} className="flex items-baseline gap-1 min-w-0">
-                  <dt className="font-bold text-slate-900 shrink-0">{row.label}:</dt>
-                  <dd className="text-slate-700 font-medium break-words min-w-0 line-clamp-1" title={row.value}>
-                    {row.value}
-                  </dd>
-                </div>
+          {/* SMARTPHONE DISPLAY (< 768px): One Compact Horizontal Row of Spec Badges (Hidden on Flash SP) */}
+          {!isFlash && showSpecs && hasMobileSpecs && (
+            <div className="md:hidden mb-1.5 pt-1.5 border-t border-black/[0.06] flex items-center gap-1 overflow-hidden min-w-0">
+              {mobileSpecPills.map((pill) => (
+                <span
+                  key={pill.key}
+                  title={pill.title}
+                  className="inline-flex items-center rounded bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 leading-tight truncate min-w-0 max-w-full"
+                >
+                  {pill.text}
+                </span>
               ))}
-            </dl>
+            </div>
           )}
 
           {/* Footer Meta: Warranty & Stock Status */}
-          <div className="pt-1.5 sm:pt-2 border-t border-black/[0.06] flex items-center justify-between gap-1 text-[10.5px] sm:text-caption">
-            {/* Warranty tag */}
+          <div className="pt-1 md:pt-2 border-t border-black/[0.06] flex items-center justify-between gap-1 text-[10.5px] md:text-caption">
+            {/* Warranty tag (hidden on Flash SP to fit 120px width cleanly) */}
             <div
-              className="flex items-center gap-0.5 sm:gap-1 text-slate-700 font-medium truncate min-w-0"
+              className={`${isFlash ? "hidden md:flex " : "flex "}items-center gap-0.5 md:gap-1 text-slate-700 font-medium truncate min-w-0`}
               title={product.warranty || warrantyText}
             >
-              <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-600 shrink-0" />
+              <ShieldCheck className="w-3 h-3 md:w-3.5 md:h-3.5 text-blue-600 shrink-0" />
               <span className="truncate">{warrantyText}</span>
             </div>
 
             {/* Standardized Stock Indicator */}
             {product.availability ? (
               <span
-                className={`inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold shrink-0 whitespace-nowrap ${
+                className={`inline-flex items-center gap-1 text-[10px] md:text-[11px] font-semibold shrink-0 whitespace-nowrap ${
+                  isFlash ? "mx-auto md:mx-0 " : ""
+                }${
                   product.availability === 'AVAILABLE' && (product.stock === undefined || product.stock === null || product.stock > 0)
                     ? 'text-emerald-700'
                     : product.availability === 'PREORDER'
@@ -560,13 +638,17 @@ export default function ProductCard({
                     } as Record<string, string>)[product.availability] || 'Sẵn hàng'}
               </span>
             ) : (
-              <StockBadge stock={product.stock} variant="indicator" className="shrink-0 whitespace-nowrap text-[10px] sm:text-caption" />
+              <StockBadge
+                stock={product.stock}
+                variant="indicator"
+                className={`shrink-0 whitespace-nowrap text-[10px] md:text-caption ${isFlash ? "mx-auto md:mx-0" : ""}`}
+              />
             )}
           </div>
 
           {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}
           {footerAction && (
-            <div className="mt-2.5 pt-2 border-t border-black/[0.06] relative z-20">
+            <div className="mt-2 pt-1.5 md:mt-2.5 md:pt-2 border-t border-black/[0.06] relative z-20">
               {footerAction}
             </div>
           )}

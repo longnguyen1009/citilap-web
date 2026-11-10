@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { trackStorefront } from "@/lib/storefront-metrics";
 import Link from "next/link";
 import Form from "next/form";
@@ -11,7 +11,6 @@ import {
   Check,
   ChevronDown,
   Cpu,
-  Filter,
   HardDrive,
   Headphones,
   Inbox,
@@ -33,7 +32,7 @@ import ProductCard from "@/components/product/ProductCard";
 import EmptyState from "@/components/ui/EmptyState";
 import CategorySortSelect, { type SortOptionItem } from "@/components/category/CategorySortSelect";
 import CategoryPagination from "@/components/category/CategoryPagination";
-import MobileFilterDrawer from "@/components/category/MobileFilterDrawer";
+import CatalogFilterPanel from "@/components/category/CatalogFilterPanel";
 import SearchAutocomplete from "./SearchAutocomplete";
 import type { SearchResult } from "@/server/services/search.service";
 import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES, getAccessoryTypeBySlug } from "@/config/accessory-taxonomy";
@@ -97,9 +96,6 @@ export default function SearchListingContainer({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [openFilterGroup, setOpenFilterGroup] = useState<FilterGroupKey | null>(null);
-  const filterBarRef = useRef<HTMLDivElement>(null);
 
   const query = initialData.query;
   const lastSearch = useRef("");
@@ -109,24 +105,6 @@ export default function SearchListingContainer({
     trackStorefront("search");
     if (initialData.totalCount === 0) trackStorefront("search_empty");
   }, [query, initialData.totalCount]);
-
-  useEffect(() => {
-    if (!openFilterGroup) return;
-    const handlePointerDown = (e: MouseEvent) => {
-      if (filterBarRef.current && !filterBarRef.current.contains(e.target as Node)) {
-        setOpenFilterGroup(null);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpenFilterGroup(null);
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [openFilterGroup]);
 
   const activeCategories = searchParams.getAll("category");
   const activeBrands = searchParams.getAll("brand");
@@ -223,7 +201,6 @@ export default function SearchListingContainer({
       else params.delete("maxPrice");
     }
     pushParams(params);
-    setOpenFilterGroup(null);
   };
 
   const currentScope =
@@ -447,12 +424,398 @@ export default function SearchListingContainer({
     pushParams(params);
   };
 
+  const resetParams = new URLSearchParams();
+  const qParam = searchParams.get("q");
+  if (qParam) resetParams.set("q", qParam);
+  const sortParam = searchParams.get("sort");
+  if (sortParam) resetParams.set("sort", sortParam);
+  const resetQuery = resetParams.toString();
+  const resetHref = resetQuery ? `${pathname}?${resetQuery}` : pathname;
+  const searchString = searchParams.toString();
+  const currentUrlKey = searchString ? `${pathname}?${searchString}` : pathname;
+
+  const filterPanelContent = (
+    <div className="space-y-2.5" data-filter-inflow="true">
+      {/* Nút Sẵn hàng */}
+      <button
+        type="button"
+        aria-pressed={activeInStock}
+        onClick={toggleInStockPill}
+        className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition cursor-pointer select-none ${
+          activeInStock
+            ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-600/20 font-bold shadow-xs"
+            : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+        }`}
+      >
+        <span className="flex items-center gap-2">
+          <PackageCheck className={`w-4 h-4 shrink-0 ${activeInStock ? "text-emerald-600" : "text-slate-500"}`} aria-hidden="true" />
+          <span>Sẵn hàng</span>
+        </span>
+        {activeInStock && (
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+            <Check className="w-2.5 h-2.5 stroke-[3]" aria-hidden="true" />
+          </span>
+        )}
+      </button>
+
+      {/* Các nhóm lọc chi tiết in-flow (<details>) */}
+      {filterGroups
+        .filter((g) => g.visible)
+        .map((g) => {
+          const Icon = g.icon;
+          const hasActive = g.activeCount > 0;
+          return (
+            <details
+              key={g.key}
+              data-category-filter
+              data-inflow="true"
+              open
+              className="group rounded-xl border border-slate-200/90 bg-slate-50/30"
+            >
+              <summary
+                className={`flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition select-none [&::-webkit-details-marker]:hidden ${
+                  hasActive ? "text-blue-800 font-bold" : "text-slate-800 hover:text-blue-600"
+                }`}
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${hasActive ? "text-blue-600" : "text-slate-500"}`} aria-hidden="true" />
+                  <span className="min-w-0 break-words">
+                    {g.summary ? (
+                      <>
+                        {g.label}: <strong className="text-blue-700">{g.summary}</strong>
+                      </>
+                    ) : (
+                      g.label
+                    )}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1">
+                  {g.activeCount > 0 && (
+                    <span className="flex min-h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-extrabold text-white">
+                      {g.activeCount}
+                    </span>
+                  )}
+                  <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+                </span>
+              </summary>
+
+              <div className="border-t border-slate-200/80 px-2.5 pb-2.5 pt-2 space-y-2">
+                {g.key === "price" && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {currentPricePresets.map((pr) => {
+                        const active = activePricePreset === pr.value;
+                        return (
+                          <button
+                            key={pr.value}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => togglePricePill(pr)}
+                            className={`flex min-h-11 items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                              active
+                                ? "border-blue-600 bg-blue-50 text-blue-700 font-bold"
+                                : "border-slate-200 bg-white text-slate-700 hover:border-blue-300"
+                            }`}
+                          >
+                            <span className="break-words text-left">{pr.label}</span>
+                            {active && <Check className="w-3.5 h-3.5 shrink-0 text-blue-600 stroke-[3]" aria-hidden="true" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <Form
+                      action={pathname}
+                      className="space-y-2 pt-2.5 border-t border-slate-200/80"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const params = new URLSearchParams();
+                        new FormData(event.currentTarget).forEach((value, key) => {
+                          if (typeof value === "string" && value.trim()) params.append(key, value);
+                        });
+                        pushParams(params);
+                      }}
+                    >
+                      {[...searchParams.entries()]
+                        .filter(([key]) => !["minPrice", "maxPrice", "pricePreset", "page"].includes(key))
+                        .map(([key, value], i) => (
+                          <input key={i} type="hidden" name={key} value={value} />
+                        ))}
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="text-[11px] font-semibold text-slate-600">
+                          Giá từ (₫)
+                          <input
+                            key={`min-${searchParams.get("minPrice")}`}
+                            name="minPrice"
+                            type="number"
+                            min={0}
+                            max={1000000000}
+                            step="any"
+                            placeholder="0"
+                            defaultValue={searchParams.get("minPrice") || ""}
+                            className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-base md:text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                          />
+                        </label>
+                        <label className="text-[11px] font-semibold text-slate-600">
+                          Giá đến (₫)
+                          <input
+                            key={`max-${searchParams.get("maxPrice")}`}
+                            name="maxPrice"
+                            type="number"
+                            min={0}
+                            max={1000000000}
+                            step="any"
+                            placeholder="50000000"
+                            defaultValue={searchParams.get("maxPrice") || ""}
+                            className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-base md:text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                          />
+                        </label>
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full min-h-11 py-2.5 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition cursor-pointer"
+                      >
+                        Áp dụng khoảng giá
+                      </button>
+                    </Form>
+                  </div>
+                )}
+
+                {g.key === "condition" && (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {initialData.facets.conditions.map((c) => {
+                      const isSelected = activeConditions.includes(c.value);
+                      const condFallbackMap: Record<string, string> = {
+                        NEW: "Mới 100% Fullbox",
+                        LIKE_NEW: "LikeNew 99%",
+                        USED: "Đã qua sử dụng",
+                        REFURBISHED: "Refurbished",
+                      };
+                      const label = condFallbackMap[c.value] || c.label;
+                      return (
+                        <button
+                          key={c.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("condition", c.value)}
+                          className={`flex min-h-11 items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({c.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "cpu" && (
+                  <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto overscroll-contain pr-0.5">
+                    {initialData.facets.cpuSeries.map((c) => {
+                      const isSelected = activeCpus.includes(c.value);
+                      return (
+                        <button
+                          key={c.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("cpu", c.value)}
+                          className={`flex min-h-11 items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{c.label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({c.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "gpu" && (
+                  <div className="grid grid-cols-1 gap-1.5 max-h-56 overflow-y-auto overscroll-contain pr-0.5">
+                    {initialData.facets.gpuSeries.map((gpu) => {
+                      const isSelected = activeGpus.includes(gpu.value);
+                      return (
+                        <button
+                          key={gpu.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("gpu", gpu.value)}
+                          className={`flex min-h-11 items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{gpu.label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({gpu.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "ram" && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {initialData.facets.ramOptions.map((r) => {
+                      const isSelected = activeRams.includes(String(r.value));
+                      return (
+                        <button
+                          key={r.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("ram", String(r.value))}
+                          className={`flex min-h-11 items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{r.label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({r.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "storage" && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {initialData.facets.storageOptions.map((s) => {
+                      const isSelected = activeStorage.includes(String(s.value));
+                      return (
+                        <button
+                          key={s.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("storage", String(s.value))}
+                          className={`flex min-h-11 items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{s.label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({s.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "year" && initialData.facets.years && (
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {initialData.facets.years.map((y) => {
+                      const isSelected = activeYears.includes(y.value);
+                      return (
+                        <button
+                          key={y.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("year", y.value)}
+                          className={`flex min-h-11 items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">Năm {y.label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({y.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "accessoryType" && (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {ACCESSORY_TYPES.map((t) => {
+                      const isSelected = activeType === t.slug;
+                      return (
+                        <button
+                          key={t.slug}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleSingleParam("type", t.slug)}
+                          className={`flex min-h-11 items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{t.shortName}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-blue-600" aria-hidden="true" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "connection" && initialData.facets.connections && (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {initialData.facets.connections.map((c) => {
+                      const isSelected = activeConnections.includes(c.value);
+                      return (
+                        <button
+                          key={c.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("connection", c.value)}
+                          className={`flex min-h-11 items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{c.label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({c.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {g.key === "power" && initialData.facets.powers && (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {initialData.facets.powers.map((p) => {
+                      const isSelected = activePowers.includes(p.value);
+                      return (
+                        <button
+                          key={p.value}
+                          type="button"
+                          aria-pressed={isSelected}
+                          onClick={() => toggleMultiParam("power", p.value)}
+                          className={`flex min-h-11 items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                            isSelected
+                              ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
+                              : "border-slate-200/80 bg-white text-slate-700 hover:border-blue-300"
+                          }`}
+                        >
+                          <span className="break-words text-left">{p.label}</span>
+                          <span className="shrink-0 text-[10px] text-slate-400">({p.count})</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </details>
+          );
+        })}
+    </div>
+  );
+
   return (
-    <div className="space-y-3.5">
+    <div className="min-w-0 space-y-3 sm:space-y-4">
       {/* 1. KHỐI PHÂN LOẠI NHANH: PHẠM VI, THƯƠNG HIỆU & NHU CẦU (1 Card đồng nhất, gọn gàng) */}
       <section
         aria-label="Phân loại sản phẩm, thương hiệu và nhu cầu"
-        className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-xs space-y-3"
+        className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2.5 sm:space-y-3"
       >
         {/* Hàng 1: Segmented Scope Tabs + Tổng số kết quả + Link Tư vấn */}
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
@@ -466,20 +829,20 @@ export default function SearchListingContainer({
                   type="button"
                   aria-pressed={active}
                   onClick={() => setScopeCategory(sc.slug)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  className={`inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                     active
                       ? "bg-blue-600 text-white shadow-2xs"
                       : "text-slate-700 hover:text-blue-600 hover:bg-white/70"
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${active ? "text-white" : "text-blue-600"}`} />
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${active ? "text-white" : "text-blue-600"}`} aria-hidden="true" />
                   <span>{sc.label}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="flex flex-wrap items-center gap-3 ml-auto">
             <div role="status" className="text-xs text-slate-600">
               {query ? (
                 <>
@@ -495,16 +858,16 @@ export default function SearchListingContainer({
 
             <Link
               href="/chon-laptop"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50/90 hover:bg-blue-100/80 border border-blue-200/80 text-xs font-bold text-blue-700 transition"
+              className="inline-flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50/90 hover:bg-blue-100/80 border border-blue-200/80 text-xs font-bold text-blue-700 transition"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-hidden="true" />
               <span>Tư vấn chọn máy</span>
             </Link>
           </div>
         </div>
 
-        {/* Hàng 2: Lưới Card Logo Thương hiệu (8 cột cân đối) */}
-        <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+        {/* Hàng 2: Lưới Card Logo Thương hiệu (compact 4 cột trên SP tới 767px, 8 cột từ md) */}
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
           {brandItems.map((b) => {
             const active = activeBrands.includes(b.value);
             return (
@@ -514,7 +877,7 @@ export default function SearchListingContainer({
                 aria-pressed={active}
                 onClick={() => toggleMultiParam("brand", b.value)}
                 title={b.count > 0 ? `${b.label} (${b.count} sản phẩm)` : b.label}
-                className={`group relative flex h-12 items-center justify-center overflow-hidden rounded-xl border px-1.5 sm:px-2.5 transition cursor-pointer select-none ${
+                className={`group relative flex min-h-11 h-12 items-center justify-center overflow-hidden rounded-xl border px-1.5 sm:px-2.5 transition cursor-pointer select-none ${
                   active
                     ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-2xs"
                     : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white"
@@ -528,7 +891,7 @@ export default function SearchListingContainer({
                     className="max-h-4 sm:max-h-5 max-w-full w-auto object-contain transition-transform group-hover:scale-105"
                   />
                 ) : (
-                  <span className="text-xs font-black uppercase text-slate-700 truncate">{b.label}</span>
+                  <span className="text-[11px] font-black uppercase text-slate-700 break-words text-center leading-tight">{b.label}</span>
                 )}
                 {b.count > 0 && (
                   <span
@@ -544,9 +907,9 @@ export default function SearchListingContainer({
           })}
         </div>
 
-        {/* Hàng 3: Lưới Card Nhu cầu sử dụng (8 cột đồng bộ với Thương hiệu, ẩn khi chọn Phụ kiện) */}
+        {/* Hàng 3: Lưới Card Nhu cầu sử dụng (compact 4 cột trên SP tới 767px, 8 cột từ md, ẩn khi chọn Phụ kiện) */}
         {!isAccessoryScope && (
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 pt-1">
+          <div className="grid grid-cols-4 md:grid-cols-8 gap-2 pt-1">
             {NEED_CARDS.map((need) => {
               const active = activeTags.some((t) => catalogNeedTag(t) === need.value);
               return (
@@ -555,7 +918,7 @@ export default function SearchListingContainer({
                   type="button"
                   aria-pressed={active}
                   onClick={() => toggleMultiParam("tag", need.value)}
-                  className={`group relative flex flex-col items-center justify-center rounded-xl border py-2 px-1.5 transition cursor-pointer select-none ${
+                  className={`group relative flex min-h-[56px] flex-col items-center justify-center rounded-xl border py-2 px-1.5 transition cursor-pointer select-none ${
                     active
                       ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/50 text-blue-900 ring-2 ring-blue-500/20 shadow-2xs"
                       : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white text-slate-700"
@@ -572,7 +935,7 @@ export default function SearchListingContainer({
                     alt={need.label}
                     className="h-6 w-6 object-contain transition-transform group-hover:scale-110"
                   />
-                  <span className={`mt-1 text-[11px] leading-tight truncate max-w-full ${active ? "font-black text-blue-900" : "font-bold text-slate-700"}`}>
+                  <span className={`mt-1 text-[11px] leading-tight text-center break-words max-w-full ${active ? "font-black text-blue-900" : "font-bold text-slate-700"}`}>
                     {need.label}
                   </span>
                 </button>
@@ -582,525 +945,127 @@ export default function SearchListingContainer({
         )}
       </section>
 
-      {/* 2. THANH CÔNG CỤ LỌC CHI TIẾT, TÌM KIẾM TỪ KHÓA & SẮP XẾP (Floating Popover, không đẩy trang) */}
-      <section
-        ref={filterBarRef}
-        aria-label="Bộ lọc chi tiết và sắp xếp"
-        className="rounded-2xl border border-slate-200/90 bg-white px-3.5 py-2.5 shadow-xs space-y-2.5"
-      >
-        <div className="flex flex-wrap items-center gap-1.5">
-          {/* Nút mở toàn bộ Bộ lọc (<dialog>) */}
-          <button
-            type="button"
-            onClick={() => setMobileDrawerOpen(true)}
-            aria-label="Mở bộ lọc tìm kiếm"
-            className={`inline-flex min-h-10.5 items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer shrink-0 ${
-              totalActiveFilters > 0
-                ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
-                : "bg-slate-50/80 hover:bg-slate-100 text-slate-700 border-slate-200"
-            }`}
+      {/* 2. KHỐI LỌC SIDEBAR PC (240px) + DRAWER SP/TABLET & CỘT KẾT QUẢ SẢN PHẨM */}
+      <div className="space-y-3 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 lg:items-start lg:space-y-0">
+        <CatalogFilterPanel
+          key={currentUrlKey}
+          activeCount={totalActiveFilters}
+          resetHref={resetHref}
+          currentUrlKey={currentUrlKey}
+        >
+          {filterPanelContent}
+        </CatalogFilterPanel>
+
+        <div className="min-w-0 space-y-3 sm:space-y-4">
+          {/* Thanh tìm kiếm từ khóa, sắp xếp & chips tiêu chí đang chọn (Ngoài drawer) */}
+          <section
+            aria-label="Bộ lọc chi tiết và sắp xếp"
+            className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-3 sm:px-3.5 sm:py-3 shadow-xs space-y-2.5"
           >
-            <Filter className={`w-3.5 h-3.5 ${totalActiveFilters > 0 ? "text-white" : "text-blue-600"}`} />
-            <span>Bộ lọc</span>
-            {totalActiveFilters > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-white text-blue-600 text-[10px] font-extrabold">
-                {totalActiveFilters}
-              </span>
-            )}
-          </button>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex-1 min-w-0">
+                <SearchAutocomplete
+                  initialQuery={query}
+                  placeholder="Tìm tên máy, CPU, GPU..."
+                  size="sm"
+                  className="w-full"
+                  inputClassName="!text-base md:!text-xs"
+                />
+              </div>
 
-          {/* Nút Sẵn hàng */}
-          <button
-            type="button"
-            aria-pressed={activeInStock}
-            onClick={toggleInStockPill}
-            className={`inline-flex min-h-10.5 items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer shrink-0 ${
-              activeInStock
-                ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-600/20 font-bold"
-                : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-            }`}
-          >
-            <PackageCheck className={`w-3.5 h-3.5 ${activeInStock ? "text-emerald-600" : "text-slate-500"}`} />
-            <span>Sẵn hàng</span>
-          </button>
-
-          {/* Các nút lọc chia nhỏ có Floating Popover riêng */}
-          {filterGroups
-            .filter((g) => g.visible)
-            .map((g) => {
-              const Icon = g.icon;
-              const isOpen = openFilterGroup === g.key;
-              const hasActive = g.activeCount > 0;
-              return (
-                <div key={g.key} className="relative">
-                  <button
-                    type="button"
-                    aria-expanded={isOpen}
-                    onClick={() => setOpenFilterGroup(isOpen ? null : g.key)}
-                    className={`inline-flex min-h-10.5 items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer shrink-0 ${
-                      isOpen || hasActive
-                        ? "border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-600/20 font-bold"
-                        : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Icon className={`w-3.5 h-3.5 shrink-0 ${isOpen || hasActive ? "text-blue-600" : "text-slate-500"}`} />
-                    <span className="max-w-36 truncate">
-                      {g.summary ? (
-                        <>
-                          {g.label}: <strong>{g.summary}</strong>
-                        </>
-                      ) : (
-                        g.label
-                      )}
-                    </span>
-                    {g.activeCount > 1 && (
-                      <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[10px] flex items-center justify-center font-extrabold">
-                        {g.activeCount}
-                      </span>
-                    )}
-                    <ChevronDown className={`w-3 h-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-                  </button>
-
-                  {/* Floating Popover Dropdown */}
-                  {isOpen && (
-                    <div className="fixed inset-x-4 top-1/2 z-40 max-h-[75vh] -translate-y-1/2 overflow-y-auto sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-80 sm:translate-y-0 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-xl">
-                      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
-                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                          <Icon className="w-3.5 h-3.5 text-blue-600" />
-                          <span>{g.label}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setOpenFilterGroup(null)}
-                          className="p-0.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
-                          aria-label="Đóng"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {g.key === "price" && (
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-2 gap-1.5">
-                            {currentPricePresets.map((pr) => {
-                              const active = activePricePreset === pr.value;
-                              return (
-                                <button
-                                  key={pr.value}
-                                  type="button"
-                                  aria-pressed={active}
-                                  onClick={() => togglePricePill(pr)}
-                                  className={`flex items-center justify-between gap-1 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                    active
-                                      ? "border-blue-600 bg-blue-50 text-blue-700 font-bold"
-                                      : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-blue-300"
-                                  }`}
-                                >
-                                  <span>{pr.label}</span>
-                                  {active && <Check className="w-3.5 h-3.5 shrink-0 text-blue-600 stroke-[3]" />}
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          <Form
-                            action={pathname}
-                            className="space-y-2 pt-2.5 border-t border-slate-100"
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              const params = new URLSearchParams();
-                              new FormData(event.currentTarget).forEach((value, key) => {
-                                if (typeof value === "string" && value.trim()) params.append(key, value);
-                              });
-                              pushParams(params);
-                              setOpenFilterGroup(null);
-                            }}
-                          >
-                            {[...searchParams.entries()]
-                              .filter(([key]) => !["minPrice", "maxPrice", "pricePreset", "page"].includes(key))
-                              .map(([key, value], i) => (
-                                <input key={i} type="hidden" name={key} value={value} />
-                              ))}
-                            <div className="grid grid-cols-2 gap-2">
-                              <label className="text-[11px] font-semibold text-slate-600">
-                                Giá từ (₫)
-                                <input
-                                  key={`min-${searchParams.get("minPrice")}`}
-                                  name="minPrice"
-                                  type="number"
-                                  min={0}
-                                  max={1000000000}
-                                  step="any"
-                                  placeholder="0"
-                                  defaultValue={searchParams.get("minPrice") || ""}
-                                  className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-900"
-                                />
-                              </label>
-                              <label className="text-[11px] font-semibold text-slate-600">
-                                Giá đến (₫)
-                                <input
-                                  key={`max-${searchParams.get("maxPrice")}`}
-                                  name="maxPrice"
-                                  type="number"
-                                  min={0}
-                                  max={1000000000}
-                                  step="any"
-                                  placeholder="50000000"
-                                  defaultValue={searchParams.get("maxPrice") || ""}
-                                  className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-900"
-                                />
-                              </label>
-                            </div>
-                            <button
-                              type="submit"
-                              className="w-full py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition cursor-pointer"
-                            >
-                              Áp dụng khoảng giá
-                            </button>
-                          </Form>
-                        </div>
-                      )}
-
-                      {g.key === "condition" && (
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {initialData.facets.conditions.map((c) => {
-                            const isSelected = activeConditions.includes(c.value);
-                            const condFallbackMap: Record<string, string> = {
-                              NEW: "Mới 100% Fullbox",
-                              LIKE_NEW: "LikeNew 99%",
-                              USED: "Đã qua sử dụng",
-                              REFURBISHED: "Refurbished",
-                            };
-                            const label = condFallbackMap[c.value] || c.label;
-                            return (
-                              <button
-                                key={c.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("condition", c.value)}
-                                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-100 bg-slate-50/70 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span>{label}</span>
-                                <span className="text-[10px] text-slate-400">({c.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "cpu" && (
-                        <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-0.5">
-                          {initialData.facets.cpuSeries.map((c) => {
-                            const isSelected = activeCpus.includes(c.value);
-                            return (
-                              <button
-                                key={c.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("cpu", c.value)}
-                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span className="truncate">{c.label}</span>
-                                <span className="text-[10px] text-slate-400">({c.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "gpu" && (
-                        <div className="grid grid-cols-2 gap-1.5 max-h-64 overflow-y-auto pr-0.5">
-                          {initialData.facets.gpuSeries.map((gpu) => {
-                            const isSelected = activeGpus.includes(gpu.value);
-                            return (
-                              <button
-                                key={gpu.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("gpu", gpu.value)}
-                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span className="truncate">{gpu.label}</span>
-                                <span className="text-[10px] text-slate-400">({gpu.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "ram" && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {initialData.facets.ramOptions.map((r) => {
-                            const isSelected = activeRams.includes(String(r.value));
-                            return (
-                              <button
-                                key={r.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("ram", String(r.value))}
-                                className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span>{r.label}</span>
-                                <span className="text-[10px] text-slate-400">({r.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "storage" && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {initialData.facets.storageOptions.map((s) => {
-                            const isSelected = activeStorage.includes(String(s.value));
-                            return (
-                              <button
-                                key={s.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("storage", String(s.value))}
-                                className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span>{s.label}</span>
-                                <span className="text-[10px] text-slate-400">({s.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "year" && initialData.facets.years && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {initialData.facets.years.map((y) => {
-                            const isSelected = activeYears.includes(y.value);
-                            return (
-                              <button
-                                key={y.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("year", y.value)}
-                                className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span>Năm {y.label}</span>
-                                <span className="text-[10px] text-slate-400">({y.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "accessoryType" && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {ACCESSORY_TYPES.map((t) => {
-                            const isSelected = activeType === t.slug;
-                            return (
-                              <button
-                                key={t.slug}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleSingleParam("type", t.slug)}
-                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span className="truncate">{t.shortName}</span>
-                                {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-blue-600" />}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "connection" && initialData.facets.connections && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {initialData.facets.connections.map((c) => {
-                            const isSelected = activeConnections.includes(c.value);
-                            return (
-                              <button
-                                key={c.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("connection", c.value)}
-                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span className="truncate">{c.label}</span>
-                                <span className="text-[10px] text-slate-400">({c.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {g.key === "power" && initialData.facets.powers && (
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {initialData.facets.powers.map((p) => {
-                            const isSelected = activePowers.includes(p.value);
-                            return (
-                              <button
-                                key={p.value}
-                                type="button"
-                                aria-pressed={isSelected}
-                                onClick={() => toggleMultiParam("power", p.value)}
-                                className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
-                                  isSelected
-                                    ? "border-blue-600 bg-blue-50 text-blue-800 font-bold"
-                                    : "border-slate-200 bg-slate-50/60 text-slate-700 hover:border-blue-300"
-                                }`}
-                              >
-                                <span className="truncate">{p.label}</span>
-                                <span className="text-[10px] text-slate-400">({p.count})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-          {/* Bên phải cùng hàng: Ô lọc từ khóa nhanh + Sắp xếp */}
-          <div className="flex items-center gap-2 ml-auto w-full lg:w-auto pt-1 lg:pt-0">
-            <div className="flex-1 lg:w-56 xl:w-64">
-              <SearchAutocomplete
-                initialQuery={query}
-                placeholder="Tìm tên máy, CPU, GPU..."
-                size="sm"
-                className="w-full"
-              />
+              <div className="shrink-0 [&_select]:min-h-11 [&_select]:text-base md:[&_select]:text-xs">
+                <CategorySortSelect
+                  options={SEARCH_SORT_OPTIONS}
+                  defaultSort={query ? "relevance" : "newest"}
+                />
+              </div>
             </div>
 
-            <CategorySortSelect
-              options={SEARCH_SORT_OPTIONS}
-              defaultSort={query ? "relevance" : "newest"}
-            />
-          </div>
-        </div>
-
-        {/* Thanh Chips tiêu chí đang chọn (Gộp gọn bên trong cùng khối, chỉ hiện khi có tiêu chí lọc phụ) */}
-        {chips.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-            <span className="text-[11px] font-bold text-slate-500 mr-1">Đang chọn:</span>
-            {chips.map((chip, idx) => (
-              <span
-                key={`${chip.key}-${chip.value}-${idx}`}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 border border-blue-200/80 text-blue-700 text-xs rounded-lg font-semibold"
-              >
-                <span>{chip.label}</span>
+            {chips.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+                <span className="text-xs font-bold text-slate-600 mr-1">Đang chọn:</span>
+                {chips.map((chip, idx) => (
+                  <button
+                    key={`${chip.key}-${chip.value}-${idx}`}
+                    type="button"
+                    onClick={() => removeChip(chip.key, chip.value)}
+                    aria-label={`Xóa lọc ${chip.label}`}
+                    className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-blue-200/90 bg-blue-50/80 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer group"
+                  >
+                    <span className="break-words">{chip.label}</span>
+                    <X className="w-3.5 h-3.5 shrink-0 text-blue-500 group-hover:text-rose-600" aria-hidden="true" />
+                  </button>
+                ))}
                 <button
                   type="button"
-                  onClick={() => removeChip(chip.key, chip.value)}
-                  className="hover:text-rose-600 text-blue-500 transition cursor-pointer p-0.5 rounded"
-                  aria-label={`Xóa lọc ${chip.label}`}
+                  onClick={clearAllFilters}
+                  className="ml-auto inline-flex min-h-11 items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition cursor-pointer px-3 py-1.5"
                 >
-                  <X className="w-3 h-3" />
+                  <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Xóa tất cả</span>
                 </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={clearAllFilters}
-              className="ml-auto inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition cursor-pointer px-2 py-0.5"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Xóa tất cả</span>
-            </button>
-          </div>
-        )}
-      </section>
+              </div>
+            )}
+          </section>
 
-      {/* 3. LƯỚI KẾT QUẢ SẢN PHẨM (Full-Width 5 cột) */}
-      <section aria-label="Kết quả sản phẩm" className="min-w-0">
-        {initialData.products.length === 0 ? (
-          <div className="bg-surface-card border border-border-default rounded-2xl p-8 sm:p-10 text-center">
-            <EmptyState
-              icon={<Inbox className="w-8 h-8 stroke-1.5" aria-hidden="true" />}
-              title="Không tìm thấy sản phẩm phù hợp"
-              description={
-                query
-                  ? `Rất tiếc, không có sản phẩm nào khớp với từ khóa "${query}". Bạn có thể thử tìm kiếm bằng từ khóa ngắn hơn hoặc kiểm tra lỗi chính tả.`
-                  : "Không tìm thấy sản phẩm nào với các bộ lọc bạn đã chọn."
-              }
-              action={
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4 flex-wrap">
-                  {totalActiveFilters > 0 && (
-                    <Link
-                      href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
-                      className="px-5 py-2.5 rounded-xl bg-brand-primary text-text-inverse font-bold text-body-sm hover:bg-brand-primary-hover transition"
-                    >
-                      Xóa tất cả bộ lọc
-                    </Link>
-                  )}
-                  <Link
-                    href="/chon-laptop"
-                    className="px-5 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-body-sm hover:bg-blue-100 transition inline-flex items-center gap-1.5"
-                  >
-                    <Sparkles className="w-4 h-4 text-blue-600" />
-                    <span>Tư vấn chọn laptop phù hợp</span>
-                  </Link>
-                  <Link
-                    href="/phan-loai"
-                    className="px-5 py-2.5 rounded-xl border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
-                  >
-                    Khám phá tất cả danh mục
-                  </Link>
+          {/* 3. LƯỚI KẾT QUẢ SẢN PHẨM (SP 2 cột, Tablet 3 cột, PC lg 3 cột / xl 4 cột khi có sidebar 240px) */}
+          <section aria-label="Kết quả sản phẩm" className="min-w-0">
+            {initialData.products.length === 0 ? (
+              <div className="bg-surface-card border border-border-default rounded-2xl p-8 sm:p-10 text-center">
+                <EmptyState
+                  icon={<Inbox className="w-8 h-8 stroke-1.5" aria-hidden="true" />}
+                  title="Không tìm thấy sản phẩm phù hợp"
+                  description={
+                    query
+                      ? `Rất tiếc, không có sản phẩm nào khớp với từ khóa "${query}". Bạn có thể thử tìm kiếm bằng từ khóa ngắn hơn hoặc kiểm tra lỗi chính tả.`
+                      : "Không tìm thấy sản phẩm nào với các bộ lọc bạn đã chọn."
+                  }
+                  action={
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mt-4 flex-wrap">
+                      {totalActiveFilters > 0 && (
+                        <Link
+                          href={`${pathname}${query ? `?q=${encodeURIComponent(query)}` : ""}`}
+                          className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 rounded-xl bg-brand-primary text-text-inverse font-bold text-body-sm hover:bg-brand-primary-hover transition"
+                        >
+                          Xóa tất cả bộ lọc
+                        </Link>
+                      )}
+                      <Link
+                        href="/chon-laptop"
+                        className="inline-flex min-h-11 items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 font-bold text-body-sm hover:bg-blue-100 transition"
+                      >
+                        <Sparkles className="w-4 h-4 text-blue-600" aria-hidden="true" />
+                        <span>Tư vấn chọn laptop phù hợp</span>
+                      </Link>
+                      <Link
+                        href="/phan-loai"
+                        className="inline-flex min-h-11 items-center justify-center px-5 py-2.5 rounded-xl border border-border-default bg-surface text-text-primary font-bold text-body-sm hover:border-brand-primary transition"
+                      >
+                        Khám phá tất cả danh mục
+                      </Link>
+                    </div>
+                  }
+                />
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
+                  {initialData.products.map((product) => (
+                    <ProductCard key={`${product.id}:${product.variantId || ""}`} product={product} />
+                  ))}
                 </div>
-              }
-            />
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
-              {initialData.products.map((product) => (
-                <ProductCard key={`${product.id}:${product.variantId || ""}`} product={product} />
-              ))}
-            </div>
 
-            <CategoryPagination
-              currentPage={initialData.page}
-              totalPages={initialData.totalPages}
-            />
-          </>
-        )}
-      </section>
-
-      {/* Full Filter Drawer Modal */}
-      <MobileFilterDrawer
-        isOpen={mobileDrawerOpen}
-        onClose={() => setMobileDrawerOpen(false)}
-        activeCount={totalActiveFilters}
-        facets={initialData.facets}
-      />
+                <div className="[&_a]:min-h-11 [&_a]:min-w-11 [&_span[aria-current]]:min-h-11 [&_span[aria-current]]:min-w-11 [&_span[aria-disabled]]:min-h-11">
+                  <CategoryPagination
+                    currentPage={initialData.page}
+                    totalPages={initialData.totalPages}
+                  />
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

@@ -215,7 +215,7 @@ function BannerBlock({ data }: { data: any }) {
             alt={mobileTitle || data.title || 'Banner'}
             fill
             unoptimized={mobileImageUrl.startsWith('/brand/')}
-            className="sm:hidden object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none"
+            className="md:hidden object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none"
             sizes="100vw"
           />
         )}
@@ -224,16 +224,16 @@ function BannerBlock({ data }: { data: any }) {
           alt={data.title || 'Banner'}
           fill
           unoptimized={imageUrl.startsWith('/brand/')}
-          className={`${hasSeparateMobileImage ? 'hidden sm:block ' : ''}object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none`}
-          sizes="100vw"
+          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none`}
+          sizes="(max-width: 1280px) 100vw, 1280px"
         />
       </>
     );
 
     return (
       <section className="w-full relative overflow-hidden" aria-label={data.title || 'Banner'}>
-        <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px] py-2.5 md:py-4">
-          <div className="relative w-full h-[140px] sm:h-[180px] md:h-[220px] rounded-2xl overflow-hidden shadow-xs border border-slate-200">
+        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 py-2 md:py-4">
+          <div className="relative w-full h-[140px] sm:h-[168px] md:h-[200px] lg:h-[236px] rounded-lg lg:rounded-xl overflow-hidden shadow-xs border border-slate-200/80">
             {data.link ? (
               <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden" aria-label={data.title || 'Banner'}>
                 {imageContent}
@@ -256,7 +256,7 @@ function BannerBlock({ data }: { data: any }) {
             alt={mobileTitle || data.title || 'Banner'}
             fill
             unoptimized={mobileImageUrl.startsWith('/brand/')}
-            className="sm:hidden object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none"
+            className="md:hidden object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none"
             sizes="100vw"
           />
         )}
@@ -265,49 +265,49 @@ function BannerBlock({ data }: { data: any }) {
           alt={data.title || 'Banner'}
           fill
           unoptimized={imageUrl.startsWith('/brand/')}
-          className={`${hasSeparateMobileImage ? 'hidden sm:block ' : ''}object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none`}
-          sizes="(max-width: 768px) 100vw, 50vw"
+          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none`}
+          sizes="(max-width: 767px) 100vw, 50vw"
         />
       </>
     );
 
     return (
-      <section className="py-6 md:py-12 bg-white border-y border-slate-100" aria-label={data.title || 'Banner'}>
-        <div className="container mx-auto px-3 sm:px-4 max-w-[1370px]">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 items-center bg-slate-900 rounded-3xl overflow-hidden p-5 sm:p-6 md:p-12 text-white">
-            <div className={`space-y-3.5 sm:space-y-4 ${hideOverlayOnMobile ? 'hidden sm:block' : ''}`}>
+      <section className="py-4 md:py-8 bg-white border-y border-slate-100" aria-label={data.title || 'Banner'}>
+        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 lg:gap-8 items-center bg-slate-900 rounded-xl lg:rounded-2xl overflow-hidden p-4 sm:p-5 md:p-8 lg:p-10 text-white">
+            <div className={`space-y-3 md:space-y-4 ${hideOverlayOnMobile ? 'hidden md:block' : ''}`}>
               {data.badge && (
-                <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                <span className="inline-block px-2.5 py-1 rounded-full text-[11px] md:text-xs font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-500/30">
                   {data.badge}
                 </span>
               )}
-              <h2 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
+              <h2 className="text-lg sm:text-xl md:text-3xl lg:text-4xl font-black tracking-tight leading-tight">
                 {mobileTitle ? (
                   <>
-                    <span className="sm:hidden">{mobileTitle}</span>
-                    <span className="hidden sm:inline">{data.title}</span>
+                    <span className="md:hidden">{mobileTitle}</span>
+                    <span className="hidden md:inline">{data.title}</span>
                   </>
                 ) : (
                   data.title
                 )}
               </h2>
               {(data.subtitle || mobileSubtitle) && (
-                <p className="text-slate-300 text-xs sm:text-base leading-relaxed">
+                <p className="text-slate-300 text-xs md:text-sm lg:text-base leading-relaxed">
                   {mobileSubtitle ? (
                     <>
-                      <span className="sm:hidden">{mobileSubtitle}</span>
-                      <span className="hidden sm:inline">{data.subtitle}</span>
+                      <span className="md:hidden">{mobileSubtitle}</span>
+                      <span className="hidden md:inline">{data.subtitle}</span>
                     </>
                   ) : (
                     data.subtitle
                   )}
                 </p>
               )}
-              <div className="pt-1 sm:pt-2 flex flex-wrap gap-2.5 sm:gap-3">
+              <div className="pt-1 flex flex-wrap gap-2.5">
                 {data.link && data.buttonText && (
                   <Link
                     href={data.link}
-                    className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="min-h-11 inline-flex items-center justify-center px-4 md:px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs md:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.buttonText}
                   </Link>
@@ -315,16 +315,16 @@ function BannerBlock({ data }: { data: any }) {
                 {data.secondaryLink && data.secondaryButtonText && (
                   <Link
                     href={data.secondaryLink}
-                    className="inline-flex items-center px-5 sm:px-6 py-2.5 sm:py-3 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 text-white font-semibold text-xs sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="min-h-11 inline-flex items-center justify-center px-4 md:px-6 py-2.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 border border-white/20 text-white font-semibold text-xs md:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.secondaryButtonText}
                   </Link>
                 )}
               </div>
             </div>
-            <div className="relative h-56 sm:h-64 md:h-80 rounded-2xl overflow-hidden group">
+            <div className="relative h-[176px] sm:h-[200px] md:h-[240px] lg:h-[300px] rounded-lg lg:rounded-xl overflow-hidden group">
               {data.link ? (
-                <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-2xl overflow-hidden" aria-label={data.title || 'Banner'}>
+                <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-lg lg:rounded-xl overflow-hidden" aria-label={data.title || 'Banner'}>
                   {splitImages}
                 </Link>
               ) : (
@@ -339,14 +339,14 @@ function BannerBlock({ data }: { data: any }) {
 
   return (
     <section className="bg-[#0f172a] relative overflow-hidden" aria-label={data.title || 'Hero Banner'}>
-      <div className="w-full relative h-[225px] sm:h-[270px] lg:h-[300px]">
+      <div className="w-full relative min-h-[188px] sm:min-h-[208px] md:h-[260px] lg:h-[340px]">
         {hasSeparateMobileImage && (
           <Image
             src={mobileImageUrl}
             alt={mobileTitle || data.title || 'Hero banner'}
             width={800}
             height={540}
-            className="sm:hidden absolute inset-0 w-full h-full object-cover object-right"
+            className="md:hidden absolute inset-0 w-full h-full object-cover object-right"
             priority
             fetchPriority="high"
             unoptimized={mobileImageUrl.startsWith('/brand/')}
@@ -358,7 +358,7 @@ function BannerBlock({ data }: { data: any }) {
           alt={data.title || 'Hero banner'}
           width={1920}
           height={600}
-          className={`${hasSeparateMobileImage ? 'hidden sm:block ' : ''}absolute inset-0 w-full h-full object-cover`}
+          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}absolute inset-0 w-full h-full object-cover`}
           priority
           fetchPriority="high"
           unoptimized={imageUrl.startsWith('/brand/')}
@@ -368,50 +368,50 @@ function BannerBlock({ data }: { data: any }) {
           <Link
             href={data.link}
             aria-label={mobileTitle || data.title || 'Hero Banner'}
-            className="sm:hidden absolute inset-0 z-10"
+            className="md:hidden absolute inset-0 z-10"
           />
         )}
         <div
-          className={`absolute inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent ${
-            hideOverlayOnMobile ? 'hidden sm:flex' : 'flex'
-          } items-center`}
+          className={`relative z-10 min-h-[188px] sm:min-h-[208px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent ${
+            hideOverlayOnMobile ? 'hidden md:flex' : 'flex'
+          } items-center py-3 sm:py-4 md:py-0`}
         >
-          <div className="container mx-auto px-3.5 sm:px-4 max-w-[1370px]">
-            <div className="max-w-2xl text-white">
+          <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+            <div className="max-w-xl lg:max-w-2xl text-white">
               {data.badge && (
-                <div className="inline-block border border-blue-500/50 rounded-lg px-2.5 sm:px-3.5 py-1 sm:py-1.5 mb-2 sm:mb-4 backdrop-blur-md bg-blue-900/40 shadow-lg max-w-full">
-                  <span className="text-blue-300 sm:text-blue-400 font-black text-[10px] sm:text-sm tracking-wider sm:tracking-widest uppercase line-clamp-1">
+                <div className="inline-block border border-blue-500/50 rounded-md md:rounded-lg px-2.5 md:px-3.5 py-0.5 md:py-1 mb-1 sm:mb-1.5 md:mb-3 backdrop-blur-md bg-blue-900/40 shadow-lg max-w-full">
+                  <span className="text-blue-300 md:text-blue-400 font-black text-[10px] md:text-xs lg:text-sm tracking-wider md:tracking-widest uppercase line-clamp-1">
                     {data.badge}
                   </span>
                 </div>
               )}
-              <h1 className="text-xl sm:text-4xl lg:text-5xl font-black mb-1.5 sm:mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-300 drop-shadow-sm leading-tight">
+              <h1 className="text-lg sm:text-xl md:text-3xl lg:text-5xl font-black mb-1 md:mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-300 drop-shadow-sm leading-tight">
                 {mobileTitle ? (
                   <>
-                    <span className="sm:hidden">{mobileTitle}</span>
-                    <span className="hidden sm:inline">{data.title}</span>
+                    <span className="md:hidden">{mobileTitle}</span>
+                    <span className="hidden md:inline">{data.title}</span>
                   </>
                 ) : (
                   data.title
                 )}
               </h1>
               {(data.subtitle || mobileSubtitle) && (
-                <p className="text-xs sm:text-base font-bold text-yellow-400 mb-3 sm:mb-4 tracking-wide drop-shadow-md line-clamp-2">
+                <p className="text-xs md:text-sm lg:text-base font-bold text-yellow-400 mb-2 md:mb-4 tracking-wide drop-shadow-md line-clamp-2">
                   {mobileSubtitle ? (
                     <>
-                      <span className="sm:hidden">{mobileSubtitle}</span>
-                      <span className="hidden sm:inline">{data.subtitle}</span>
+                      <span className="md:hidden">{mobileSubtitle}</span>
+                      <span className="hidden md:inline">{data.subtitle}</span>
                     </>
                   ) : (
                     data.subtitle
                   )}
                 </p>
               )}
-              <div className="flex flex-wrap gap-2 sm:gap-4">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 md:gap-3">
                 {data.link && data.buttonText && (
                   <Link
                     href={data.link}
-                    className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-full uppercase text-[11px] sm:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="min-h-11 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-2.5 sm:px-4 md:px-6 lg:px-7 rounded-full uppercase text-[11px] md:text-xs lg:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.buttonText}
                   </Link>
@@ -419,7 +419,7 @@ function BannerBlock({ data }: { data: any }) {
                 {data.secondaryLink && data.secondaryButtonText && (
                   <Link
                     href={data.secondaryLink}
-                    className="inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2 sm:py-3 px-4 sm:px-8 rounded-full uppercase text-[11px] sm:text-sm transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="min-h-11 inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2 px-2.5 sm:px-4 md:px-6 lg:px-7 rounded-full uppercase text-[11px] md:text-xs lg:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.secondaryButtonText}
                   </Link>
@@ -465,33 +465,33 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
   if (section.resolvedTabs?.length) return <ProductTabs title={data.title} subtitle={data.subtitle} tabs={section.resolvedTabs} eagerImages={eagerImages} />;
 
   return (
-    <section className="pb-5 sm:pb-12 md:pb-16" aria-label={data.title}>
-      <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px]">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+    <section className="py-4 md:py-6 lg:py-8" aria-label={data.title}>
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="bg-white rounded-xl md:rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           {/* Header */}
-          <div className={`${colorClass} px-3.5 sm:px-4 md:px-6 py-2.5 sm:py-3.5 md:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 text-white`}>
-            <div className="flex items-center justify-between gap-2 sm:gap-3">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-white/15 backdrop-blur-md shadow-2xs shrink-0">
+          <div className={`${colorClass} px-3 md:px-5 lg:px-6 py-2.5 md:py-3.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4 text-white`}>
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
+                <div className="p-1.5 md:p-2 rounded-lg md:rounded-xl bg-white/15 backdrop-blur-md shadow-2xs shrink-0">
                   {headerIconNode}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-[15px] sm:text-lg md:text-xl font-black uppercase tracking-tight leading-snug">{data.title}</h2>
+                    <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase tracking-tight leading-snug">{data.title}</h2>
                     {data.badge && (
                       <span className={`text-[10px] uppercase font-extrabold px-2 sm:px-2.5 py-0.5 rounded-full ${data.badgeColor || 'bg-white/20 text-white'}`}>
                         {data.badge}
                       </span>
                     )}
                   </div>
-                  {data.subtitle && <p className="text-[11px] sm:text-xs text-white/85 mt-0.5 line-clamp-1">{data.subtitle}</p>}
+                  {data.subtitle && <p className="text-[11px] md:text-[12px] text-white/85 mt-0.5 line-clamp-1">{data.subtitle}</p>}
                 </div>
               </div>
 
               {data.viewAllLink && (
                 <Link
                   href={data.viewAllLink}
-                  className="sm:hidden inline-flex items-center gap-0.5 text-xs font-bold text-white/95 hover:text-yellow-300 shrink-0 whitespace-nowrap"
+                  className="lg:hidden min-h-11 inline-flex items-center gap-0.5 px-2 -mr-1 rounded-lg text-[12px] font-bold text-white/95 hover:text-yellow-300 shrink-0 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                 >
                   <span>Tất cả</span>
                   <ChevronRight className="w-3.5 h-3.5" />
@@ -501,12 +501,12 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
 
             {/* Quick links */}
             {links.length > 0 && (
-              <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain pb-0.5 sm:max-w-[62%] sm:pb-0 hide-scrollbar text-xs">
+              <div className="flex min-w-0 items-center gap-1.5 md:gap-2 overflow-x-auto overscroll-x-contain lg:max-w-[62%] hide-scrollbar">
                 {links.map((link: { label: string; href: string }, idx: number) => (
                   <Link
                     key={idx}
                     href={link.href}
-                    className="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-white/15 hover:bg-white hover:text-slate-900 border border-white/15 transition whitespace-nowrap text-white font-semibold shadow-2xs text-[11px] sm:text-xs"
+                    className="min-h-11 inline-flex items-center px-3 py-1.5 rounded-full bg-white/15 hover:bg-white hover:text-slate-900 border border-white/15 transition duration-200 motion-reduce:transition-none whitespace-nowrap text-white font-semibold shadow-2xs text-[11px] md:text-[12px] shrink-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {link.label}
                   </Link>
@@ -516,13 +516,13 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
           </div>
 
           {/* Product grid content */}
-          <div className="p-2 sm:p-4 md:p-6 bg-slate-50/30">
+          <div className="p-2.5 md:p-4 lg:p-6 bg-slate-50/30">
             {products.length === 0 ? (
               <div className="text-center py-10 sm:py-12 text-slate-500">
                 <p className="text-sm">Chưa có sản phẩm nào phù hợp trong danh mục này.</p>
               </div>
             ) : section.id === 'sec-hot-sale' ? <ProductCarousel products={products} label={data.title} /> : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 md:gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 md:gap-3 lg:gap-4">
                 {products.map((p, idx) => {
                   const effectiveMobileLimit = mobileLimit || 6;
                   const hideOnMobile = Boolean(idx >= effectiveMobileLimit);
@@ -535,7 +535,7 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
                     />
                   );
                   return hideOnMobile ? (
-                    <div key={p.id} className="hidden sm:block h-full">
+                    <div key={p.id} className="hidden md:block h-full">
                       {cardNode}
                     </div>
                   ) : (
@@ -549,7 +549,7 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
               <div className="mt-3 sm:mt-6 text-center">
                 <Link
                   href={data.viewAllLink}
-                  className="inline-flex items-center justify-center gap-1.5 w-full sm:w-auto px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
+                  className="min-h-11 inline-flex items-center justify-center gap-1.5 w-full sm:w-auto px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
                 >
                   Xem tất cả {data.title} <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
@@ -603,17 +603,21 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
 
   return (
     <section className="py-4 md:py-6" aria-label={data.title || 'Danh mục nổi bật'}>
-      <div className="container mx-auto px-4 max-w-[1370px]">
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
         {(data.title || data.viewAllLink) && (
-          <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
-            <div>
-              {data.title && <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">{data.title}</h2>}
-              {data.subtitle && <p className="text-slate-600 text-xs md:text-sm mt-1">{data.subtitle}</p>}
+          <div className="mb-3 md:mb-5 flex flex-wrap items-end justify-between gap-2">
+            <div className="min-w-0">
+              {data.title && (
+                <h2 className="text-base sm:text-lg md:text-xl lg:text-2xl font-black text-slate-900 tracking-tight">
+                  {data.title}
+                </h2>
+              )}
+              {data.subtitle && <p className="text-slate-600 text-xs md:text-sm mt-0.5">{data.subtitle}</p>}
             </div>
             {data.viewAllLink && (
               <Link
                 href={data.viewAllLink}
-                className="inline-flex items-center gap-1 text-xs sm:text-sm font-bold text-blue-600 hover:text-blue-700 transition"
+                className="min-h-11 inline-flex items-center gap-1 text-xs md:text-sm font-bold text-blue-600 hover:text-blue-700 transition shrink-0"
               >
                 Xem tất cả <ChevronRight className="w-4 h-4" />
               </Link>
@@ -621,17 +625,30 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
           </div>
         )}
 
-        <div className={data.layout === 'board' ? 'grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 lg:grid-cols-5 shadow-2xs' : 'grid grid-rows-2 grid-flow-col auto-cols-[44%] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2.5 pb-1 sm:grid-rows-none sm:grid-flow-row sm:auto-cols-auto sm:overflow-visible sm:pb-0 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5'}>
+        <div
+          className={
+            data.layout === 'board'
+              ? 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-hidden md:rounded-2xl md:p-0 md:gap-0 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+              : 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:grid-cols-3 md:gap-3 lg:grid-cols-4 lg:gap-4 xl:grid-cols-5'
+          }
+        >
           {categories.map((c: { id: string; name: string; href: string; image: string | null }, index: number) => (
             <Link
               key={`${c.id}-${index}`}
               href={c.href}
-              className={data.layout === 'board'
-                ? 'group flex min-w-0 items-center gap-3 border-b border-r border-slate-100 p-3 hover:bg-blue-50/70 active:scale-[0.99] transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden sm:p-4'
-                : 'group snap-start flex flex-col items-center rounded-2xl border border-slate-200/80 bg-white p-2.5 sm:p-4 text-center shadow-xs transition duration-150 hover:border-blue-500 hover:shadow-md active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden'
+              className={
+                data.layout === 'board'
+                  ? 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1 rounded-lg text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:flex-row md:items-center md:justify-start md:gap-3 md:rounded-none md:border-b md:border-r md:border-slate-100 md:p-3.5 lg:p-4 md:text-left md:hover:bg-blue-50/70 motion-reduce:transition-none'
+                  : 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1 rounded-lg text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:rounded-xl lg:rounded-2xl md:border md:border-slate-200/80 md:bg-white md:p-3.5 lg:p-4 md:shadow-xs md:hover:-translate-y-1 md:hover:border-blue-500 md:hover:shadow-md motion-reduce:md:hover:translate-y-0 motion-reduce:transition-none'
               }
             >
-              <div className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white transition group-hover:scale-105 motion-reduce:group-hover:scale-100 ${data.layout === 'board' ? 'h-14 w-14' : 'mb-2 h-16 w-20 sm:mb-3 sm:h-20 sm:w-24'}`}>
+              <div
+                className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-50 border border-slate-200/60 transition group-hover:scale-105 motion-reduce:group-hover:scale-100 ${
+                  data.layout === 'board'
+                    ? 'mb-1.5 h-11 w-11 md:mb-0 md:h-14 md:w-14 lg:h-16 lg:w-16 md:bg-white md:border-slate-100'
+                    : 'mb-1.5 h-11 w-11 md:mb-2.5 md:h-14 md:w-14 lg:h-16 lg:w-16 md:bg-white md:border-0'
+                }`}
+              >
                 {c.image ? (() => {
                   const catImg = c.image.startsWith('/api/library/') && !c.image.includes('?') ? `${c.image}?size=thumb&v=2` : c.image;
                   return (
@@ -642,14 +659,14 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
                       loading={index < 5 ? 'eager' : 'lazy'}
                       unoptimized={catImg.includes('size=thumb') || catImg.startsWith('/brand/')}
                       className="object-contain p-1"
-                      sizes="80px"
+                      sizes="(max-width: 767px) 44px, 64px"
                     />
                   );
                 })() : (
-                  <Store className="w-6 h-6 text-slate-400" />
+                  <Store className="w-5 h-5 md:w-6 md:h-6 text-slate-400" />
                 )}
               </div>
-              <h3 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-blue-600 transition line-clamp-2">
+              <h3 className="text-[11px] md:text-xs lg:text-sm font-semibold md:font-bold text-slate-800 group-hover:text-blue-600 transition leading-tight line-clamp-2 w-full">
                 {c.name}
               </h3>
             </Link>
@@ -701,30 +718,30 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
   const targetHref = data.viewAllLink || `/collection/${col.slug}`;
 
   return (
-    <section className="pb-12 md:pb-16" aria-label={data.title || col.name}>
-      <div className="container mx-auto px-4 max-w-[1370px]">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 px-6 py-4 flex items-center justify-between text-white">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg md:text-xl font-black uppercase tracking-tight">{data.title || col.name}</h2>
+    <section className="py-4 md:py-6 lg:py-8" aria-label={data.title || col.name}>
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="bg-white rounded-xl lg:rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 px-3 md:px-5 lg:px-6 py-2.5 md:py-3.5 flex flex-wrap items-center justify-between gap-2 text-white">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase tracking-tight leading-snug">{data.title || col.name}</h2>
                 <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-white/20 text-white">Bộ Sưu Tập</span>
               </div>
               {(data.subtitle || col.description) && (
-                <p className="text-xs text-white/80 mt-0.5">{data.subtitle || col.description}</p>
+                <p className="text-[11px] md:text-[12px] text-white/85 mt-0.5">{data.subtitle || col.description}</p>
               )}
             </div>
             <Link
               href={targetHref}
-              className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition flex items-center gap-1 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+              className="min-h-11 inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-[12px] font-bold transition shrink-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
             >
               Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
-          <div className="p-4 md:p-6 bg-slate-50/30">
+          <div className="p-2.5 md:p-4 lg:p-6 bg-slate-50/30">
             {displayProducts.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 md:gap-3 lg:gap-4">
                 {displayProducts.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
@@ -775,30 +792,32 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
   }
 
   return (
-    <section className="py-3 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
-      <div className="container mx-auto px-4 max-w-[1370px]">
+    <section className="py-2.5 md:py-4 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
         {d.title && (
-          <div className="text-center mb-5">
-            <h2 className="text-xl md:text-2xl font-black text-slate-900">{d.title}</h2>
-            {d.subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-1">{d.subtitle}</p>}
+          <div className="text-center mb-3 md:mb-4">
+            <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black text-slate-900 leading-snug">{d.title}</h2>
+            {d.subtitle && <p className="text-[12px] md:text-[13px] text-slate-500 mt-0.5">{d.subtitle}</p>}
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
           {activeFeatures.map((item) => {
             const Icon = ICON_MAP[item.icon] || Star;
             const cardContent = (
               <>
-                <div className="p-2 rounded-lg bg-blue-600 text-white shrink-0 shadow-xs group-hover:bg-blue-700 transition">
-                  <Icon className="w-4 h-4" />
+                <div className="flex items-center gap-1.5 lg:gap-2 min-w-0">
+                  <div className="w-6 h-6 lg:w-8 lg:h-8 rounded-md lg:rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-blue-700 transition">
+                    <Icon className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
+                  </div>
+                  <h3 className="font-bold text-[12px] md:text-[13px] lg:text-[14px] text-slate-900 group-hover:text-blue-700 transition leading-tight min-w-0 flex-1">
+                    {item.title}
+                  </h3>
+                  {item.href && (
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 shrink-0 transition group-hover:translate-x-0.5 motion-reduce:group-hover:translate-x-0" />
+                  )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-blue-700 transition">{item.title}</h3>
-                  <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">{item.description}</p>
-                </div>
-                {item.href && (
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 shrink-0 self-center transition group-hover:translate-x-0.5" />
-                )}
+                <p className="text-[11px] md:text-[12px] text-slate-600 leading-snug">{item.description}</p>
               </>
             );
             if (item.href) {
@@ -806,7 +825,7 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
                 <Link
                   key={item.id}
                   href={item.href}
-                  className="group p-2.5 sm:p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-start gap-2.5 hover:bg-blue-50/60 hover:border-blue-200 hover:shadow-2xs transition"
+                  className="group min-h-11 p-2 md:p-3 lg:p-3.5 rounded-lg lg:rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-1 hover:bg-blue-50/50 hover:border-blue-200 transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                 >
                   {cardContent}
                 </Link>
@@ -815,7 +834,7 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
             return (
               <div
                 key={item.id}
-                className="group p-2.5 sm:p-3 rounded-xl bg-slate-50/80 border border-slate-100 flex items-start gap-2.5 hover:bg-blue-50/40 hover:border-blue-100 transition"
+                className="group p-2 md:p-3 lg:p-3.5 rounded-lg lg:rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-1 hover:bg-blue-50/40 hover:border-blue-200 transition motion-reduce:transition-none"
               >
                 {cardContent}
               </div>
@@ -831,47 +850,49 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
 function CtaBlock({ data }: { data: unknown }) {
   const d = ctaSectionDataSchema.parse(data);
   return (
-    <section className="mx-auto max-w-[1370px] px-4 py-10" aria-label={d.title || 'Kêu gọi hành động'}>
-      <div className="grid gap-8 overflow-hidden rounded-3xl bg-slate-900 text-white md:grid-cols-2">
-        <div className="p-8 md:p-12">
-          <h2 className="text-3xl font-black">{d.title}</h2>
-          <p className="mt-4 text-slate-300">{d.subtitle}</p>
-          <div className="mt-6 flex flex-wrap gap-4">
-            {d.primaryLink && (
-              <Link
-                href={d.primaryLink}
-                className="rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 px-5 py-3 font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+    <section className="py-4 md:py-6 lg:py-8" aria-label={d.title || 'Kêu gọi hành động'}>
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="grid gap-4 md:gap-6 lg:gap-8 overflow-hidden rounded-xl lg:rounded-2xl bg-slate-900 text-white md:grid-cols-2 border border-slate-800 shadow-sm">
+          <div className="p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col justify-center">
+            <h2 className="text-[18px] sm:text-[20px] lg:text-[24px] font-black leading-snug">{d.title}</h2>
+            <p className="mt-2 md:mt-3 text-[12px] md:text-[14px] text-slate-300 leading-relaxed">{d.subtitle}</p>
+            <div className="mt-4 md:mt-5 flex flex-wrap gap-2.5 md:gap-3">
+              {d.primaryLink && (
+                <Link
+                  href={d.primaryLink}
+                  className="min-h-11 inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 px-4 md:px-5 py-2.5 text-[12px] md:text-[14px] font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                >
+                  {d.primaryText}
+                </Link>
+              )}
+              {d.secondaryLink && (
+                <Link
+                  href={d.secondaryLink}
+                  className="min-h-11 inline-flex items-center justify-center rounded-xl border border-slate-500 hover:bg-white/10 active:scale-95 px-4 md:px-5 py-2.5 text-[12px] md:text-[14px] font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                >
+                  {d.secondaryText}
+                </Link>
+              )}
+            </div>
+            {d.phone && (
+              <a
+                href={`tel:${d.phone.replace(/[^+\d]/g, '')}`}
+                className="min-h-11 mt-3 md:mt-4 inline-flex items-center self-start text-[16px] md:text-[18px] font-bold text-yellow-400 hover:text-yellow-300 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
               >
-                {d.primaryText}
-              </Link>
-            )}
-            {d.secondaryLink && (
-              <Link
-                href={d.secondaryLink}
-                className="rounded-xl border border-slate-500 hover:bg-white/10 active:scale-95 px-5 py-3 font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
-              >
-                {d.secondaryText}
-              </Link>
+                {d.phone}
+              </a>
             )}
           </div>
-          {d.phone && (
-            <a
-              href={`tel:${d.phone.replace(/[^+\d]/g, '')}`}
-              className="mt-6 inline-block text-xl font-bold text-yellow-400 hover:text-yellow-300 active:scale-95 transition focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
-            >
-              {d.phone}
-            </a>
+          {d.bgImageUrl && (
+            <Image
+              src={d.bgImageUrl}
+              alt="Showroom CitiLap"
+              width={800}
+              height={600}
+              className="h-full min-h-48 md:min-h-64 w-full object-cover"
+            />
           )}
         </div>
-        {d.bgImageUrl && (
-          <Image
-            src={d.bgImageUrl}
-            alt="Showroom CitiLap"
-            width={800}
-            height={600}
-            className="h-full min-h-64 w-full object-cover"
-          />
-        )}
       </div>
     </section>
   );

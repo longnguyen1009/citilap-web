@@ -25,6 +25,7 @@ import {
 import ProductCard from "@/components/product/ProductCard";
 import EmptyState from "@/components/ui/EmptyState";
 import CategoryFilterBehavior from "./CategoryFilterBehavior";
+import CatalogFilterPanel from "./CatalogFilterPanel";
 import { categoryAncestors } from "@/lib/category-paths";
 import { NEED_LABELS, catalogNeedTag } from "@/lib/catalog-needs";
 import { ACCESSORY_PRICE_PRESETS, ACCESSORY_TYPES } from "@/config/accessory-taxonomy";
@@ -256,19 +257,185 @@ export default function CategoryCatalog({
     return url(next); 
   };
   const pages = [...new Set([1, result.page - 1, result.page, result.page + 1, result.totalPages])].filter(page => page > 0 && page <= result.totalPages).sort((a, b) => a - b);
+  const currentUrlKey = url(params);
 
+  // Shared server-rendered filter options JSX (zero duplicate IDs, reused by PC sidebar + SP/tablet drawer)
+  const filterPanelContent = (
+    <div className="space-y-2.5" data-filter-inflow="true">
+      {/* 1. Nút Sẵn hàng */}
+      <Link
+        href={toggle("inStock", "1", false)}
+        aria-current={selected("inStock", "1") ? "true" : undefined}
+        className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition select-none ${
+          selected("inStock", "1")
+            ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-600/20 font-bold shadow-xs"
+            : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
+        }`}
+      >
+        <span className="flex items-center gap-2">
+          <PackageCheck size={15} className={selected("inStock", "1") ? "text-emerald-600 shrink-0" : "text-slate-500 shrink-0"} aria-hidden="true" />
+          <span>Sẵn hàng</span>
+        </span>
+        {selected("inStock", "1") && (
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">
+            <Check size={9} strokeWidth={3} aria-hidden="true" />
+          </span>
+        )}
+      </Link>
+
+      {/* 2. In-flow details Mức giá */}
+      <details data-category-filter data-inflow="true" open className="group rounded-xl border border-slate-200/90 bg-slate-50/30">
+        <summary className={`flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition select-none [&::-webkit-details-marker]:hidden ${
+          params.has("pricePreset") || params.has("minPrice") || params.has("maxPrice")
+            ? "text-blue-800 font-bold"
+            : "text-slate-800 hover:text-blue-600"
+        }`}>
+          <span className="min-w-0 break-words" title={priceText}>
+            {priceText ? <>Mức giá: <strong className="text-blue-700">{priceText}</strong></> : "Mức giá"}
+          </span>
+          <span className="flex shrink-0 items-center gap-1">
+            {priceText && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white">
+                <Check size={9} strokeWidth={3} aria-hidden="true" />
+              </span>
+            )}
+            <ChevronDown size={14} className="transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+          </span>
+        </summary>
+
+        <div className="border-t border-slate-200/80 px-2.5 pb-2.5 pt-2 space-y-1.5">
+          {params.has("pricePreset") && (
+            <div className="flex justify-end">
+              <Link
+                href={toggle("pricePreset", params.get("pricePreset")!, false)}
+                className="inline-flex min-h-11 items-center px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:underline"
+              >
+                Bỏ chọn
+              </Link>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-1.5">
+            {prices.map((p) => {
+              const isPresetActive = selected("pricePreset", p.value);
+              return (
+                <Link
+                  key={p.value}
+                  href={toggle("pricePreset", p.value, false)}
+                  aria-current={isPresetActive ? "true" : undefined}
+                  className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition cursor-pointer select-none ${
+                    isPresetActive
+                      ? "border border-blue-600 bg-blue-50 text-blue-700 font-bold shadow-2xs"
+                      : "border border-slate-200/80 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="break-words">{p.label}</span>
+                  {isPresetActive && (
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-bold">
+                      ✓
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </details>
+
+      {/* 3. In-flow details: Năm sản xuất, CPU, Card đồ họa, Dung lượng RAM / Phụ kiện */}
+      {filterGroups.map((group, index) => {
+        const options = selectedOptions(group);
+        const activeCount = options.length;
+        const values = options.map(o => o.label).join(", ");
+
+        return (
+          <details key={`${group.key}-${index}`} data-category-filter data-inflow="true" open className="group rounded-xl border border-slate-200/90 bg-slate-50/30">
+            <summary className={`flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition select-none [&::-webkit-details-marker]:hidden ${
+              activeCount > 0
+                ? "text-blue-800 font-bold"
+                : "text-slate-800 hover:text-blue-600"
+            }`}>
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="shrink-0 text-slate-500">{group.icon}</span>
+                <span className="min-w-0 break-words" title={values || group.label}>
+                  {activeCount > 0 ? <>{group.label}: <strong className="text-blue-700">{values}</strong></> : group.label}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-1">
+                {activeCount > 0 && (
+                  <span className="flex min-h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+                    {activeCount}
+                  </span>
+                )}
+                <ChevronDown size={14} className="transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+              </span>
+            </summary>
+
+            <div className="border-t border-slate-200/80 px-2.5 pb-2.5 pt-2 space-y-1.5">
+              {activeCount > 0 && (
+                <div className="flex justify-end">
+                  <Link
+                    href={remove(group.options.map(o => [group.key, String(o.value)]))}
+                    className="inline-flex min-h-11 items-center px-2.5 py-1.5 text-[11px] font-semibold text-rose-600 hover:underline"
+                  >
+                    Bỏ chọn ({activeCount})
+                  </Link>
+                </div>
+              )}
+
+              <div className="max-h-56 overflow-y-auto overscroll-contain space-y-1 pr-0.5">
+                {group.options.map((option) => {
+                  const isOptionChecked = selected(group.key, String(option.value));
+                  const targetHref = toggle(group.key, String(option.value));
+
+                  return (
+                    <Link
+                      key={String(option.value)}
+                      href={targetHref}
+                      aria-current={isOptionChecked ? "true" : undefined}
+                      className={`flex min-h-11 items-center justify-between gap-2 rounded-xl px-2.5 py-2 text-xs transition cursor-pointer select-none ${
+                        isOptionChecked
+                          ? "bg-blue-50 text-blue-900 font-bold border border-blue-200 shadow-2xs"
+                          : "bg-white text-slate-800 hover:bg-slate-50 hover:text-blue-600 border border-slate-100"
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition ${
+                          isOptionChecked
+                            ? "border-blue-600 bg-blue-600 text-white"
+                            : "border-slate-300 bg-white"
+                        }`}>
+                          {isOptionChecked && <Check size={11} strokeWidth={3.5} aria-hidden="true" />}
+                        </span>
+                        <span className="break-words">{option.label}</span>
+                      </div>
+                      {option.count > 0 && (
+                        <span className={`shrink-0 text-[10px] ${isOptionChecked ? "text-blue-600 font-semibold" : "text-slate-400 font-normal"}`}>
+                          ({option.count})
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <div className="space-y-4" data-catalog-kind={isAccessory ? "accessory" : "laptop"}>
+    <div className="min-w-0 space-y-3 sm:space-y-4" data-catalog-kind={isAccessory ? "accessory" : "laptop"}>
       <CategoryFilterBehavior />
       <h1 className="sr-only">{category.name}</h1>
 
-      {/* 1. KHỐI PHÂN LOẠI CON & NHU CẦU SỬ DỤNG (Chung 1 block border, các item nhỏ gọn gần vuông) */}
-      <section aria-label="Phân loại con và Nhu cầu" className="rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-4 shadow-xs space-y-2.5 sm:space-y-3.5">
-        
+      {/* 1. KHỐI PHÂN LOẠI CON & NHU CẦU SỬ DỤNG (Compact top category rails, giữ nguyên tên/link/counts) */}
+      <section aria-label="Phân loại con và Nhu cầu" className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2.5 sm:space-y-3">
+
         {/* Phần Phân loại con Cấp 2 (Dòng máy của danh mục cha - vuốt ngang mượt trên mobile, wrap trên desktop) */}
         {level2Categories.length > 0 ? (
-          <nav aria-label="Chọn dòng máy" className="flex flex-nowrap sm:flex-wrap items-center gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
+          <nav aria-label="Chọn dòng máy" className="flex flex-nowrap md:flex-wrap items-center gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
             {level2Categories.map(sub => {
               const checked = isRoot
                 ? (selected("subcat", sub.slug) || selected("subcat", sub.id))
@@ -279,32 +446,30 @@ export default function CategoryCatalog({
                 : currentLevel2?.id === sub.id ? rootCategory.href : sub.href;
 
               return (
-                <Link 
-                  key={sub.id} 
-                  href={targetHref} 
-                  aria-current={checked ? "true" : undefined} 
-                  title={sub.name} 
-                  className={`group relative flex w-[88px] sm:w-[124px] min-h-[70px] sm:min-h-[98px] flex-col items-center justify-center rounded-xl sm:rounded-2xl border p-1.5 sm:p-2.5 transition text-center select-none shrink-0 snap-start ${
-                    checked 
-                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25" 
+                <Link
+                  key={sub.id}
+                  href={targetHref}
+                  aria-current={checked ? "true" : undefined}
+                  title={sub.name}
+                  className={`group relative flex w-[78px] sm:w-[104px] md:w-[114px] min-h-[58px] sm:min-h-[72px] flex-col items-center justify-center rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none shrink-0 snap-start ${
+                    checked
+                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25"
                       : "border-slate-200 bg-slate-50/40 text-slate-700 hover:border-blue-400 hover:bg-white hover:shadow-xs"
                   }`}
                 >
-                  {/* Icon tích xanh góc trên phải */}
                   {checked && (
-                    <span className="absolute right-1.5 top-1.5 flex h-4 w-4 sm:h-4.5 sm:w-4.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[10px] sm:text-[11px] font-black">
+                    <span className="absolute right-1 top-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
                       ✓
                     </span>
                   )}
 
-                  {/* Logo/Ảnh Dòng máy */}
-                  <div className="flex h-6 sm:h-9 items-center justify-center">
+                  <div className="flex h-5 sm:h-7 items-center justify-center">
                     {subImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img loading="lazy" decoding="async" 
-                        src={subImage} 
-                        alt={sub.name} 
-                        className="max-h-6 sm:max-h-9 max-w-[58px] sm:max-w-[82px] object-contain transition-transform group-hover:scale-105" 
+                      <img loading="lazy" decoding="async"
+                        src={subImage}
+                        alt={sub.name}
+                        className="max-h-5 sm:max-h-7 max-w-[54px] sm:max-w-[74px] object-contain transition-transform group-hover:scale-105"
                       />
                     ) : (
                       <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-700 uppercase">
@@ -313,8 +478,7 @@ export default function CategoryCatalog({
                     )}
                   </div>
 
-                  {/* Tên dòng máy hiển thị 2 dòng to rõ */}
-                  <span className={`text-[10px] sm:text-xs font-black uppercase tracking-tight mt-1 sm:mt-1.5 line-clamp-2 leading-tight text-center max-w-full px-0.5 sm:px-1 ${
+                  <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-tight mt-1 line-clamp-2 leading-tight text-center max-w-full px-0.5 ${
                     checked ? "text-blue-900" : "text-slate-800"
                   }`}>
                     {sub.name}
@@ -324,8 +488,8 @@ export default function CategoryCatalog({
             })}
           </nav>
         ) : facets.brands.length > 0 ? (
-          /* Fallback cho danh mục không có phân loại con: hiển thị thương hiệu to rõ */
-          <nav aria-label="Chọn thương hiệu" className="flex flex-nowrap sm:flex-wrap items-center gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-1 sm:mx-0 sm:px-0 sm:pb-0">
+          /* Fallback cho danh mục không có phân loại con: hiển thị thương hiệu kèm số lượng thật */
+          <nav aria-label="Chọn thương hiệu" className="flex flex-nowrap md:flex-wrap items-center gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
             {facets.brands.map(brand => {
               const brandSlug = String(brand.value).toLowerCase();
               const logoSrc = BRAND_LOGOS[brandSlug];
@@ -333,30 +497,30 @@ export default function CategoryCatalog({
               const count = brandCounts.find(b => b.value === brand.value)?.count || 0;
 
               return (
-                <Link 
-                  key={brand.value} 
-                  href={toggle("brand", brand.value)} 
-                  aria-current={checked ? "true" : undefined} 
-                  title={`${brand.label}: ${count} ${isAccessory ? "sản phẩm" : "máy"}`} 
-                  className={`group relative flex w-[88px] sm:w-[124px] min-h-[70px] sm:min-h-[98px] flex-col items-center justify-center rounded-xl sm:rounded-2xl border p-1.5 sm:p-2.5 transition text-center select-none shrink-0 snap-start ${
-                    checked 
-                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25" 
+                <Link
+                  key={brand.value}
+                  href={toggle("brand", brand.value)}
+                  aria-current={checked ? "true" : undefined}
+                  title={`${brand.label}: ${count} ${isAccessory ? "sản phẩm" : "máy"}`}
+                  className={`group relative flex w-[78px] sm:w-[104px] md:w-[114px] min-h-[58px] sm:min-h-[72px] flex-col items-center justify-center rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none shrink-0 snap-start ${
+                    checked
+                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25"
                       : "border-slate-200 bg-slate-50/40 text-slate-700 hover:border-blue-400 hover:bg-white hover:shadow-xs"
                   }`}
                 >
                   {checked && (
-                    <span className="absolute right-1.5 top-1.5 flex h-4 w-4 sm:h-4.5 sm:w-4.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[10px] sm:text-[11px] font-black">
+                    <span className="absolute right-1 top-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
                       ✓
                     </span>
                   )}
 
-                  <div className="flex h-6 sm:h-9 items-center justify-center">
+                  <div className="flex h-5 sm:h-7 items-center justify-center">
                     {logoSrc ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img loading="lazy" decoding="async" 
-                        src={logoSrc} 
-                        alt={brand.label} 
-                        className="max-h-6 sm:max-h-9 max-w-[58px] sm:max-w-[82px] object-contain transition-transform group-hover:scale-105" 
+                      <img loading="lazy" decoding="async"
+                        src={logoSrc}
+                        alt={brand.label}
+                        className="max-h-5 sm:max-h-7 max-w-[54px] sm:max-w-[74px] object-contain transition-transform group-hover:scale-105"
                       />
                     ) : (
                       <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-700 uppercase">
@@ -365,7 +529,7 @@ export default function CategoryCatalog({
                     )}
                   </div>
 
-                  <span className={`text-[10px] sm:text-xs font-black uppercase tracking-tight mt-1 sm:mt-1.5 line-clamp-2 leading-tight text-center max-w-full px-0.5 sm:px-1 ${
+                  <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-tight mt-1 line-clamp-2 leading-tight text-center max-w-full px-0.5 ${
                     checked ? "text-blue-900" : "text-slate-800"
                   }`}>
                     {brand.label}
@@ -376,9 +540,9 @@ export default function CategoryCatalog({
           </nav>
         ) : null}
 
-        {/* HÀNG PHÂN LOẠI CHI TIẾT (CẤP 3): Cùng hàng ngang với nhãn Phân loại chi tiết, kích thước to rõ hơn */}
+        {/* HÀNG PHÂN LOẠI CHI TIẾT (CẤP 3) */}
         {level3Categories.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
             <span className="text-xs sm:text-sm font-black text-slate-700 flex items-center gap-1.5 shrink-0 mr-1">
               <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" />
               Phân loại chi tiết:
@@ -396,7 +560,7 @@ export default function CategoryCatalog({
                     key={sub3.id}
                     href={sub3Href}
                     aria-current={checked ? "true" : undefined}
-                    className={`inline-flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-bold transition cursor-pointer select-none shadow-2xs ${
+                    className={`inline-flex min-h-11 items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition cursor-pointer select-none shadow-2xs ${
                       checked
                         ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
                         : "border-slate-200 bg-slate-50/80 text-slate-700 hover:border-indigo-400 hover:bg-white"
@@ -415,53 +579,48 @@ export default function CategoryCatalog({
           </div>
         )}
 
-        {/* Đường phân cách mảnh giữa Dòng máy và Nhu cầu */}
         {(level2Categories.length > 0 || facets.brands.length > 0) && !isAccessory && (
           <div className="border-t border-slate-100" />
         )}
 
-        {/* Phần Nhu cầu sử dụng (Kích thước to hơn, trực quan rõ ràng) */}
+        {/* Phần Nhu cầu sử dụng */}
         {!isAccessory && (
           <div className="space-y-2">
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-              <Sparkles size={14} className="text-blue-600" aria-hidden="true" />
-              Nhu cầu sử dụng
+            <h2 className="text-base sm:text-lg lg:text-sm font-black tracking-tight lg:uppercase lg:tracking-wider text-slate-800 flex items-center gap-1.5">
+              <Sparkles size={15} className="text-blue-600 shrink-0" aria-hidden="true" />
+              <span>Nhu cầu sử dụng</span>
             </h2>
 
-            {/* Vuốt ngang trên mobile, Grid 4/8 cột trên tablet/desktop, chữ không bị cắt cụt */}
-            <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto sm:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-1 sm:mx-0 sm:px-0 sm:pb-0 sm:grid sm:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2.5">
+            <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:grid md:grid-cols-4 lg:grid-cols-8 gap-1.5 sm:gap-2">
               {STANDARD_NEEDS.map((need) => {
                 const checked = selected("tag", need.key);
                 return (
-                  <Link 
-                    key={need.key} 
-                    href={toggle("tag", need.key)} 
-                    aria-current={checked ? "true" : undefined} 
-                    className={`group relative flex w-[76px] sm:w-auto shrink-0 snap-start min-h-[64px] sm:min-h-[86px] flex-col items-center justify-center rounded-xl sm:rounded-2xl border p-1.5 sm:p-2.5 transition text-center select-none ${
-                      checked 
-                        ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25" 
+                  <Link
+                    key={need.key}
+                    href={toggle("tag", need.key)}
+                    aria-current={checked ? "true" : undefined}
+                    className={`group relative flex w-[74px] md:w-auto shrink-0 snap-start min-h-[56px] sm:min-h-[70px] flex-col items-center justify-center rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none ${
+                      checked
+                        ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
                         : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"
                     }`}
                   >
-                    {/* Icon tích xanh góc trên phải */}
                     {checked && (
-                      <span className="absolute right-1 top-1 sm:right-1.5 sm:top-1.5 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
+                      <span className="absolute right-1 top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
                         ✓
                       </span>
                     )}
 
-                    {/* Ảnh minh họa nhu cầu to rõ */}
-                    <div className="flex h-6 sm:h-8 items-center justify-center">
+                    <div className="flex h-5 sm:h-7 items-center justify-center">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img loading="lazy" decoding="async" 
-                        src={need.image} 
-                        alt={need.label} 
-                        className="max-h-6 sm:max-h-8 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs" 
+                      <img loading="lazy" decoding="async"
+                        src={need.image}
+                        alt={need.label}
+                        className="max-h-5 sm:max-h-7 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs"
                       />
                     </div>
 
-                    {/* Tên nhu cầu hiển thị trọn vẹn (không bị cắt Văn p...) */}
-                    <span className={`text-[10px] sm:text-xs font-bold leading-tight mt-1 sm:mt-1.5 line-clamp-2 max-w-full ${
+                    <span className={`text-[10px] sm:text-xs font-bold leading-tight mt-1 line-clamp-2 max-w-full ${
                       checked ? "text-blue-900 font-black" : "text-slate-800"
                     }`}>
                       {need.label}
@@ -475,354 +634,194 @@ export default function CategoryCatalog({
 
       </section>
 
-      {/* 4. KHỐI BỘ LỌC CHI TIẾT (Searchbox ngang hàng với các option lọc, click option lọc luôn không cần nút Áp dụng) */}
-      <section aria-label="Bộ lọc chi tiết" className="rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-4 shadow-xs space-y-2.5 sm:space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-            <SlidersHorizontal size={14} className="text-blue-600" aria-hidden="true" />
-            Bộ lọc chi tiết
-          </h2>
-        </div>
+      {/* 2. KHỐI LỌC SIDEBAR PC (240px) + DRAWER SP/TABLET & CỘT KẾT QUẢ SẢN PHẨM */}
+      <div className="space-y-3 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6 lg:items-start lg:space-y-0">
+        <CatalogFilterPanel
+          activeCount={chips.length}
+          resetHref={category.href}
+          currentUrlKey={currentUrlKey}
+        >
+          {filterPanelContent}
+        </CatalogFilterPanel>
 
-        {/* Hàng ngang chứa các Option lọc và Searchbox căn lề bên phải */}
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-          
-          {/* 1. Nút Sẵn hàng */}
-          <Link
-            href={toggle("inStock", "1", false)}
-            aria-current={selected("inStock", "1") ? "true" : undefined}
-            className={`inline-flex min-h-9 sm:min-h-10.5 items-center gap-1 sm:gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition shrink-0 select-none ${
-              selected("inStock", "1")
-                ? "border-emerald-600 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-600/20 font-bold shadow-xs"
-                : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-            }`}
-          >
-            <PackageCheck size={14} className={selected("inStock", "1") ? "text-emerald-600" : "text-slate-500"} aria-hidden="true" />
-            <span>Sẵn hàng</span>
-            {selected("inStock", "1") && (
-              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-600 text-white ml-0.5">
-                <Check size={9} strokeWidth={3} aria-hidden="true" />
-              </span>
-            )}
-          </Link>
-
-          {/* 2. Dropdown Mức giá (Instant filter - click là lọc ngay) */}
-          <details name="catalog-filter" data-category-filter className="group relative">
-            <summary className={`inline-flex min-h-9 sm:min-h-10.5 cursor-pointer list-none items-center gap-1 sm:gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition select-none [&::-webkit-details-marker]:hidden ${
-              params.has("pricePreset") || params.has("minPrice") || params.has("maxPrice")
-                ? "border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-600/20 font-bold shadow-xs"
-                : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-            }`}>
-              <span className="max-w-40 sm:max-w-48 truncate" title={priceText}>
-                {priceText ? <>Giá: <strong>{priceText}</strong></> : "Mức giá"}
-              </span>
-              {priceText && (
-                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white">
-                  <Check size={9} strokeWidth={3} aria-hidden="true" />
+        <div className="min-w-0 space-y-3 sm:space-y-4">
+          {/* Active Summary Bar (Ngoài drawer) */}
+          {chips.length > 0 && (
+            <nav aria-label="Bộ lọc đang áp dụng" className="flex flex-wrap items-center justify-between gap-2 rounded-xl md:rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/90 to-indigo-50/60 px-3 py-2 shadow-xs">
+              <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                <span className="text-xs font-black text-blue-950 flex items-center gap-1.5 shrink-0">
+                  <SlidersHorizontal size={13} className="text-blue-700" aria-hidden="true" />
+                  Đang lọc ({chips.length}):
                 </span>
-              )}
-              <ChevronDown size={13} aria-hidden="true" />
-            </summary>
-            
-            <div className="hidden group-open:block fixed inset-x-4 top-1/2 z-40 max-h-[75vh] -translate-y-1/2 overflow-y-auto sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-64 sm:translate-y-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
-              <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Chọn mức giá
-                </span>
-                {params.has("pricePreset") && (
+                {chips.map((chip, i) => (
                   <Link
-                    href={toggle("pricePreset", params.get("pricePreset")!, false)}
-                    className="text-[11px] font-semibold text-rose-600 hover:underline"
+                    key={i}
+                    href={chip.href}
+                    aria-label={`Xóa tiêu chí ${chip.text}`}
+                    className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition shadow-2xs group"
                   >
-                    Bỏ chọn
+                    <span className="break-words">{chip.text}</span>
+                    <X size={13} className="shrink-0 text-blue-500 group-hover:text-rose-600" aria-hidden="true" />
                   </Link>
-                )}
+                ))}
               </div>
 
-              <div className="flex flex-col gap-1.5">
-                {prices.map((p) => {
-                  const isPresetActive = selected("pricePreset", p.value);
+              <Link
+                href={category.href}
+                className="inline-flex min-h-11 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100/70 hover:text-rose-800 transition shrink-0"
+              >
+                <RotateCcw size={12} aria-hidden="true" />
+                <span>Xóa tất cả</span>
+              </Link>
+            </nav>
+          )}
+
+          {/* Product Listing Grid, GET Search Form & Sorting Bar */}
+          <section aria-label="Kết quả sản phẩm" className="min-w-0 space-y-3 sm:space-y-4">
+            <div className="flex flex-col gap-2.5 bg-white p-3 sm:px-4 sm:py-3 rounded-xl md:rounded-2xl border border-slate-200/90 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <p role="status" className="text-xs sm:text-sm text-slate-600">
+                  Tìm thấy <strong className="font-bold text-slate-900">{result.totalCount}</strong> sản phẩm
+                  {result.query && <> khớp với “<span className="text-blue-600 font-bold">{result.query}</span>”</>}
+                </p>
+
+                {/* Ô Searchbox GET giữ nguyên hidden params, font 16px trên SP và control 44px */}
+                <div className="w-full sm:w-auto">
+                  <form action={category.href} method="get" className="relative flex items-center gap-1.5">
+                    {hidden(["q", "page"])}
+                    <div className="relative flex min-w-0 flex-1 items-center sm:w-60 md:w-68">
+                      <input
+                        type="search"
+                        name="q"
+                        aria-label="Tìm sản phẩm trong danh mục"
+                        defaultValue={result.query || ""}
+                        placeholder="Tìm tên máy, mã model, CPU..."
+                        className={`h-11 min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-9 ${result.query ? "pr-11" : "pr-3"} text-base md:text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none transition shadow-2xs`}
+                      />
+                      <Search size={15} className="absolute left-3 text-slate-400 pointer-events-none" aria-hidden="true" />
+                      {result.query && (
+                        <Link
+                          href={toggle("q", result.query, false)}
+                          title="Xóa tìm kiếm"
+                          aria-label="Xóa từ khóa tìm kiếm"
+                          className="absolute right-0 inline-flex h-11 w-11 min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-slate-600 rounded-xl"
+                        >
+                          <X size={15} aria-hidden="true" />
+                        </Link>
+                      )}
+                    </div>
+                    <button
+                      type="submit"
+                      title="Tìm kiếm"
+                      aria-label="Tìm kiếm"
+                      className="inline-flex h-11 min-h-11 min-w-11 px-3.5 items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-2xs font-bold text-xs shrink-0 cursor-pointer"
+                    >
+                      <Search size={15} aria-hidden="true" />
+                      <span className="hidden md:inline">Tìm</span>
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              <nav aria-label="Sắp xếp sản phẩm" className="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pt-2 border-t border-slate-100 sm:mx-0 sm:px-0">
+                <span className="mr-1 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0 whitespace-nowrap">
+                  <ArrowUpDown size={13} aria-hidden="true" />
+                  Sắp xếp:
+                </span>
+                {SORTS.filter(s => s.value !== "relevance" || result.query).map((s) => {
+                  const next = new URLSearchParams(params);
+                  next.set("sort", s.value);
+                  next.delete("page");
+                  const isSortActive = sort === s.value;
                   return (
                     <Link
-                      key={p.value}
-                      href={toggle("pricePreset", p.value, false)}
-                      className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition cursor-pointer select-none ${
-                        isPresetActive
-                          ? "border border-blue-600 bg-blue-50 text-blue-700 font-bold shadow-2xs"
-                          : "border border-slate-100 bg-slate-50/70 text-slate-700 hover:border-blue-300 hover:bg-slate-100"
+                      key={s.value}
+                      href={url(next)}
+                      aria-current={isSortActive ? "true" : undefined}
+                      className={`inline-flex min-h-11 items-center shrink-0 whitespace-nowrap snap-start rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                        isSortActive
+                          ? "bg-slate-900 text-white shadow-xs font-bold"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
-                      <span>{p.label}</span>
-                      {isPresetActive && (
-                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-white text-[10px] font-bold">
-                          ✓
-                        </span>
-                      )}
+                      {s.label}
                     </Link>
                   );
                 })}
-              </div>
+              </nav>
             </div>
-          </details>
 
-          {/* 3. Dropdowns: Năm sản xuất, CPU, Card đồ họa, Dung lượng RAM (Instant filter - click là lọc ngay, không cần bấm Áp dụng) */}
-          {filterGroups.map((group, index) => {
-            const options = selectedOptions(group);
-            const activeCount = options.length;
-            const values = options.map(o => o.label).join(", ");
-
-            return (
-              <details key={`${group.key}-${index}`} name="catalog-filter" data-category-filter className="group relative">
-                <summary className={`inline-flex min-h-9 sm:min-h-10.5 cursor-pointer list-none items-center gap-1 sm:gap-1.5 rounded-xl border px-2.5 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold transition select-none [&::-webkit-details-marker]:hidden ${
-                  activeCount > 0
-                    ? "border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-600/20 font-bold shadow-xs"
-                    : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-slate-100"
-                }`}>
-                  {group.icon}
-                  <span className="max-w-36 sm:max-w-44 truncate" title={values}>
-                    {activeCount > 0 ? <>{group.label}: <strong>{values}</strong></> : group.label}
-                  </span>
-                  {activeCount > 0 && (
-                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white">
-                      <Check size={9} strokeWidth={3} aria-hidden="true" />
-                    </span>
-                  )}
-                  {activeCount > 1 && (
-                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
-                      {activeCount}
-                    </span>
-                  )}
-                  <ChevronDown size={13} aria-hidden="true" />
-                </summary>
-
-                <div className={`hidden group-open:block fixed inset-x-4 top-1/2 z-40 max-h-[75vh] -translate-y-1/2 overflow-y-auto sm:absolute sm:inset-x-auto sm:top-full sm:mt-2 sm:w-72 sm:translate-y-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl ${index >= 2 ? "sm:right-0 sm:left-auto lg:left-0 lg:right-auto" : "sm:left-0"}`}>
-                  <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
-                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      {group.label}
-                    </span>
-                    {activeCount > 0 && (
-                      <Link
-                        href={remove(group.options.map(o => [group.key, String(o.value)]))}
-                        className="text-[11px] font-semibold text-rose-600 hover:underline"
-                      >
-                        Bỏ chọn ({activeCount})
-                      </Link>
-                    )}
-                  </div>
-
-                  {/* Danh sách options dạng LINK: Click là lọc ngay lập tức */}
-                  <div className="max-h-60 overflow-y-auto space-y-1 pr-1">
-                    {group.options.map((option) => {
-                      const isOptionChecked = selected(group.key, String(option.value));
-                      const targetHref = toggle(group.key, String(option.value));
-
-                      return (
-                        <Link
-                          key={String(option.value)}
-                          href={targetHref}
-                          className={`flex min-h-9 items-center justify-between rounded-xl px-2.5 py-1.5 text-xs transition cursor-pointer select-none ${
-                            isOptionChecked 
-                              ? "bg-blue-50 text-blue-900 font-bold border border-blue-200 shadow-2xs" 
-                              : "text-slate-800 hover:bg-slate-50 hover:text-blue-600 border border-transparent"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition ${
-                              isOptionChecked 
-                                ? "border-blue-600 bg-blue-600 text-white" 
-                                : "border-slate-300 bg-white"
-                            }`}>
-                              {isOptionChecked && <Check size={11} strokeWidth={3.5} aria-hidden="true" />}
-                            </span>
-                            <span>{option.label}</span>
-                          </div>
-                          {option.count > 0 && (
-                            <span className={`text-[10px] ${isOptionChecked ? "text-blue-600 font-semibold" : "text-slate-400 font-normal"}`}>
-                              ({option.count})
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </div>
-              </details>
-            );
-          })}
-
-          {/* Ô Searchbox chuyển xuống ngang hàng với các option lọc (căn lề bên phải), Button tìm kiếm to hơn */}
-          <div className="ml-auto w-full sm:w-auto mt-1 sm:mt-0">
-            <form action={category.href} method="get" className="relative flex items-center gap-1.5">
-              {hidden(["q", "page"])}
-              <div className="relative flex items-center w-full sm:w-60 md:w-68">
-                <input
-                  type="search"
-                  name="q"
-                  defaultValue={result.query || ""}
-                  placeholder="Tìm tên máy, mã model, CPU..."
-                  className="h-9.5 w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-8.5 pr-8 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none transition shadow-2xs"
+            {/* Product Cards Grid: SP 2 cột, Tablet 3 cột, PC lg 3 cột / xl 4 cột khi có sidebar 240px */}
+            {result.products.length ? (
+              <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
+                {result.products.map((product) => (
+                  <ProductCard key={product.id} product={product} showSpecs={!isAccessory} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-10 shadow-xs text-center">
+                <EmptyState
+                  title="Không tìm thấy sản phẩm phù hợp"
+                  description={`Rất tiếc, không có sản phẩm nào thỏa mãn tất cả tiêu chí bạn đã chọn trong danh mục ${category.name}. Bạn vui lòng thử bỏ bớt bộ lọc.`}
+                  action={
+                    <Link
+                      href={category.href}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
+                    >
+                      Xem tất cả {category.name}
+                    </Link>
+                  }
                 />
-                <Search size={14} className="absolute left-2.5 text-slate-400 pointer-events-none" aria-hidden="true" />
-                {result.query && (
+              </div>
+            )}
+
+            {/* Pagination */}
+            {result.totalPages > 1 && (
+              <nav aria-label="Phân trang sản phẩm" className="flex flex-wrap items-center justify-center gap-2 pt-4 sm:pt-6">
+                {result.page > 1 && (
                   <Link
-                    href={toggle("q", result.query, false)}
-                    title="Xóa tìm kiếm"
-                    className="absolute right-2.5 p-0.5 text-slate-400 hover:text-slate-600 rounded"
+                    href={pageHref(result.page - 1)}
+                    rel="prev"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition shadow-xs"
                   >
-                    <X size={14} />
+                    Trang trước
                   </Link>
                 )}
-              </div>
-              <button
-                type="submit"
-                title="Tìm kiếm"
-                className="flex h-9.5 min-w-9.5 px-3.5 items-center justify-center gap-1.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition shadow-2xs font-bold text-xs shrink-0 cursor-pointer"
-              >
-                <Search size={15} />
-                <span className="hidden md:inline">Tìm</span>
-              </button>
-            </form>
-          </div>
 
-        </div>
-      </section>
+                {pages.map((page, i) => (
+                  <span key={page} className="inline-flex items-center gap-1.5">
+                    {i > 0 && page - pages[i - 1] > 1 && (
+                      <span className="px-1 text-slate-400 font-bold" aria-hidden="true">…</span>
+                    )}
+                    <Link
+                      href={pageHref(page)}
+                      aria-label={`Trang ${page}`}
+                      aria-current={page === result.page ? "page" : undefined}
+                      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl px-3 py-2 text-xs sm:text-sm font-bold transition shadow-xs ${
+                        page === result.page
+                          ? "bg-blue-600 text-white"
+                          : "border border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:text-blue-600"
+                      }`}
+                    >
+                      {page}
+                    </Link>
+                  </span>
+                ))}
 
-      {/* 5. Active Summary Bar (Thanh tóm tắt thông minh khi đang lọc) */}
-      {chips.length > 0 && (
-        <nav aria-label="Bộ lọc đang áp dụng" className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/90 to-indigo-50/60 px-3.5 py-2.5 shadow-xs">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-black text-blue-950 flex items-center gap-1.5">
-              <SlidersHorizontal size={13} className="text-blue-700" />
-              Đang lọc ({chips.length}):
-            </span>
-            {chips.map((chip, i) => (
-              <Link
-                key={i}
-                href={chip.href}
-                aria-label={`Xóa tiêu chí ${chip.text}`}
-                className="inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-800 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition shadow-2xs group"
-              >
-                <span className="break-words">{chip.text}</span>
-                <X size={12} className="shrink-0 text-blue-500 group-hover:text-rose-600" aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-
-          <Link 
-            href={category.href} 
-            className="inline-flex min-h-8 items-center gap-1 rounded-xl px-2.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-100/70 hover:text-rose-800 transition"
-          >
-            <RotateCcw size={12} />
-            <span>Xóa tất cả</span>
-          </Link>
-        </nav>
-      )}
-
-      {/* 6. Product Listing Grid & Sorting Bar */}
-      <section aria-label="Kết quả sản phẩm" className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-xs">
-          <p role="status" className="text-xs sm:text-sm text-slate-600">
-            Tìm thấy <strong className="font-bold text-slate-900">{result.totalCount}</strong> sản phẩm
-            {result.query && <> khớp với “<span className="text-blue-600 font-bold">{result.query}</span>”</>}
-          </p>
-
-          <nav aria-label="Sắp xếp sản phẩm" className="flex flex-nowrap sm:flex-wrap items-center gap-1.5 overflow-x-auto sm:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 py-0.5 sm:mx-0 sm:px-0 sm:py-0">
-            <span className="mr-1 text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0 whitespace-nowrap">
-              <ArrowUpDown size={13} />
-              Sắp xếp:
-            </span>
-            {SORTS.filter(s => s.value !== "relevance" || result.query).map((s) => {
-              const next = new URLSearchParams(params);
-              next.set("sort", s.value);
-              next.delete("page");
-              const isSortActive = sort === s.value;
-              return (
-                <Link
-                  key={s.value}
-                  href={url(next)}
-                  aria-current={isSortActive ? "true" : undefined}
-                  className={`inline-flex items-center shrink-0 whitespace-nowrap snap-start rounded-xl px-2.5 py-1.5 text-xs font-semibold transition ${
-                    isSortActive
-                      ? "bg-slate-900 text-white shadow-xs font-bold"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {s.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Product Cards Grid */}
-        {result.products.length ? (
-          <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {result.products.map((product) => (
-              <ProductCard key={product.id} product={product} showSpecs={!isAccessory} />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-slate-200 bg-white p-10 shadow-xs text-center">
-            <EmptyState
-              title="Không tìm thấy sản phẩm phù hợp"
-              description={`Rất tiếc, không có sản phẩm nào thỏa mãn tất cả tiêu chí bạn đã chọn trong danh mục ${category.name}. Bạn vui lòng thử bỏ bớt bộ lọc.`}
-              action={
-                <Link
-                  href={category.href}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
-                >
-                  Xem tất cả {category.name}
-                </Link>
-              }
-            />
-          </div>
-        )}
-
-        {/* Pagination */}
-        {result.totalPages > 1 && (
-          <nav aria-label="Phân trang sản phẩm" className="flex flex-wrap items-center justify-center gap-2 pt-6">
-            {result.page > 1 && (
-              <Link
-                href={pageHref(result.page - 1)}
-                rel="prev"
-                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition shadow-xs"
-              >
-                Trang trước
-              </Link>
-            )}
-
-            {pages.map((page, i) => (
-              <span key={page} className="inline-flex items-center gap-1.5">
-                {i > 0 && page - pages[i - 1] > 1 && (
-                  <span className="px-1 text-slate-400 font-bold" aria-hidden="true">…</span>
+                {result.page < result.totalPages && (
+                  <Link
+                    href={pageHref(result.page + 1)}
+                    rel="next"
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition shadow-xs"
+                  >
+                    Trang sau
+                  </Link>
                 )}
-                <Link
-                  href={pageHref(page)}
-                  aria-label={`Trang ${page}`}
-                  aria-current={page === result.page ? "page" : undefined}
-                  className={`inline-flex min-h-10 min-w-10 items-center justify-center rounded-xl px-3 py-2 text-xs sm:text-sm font-bold transition shadow-xs ${
-                    page === result.page
-                      ? "bg-blue-600 text-white"
-                      : "border border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:text-blue-600"
-                  }`}
-                >
-                  {page}
-                </Link>
-              </span>
-            ))}
-
-            {result.page < result.totalPages && (
-              <Link
-                href={pageHref(result.page + 1)}
-                rel="next"
-                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-600 transition shadow-xs"
-              >
-                Trang sau
-              </Link>
+              </nav>
             )}
-          </nav>
-        )}
-      </section>
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

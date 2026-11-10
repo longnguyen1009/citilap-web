@@ -255,7 +255,7 @@ export function ProductGallery({
               type="button"
               onClick={handlePrev}
               aria-label="Ảnh trước"
-              className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm opacity-90 sm:opacity-0 sm:group-hover:opacity-100 active:scale-95 transition hover:bg-white hover:text-blue-600 cursor-pointer"
+              className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm opacity-90 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 active:scale-95 transition hover:bg-white hover:text-blue-600 cursor-pointer"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
@@ -263,7 +263,7 @@ export function ProductGallery({
               type="button"
               onClick={handleNext}
               aria-label="Ảnh tiếp theo"
-              className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm opacity-90 sm:opacity-0 sm:group-hover:opacity-100 active:scale-95 transition hover:bg-white hover:text-blue-600 cursor-pointer"
+              className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 z-10 flex h-11 w-11 min-h-11 min-w-11 items-center justify-center rounded-full border border-slate-200 bg-white/90 text-slate-700 shadow-sm opacity-90 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 active:scale-95 transition hover:bg-white hover:text-blue-600 cursor-pointer"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
@@ -301,9 +301,9 @@ export function ProductGallery({
             openerRef.current = e.currentTarget;
             setLightboxOpen(true);
           }}
-          className="absolute bottom-2 right-2 sm:bottom-3.5 sm:right-3.5 inline-flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-slate-200/80 bg-white/85 sm:bg-white/95 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold text-slate-700 shadow-2xs backdrop-blur-xs transition hover:border-blue-500 hover:text-blue-600 active:scale-95 cursor-pointer"
+          className="absolute bottom-2 right-2 sm:bottom-3.5 sm:right-3.5 inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/90 sm:bg-white/95 px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs backdrop-blur-xs transition hover:border-blue-500 hover:text-blue-600 active:scale-95 cursor-pointer"
         >
-          <Maximize2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+          <Maximize2 className="h-3.5 w-3.5 shrink-0" />
           <span>
             <span className="sm:hidden">Phóng to</span>
             <span className="hidden sm:inline">Xem ảnh to</span>
@@ -395,7 +395,7 @@ export function ProductGallery({
               <button
                 type="button"
                 onClick={handlePrev}
-                className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 cursor-pointer"
+                className="flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 cursor-pointer"
                 aria-label="Ảnh trước"
               >
                 <ChevronLeft className="h-6 w-6" />
@@ -437,7 +437,7 @@ export function ProductGallery({
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 cursor-pointer"
+                className="flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 cursor-pointer"
                 aria-label="Ảnh tiếp theo"
               >
                 <ChevronRight className="h-6 w-6" />

@@ -9,8 +9,8 @@ export interface ContainerProps extends React.HTMLAttributes<HTMLDivElement> {
 
 /**
  * Standardized responsive storefront container.
- * - Horizontal padding: 16px (px-4) across all breakpoints to align flush with Header & Footer
- * - Max Width: 1370px (max-w-[1370px])
+ * - Horizontal padding: 12px on mobile (px-3), 24px from md+ (md:px-6)
+ * - Max Width: 1280px (max-w-7xl)
  */
 export function Container({
   as: Component = "div",
@@ -19,11 +19,13 @@ export function Container({
   children,
   ...props
 }: ContainerProps) {
+  const paddingClass = clean ? "" : "px-3 md:px-6";
+  const classes = ["w-full min-w-0 mx-auto max-w-7xl", paddingClass, className]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <Component
-      className={`container w-full mx-auto max-w-[1370px] ${clean ? "" : "px-4"} ${className}`}
-      {...props}
-    >
+    <Component className={classes} {...props}>
       {children}
     </Component>
   );

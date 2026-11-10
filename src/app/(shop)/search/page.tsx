@@ -67,7 +67,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     <div className="bg-surface min-h-screen pb-12">
       <Breadcrumb items={breadcrumbItems} />
 
-      <div className="container mx-auto px-4 max-w-[1370px] mt-3">
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 mt-3">
         <Suspense
           fallback={
             <div className="bg-surface-card border border-border-default rounded-card p-8 text-center">

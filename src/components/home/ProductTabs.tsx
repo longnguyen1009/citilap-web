@@ -57,23 +57,23 @@ export default function ProductTabs({
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
   }
   return (
-    <section className="pb-8 sm:pb-12 md:pb-16" aria-label={title}>
-      <div className="container mx-auto max-w-[1370px] px-2.5 sm:px-4">
+    <section className="py-4 md:py-6 lg:py-8" aria-label={title}>
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
         {subtitle && (
-          <div className="mb-3">
-            <h2 className="text-lg sm:text-xl font-black uppercase text-slate-900">{title}</h2>
-            <p className="text-xs sm:text-sm text-slate-600 mt-0.5">{subtitle}</p>
+          <div className="mb-2.5 md:mb-3.5">
+            <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase text-slate-900 leading-snug">{title}</h2>
+            <p className="text-[12px] md:text-[13px] text-slate-600 mt-0.5">{subtitle}</p>
           </div>
         )}
         <div>
-          <div role="tablist" aria-label={title} className="relative z-10 -mb-0.5 flex gap-1.5 overflow-x-auto overscroll-x-contain hide-scrollbar">
+          <div role="tablist" aria-label={title} className="relative z-10 -mb-0.5 flex gap-1 md:gap-1.5 overflow-x-auto overscroll-x-contain hide-scrollbar">
             {tabs.map((t, index) => {
               const visCls =
                 t.deviceVisibility === 'desktop'
                   ? 'hidden md:inline-flex'
                   : t.deviceVisibility === 'mobile'
                     ? 'md:hidden'
-                    : '';
+                    : 'inline-flex';
               return (
                 <button
                   key={t.id}
@@ -101,7 +101,7 @@ export default function ProductTabs({
                       document.getElementById(`${prefix}-tab-${tabs[next].id}`)?.focus();
                     }
                   }}
-                  className={`${visCls} min-w-32 sm:min-w-36 flex-1 rounded-t-2xl border-2 px-2.5 sm:px-3 py-3 sm:py-4 text-xs font-black uppercase transition sm:text-base lg:text-lg cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
+                  className={`${visCls} min-h-11 flex-1 shrink-0 items-center justify-center rounded-t-xl md:rounded-t-2xl border-2 px-2.5 md:px-4 py-1.5 md:py-2.5 text-[12px] md:text-[14px] lg:text-[16px] font-black uppercase whitespace-nowrap transition cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
                     safeIndex === index
                       ? 'border-blue-500 border-b-blue-50 bg-blue-50 text-blue-700 shadow-2xs'
                       : 'border-slate-200/90 border-b-blue-500 bg-white text-slate-700 hover:bg-blue-50/60 hover:text-blue-700'
@@ -117,7 +117,7 @@ export default function ProductTabs({
             id={`${prefix}-panel`}
             aria-labelledby={`${prefix}-tab-${tab.id}`}
             tabIndex={0}
-            className="rounded-b-2xl border-2 border-blue-500 bg-gradient-to-b from-blue-50 via-white to-white px-2.5 pb-4 pt-4 sm:px-5 sm:pb-5 sm:pt-6 shadow-xs focus-visible:outline-hidden"
+            className="rounded-b-xl md:rounded-b-2xl border-2 border-blue-500 bg-gradient-to-b from-blue-50 via-white to-white px-2.5 pb-3.5 pt-3 md:px-5 md:pb-5 md:pt-5 shadow-xs focus-visible:outline-hidden"
           >
             {tab.products.length ? (
               <ProductCarousel
@@ -136,10 +136,10 @@ export default function ProductTabs({
               </p>
             )}
             {tab.href && (
-              <div className="mt-4 text-center">
+              <div className="mt-3 md:mt-4 text-center">
                 <Link
                   href={tab.href}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold uppercase text-white hover:bg-blue-700 active:scale-95 transition duration-150 shadow-xs focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
+                  className="min-h-11 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-5 md:px-6 py-2.5 text-[12px] md:text-[14px] font-bold uppercase text-white hover:bg-blue-700 active:scale-95 transition duration-150 shadow-xs focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                 >
                   Xem {tab.label}
                   <ChevronRight className="h-4 w-4" />
@@ -159,13 +159,16 @@ export function ProductCarousel({
   oneAtATime = false,
   mobileLimit = null,
   eagerImages = false,
+  cardVariant = 'default',
 }: {
   products: ProductCardProduct[];
   label: string;
   oneAtATime?: boolean;
   mobileLimit?: number | null;
   eagerImages?: boolean;
+  cardVariant?: 'default' | 'flash';
 }) {
+  const isFlash = cardVariant === 'flash';
   const container = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
   const [autoplay, setAutoplay] = useState(true);
@@ -206,19 +209,24 @@ export function ProductCarousel({
     update();
     return () => { observer.disconnect(); el.removeEventListener('scroll', update); };
   }, [products]);
-  return <div ref={container} className="grid grid-cols-1 sm:grid-cols-[36px_minmax(0,1fr)_36px] items-center gap-1 sm:gap-2">
+  const spColsClass = isFlash
+    ? 'auto-cols-[calc((100%-16px)/2.3)] gap-2'
+    : oneAtATime
+      ? 'auto-cols-[calc((100%-10px)/2)] gap-2.5'
+      : 'auto-cols-[calc((100%-10px)/2)] gap-2.5';
+  return <div ref={container} className="grid grid-cols-1 md:grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 md:gap-2">
     <div
       ref={rail}
       tabIndex={0}
       role="region"
       aria-label={`Sản phẩm ${label}`}
-      className={`sm:col-start-2 sm:row-start-1 grid ${oneAtATime ? 'auto-cols-[calc((100%-8px)/2)] sm:auto-cols-[calc((100%-12px)/2)]' : 'auto-cols-[calc((100%-8px)/2)] sm:auto-cols-[calc((100%-12px)/2)]'} grid-flow-col gap-2 sm:gap-3 overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-0.5 sm:px-1 pt-1.5 sm:pt-2 pb-2 sm:pb-4 md:auto-cols-[calc((100%-24px)/3)] lg:auto-cols-[calc((100%-48px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
+      className={`md:col-start-2 md:row-start-1 grid ${spColsClass} grid-flow-col overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-0.5 md:px-1 pt-1.5 md:pt-2 pb-2 md:pb-4 md:gap-3 md:auto-cols-[calc((100%-24px)/3)] lg:gap-4 lg:auto-cols-[calc((100%-48px)/4)] xl:auto-cols-[calc((100%-64px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
     >
       {products.map((p, idx) => {
         const hideOnMobile = Boolean(mobileLimit && mobileLimit > 0 && idx >= mobileLimit);
         return (
-          <div key={`${p.id}:${p.variantId || ''}`} className={`min-w-0 snap-start h-full ${hideOnMobile ? 'hidden sm:block' : ''}`}>
-            <ProductCard product={p} imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'} />
+          <div key={`${p.id}:${p.variantId || ''}`} className={`min-w-0 snap-start h-full ${hideOnMobile ? 'hidden md:block' : ''}`}>
+            <ProductCard product={p} variant={cardVariant} imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'} />
           </div>
         );
       })}
@@ -228,7 +236,7 @@ export function ProductCarousel({
       aria-label="Sản phẩm trước"
       disabled={bounds.start}
       onClick={() => move(-1)}
-      className="hidden sm:flex sm:col-start-1 sm:row-start-1 h-14 w-full cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
+      className="hidden md:flex md:col-start-1 md:row-start-1 min-h-11 min-w-11 h-14 w-full cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
     >
       <ChevronLeft className="h-6 w-6" />
     </button>
@@ -237,11 +245,11 @@ export function ProductCarousel({
       aria-label="Sản phẩm tiếp theo"
       disabled={bounds.end}
       onClick={() => move(1)}
-      className="hidden sm:flex sm:col-start-3 sm:row-start-1 h-14 w-full cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
+      className="hidden md:flex md:col-start-3 md:row-start-1 min-h-11 min-w-11 h-14 w-full cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
     >
       <ChevronRight className="h-6 w-6" />
     </button>
-    <button type="button" aria-label={autoplay ? 'Tạm dừng tự cuộn sản phẩm' : 'Bật tự cuộn sản phẩm'} aria-pressed={!autoplay} onClick={() => setAutoplay(value => !value)} className="sm:col-start-2 min-h-7 sm:min-h-9 justify-self-start sm:justify-self-end rounded-full border border-slate-200 bg-white/95 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600">
+    <button type="button" aria-label={autoplay ? 'Tạm dừng tự cuộn sản phẩm' : 'Bật tự cuộn sản phẩm'} aria-pressed={!autoplay} onClick={() => setAutoplay(value => !value)} className="md:col-start-2 min-h-11 justify-self-start md:justify-self-end rounded-full border border-slate-200 bg-white/95 px-3 md:px-3.5 py-1.5 text-[11px] md:text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600">
       {autoplay ? <Pause aria-hidden="true" className="mr-1 inline h-3 w-3" /> : <Play aria-hidden="true" className="mr-1 inline h-3 w-3" />}{autoplay ? 'Tạm dừng' : 'Tự cuộn'}
     </button>
   </div>;

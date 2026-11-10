@@ -88,7 +88,7 @@ export function ProductSpecsSidebarCard({
 
   return (
     <>
-      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200/80 shadow-xs">
+      <div className="bg-white rounded-2xl md:rounded-3xl p-4 sm:p-6 border border-slate-200/80 shadow-xs">
         <div className="flex items-center justify-between mb-3.5 pb-3 border-b border-slate-100">
           <h2 className="text-sm sm:text-base font-extrabold text-slate-900 uppercase tracking-tight flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4 text-[#2563EB] shrink-0" />
@@ -97,12 +97,14 @@ export function ProductSpecsSidebarCard({
         </div>
 
         {/* Fixed-height preview container with bottom fade */}
-        <div className="relative max-h-[320px] overflow-hidden">
+        <div className="relative max-h-[320px] overflow-hidden rounded-xl border border-slate-200/70">
           <div className="divide-y divide-slate-100 text-xs sm:text-sm">
             {validSpecs.map((row, idx) => (
               <div
                 key={`${row.label}-${idx}`}
-                className="py-2.5 grid grid-cols-12 gap-2.5 sm:gap-3 items-start"
+                className={`py-2.5 px-3 grid grid-cols-12 gap-2.5 sm:gap-3 items-start ${
+                  idx % 2 === 0 ? 'bg-slate-50/80' : 'bg-white'
+                }`}
               >
                 <span className="col-span-5 sm:col-span-4 text-slate-500 font-medium break-words">
                   {row.label}
@@ -128,7 +130,7 @@ export function ProductSpecsSidebarCard({
         <button
           type="button"
           onClick={openModal}
-          className="mt-4 w-full py-2.5 px-3 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-50 text-xs sm:text-sm font-bold text-[#2563EB] transition cursor-pointer"
+          className="mt-4 w-full min-h-11 py-2.5 px-3 rounded-xl border border-blue-200 bg-blue-50/50 hover:bg-blue-50 text-xs sm:text-sm font-bold text-[#2563EB] transition cursor-pointer"
         >
           Xem tất cả thông số ({fullSpecs.length} mục) →
         </button>
@@ -159,7 +161,7 @@ export function ProductSpecsSidebarCard({
               type="button"
               onClick={closeModal}
               aria-label="Đóng bảng thông số"
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-200/80 hover:bg-slate-300 flex items-center justify-center text-slate-700 font-bold cursor-pointer shrink-0 transition"
+              className="w-11 h-11 min-h-11 min-w-11 rounded-full bg-slate-200/80 hover:bg-slate-300 flex items-center justify-center text-slate-700 font-bold cursor-pointer shrink-0 transition"
             >
               <X className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
@@ -191,7 +193,7 @@ export function ProductSpecsSidebarCard({
             <button
               type="button"
               onClick={closeModal}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition cursor-pointer"
+              className="w-full sm:w-auto min-h-11 px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition cursor-pointer"
             >
               Đóng
             </button>

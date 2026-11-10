@@ -47,7 +47,7 @@ export default function HotSaleCampaigns({
   const slots = groups[groupIndex].slots;
   const days = [...new Set(slots.map(c => dayKey(c.startAt)))];
   const single = groups.length === 1;
-  const pill = (active: boolean) => `shrink-0 min-h-8 sm:min-h-11 inline-flex items-center justify-center rounded-full border-2 sm:border-[3px] border-white px-2.5 sm:px-5 py-1 sm:py-1.5 text-[11px] sm:text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${active ? 'bg-white text-red-700' : 'bg-transparent text-white hover:bg-white/10'}`;
+  const pill = (active: boolean) => `shrink-0 min-h-11 inline-flex items-center justify-center rounded-full border-2 md:border-[3px] border-white px-3 md:px-5 py-1.5 text-[11px] md:text-sm font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${active ? 'bg-white text-red-700' : 'bg-transparent text-white hover:bg-white/10'}`;
   function selectGroup(index: number, now: number) {
     const items = groups[index].slots;
     setSelected((items.find(c => Date.parse(c.startAt) <= now && Date.parse(c.endAt) > now) || items[0]).id);
@@ -63,7 +63,7 @@ export default function HotSaleCampaigns({
           decoding="async"
           src={mobileBannerImage}
           alt={bannerAlt || 'HOT SALE'}
-          className={`${bannerImage && hasSeparateMobileBanner ? 'sm:hidden ' : ''}w-full h-auto max-h-[140px] sm:max-h-[180px] object-cover`}
+          className={`${bannerImage && hasSeparateMobileBanner ? 'md:hidden ' : ''}w-full h-auto max-h-[140px] md:max-h-[180px] object-cover`}
         />
       )}
       {bannerImage && (
@@ -73,15 +73,15 @@ export default function HotSaleCampaigns({
           decoding="async"
           src={bannerImage}
           alt={bannerAlt || 'HOT SALE'}
-          className={`${hasSeparateMobileBanner ? 'hidden sm:block ' : ''}w-full h-auto max-h-[140px] sm:max-h-[180px] object-cover`}
+          className={`${hasSeparateMobileBanner ? 'hidden md:block ' : ''}w-full h-auto max-h-[140px] md:max-h-[180px] object-cover`}
         />
       )}
     </>
   );
-  return <section aria-label="HOT SALE" className="pb-5 sm:pb-10">
-    <div className="container mx-auto max-w-[1370px] px-2.5 sm:px-4">
+  return <section aria-label="HOT SALE" className="pb-4 md:pb-8 lg:pb-10">
+    <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
       {(bannerImage || mobileBannerImage) && (
-        <div className="mb-2.5 sm:mb-4 overflow-hidden rounded-xl sm:rounded-2xl shadow-sm">
+        <div className="mb-2.5 md:mb-4 overflow-hidden rounded-lg md:rounded-xl lg:rounded-2xl shadow-sm">
           {bannerLink ? (
             <a href={bannerLink} className="block hover:opacity-95 transition">
               {bannerNode}
@@ -91,33 +91,33 @@ export default function HotSaleCampaigns({
           )}
         </div>
       )}
-      {!single && <div className="relative isolate overflow-hidden before:absolute before:inset-x-1 sm:before:inset-x-3 before:bottom-0 before:top-4 sm:before:top-5 before:-z-10 before:bg-gradient-to-r before:from-[#ef3b20] before:via-[#f46a49] before:to-[#ef3b20] before:[clip-path:polygon(4%_0,96%_0,100%_100%,0_100%)]">
-        <div role="tablist" aria-label="Chiến dịch HOT SALE" className="flex gap-1.5 overflow-x-auto overscroll-x-contain overflow-y-hidden px-1.5 pb-1.5 pt-1 hide-scrollbar sm:gap-8 sm:px-20 sm:pb-2">
+      {!single && <div className="relative isolate overflow-hidden before:absolute before:inset-x-1 md:before:inset-x-3 before:bottom-0 before:top-4 md:before:top-5 before:-z-10 before:bg-gradient-to-r before:from-[#ef3b20] before:via-[#f46a49] before:to-[#ef3b20] before:[clip-path:polygon(4%_0,96%_0,100%_100%,0_100%)]">
+        <div role="tablist" aria-label="Chiến dịch HOT SALE" className="flex gap-1.5 overflow-x-auto overscroll-x-contain overflow-y-hidden px-1.5 pb-1.5 pt-1 hide-scrollbar md:gap-6 lg:gap-8 md:px-12 lg:px-20 md:pb-2">
           {groups.map((g, index) => <button key={g.key} id={`${prefix}-tab-${index}`} type="button" role="tab" aria-selected={index === groupIndex} aria-controls={`${prefix}-panel`} tabIndex={index === groupIndex ? 0 : -1}
             onClick={() => selectGroup(index, Date.now())} onKeyDown={e => {
               const next = e.key === 'ArrowRight' ? (index + 1) % groups.length : e.key === 'ArrowLeft' ? (index - 1 + groups.length) % groups.length : e.key === 'Home' ? 0 : e.key === 'End' ? groups.length - 1 : -1;
               if (next >= 0) { e.preventDefault(); selectGroup(next, Date.now()); document.getElementById(`${prefix}-tab-${next}`)?.focus(); }
             }}
-            className={`relative isolate min-h-11 sm:min-h-16 min-w-0 sm:min-w-44 flex-1 cursor-pointer rounded-t-[14px] sm:rounded-t-[24px] px-2 py-1.5 sm:px-4 sm:py-4 text-[11px] leading-tight font-black uppercase italic before:absolute before:-inset-x-1 sm:before:-inset-x-3 before:-bottom-1 before:-z-10 before:h-3 sm:before:h-4 before:rounded-t-full before:bg-[#8f0813] focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white sm:text-xl ${index === groupIndex ? 'bg-gradient-to-b from-[#df2639] to-[#cc2031] text-white shadow-[inset_0_-6px_5px_-4px_#810914]' : 'bg-gradient-to-b from-[#ac1022] to-[#870812] text-[#f8b4bd] hover:from-[#bd1729] hover:to-[#980d1a]'}`}>{g.slots[0].name}</button>)}
+            className={`relative isolate min-h-11 md:min-h-14 lg:min-h-16 min-w-0 md:min-w-44 flex-1 cursor-pointer rounded-t-[14px] md:rounded-t-[24px] px-2.5 py-2 md:px-4 md:py-3.5 text-[11px] leading-tight font-black uppercase italic before:absolute before:-inset-x-1 md:before:-inset-x-3 before:-bottom-1 before:-z-10 before:h-3 md:before:h-4 before:rounded-t-full before:bg-[#8f0813] focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white md:text-lg lg:text-xl ${index === groupIndex ? 'bg-gradient-to-b from-[#df2639] to-[#cc2031] text-white shadow-[inset_0_-6px_5px_-4px_#810914]' : 'bg-gradient-to-b from-[#ac1022] to-[#870812] text-[#f8b4bd] hover:from-[#bd1729] hover:to-[#980d1a]'}`}>{g.slots[0].name}</button>)}
         </div>
       </div>}
-      <div role={single ? 'region' : 'tabpanel'} id={`${prefix}-panel`} aria-label={single ? campaign.name : undefined} aria-labelledby={single ? undefined : `${prefix}-tab-${groupIndex}`} tabIndex={0} className={`rounded-2xl sm:rounded-[24px] p-2 sm:p-5 focus-visible:outline-2 focus-visible:outline-red-900 ${single ? 'bg-gradient-to-b from-[#fc3561] to-[#ff4d46]' : 'border-2 sm:border-[3px] border-[#e8c57e] bg-[#d60900] shadow-[inset_0_0_0_2px_#ffedbb]'}`}>
-        {single && <h2 className="flex items-center justify-center gap-1.5 sm:gap-2 px-2 py-1.5 sm:py-4 text-center text-base sm:text-3xl font-black uppercase text-white"><Flame aria-hidden="true" className="h-5 w-5 sm:h-8 sm:w-8 shrink-0 text-yellow-200" /><span>{campaign.name} <span className="text-yellow-200">NỔI BẬT</span></span></h2>}
+      <div role={single ? 'region' : 'tabpanel'} id={`${prefix}-panel`} aria-label={single ? campaign.name : undefined} aria-labelledby={single ? undefined : `${prefix}-tab-${groupIndex}`} tabIndex={0} className={`rounded-xl md:rounded-[24px] p-2 md:p-5 focus-visible:outline-2 focus-visible:outline-red-900 ${single ? 'bg-gradient-to-b from-[#fc3561] to-[#ff4d46]' : 'border-2 md:border-[3px] border-[#e8c57e] bg-[#d60900] shadow-[inset_0_0_0_2px_#ffedbb]'}`}>
+        {single && <h2 className="flex items-center justify-center gap-1.5 md:gap-2 px-2 py-1.5 md:py-4 text-center text-base md:text-2xl lg:text-3xl font-black uppercase text-white"><Flame aria-hidden="true" className="h-5 w-5 md:h-7 md:w-7 lg:h-8 lg:w-8 shrink-0 text-yellow-200" /><span>{campaign.name} <span className="text-yellow-200">NỔI BẬT</span></span></h2>}
         {days.length > 1 && (
-          <div role="group" aria-label="Ngày sale (GMT+7)" className="mb-1.5 sm:mb-3 flex justify-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain py-0.5 sm:py-1 hide-scrollbar">
+          <div role="group" aria-label="Ngày sale (GMT+7)" className="mb-1.5 md:mb-3 flex justify-center gap-1.5 md:gap-2 overflow-x-auto overscroll-x-contain py-0.5 md:py-1 hide-scrollbar">
             {days.map(day => { const slot = slots.find(c => dayKey(c.startAt) === day)!; return <button key={day} type="button" aria-pressed={day === dayKey(campaign.startAt)} onClick={() => setSelected(slot.id)} className={pill(day === dayKey(campaign.startAt))}><time dateTime={day}>{dateLabel(slot.startAt)}</time></button>; })}
           </div>
         )}
-        <div className="mb-1.5 sm:mb-2 flex flex-wrap items-center justify-between gap-1.5 sm:gap-3 px-1 sm:px-2 py-1 sm:py-2">
+        <div className="mb-1.5 md:mb-2 flex flex-wrap items-center justify-between gap-1.5 md:gap-3 px-1 md:px-2 py-1 md:py-2">
           {slots.filter(c => dayKey(c.startAt) === dayKey(campaign.startAt)).length > 1 && (
-            <div role="group" aria-label="Khung giờ sale (GMT+7)" className="flex max-w-full gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain py-0.5 sm:py-1 hide-scrollbar">
+            <div role="group" aria-label="Khung giờ sale (GMT+7)" className="flex max-w-full gap-1.5 md:gap-2 overflow-x-auto overscroll-x-contain py-0.5 md:py-1 hide-scrollbar">
               {slots.filter(c => dayKey(c.startAt) === dayKey(campaign.startAt)).map(c => <button key={c.id} type="button" aria-pressed={c.id === campaign.id} onClick={() => setSelected(c.id)} className={pill(c.id === campaign.id)}>{timeLabel(c.startAt)}–{timeLabel(c.endAt)}h {dateLabel(c.startAt)}{dayKey(c.endAt) !== dayKey(c.startAt) && ` – ${dateLabel(c.endAt)}`}</button>)}
             </div>
           )}
           <FlashSaleCountdown key={campaign.id} startAt={campaign.startAt} endAt={campaign.endAt} saleStyle />
         </div>
-        <ProductCarousel key={campaign.id} products={campaign.products} label={campaign.name} oneAtATime eagerImages />
-        <p className="px-2 pb-0.5 pt-2 sm:pt-3 text-center text-[11px] font-semibold text-white/95 sm:text-sm">Giá ưu đãi áp dụng đúng cấu hình trong khung giờ đã chọn · Giờ Việt Nam (GMT+7)</p>
+        <ProductCarousel key={campaign.id} products={campaign.products} label={campaign.name} oneAtATime cardVariant="flash" eagerImages />
+        <p className="px-2 pb-0.5 pt-2 md:pt-3 text-center text-[11px] font-semibold text-white/95 md:text-sm">Giá ưu đãi áp dụng đúng cấu hình trong khung giờ đã chọn · Giờ Việt Nam (GMT+7)</p>
       </div>
     </div>
   </section>;

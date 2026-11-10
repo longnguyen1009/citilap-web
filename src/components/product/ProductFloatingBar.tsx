@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { ShoppingCart, X } from "lucide-react";
+import { Phone, ShoppingCart, X } from "lucide-react";
+import { businessProfile } from "@/config/business-profile";
 
 interface ProductFloatingBarProps {
   productName: string;
@@ -10,6 +11,8 @@ interface ProductFloatingBarProps {
   variantLabel?: string;
   colorLabel?: string;
   totalPrice: number;
+  phone?: string;
+  orderable?: boolean;
   onAddToCart?: () => void;
   onBuyNow: () => void;
 }
@@ -20,29 +23,41 @@ export default function ProductFloatingBar({
   variantLabel,
   colorLabel,
   totalPrice,
+  phone = businessProfile.displayPhone,
+  orderable = true,
   onAddToCart,
   onBuyNow,
 }: ProductFloatingBarProps) {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isScrolledPast, setIsScrolledPast] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      // Show when scrolled down past 450px
-      if (window.scrollY > 450) {
-        setIsVisible(true);
-      } else {
-        setIsVisible(false);
+    const mq = window.matchMedia("(max-width: 767px)");
+    const updateLayout = () => {
+      const mobile = mq.matches || window.innerWidth < 768;
+      setIsMobileViewport(mobile);
+      setIsScrolledPast(window.scrollY > 450);
+      // Resizing a PC-dismissed bar to SP (<768px) resets dismiss so SP critical actions are never inaccessible
+      if (mobile) {
+        setIsDismissed(false);
       }
     };
 
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => window.removeEventListener("scroll", handleScroll);
+    updateLayout();
+    window.addEventListener("scroll", updateLayout, { passive: true });
+    window.addEventListener("resize", updateLayout, { passive: true });
+    mq.addEventListener("change", updateLayout);
+    return () => {
+      window.removeEventListener("scroll", updateLayout);
+      window.removeEventListener("resize", updateLayout);
+      mq.removeEventListener("change", updateLayout);
+    };
   }, []);
 
+  const active = isMobileViewport || (isScrolledPast && !isDismissed);
+
   useEffect(() => {
-    const active = isVisible && !isDismissed;
     if (active) {
       document.documentElement.dataset.pdpBar = "visible";
     } else {
@@ -53,26 +68,30 @@ export default function ProductFloatingBar({
       delete document.documentElement.dataset.pdpBar;
       window.dispatchEvent(new CustomEvent("citilap:pdp-bar", { detail: { visible: false } }));
     };
-  }, [isVisible, isDismissed]);
+  }, [active]);
 
-  if (isDismissed) {
+  if (isDismissed && !isMobileViewport) {
     return null;
   }
 
   const specSummary = [variantLabel, colorLabel].filter(Boolean).join(" • ");
+  const resolvedPhone = (phone || businessProfile.displayPhone).trim();
+  const telHref = resolvedPhone
+    ? `tel:${resolvedPhone.replace(/\s+/g, "")}`
+    : businessProfile.telHref;
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 sm:px-4 py-2 sm:py-2.5 safe-area-bottom z-40 shadow-[0_-8px_24px_-4px_rgba(15,23,42,0.12)] transition-all duration-300 ease-out ${
-        isVisible
-          ? "translate-y-0 opacity-100 pointer-events-auto"
-          : "translate-y-full opacity-0 pointer-events-none"
+      className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 md:px-6 py-2 md:py-2.5 safe-area-bottom z-40 shadow-[0_-8px_24px_-4px_rgba(15,23,42,0.12)] transition-all duration-300 motion-reduce:transition-none ease-out max-md:translate-y-0 max-md:opacity-100 max-md:pointer-events-auto ${
+        isScrolledPast
+          ? "md:translate-y-0 md:opacity-100 md:pointer-events-auto"
+          : "md:translate-y-full md:opacity-0 md:pointer-events-none"
       }`}
     >
-      <div className="max-w-[1370px] mx-auto flex items-center justify-between gap-2 sm:gap-4">
-        {/* Left: Thumbnail & Selected Specs */}
-        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-          <div className="relative hidden sm:block h-11 w-11 rounded-lg border border-slate-200 bg-slate-50 shrink-0 p-0.5 overflow-hidden">
+      <div className="w-full min-w-0 max-w-7xl mx-auto flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between md:gap-4">
+        {/* Top on SP / Left on Tablet+PC: Thumbnail, Selected Specs & Full Price */}
+        <div className="flex items-center justify-between md:justify-start gap-2.5 md:gap-3 min-w-0 md:flex-1">
+          <div className="relative hidden md:block h-11 w-11 rounded-lg border border-slate-200 bg-slate-50 shrink-0 p-0.5 overflow-hidden">
             <Image
               src={image || "/images/placeholder-laptop.svg"}
               alt={productName}
@@ -81,60 +100,71 @@ export default function ProductFloatingBar({
               sizes="44px"
             />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-              {productName}
-            </p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-sm sm:hidden font-black text-rose-600 shrink-0 tabular-nums">
-                {totalPrice.toLocaleString("vi-VN")}₫
-              </span>
-              {specSummary && (
-                <p className="text-[11px] text-blue-700 font-semibold truncate">
-                  <span className="sm:hidden text-slate-300 mr-1">•</span>
-                  {specSummary}
-                </p>
-              )}
+          <div className="min-w-0 flex-1 flex items-center justify-between gap-2 md:block">
+            <div className="min-w-0 flex-1">
+              <p className="hidden md:block text-sm font-bold text-slate-900 truncate">
+                {productName}
+              </p>
+              <p className="text-[11px] md:text-xs text-blue-700 font-semibold truncate">
+                {specSummary || productName}
+              </p>
             </div>
+            <span className="md:hidden text-sm font-black text-rose-600 shrink-0 tabular-nums whitespace-nowrap">
+              {totalPrice.toLocaleString("vi-VN")}₫
+            </span>
           </div>
         </div>
 
-        {/* Right: Live Price & Actions + Close button */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <div className="hidden sm:block text-right">
+        {/* Bottom on SP / Right on Tablet+PC: Live Price & Actions + Close button */}
+        <div className="flex items-center justify-between md:justify-end gap-2 md:gap-3 shrink-0">
+          <div className="hidden md:block text-right">
             <span className="text-[10px] text-slate-400 block font-medium">Giá thanh toán:</span>
-            <span className="text-base sm:text-xl font-black text-rose-600 tabular-nums">
+            <span className="text-base lg:text-xl font-black text-rose-600 tabular-nums whitespace-nowrap">
               {totalPrice.toLocaleString("vi-VN")}₫
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-[auto_auto_minmax(0,1fr)] md:flex items-center gap-1.5 sm:gap-2 w-full md:w-auto">
+            <a
+              href={telHref}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100/80 text-blue-700 font-bold text-xs transition shrink-0"
+              title={`Gọi tư vấn ${resolvedPhone}`}
+            >
+              <Phone className="w-4 h-4 shrink-0" />
+              <span>Tư vấn</span>
+            </a>
+
             {onAddToCart && (
               <button
                 type="button"
                 onClick={onAddToCart}
-                className="hidden sm:flex items-center justify-center p-2.5 rounded-xl border border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 text-slate-800 transition font-bold text-xs cursor-pointer"
+                disabled={!orderable}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed text-slate-800 transition font-bold text-xs cursor-pointer shrink-0"
                 title="Thêm vào giỏ"
               >
-                <ShoppingCart className="w-4 h-4" />
+                <ShoppingCart className="w-4 h-4 shrink-0" />
+                <span>Thêm giỏ</span>
               </button>
             )}
+
             <button
               type="button"
               onClick={onBuyNow}
-              className="min-h-10 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer whitespace-nowrap"
+              disabled={!orderable}
+              className="min-h-11 min-w-11 px-3 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 disabled:from-slate-300 disabled:to-slate-400 disabled:text-slate-600 disabled:shadow-none disabled:cursor-not-allowed text-white font-black text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer whitespace-nowrap text-center"
             >
-              MUA NGAY
+              {orderable ? "MUA NGAY" : "TẠM HẾT HÀNG"}
             </button>
+
             <button
               type="button"
               onClick={() => setIsDismissed(true)}
               aria-label="Đóng thanh mua nhanh"
               title="Đóng thanh mua nhanh"
-              className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1 px-2.5 py-2 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-100/80 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 text-xs font-semibold transition cursor-pointer"
+              className="hidden md:inline-flex min-h-11 min-w-11 items-center justify-center gap-1 px-2.5 py-2 rounded-xl border border-slate-200 hover:border-slate-300 bg-slate-100/80 hover:bg-slate-200/80 text-slate-600 hover:text-slate-900 text-xs font-semibold transition cursor-pointer shrink-0"
             >
               <X className="w-4 h-4" />
-              <span className="hidden md:inline">Đóng</span>
+              <span className="hidden lg:inline">Đóng</span>
             </button>
           </div>
         </div>

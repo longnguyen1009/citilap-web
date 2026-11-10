@@ -297,9 +297,9 @@ export default function SearchAutocomplete({
 
   // Height and font styling by size with mobile optimization
   const sizeStyles = {
-    sm: "h-9 sm:h-9 text-xs sm:text-xs pl-7 sm:pl-9 pr-6 sm:pr-8",
-    md: "h-10 sm:h-10 text-xs sm:text-sm pl-7.5 sm:pl-10 pr-7 sm:pr-9",
-    lg: "h-11 sm:h-12 text-xs sm:text-base pl-8.5 sm:pl-12 pr-8 sm:pr-10",
+    sm: "min-h-11 h-11 text-xs sm:text-xs pl-7 sm:pl-9 pr-10 sm:pr-20",
+    md: "min-h-11 h-11 text-xs sm:text-sm pl-7.5 sm:pl-10 pr-10 sm:pr-20",
+    lg: "min-h-11 h-11 sm:h-12 text-xs sm:text-base pl-8.5 sm:pl-12 pr-10 sm:pr-20",
   }[size];
 
   const iconSizes = {
@@ -349,16 +349,18 @@ export default function SearchAutocomplete({
         />
 
         {/* Right Action Icons: Spinner / Clear */}
-        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center">
           {isLoading && (
-            <Loader2 className="w-4 h-4 text-blue-600 animate-spin" aria-hidden="true" />
+            <span className="flex h-11 w-11 items-center justify-center">
+              <Loader2 className="w-4 h-4 text-blue-600 animate-spin" aria-hidden="true" />
+            </span>
           )}
 
           {query.length > 0 && !isLoading && (
             <button
               type="button"
               onClick={clearInput}
-              className="p-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+              className="min-w-11 min-h-11 h-11 w-11 flex items-center justify-center rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer"
               aria-label="Xóa từ khóa tìm kiếm"
             >
               <X className="w-3.5 h-3.5" />
@@ -367,7 +369,7 @@ export default function SearchAutocomplete({
 
           <button
             type="submit"
-            className="hidden sm:flex items-center justify-center p-1.5 rounded-md text-gray-500 hover:text-blue-600 transition cursor-pointer"
+            className="hidden sm:flex min-w-11 min-h-11 h-11 w-11 items-center justify-center rounded-md text-gray-500 hover:text-blue-600 transition cursor-pointer"
             aria-label="Bắt đầu tìm kiếm"
           >
             <ArrowRight className="w-4 h-4" />

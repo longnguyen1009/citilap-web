@@ -79,51 +79,51 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
   return (
     <section
       aria-label="Khám phá danh mục CitiLap"
-      className="pb-5 sm:pb-10 pt-1 sm:pt-2"
+      className="py-4 md:py-6"
     >
-      <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px]">
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-3 sm:p-4 md:p-6 relative overflow-hidden">
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="bg-white rounded-xl lg:rounded-2xl border border-slate-200/90 shadow-xs p-3 md:p-5 lg:p-6 relative overflow-hidden">
           {/* Header thanh danh mục */}
-          <div className="flex items-center justify-between pb-2.5 mb-2.5 sm:pb-4 sm:mb-4 border-b border-slate-100">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/20">
-                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" />
+          <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 md:pb-4 md:mb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              <div className="w-8 h-8 md:w-9 md:h-9 rounded-lg md:rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm shadow-blue-500/20 shrink-0">
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5 animate-pulse motion-reduce:animate-none" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-sm sm:text-base md:text-lg font-black uppercase tracking-wider text-slate-900">
+                  <h2 className="text-base md:text-xl font-black uppercase tracking-wider text-slate-900 truncate">
                     DANH MỤC NỔI BẬT
                   </h2>
-                  <span className="hidden sm:inline-block text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
+                  <span className="hidden md:inline-block text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 shrink-0">
                     Laptop & Phụ Kiện Tech
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 hidden md:block">
+                <p className="text-xs text-slate-500 hidden lg:block">
                   Laptop chính hãng, phụ kiện tuyển chọn và đồ chơi công nghệ setup bàn làm việc
                 </p>
               </div>
             </div>
 
             {/* Điều hướng & Link xem tất cả */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 shrink-0">
               <Link
                 href="/phan-loai"
-                className="inline-flex items-center gap-1 text-xs md:text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition"
+                className="min-h-11 inline-flex items-center gap-1 text-xs md:text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition"
               >
-                <span className="sm:hidden">Tất cả</span>
-                <span className="hidden sm:inline">Xem tất cả danh mục</span>
+                <span className="md:hidden">Tất cả</span>
+                <span className="hidden md:inline">Xem tất cả danh mục</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
 
               {/* Nút lướt ngang (Chỉ hiển thị trên tablet/desktop khi nội dung cần cuộn) */}
               {canScroll && (
-                <div className="hidden sm:flex items-center gap-1.5 ml-2">
+                <div className="hidden md:flex items-center gap-1.5 ml-1">
                   <button
                     type="button"
                     onClick={() => scroll("left")}
                     disabled={!canScrollLeft}
                     aria-label="Cuộn danh mục sang trái"
-                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
+                    className="w-11 h-11 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
@@ -132,7 +132,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
                     onClick={() => scroll("right")}
                     disabled={!canScrollRight}
                     aria-label="Cuộn danh mục sang phải"
-                    className="w-8 h-8 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
+                    className="w-11 h-11 rounded-full border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition shadow-xs cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                   >
                     <ChevronRight className="w-4 h-4" />
                   </button>
@@ -147,22 +147,22 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
             tabIndex={0}
             role="region"
             aria-label="Danh mục nổi bật"
-            className="overflow-x-auto overscroll-x-contain hide-scrollbar pb-1 sm:pb-2 -mx-1.5 px-1.5 sm:-mx-2 sm:px-2 snap-x snap-mandatory scroll-smooth focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-xl"
+            className="overflow-x-auto overscroll-x-contain hide-scrollbar pb-1 md:pb-2 -mx-1 px-1 snap-x snap-mandatory scroll-smooth focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden rounded-xl"
           >
-            {/* Smartphone: 2-row horizontal grid where 4 columns fit cleanly per view without any right-edge clipping */}
-            <div className="grid sm:hidden grid-rows-2 grid-flow-col auto-cols-[calc((100%-18px)/4)] gap-x-1.5 gap-y-2.5 pt-1">
+            {/* Smartphone (< 768px): 2-row horizontal grid with 4 columns */}
+            <div className="grid md:hidden grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] gap-2 pt-1">
               {displayCategories.map((item) => {
                 const Icon = item.icon;
                 return (
                   <Link
                     key={item.id}
                     href={item.href}
-                    className="group flex flex-col items-center p-1 rounded-xl active:scale-95 transition-all duration-150 snap-start text-center"
+                    className="group min-h-11 min-w-0 flex flex-col items-center justify-start p-1 rounded-lg active:scale-95 transition-all duration-150 motion-reduce:transition-none snap-start text-center focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                   >
                     <div className="relative mb-1.5">
-                      <div className="w-11 h-11 rounded-2xl bg-slate-100/90 border border-slate-200/80 flex items-center justify-center text-slate-700 shadow-2xs">
+                      <div className="w-11 h-11 rounded-xl bg-slate-100/90 border border-slate-200/80 flex items-center justify-center text-slate-700 shadow-2xs">
                         {item.image ? (
-                          <Image src={item.image} alt={item.alt || item.name} width={44} height={44} unoptimized className="w-full h-full rounded-2xl object-cover" />
+                          <Image src={item.image} alt={item.alt || item.name} width={44} height={44} unoptimized className="w-full h-full rounded-xl object-cover" />
                         ) : (
                           <Icon className="w-5 h-5 text-blue-600" />
                         )}
@@ -185,42 +185,44 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
               })}
             </div>
 
-            {/* PC / Tablet (>= 640px): Original 8-column rows */}
-            <div className="hidden sm:flex flex-col gap-4 min-w-[760px] md:min-w-[980px] lg:min-w-full">
+            {/* PC / Tablet (>= 768px): 2-row 8-column or responsive grid */}
+            <div className="hidden md:flex flex-col gap-3 lg:gap-4 min-w-[720px] lg:min-w-full">
               {rows.map((row, rowIndex) => (
-                <div key={rowIndex} className="grid grid-cols-8 gap-2 md:gap-3">
-                {row.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Link
-                      key={item.id}
-                      href={item.href}
-                      className="group flex flex-col items-center p-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all duration-150 snap-start text-center cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
-                    >
-                      {/* Vòng tròn Icon */}
-                      <div className="relative mb-2">
-                        <div className="w-13 h-13 md:w-16 md:h-16 rounded-full bg-slate-100/80 border border-slate-200/70 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50 group-hover:border-blue-400 group-hover:text-blue-600 group-hover:scale-105 motion-reduce:group-hover:scale-100 group-hover:shadow-md group-hover:shadow-blue-500/10">
-                          {item.image
-                            ? <Image src={item.image} alt={item.alt || item.name} width={64} height={64} unoptimized className="w-full h-full rounded-full object-cover" />
-                            : <Icon className="w-6 h-6 md:w-7 md:h-7 transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100" />}
+                <div key={rowIndex} className="grid grid-cols-8 gap-2.5 lg:gap-3">
+                  {row.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.id}
+                        href={item.href}
+                        className="group min-h-11 flex flex-col items-center p-2.5 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50/90 hover:-translate-y-1 motion-reduce:hover:translate-y-0 active:scale-95 transition-all duration-150 motion-reduce:transition-none snap-start text-center cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
+                      >
+                        {/* Vòng tròn Icon */}
+                        <div className="relative mb-2">
+                          <div className="w-14 h-14 lg:w-16 lg:h-16 rounded-2xl bg-slate-100/80 border border-slate-200/70 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50 group-hover:border-blue-400 group-hover:text-blue-600 group-hover:shadow-md group-hover:shadow-blue-500/10">
+                            {item.image ? (
+                              <Image src={item.image} alt={item.alt || item.name} width={64} height={64} unoptimized className="w-full h-full rounded-2xl object-cover" />
+                            ) : (
+                              <Icon className="w-6 h-6 lg:w-7 lg:h-7 transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100" />
+                            )}
+                          </div>
+                          {item.badge && (
+                            <span
+                              className={`absolute -top-1 -right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-xs uppercase tracking-tight ${
+                                item.badgeColor || "bg-red-500 text-white"
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
                         </div>
-                        {item.badge && (
-                          <span
-                            className={`absolute -top-1 -right-1.5 text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-xs uppercase tracking-tight ${
-                              item.badgeColor || "bg-red-500 text-white"
-                            }`}
-                          >
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
-                      {/* Tên danh mục */}
-                      <span className="text-xs md:text-sm font-semibold text-slate-800 leading-tight line-clamp-2 max-w-[85px] md:max-w-[105px] group-hover:text-blue-600 transition-colors">
-                        {item.name}
-                      </span>
-                    </Link>
-                  );
-                })}
+                        {/* Tên danh mục */}
+                        <span className="text-xs lg:text-sm font-semibold text-slate-800 leading-tight line-clamp-2 max-w-[105px] group-hover:text-blue-600 transition-colors">
+                          {item.name}
+                        </span>
+                      </Link>
+                    );
+                  })}
                 </div>
               ))}
             </div>

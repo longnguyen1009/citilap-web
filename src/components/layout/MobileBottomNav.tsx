@@ -130,7 +130,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 1. Trang chủ */}
           <Link
             href="/"
-            className={`flex flex-col items-center justify-center gap-0.5 transition ${
+            aria-current={pathname === "/" ? "page" : undefined}
+            className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 transition ${
               pathname === "/" ? "text-brand-primary" : "text-text-secondary"
             }`}
           >
@@ -146,7 +147,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
               restoreFocusRef.current = true;
               setDrawerOpen(true);
             }}
-            className={`flex flex-col items-center justify-center gap-0.5 transition cursor-pointer ${
+            className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 transition cursor-pointer ${
               isCategoryActive || drawerOpen ? "text-brand-primary" : "text-text-secondary"
             }`}
             aria-label="Mở danh mục sản phẩm"
@@ -163,7 +164,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 3. Tìm kiếm */}
           <Link
             href="/search"
-            className={`flex flex-col items-center justify-center gap-0.5 transition ${
+            aria-current={pathname === "/search" ? "page" : undefined}
+            className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 transition ${
               pathname === "/search" ? "text-brand-primary" : "text-text-secondary"
             }`}
           >
@@ -174,7 +176,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 4. Giỏ hàng */}
           <Link
             href="/cart"
-            className={`flex flex-col items-center justify-center gap-0.5 relative transition ${
+            aria-current={pathname === "/cart" ? "page" : undefined}
+            className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 relative transition ${
               pathname === "/cart" ? "text-brand-primary" : "text-text-secondary"
             }`}
           >
@@ -192,7 +195,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 5. Tra cứu & Hỗ trợ */}
           <Link
             href="/profile"
-            className={`flex flex-col items-center justify-center gap-0.5 transition ${
+            aria-current={pathname === "/profile" ? "page" : undefined}
+            className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 transition ${
               pathname === "/profile" || pathname.startsWith("/order-tracking") ? "text-brand-primary" : "text-text-secondary"
             }`}
           >
@@ -255,6 +259,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
               {/* Direct link to All Categories */}
               <Link
                 href="/phan-loai"
+                aria-current={pathname === "/phan-loai" ? "page" : undefined}
                 onClick={() => closeDrawer(false)}
                 className="min-h-11 flex items-center justify-between p-3 rounded-control bg-brand-primary-subtle text-brand-primary font-bold text-body-sm mb-3 border border-brand-primary/20"
               >
@@ -266,16 +271,30 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
               {navigation?.menus.main && navigation.menus.main.length > 0 ? (
                 navigation.menus.main.map((item) => (
                   <div key={item.id} className="rounded-lg border border-border-default overflow-hidden">
-                    <Link href={item.href} onClick={() => closeDrawer(false)}
-                      className="min-h-11 flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle">
-                      {item.label}<ChevronRight className="w-4 h-4" />
+                    <Link
+                      href={item.href}
+                      aria-current={pathname === item.href ? "page" : undefined}
+                      onClick={() => closeDrawer(false)}
+                      className="min-h-11 flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle"
+                    >
+                      {item.label}
+                      <ChevronRight className="w-4 h-4" />
                     </Link>
-                    {item.children.length > 0 && <div className="border-t border-border-default bg-surface-subtle px-3 py-1">
-                      {item.children.map((child) => (
-                        <Link key={child.id} href={child.href} onClick={() => closeDrawer(false)}
-                          className="min-h-10 flex items-center pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary">{child.label}</Link>
-                      ))}
-                    </div>}
+                    {item.children.length > 0 && (
+                      <div className="border-t border-border-default bg-surface-subtle px-3 py-1">
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.id}
+                            href={child.href}
+                            aria-current={pathname === child.href ? "page" : undefined}
+                            onClick={() => closeDrawer(false)}
+                            className="min-h-11 flex items-center pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary"
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -287,6 +306,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
                     <Link
                       key={cat.id}
                       href={cat.href || `/${cat.slug}`}
+                      aria-current={isSelected ? "page" : undefined}
                       onClick={() => closeDrawer(false)}
                       className={`min-h-11 flex items-center justify-between p-3 rounded-control transition border ${
                         isSelected

@@ -80,14 +80,14 @@ export default async function FlashSaleSection({
     const fallbackTabs = await resolveFallbackProductTabs();
     return (
       <div className="mb-8 space-y-6">
-        <div className="container mx-auto max-w-[1370px] px-4 space-y-4">
+        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 space-y-4">
           {(bannerImage || mobileBannerImage) && (
-            <div className="overflow-hidden rounded-2xl shadow-sm">
+            <div className="overflow-hidden rounded-lg md:rounded-xl lg:rounded-2xl shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img loading="lazy" decoding="async" src={mobileBannerImage || bannerImage} alt={bannerAlt} className="w-full h-auto max-h-[180px] object-cover" />
+              <img loading="lazy" decoding="async" src={mobileBannerImage || bannerImage} alt={bannerAlt} className="w-full h-auto max-h-[140px] md:max-h-[180px] object-cover" />
             </div>
           )}
-          <p className="rounded-xl border border-red-100 bg-white p-6 text-center text-sm text-slate-600">
+          <p className="rounded-xl border border-red-100 bg-white p-4 md:p-6 text-center text-sm text-slate-600">
             Chưa có chiến dịch HOT SALE đang chạy hoặc sắp bắt đầu. Khám phá ngay các dòng sản phẩm nổi bật bên dưới:
           </p>
         </div>

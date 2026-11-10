@@ -503,7 +503,7 @@ export default async function ProductDetailPage({
   };
 
   return (
-    <div className="bg-[#f8fafc] min-h-screen pb-20">
+    <div className="bg-[#f8fafc] min-h-screen pb-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:pb-20">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
@@ -521,29 +521,31 @@ export default async function ProductDetailPage({
 
       {/* Breadcrumb Navigation */}
       <nav aria-label="Đường dẫn trang" className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 max-w-[1370px]">
-          <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-2.5 font-medium flex-wrap gap-y-1">
+        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+          <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-1 font-medium flex-wrap gap-y-0.5">
             <li>
-              <Link href="/" className="hover:text-blue-600 transition">
+              <Link href="/" className="inline-flex min-h-11 items-center hover:text-blue-600 transition">
                 Trang chủ
               </Link>
             </li>
             {categoryTrail.map(c => (
               <li key={c.id} className="flex items-center">
                 <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
-                <Link href={c.href} className="hover:text-blue-600 transition">{c.name}</Link>
+                <Link href={c.href} className="inline-flex min-h-11 items-center hover:text-blue-600 transition">{c.name}</Link>
               </li>
             ))}
-            <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
-            <li className="text-gray-900 font-semibold truncate max-w-xs sm:max-w-md" aria-current="page">
-              {displayName}
+            <li className="flex items-center min-w-0 max-w-full">
+              <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-gray-400 shrink-0" aria-hidden="true" />
+              <span className="py-1.5 text-gray-900 font-semibold truncate max-w-[260px] sm:max-w-md" aria-current="page">
+                {displayName}
+              </span>
             </li>
           </ol>
         </div>
       </nav>
 
       {/* Main Content Container */}
-      <div className="container mx-auto px-4 max-w-[1370px] mt-5 sm:mt-6">
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 mt-4 sm:mt-6">
         {/* 1. TOP HERO SECTION: GALLERY, BADGES, DEAL COMBO, PURCHASING, CARDS 365 */}
         <ProductHeroSection
           key={product.id}
@@ -573,9 +575,9 @@ export default async function ProductDetailPage({
         />
 
         {/* 2. MIDDLE SECTION: SPECIFICATIONS, CONTENT, FAQ, SHOWROOMS & REVIEWS */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10" aria-label="Chi tiết sản phẩm">
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6 mb-10" aria-label="Chi tiết sản phẩm">
           {/* Cột trái (Col 8): Đánh giá chi tiết -> FAQ -> Đánh giá từ khách hàng */}
-          <div className="lg:col-span-8 space-y-6">
+          <div className="lg:col-span-8 min-w-0 space-y-6">
             {/* Đánh giá chi tiết */}
             <ProductDescriptionArticle
               safeDescription={safeDescription}
@@ -603,7 +605,7 @@ export default async function ProductDetailPage({
           </div>
 
           {/* Cột phải (Col 4): Thông số kỹ thuật -> Showroom -> Vận chuyển -> Banners */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 min-w-0 space-y-6">
             {/* Thông số kỹ thuật */}
             <section id="thong-so-ky-thuat">
               <ProductSpecsSidebarCard
@@ -631,10 +633,10 @@ export default async function ProductDetailPage({
 
         {/* 3. NỘI DUNG DƯỚI CÙNG: SẢN PHẨM TƯƠNG TỰ */}
         {relatedProducts.length > 0 && (
-          <section className="mt-12" aria-label="Sản phẩm tương tự">
-            <div className="flex items-center justify-between gap-3 mb-6">
+          <section className="mt-10 md:mt-12" aria-label="Sản phẩm tương tự">
+            <div className="flex items-center justify-between gap-3 mb-4 md:mb-6">
               <div className="min-w-0">
-                <h2 className="text-lg sm:text-xl font-black text-gray-900 uppercase tracking-tight">
+                <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] font-black text-gray-900 uppercase tracking-tight">
                   Sản phẩm tương tự
                 </h2>
                 <p className="text-xs text-gray-500 line-clamp-1 sm:line-clamp-none">
@@ -644,14 +646,14 @@ export default async function ProductDetailPage({
               {product.categorySlug && (
                 <Link
                   href={categoryUrl}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1 shrink-0 whitespace-nowrap"
+                  className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition shrink-0 whitespace-nowrap"
                 >
                   Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 md:gap-3 lg:gap-4">
               {relatedProducts.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}

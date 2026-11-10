@@ -231,8 +231,8 @@ export default function ProductHeroSection({
   };
 
   return (
-    <section className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm p-3 sm:p-6 lg:p-7 mb-5 sm:mb-8">
-      <div className="grid grid-cols-1 lg:grid-cols-12 lg:items-start gap-4 sm:gap-5 lg:gap-x-8 lg:gap-y-4">
+    <section className="bg-white rounded-2xl md:rounded-3xl border border-slate-200/90 shadow-sm p-3 sm:p-5 lg:p-6 mb-5 sm:mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 lg:grid-rows-[auto_1fr] lg:items-start gap-4 sm:gap-5 lg:gap-x-8 lg:gap-y-4">
         {/* ========================================================= */}
         {/* KHỐI 1 (TRÁI TRÊN): GALLERY ẢNH                           */}
         {/* ========================================================= */}
@@ -250,18 +250,19 @@ export default function ProductHeroSection({
         {/* ========================================================= */}
         {/* KHỐI 2 (PHẢI): TIÊU ĐỀ, GIÁ, CẤU HÌNH, MÀU, BH, CTA       */}
         {/* Hiển thị ngay dưới ảnh trên mobile để khách mua nhanh     */}
+        {/* ponytail: We keep the tall variant/color/warranty selectors in regular scroll flow and only apply lg:sticky (top = var(--storefront-header-height) + 16px) to the compact purchase action block at the bottom of the right column when the opposite left column is taller. Making the entire multi-option buy box sticky would exceed 100dvh and lock bottom controls out of reach. Upgrade trigger: if variants/warranties move into a compact single-row picker (<420px total height), the entire right column can become sticky. */}
         {/* ========================================================= */}
-        <div className="lg:col-span-6 lg:row-span-2 flex flex-col space-y-3.5 sm:space-y-4">
+        <div className="lg:col-span-6 lg:row-span-2 lg:self-stretch flex flex-col space-y-3.5 sm:space-y-4">
           {/* 1. TIÊU ĐỀ SẢN PHẨM & METADATA (ĐÁNH GIÁ, MODEL, THƯƠNG HIỆU) */}
           <div>
-            <h1 className="text-lg sm:text-2xl font-black text-slate-900 leading-snug tracking-tight">
+            <h1 className="text-[18px] sm:text-[21px] md:text-2xl font-black text-slate-900 leading-snug tracking-tight">
               {productName}
             </h1>
 
             <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs sm:text-sm text-slate-600">
               <a
                 href="#danh-gia-khach-hang"
-                className="flex items-center gap-1 text-amber-500 font-bold hover:underline"
+                className="inline-flex min-h-11 items-center gap-1 text-amber-500 font-bold hover:underline"
               >
                 {reviewCount > 0 ? (
                   <>
@@ -306,7 +307,7 @@ export default function ProductHeroSection({
                         window.dispatchEvent(new CustomEvent("citilap:open-full-specs"));
                       }
                     }}
-                    className="text-blue-600 hover:underline font-semibold inline-flex items-center gap-1 cursor-pointer"
+                    className="min-h-11 text-blue-600 hover:underline font-semibold inline-flex items-center gap-1 cursor-pointer"
                   >
                     <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -324,13 +325,13 @@ export default function ProductHeroSection({
                     else wishlistCtx.addToWishlist({ productId });
                   }}
                   aria-pressed={isLiked}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold transition cursor-pointer ${
+                  className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition cursor-pointer ${
                     isLiked
                       ? "border-rose-200 bg-rose-50 text-rose-600"
                       : "border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:text-rose-600"
                   }`}
                 >
-                  <Heart className="w-3.5 h-3.5" fill={isLiked ? "currentColor" : "none"} />
+                  <Heart className="w-3.5 h-3.5 shrink-0" fill={isLiked ? "currentColor" : "none"} />
                   <span>{isLiked ? "Đã lưu" : "Yêu thích"}</span>
                 </button>
                 <button
@@ -350,13 +351,13 @@ export default function ProductHeroSection({
                     }
                   }}
                   aria-pressed={isInCompare}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs font-bold transition cursor-pointer ${
+                  className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition cursor-pointer ${
                     isInCompare
                       ? "border-blue-600 bg-blue-600 text-white"
                       : "border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-600"
                   }`}
                 >
-                  <Scale className="w-3.5 h-3.5" />
+                  <Scale className="w-3.5 h-3.5 shrink-0" />
                   <span>{isInCompare ? "Đang so sánh" : "So sánh"}</span>
                 </button>
               </div>
@@ -364,19 +365,19 @@ export default function ProductHeroSection({
           </div>
 
           {/* 2. KHỐI GIÁ NẰM TRÊN ĐẦU (DỄ THEO DÕI NHẤT) */}
-          <div className="rounded-2xl border-2 border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-4 shadow-xs relative overflow-hidden">
+          <div className="rounded-2xl border-2 border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-3.5 sm:p-4 shadow-xs relative overflow-hidden">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-xs font-black uppercase tracking-wider animate-pulse">
+                <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-xs font-black uppercase tracking-wider animate-pulse motion-reduce:animate-none">
                   {saving ? 'GIÁ ƯU ĐÃI' : 'GIÁ BÁN'}
                 </span>
               </div>
               <div className="flex flex-wrap items-baseline gap-2.5">
-                <span className="text-2xl sm:text-3xl font-black text-rose-600 tracking-tight">
+                <span className="text-[22px] sm:text-[24px] md:text-3xl font-black text-rose-600 tracking-tight tabular-nums">
                   {totalPrice.toLocaleString("vi-VN")}₫
                 </span>
                 {totalOriginalPrice && totalOriginalPrice > totalPrice && (
-                  <span className="text-sm sm:text-base text-slate-400 line-through">
+                  <span className="text-sm sm:text-base text-slate-400 line-through tabular-nums">
                     {totalOriginalPrice.toLocaleString("vi-VN")}₫
                   </span>
                 )}
@@ -430,7 +431,7 @@ export default function ProductHeroSection({
                       type="button"
                       onClick={() => handleSelectVariant(item)}
                       aria-pressed={isSelected}
-                      className={`relative text-left p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 transition-all flex flex-col justify-between cursor-pointer select-none ${
+                      className={`relative min-h-11 text-left p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 transition-all flex flex-col justify-between cursor-pointer select-none ${
                         isSelected
                           ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/40 text-blue-950 shadow-xs ring-2 ring-blue-500/25"
                           : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/60 text-slate-800"
@@ -451,24 +452,24 @@ export default function ProductHeroSection({
                       )}
 
                       <div>
-                        <span className={`text-[11px] sm:text-sm font-black uppercase tracking-tight block pr-5 sm:pr-6 leading-snug ${
+                        <span className={`text-xs sm:text-sm font-black uppercase tracking-tight block pr-5 sm:pr-6 leading-snug ${
                           isSelected ? "text-blue-950" : "text-slate-900"
                         }`}>
                           {item.name}
                         </span>
                         {item.subSpecs && (
-                          <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-1 mt-0.5 sm:mt-1 font-medium">
+                          <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1 mt-0.5 sm:mt-1 font-medium">
                             {item.subSpecs}
                           </p>
                         )}
                       </div>
 
                       <div className="pt-2 mt-2 sm:pt-2.5 sm:mt-2.5 border-t border-slate-200/70 flex flex-wrap items-baseline justify-between gap-1">
-                        <span className="text-xs sm:text-sm font-black text-rose-600">
+                        <span className="text-xs sm:text-sm font-black text-rose-600 tabular-nums">
                           {item.price.toLocaleString("vi-VN")}₫
                         </span>
                         {item.originalPrice && item.originalPrice > item.price && (
-                          <span className="text-[10px] sm:text-xs text-slate-400 line-through">
+                          <span className="text-[10px] sm:text-xs text-slate-400 line-through tabular-nums">
                             {item.originalPrice.toLocaleString("vi-VN")}₫
                           </span>
                         )}
@@ -499,7 +500,7 @@ export default function ProductHeroSection({
                       key={c.id}
                       type="button"
                       onClick={() => {const variant = variants.find(v => v.color === c.name && v.subSpecs === selectedVariant?.subSpecs) || variants.find(v => v.color === c.name);if (variantColors.length && variant) handleSelectVariant(variant);else setSelectedColorIndex(idx);}}
-                      className={`relative flex items-center justify-between p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border-2 transition cursor-pointer select-none ${
+                      className={`relative min-h-11 flex items-center justify-between p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border-2 transition cursor-pointer select-none ${
                         isSelected
                           ? "border-blue-600 bg-blue-50/60 font-bold text-blue-950 ring-2 ring-blue-500/20"
                           : "border-slate-200 bg-white hover:border-slate-300 text-slate-700"
@@ -537,7 +538,7 @@ export default function ProductHeroSection({
                 </label>
                 <Link
                   href="/chinh-sach-bao-hanh"
-                  className="text-[11px] sm:text-xs text-blue-600 hover:underline font-semibold"
+                  className="inline-flex min-h-11 items-center text-[11px] sm:text-xs text-blue-600 hover:underline font-semibold"
                 >
                   Chi tiết BH →
                 </Link>
@@ -551,7 +552,7 @@ export default function ProductHeroSection({
                       key={w.id}
                       type="button"
                       onClick={() => setSelectedWarrantyIndex(idx)}
-                      className={`relative rounded-xl sm:rounded-2xl border-2 text-left p-2.5 sm:p-3 transition flex flex-col justify-between cursor-pointer select-none ${
+                      className={`relative min-h-11 rounded-xl sm:rounded-2xl border-2 text-left p-2.5 sm:p-3 transition flex flex-col justify-between cursor-pointer select-none ${
                         isSelected
                           ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 shadow-2xs ring-2 ring-emerald-500/20"
                           : "border-slate-200 bg-white hover:border-emerald-400 text-slate-800"
@@ -566,7 +567,7 @@ export default function ProductHeroSection({
 
                       <div>
                         <div className="flex items-start justify-between gap-1 mb-0.5 sm:mb-1">
-                          <span className={`text-[11px] sm:text-sm font-black leading-tight ${isSelected ? "text-emerald-950" : "text-slate-900"}`}>
+                          <span className={`text-xs sm:text-sm font-black leading-tight ${isSelected ? "text-emerald-950" : "text-slate-900"}`}>
                             {w.name}
                           </span>
                           {isSelected && (
@@ -576,14 +577,14 @@ export default function ProductHeroSection({
                           )}
                         </div>
                         {w.desc && (
-                          <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-2 leading-tight">
+                          <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 leading-tight">
                             {w.desc}
                           </p>
                         )}
                       </div>
 
                       <div className="mt-2 pt-1.5 sm:mt-2.5 sm:pt-2 border-t border-slate-200/70 flex items-center justify-between gap-1">
-                        <span className={`text-[11px] sm:text-sm font-bold ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
+                        <span className={`text-xs sm:text-sm font-bold tabular-nums ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
                           {w.priceDiff === 0 ? "Mặc định (0₫)" : `${w.priceDiff > 0 ? '+' : ''}${w.priceDiff.toLocaleString("vi-VN")}₫`}
                         </span>
                         {isSelected && (
@@ -608,14 +609,14 @@ export default function ProductHeroSection({
             </ul>
           </div>}
 
-          {/* 7. CỤM NÚT HÀNH ĐỘNG MUA HÀNG */}
-          <div className="space-y-2.5 pt-1">
+          {/* 7. CỤM NÚT HÀNH ĐỘNG MUA HÀNG (STICKY COMPACT SURFACE TRÊN PC KHI ĐỦ ĐỘ CAO) */}
+          <div className="space-y-2.5 pt-1 lg:sticky lg:top-[calc(var(--storefront-header-height,4.5rem)+16px)] lg:bg-white/95 lg:backdrop-blur-xs lg:py-2 lg:rounded-2xl">
             {/* Nút Hero Mua Ngay (MỞ MODAL ĐẶT HÀNG NHANH) */}
             <button
               type="button"
               onClick={() => orderable && setIsQuickCheckoutOpen(true)}
               disabled={!orderable}
-              className="w-full flex flex-col items-center justify-center py-3 sm:py-3.5 px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black shadow-lg shadow-rose-600/25 transition cursor-pointer active:scale-[0.99]"
+              className="w-full min-h-11 flex flex-col items-center justify-center py-3 sm:py-3.5 px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-700 hover:to-red-700 disabled:from-slate-300 disabled:to-slate-400 disabled:text-slate-600 disabled:shadow-none disabled:cursor-not-allowed text-white font-black shadow-lg shadow-rose-600/25 transition cursor-pointer active:scale-[0.99]"
             >
               <div className="flex items-center gap-2 text-sm sm:text-lg">
                 <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
@@ -638,21 +639,21 @@ export default function ProductHeroSection({
               <button
                 type="button"
                 onClick={() => setIsInstallmentOpen(true)}
-                className="flex flex-col items-center justify-center py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 hover:bg-blue-100/70 text-blue-800 transition cursor-pointer"
+                className="min-h-11 flex flex-col items-center justify-center py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50/50 hover:bg-blue-100/70 text-blue-800 transition cursor-pointer"
               >
                 <span className="font-bold text-xs sm:text-sm flex items-center gap-1.5">
-                  <CreditCard className="w-4 h-4 text-blue-600" /> TƯ VẤN TRẢ GÓP
+                  <CreditCard className="w-4 h-4 text-blue-600 shrink-0" /> TƯ VẤN TRẢ GÓP
                 </span>
-                <span className="text-xs text-blue-600">Xem dự toán và gửi yêu cầu</span>
+                <span className="text-[11px] sm:text-xs text-blue-600">Xem dự toán và gửi yêu cầu</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleAddToCart(false)}
                 disabled={!orderable}
-                className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-800 transition cursor-pointer font-bold text-xs sm:text-sm"
+                className="min-h-11 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border-2 border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-slate-800 transition cursor-pointer font-bold text-xs sm:text-sm"
               >
-                <ShoppingCart className="w-4 h-4 text-slate-600" />
+                <ShoppingCart className="w-4 h-4 text-slate-600 shrink-0" />
                 <span>THÊM VÀO GIỎ</span>
               </button>
             </div>
@@ -661,7 +662,7 @@ export default function ProductHeroSection({
             {cartSuccessMsg && (
               <div role="status" aria-live="polite" className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs sm:text-sm text-emerald-800 flex items-center justify-between gap-2">
                 <span>{cartSuccessMsg}</span>
-                <Link href="/cart" className="font-bold underline shrink-0 hover:text-emerald-900 inline-flex items-center gap-0.5">
+                <Link href="/cart" className="min-h-11 font-bold underline shrink-0 hover:text-emerald-900 inline-flex items-center gap-0.5">
                   Xem giỏ hàng <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -670,7 +671,7 @@ export default function ProductHeroSection({
             {/* Đặt lịch hẹn xem máy trực tiếp tại Showroom */}
             <Link
               href={`/lien-he?intent=appointment&product=${encodeURIComponent(productId)}`}
-              className="w-full py-2.5 px-3.5 rounded-xl border border-slate-200 hover:border-blue-300 bg-slate-50/80 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 text-xs sm:text-sm font-semibold transition flex items-center justify-between gap-2"
+              className="w-full min-h-11 py-2.5 px-3.5 rounded-xl border border-slate-200 hover:border-blue-300 bg-slate-50/80 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 text-xs sm:text-sm font-semibold transition flex items-center justify-between gap-2"
             >
               <span className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
@@ -681,10 +682,10 @@ export default function ProductHeroSection({
 
             {/* Hotline tư vấn */}
             <div className="flex items-center justify-center gap-2 pt-1 text-xs sm:text-sm text-slate-600">
-              <Phone className="w-4 h-4 text-emerald-600" />
+              <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
                 Tư vấn kỹ thuật & cấu hình riêng:{" "}
-                <a href={`tel:${phone.replace(/\s+/g, "")}`} className="text-blue-600 font-bold hover:underline">
+                <a href={`tel:${phone.replace(/\s+/g, "")}`} className="inline-flex min-h-11 items-center text-blue-600 font-bold hover:underline">
                   {phone}
                 </a>{" "}
                 (Zalo / Miễn phí)
@@ -707,17 +708,19 @@ export default function ProductHeroSection({
       </div>
 
       {/* ========================================================= */}
-      {/* FLOATING BOTTOM PURCHASE BAR (KHI CUỘN XUỐNG DƯỚI)        */}
+      {/* FLOATING BOTTOM PURCHASE BAR (HIỆN NGAY TRÊN SP, 450PX PC) */}
       {/* ========================================================= */}
-      {orderable && <ProductFloatingBar
+      <ProductFloatingBar
         productName={productName}
         image={activeImage}
         variantLabel={selectedVariant?.name}
         colorLabel={selectedColor?.name}
         totalPrice={totalPrice}
+        phone={phone}
+        orderable={orderable}
         onAddToCart={() => handleAddToCart(false)}
-        onBuyNow={() => setIsQuickCheckoutOpen(true)}
-      />}
+        onBuyNow={() => orderable && setIsQuickCheckoutOpen(true)}
+      />
 
       {/* ========================================================= */}
       {/* MODAL 1: ĐẶT HÀNG NHANH 1 PHÚT                             */}

@@ -53,9 +53,9 @@ export default async function ProductSection({
   const resolvedSlugHref = slug ? (slug.startsWith("/") ? slug : `/${slug}`) : undefined;
 
   return (
-    <section className="pb-5 sm:pb-12 md:pb-16">
-      <div className="container mx-auto px-2.5 sm:px-4 max-w-[1370px]">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+    <section className="py-4 md:py-6 lg:py-8">
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="bg-white rounded-xl lg:rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <SectionHeader
             title={title}
             icon={icon}
@@ -63,7 +63,7 @@ export default async function ProductSection({
             links={links}
             slug={slug}
           />
-          <div className="p-2 sm:p-4 md:p-6 bg-slate-50/30">
+          <div className="p-2.5 md:p-4 lg:p-6 bg-slate-50/30">
             {isError ? (
               <ErrorState
                 title="Không thể tải danh sách sản phẩm"
@@ -86,7 +86,7 @@ export default async function ProductSection({
               />
             ) : (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 md:gap-5">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 md:gap-3 lg:gap-4">
                   {products.slice(0, 10).map((p, i) => {
                     const hideOnMobile = i >= 6;
                     const cardNode = (
@@ -99,7 +99,7 @@ export default async function ProductSection({
                       />
                     );
                     return hideOnMobile ? (
-                      <div key={`${p.id}-wrap-${i}`} className="hidden sm:block h-full">
+                      <div key={`${p.id}-wrap-${i}`} className="hidden md:block h-full">
                         {cardNode}
                       </div>
                     ) : (
@@ -108,10 +108,10 @@ export default async function ProductSection({
                   })}
                 </div>
                 {resolvedSlugHref && products.length > 4 && (
-                  <div className="sm:hidden mt-3 pt-2 border-t border-slate-100 text-center">
+                  <div className="md:hidden mt-3 pt-2 border-t border-slate-100 text-center">
                     <Link
                       href={resolvedSlugHref}
-                      className="inline-flex items-center justify-center w-full py-2 rounded-xl bg-slate-100 hover:bg-blue-50 active:scale-[0.99] text-slate-800 text-xs font-bold transition"
+                      className="min-h-11 inline-flex items-center justify-center w-full px-4 py-2 rounded-xl bg-slate-100 hover:bg-blue-50 active:scale-[0.99] text-slate-800 text-[12px] font-bold transition focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                     >
                       Xem tất cả {title.split("-")[0].trim()} →
                     </Link>

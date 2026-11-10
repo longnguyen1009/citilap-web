@@ -41,11 +41,14 @@ export default async function ShopLayout({
   ]);
 
   return (
-    <StorefrontProviders><div className="flex flex-col min-h-screen">
+    <StorefrontProviders><div className="storefront-shell flex flex-col min-h-screen min-w-0">
+      <a href="#main-content" className="storefront-skip-link">
+        Chuyển đến nội dung chính
+      </a>
       <NavigationProgress />
       <PublicPriceRefresh nextChange={boundary.nextChange} version={boundary.token} serverTime={serverTime}/>
       <Header categories={categories} brands={brands} navigation={navigation} settings={settings} />
-      <main className="flex-grow pb-16 md:pb-0">{children}</main>
+      <main id="main-content" tabIndex={-1} className="storefront-main flex-grow min-w-0">{children}</main>
       <Footer navigation={navigation} settings={settings} />
       <StorefrontMetrics />
       <Analytics />

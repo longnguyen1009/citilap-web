@@ -29,8 +29,10 @@ export default function CompareFloatingBar() {
   return (
     <aside
       aria-label="Thanh so sánh sản phẩm"
-      className={`fixed left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border border-slate-700/80 p-3 sm:p-4 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 ${
-        pdpBarVisible ? "bottom-36 lg:bottom-20" : "bottom-20 lg:bottom-6"
+      className={`fixed left-1/2 -translate-x-1/2 z-40 w-[95%] max-w-2xl bg-slate-900/95 backdrop-blur-md text-white rounded-2xl shadow-2xl border border-slate-700/80 px-2.5 py-2.5 sm:p-4 transition-all duration-300 motion-reduce:transition-none animate-in fade-in slide-in-from-bottom-4 ${
+        pdpBarVisible
+          ? "bottom-[calc(6.25rem+env(safe-area-inset-bottom,0px))] md:bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] lg:bottom-20"
+          : "bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] md:bottom-6"
       }`}
     >
       {compareNotice && (
@@ -52,7 +54,7 @@ export default function CompareFloatingBar() {
           </button>
         </div>
       )}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2 sm:gap-3">
         {/* Left: Product Slots */}
         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
           <div className="hidden sm:flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-blue-400 shrink-0">
@@ -60,11 +62,11 @@ export default function CompareFloatingBar() {
             <span>So sánh</span>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto py-1">
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto hide-scrollbar pt-1.5 pr-1.5 pb-1">
             {items.map((item) => (
               <div
                 key={item.id}
-                className="relative group w-11 h-11 sm:w-12 sm:h-12 bg-white rounded-xl p-1 shrink-0 border border-slate-600 shadow-xs"
+                className="relative group w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl p-1 shrink-0 border border-slate-600 shadow-xs"
               >
                 {item.image ? (
                   <Image
@@ -97,7 +99,7 @@ export default function CompareFloatingBar() {
                 type="button"
                 onClick={openCompare}
                 title="Bấm để mở bảng so sánh và thêm sản phẩm khác"
-                className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl border border-dashed border-slate-600 hover:border-blue-400 hover:text-blue-400 flex items-center justify-center text-slate-400 text-xs shrink-0 transition cursor-pointer"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl border border-dashed border-slate-600 hover:border-blue-400 hover:text-blue-400 flex items-center justify-center text-slate-400 text-xs shrink-0 transition cursor-pointer"
               >
                 +{idx + 1 + items.length}
               </button>
@@ -110,12 +112,12 @@ export default function CompareFloatingBar() {
         </div>
 
         {/* Right: Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             onClick={clearCompare}
             title="Xóa tất cả"
-            className="p-2 text-slate-400 hover:text-rose-400 transition cursor-pointer"
+            className="min-h-11 min-w-9 p-2 flex items-center justify-center text-slate-400 hover:text-rose-400 transition cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -123,9 +125,9 @@ export default function CompareFloatingBar() {
           <button
             type="button"
             onClick={openCompare}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl transition shadow-md cursor-pointer"
+            className="min-h-11 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl transition shadow-md cursor-pointer whitespace-nowrap"
           >
-            <Scale className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Scale className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span>So sánh ngay ({items.length})</span>
           </button>
         </div>

@@ -50,10 +50,18 @@ export default function FloatingContactWidget({
   const desktopElevated = pdpBarVisible || hasCompareBar;
   const mobileBottomClass =
     hasPrimaryMobileBar && hasCompareBar
-      ? "bottom-36"
-      : hasPrimaryMobileBar || hasCompareBar
-        ? "bottom-20"
-        : "bottom-5";
+      ? "bottom-[calc(11.75rem+env(safe-area-inset-bottom,0px))]"
+      : pdpBarVisible
+        ? "bottom-[calc(6.25rem+env(safe-area-inset-bottom,0px))]"
+        : hasPrimaryMobileBar || hasCompareBar
+          ? "bottom-[calc(5rem+env(safe-area-inset-bottom,0px))]"
+          : "bottom-[calc(1.25rem+env(safe-area-inset-bottom,0px))]";
+  const desktopBottomClass =
+    pdpBarVisible && hasCompareBar
+      ? "md:bottom-40 lg:bottom-40"
+      : desktopElevated
+        ? "md:bottom-24 lg:bottom-24"
+        : "md:bottom-6 lg:bottom-6";
 
   useEffect(() => {
     const sync = (e?: Event) => {
@@ -87,9 +95,7 @@ export default function FloatingContactWidget({
     <>
       <aside
         aria-label="Kênh liên hệ nhanh và điều hướng trang"
-        className={`fixed right-3.5 md:right-4 z-30 flex flex-col items-end gap-2.5 transition-all duration-300 ${mobileBottomClass} ${
-          desktopElevated ? "lg:bottom-24" : "lg:bottom-6"
-        }`}
+        className={`fixed right-3.5 md:right-4 z-30 flex flex-col items-end gap-2.5 transition-all duration-300 motion-reduce:transition-none ${mobileBottomClass} ${desktopBottomClass}`}
       >
         <ScrollToTop inline />
 

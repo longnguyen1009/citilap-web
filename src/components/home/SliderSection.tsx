@@ -194,14 +194,14 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
 
   return (
     <section
-      className="py-6 bg-slate-900 overflow-hidden"
+      className="py-3 md:py-5 bg-slate-900 overflow-hidden"
       aria-label="Slider quảng cáo"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onFocusCapture={() => setIsFocused(true)}
       onBlurCapture={() => setIsFocused(false)}
     >
-      <div className="container mx-auto px-4 max-w-[1370px]">
+      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
         <div
           ref={containerRef}
           tabIndex={0}
@@ -209,7 +209,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
           aria-roledescription="carousel"
           aria-label="Banner quảng cáo nổi bật"
           onKeyDown={handleKeyDown}
-          className={`relative rounded-2xl overflow-hidden shadow-lg border border-slate-800 select-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 ${
+          className={`relative rounded-xl lg:rounded-2xl overflow-hidden shadow-lg border border-slate-800 select-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400 ${
             total > 1
               ? isDragging
                 ? 'cursor-grabbing'
@@ -228,7 +228,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
           style={{ touchAction: 'pan-y pinch-zoom' }}
         >
           {/* Slides track */}
-          <div className="relative h-56 sm:h-72 md:h-88 lg:h-96 w-full">
+          <div className="relative h-[196px] sm:h-[212px] md:h-[280px] lg:h-[360px] w-full">
             {slides.map((slide, idx) => {
               const isActive = idx === current;
               const hasLink = Boolean(slide.link && slide.link.trim());
@@ -278,7 +278,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                             fetchPriority={idx === 0 ? 'high' : 'low'}
                             loading={idx === 0 ? 'eager' : 'lazy'}
                             unoptimized={mobileSlideImg.startsWith('/brand/')}
-                            className="sm:hidden absolute inset-0 w-full h-full object-cover object-right"
+                            className="md:hidden absolute inset-0 w-full h-full object-cover object-right"
                             sizes="100vw"
                             onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
                           />
@@ -292,8 +292,8 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                           fetchPriority={idx === 0 ? 'high' : 'low'}
                           loading={idx === 0 ? 'eager' : 'lazy'}
                           unoptimized={slide.imageUrl.startsWith('/brand/')}
-                          className={`${hasSeparateMobileSlide ? 'hidden sm:block ' : ''}absolute inset-0 w-full h-full object-cover`}
-                          sizes="(max-width: 768px) 100vw, 1370px"
+                          className={`${hasSeparateMobileSlide ? 'hidden md:block ' : ''}absolute inset-0 w-full h-full object-cover`}
+                          sizes="(max-width: 767px) 100vw, 1280px"
                           onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
                         />
                       </>
@@ -307,29 +307,29 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                   )}
 
                   {/* Gradient backdrop for readable typography */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex flex-col justify-end p-5 sm:p-10 text-white z-[6] pointer-events-none">
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent flex flex-col justify-end p-4 sm:p-6 lg:p-10 text-white z-[6] pointer-events-none">
                     <div className="max-w-2xl">
                       {slide.badge && (
-                        <span className="inline-block px-2.5 sm:px-3 py-1 mb-2 sm:mb-2.5 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                        <span className="inline-block px-2.5 py-0.5 md:py-1 mb-1.5 md:mb-2 rounded-full text-[10px] md:text-[11px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30">
                           {slide.badge}
                         </span>
                       )}
-                      <h3 className="font-black text-lg sm:text-3xl md:text-4xl drop-shadow-md tracking-tight leading-tight">
+                      <h3 className="font-black text-base sm:text-lg md:text-2xl lg:text-4xl drop-shadow-md tracking-tight leading-tight">
                         {slide.mobileTitle ? (
                           <>
-                            <span className="sm:hidden">{slide.mobileTitle}</span>
-                            <span className="hidden sm:inline">{slide.title}</span>
+                            <span className="md:hidden">{slide.mobileTitle}</span>
+                            <span className="hidden md:inline">{slide.title}</span>
                           </>
                         ) : (
                           slide.title
                         )}
                       </h3>
                       {(slide.subtitle || slide.mobileSubtitle) && (
-                        <p className="text-xs sm:text-base text-slate-200 mt-1 sm:mt-2 line-clamp-2 leading-relaxed">
+                        <p className="text-xs md:text-sm lg:text-base text-slate-200 mt-1 md:mt-2 line-clamp-2 leading-relaxed">
                           {slide.mobileSubtitle ? (
                             <>
-                              <span className="sm:hidden">{slide.mobileSubtitle}</span>
-                              <span className="hidden sm:inline">{slide.subtitle}</span>
+                              <span className="md:hidden">{slide.mobileSubtitle}</span>
+                              <span className="hidden md:inline">{slide.subtitle}</span>
                             </>
                           ) : (
                             slide.subtitle
@@ -338,7 +338,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                       )}
 
                       {hasLink && (
-                        <div className="mt-4 pointer-events-auto">
+                        <div className="mt-2.5 md:mt-4 pointer-events-auto">
                           <Link
                             href={slide.link!}
                             tabIndex={isActive ? 0 : -1}
@@ -347,7 +347,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                                 e.preventDefault();
                               }
                             }}
-                            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs sm:text-sm shadow-md transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                            className="min-h-11 inline-flex items-center gap-1.5 px-4 md:px-5 py-2 rounded-full bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs md:text-sm shadow-md transition duration-200 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                           >
                             <span>{slide.buttonText || 'Xem ngay'}</span>
                             <ChevronRight className="w-4 h-4" />
@@ -368,7 +368,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                 type="button"
                 onClick={prevSlide}
                 aria-label="Slide trước"
-                className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center transition backdrop-blur-xs focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden cursor-pointer"
+                className="absolute left-2.5 md:left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center transition backdrop-blur-xs focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden cursor-pointer"
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
@@ -376,14 +376,14 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                 type="button"
                 onClick={nextSlide}
                 aria-label="Slide tiếp theo"
-                className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center transition backdrop-blur-xs focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden cursor-pointer"
+                className="absolute right-2.5 md:right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 active:scale-95 text-white flex items-center justify-center transition backdrop-blur-xs focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden cursor-pointer"
               >
                 <ChevronRight className="w-6 h-6" />
               </button>
 
-              {/* Dots / Pagination with generous hit areas (32x32px) and small visual dots */}
+              {/* Dots / Pagination with generous hit areas (44x44px) and small visual dots */}
               <nav
-                className="absolute bottom-3 sm:bottom-4 left-0 right-0 z-20 flex items-center justify-center gap-1 pointer-events-auto"
+                className="absolute bottom-1.5 md:bottom-3 left-0 right-0 z-20 flex items-center justify-center gap-0.5 pointer-events-auto"
                 aria-label="Điều hướng slide"
               >
                 {slides.map((_, idx) => (
@@ -393,7 +393,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                     aria-current={idx === current ? 'true' : undefined}
                     aria-label={`Chuyển đến slide ${idx + 1}`}
                     onClick={() => setCurrent(idx)}
-                    className="w-8 h-8 flex items-center justify-center rounded-full group cursor-pointer focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="w-11 h-11 flex items-center justify-center rounded-full group cursor-pointer focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     <span
                       className={`h-2 rounded-full transition-all duration-200 ${
