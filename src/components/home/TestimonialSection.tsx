@@ -29,7 +29,7 @@ export default function TestimonialSection({
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label="Đánh giá từ khách hàng">
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="bg-white rounded-xl lg:rounded-2xl shadow-xs border border-slate-200/90 p-3.5 md:p-6 lg:p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 md:gap-4 mb-4 md:mb-6 pb-3 md:pb-5 border-b border-slate-100">
             <div className="flex items-center gap-2.5 md:gap-3">

@@ -287,6 +287,9 @@ export function ProductGallery({
             <img
               src={activeImg.url}
               alt={activeImg.alt || productName}
+              fetchPriority="high"
+              loading="eager"
+              decoding="async"
               className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
             />
           )}
@@ -319,6 +322,10 @@ export function ProductGallery({
         <div className="mt-3 flex items-center gap-2 sm:gap-2.5 overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar pb-1">
           {normalizedImages.map((img, idx) => {
             const isActive = idx === safeActiveIndex;
+            const thumbUrl =
+              img.url.startsWith('/api/library/') && !img.url.includes('?')
+                ? `${img.url}?size=thumb&v=2`
+                : img.url;
             return (
               <button
                 key={`${img.url}-${idx}`}
@@ -327,6 +334,12 @@ export function ProductGallery({
                 }}
                 type="button"
                 onClick={() => setActiveIndex(idx)}
+                onMouseEnter={() => {
+                  if (img.url !== thumbUrl && typeof window !== 'undefined') {
+                    const preloader = new window.Image();
+                    preloader.src = img.url;
+                  }
+                }}
                 aria-label={`Xem ảnh ${idx + 1}`}
                 aria-pressed={isActive}
                 className={`relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-xl border-2 bg-white p-1.5 transition-all cursor-pointer ${
@@ -336,7 +349,7 @@ export function ProductGallery({
                 }`}
               >
                 <img
-                  src={img.url}
+                  src={thumbUrl}
                   alt={img.alt || `${productName} - ảnh ${idx + 1}`}
                   loading="lazy"
                   decoding="async"

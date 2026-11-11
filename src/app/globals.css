@@ -239,8 +239,8 @@ body {
 
 /* Scoped Storefront Shell Rules */
 .storefront-shell {
-  --max-width-shop: 1280px;
-  --container-shop: 1280px;
+  --max-width-shop: 1370px;
+  --container-shop: 1370px;
   --storefront-bottom-nav-height: 56px;
 }
 
@@ -252,8 +252,8 @@ body {
 
 @media (min-width: 768px) {
   .storefront-shell .container-shop {
-    padding-left: 1.5rem;
-    padding-right: 1.5rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 

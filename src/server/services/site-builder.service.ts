@@ -640,7 +640,7 @@ export async function resolveSectionsForStorefront(
         if (requestedIds.length > 0) {
           resolvedSec.resolvedCategories = allCategories.filter((c) => requestedIds.includes(c.id));
         } else {
-          resolvedSec.resolvedCategories = allCategories.filter((c) => !c.parentId).slice(0, data.limit || 10);
+          resolvedSec.resolvedCategories = allCategories.filter((c) => !c.parentId).slice(0, data.limit || 12);
         }
       } else if (data.type === 'featured_brands') {
         const brandLimit = data.limit && data.limit > 0 ? data.limit : 12;

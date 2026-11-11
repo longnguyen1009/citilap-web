@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export interface SlideItem {
@@ -201,7 +200,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
       onFocusCapture={() => setIsFocused(true)}
       onBlurCapture={() => setIsFocused(false)}
     >
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div
           ref={containerRef}
           tabIndex={0}
@@ -247,6 +246,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                   {hasLink && (
                     <Link
                       href={slide.link!}
+                      prefetch={false}
                       aria-label={slide.title || 'Xem chi tiết'}
                       tabIndex={isActive ? 0 : -1}
                       onClick={(e) => {
@@ -267,36 +267,23 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                         : '');
                     const hasSeparateMobileSlide = Boolean(mobileSlideImg && mobileSlideImg !== slide.imageUrl);
                     return (
-                      <>
+                      <picture className="contents">
                         {hasSeparateMobileSlide && (
-                          <Image
-                            src={mobileSlideImg}
-                            alt={slide.mobileTitle || slide.title || 'Slide quảng cáo'}
-                            width={800}
-                            height={540}
-                            priority={idx === 0}
-                            fetchPriority={idx === 0 ? 'high' : 'low'}
-                            loading={idx === 0 ? 'eager' : 'lazy'}
-                            unoptimized={mobileSlideImg.startsWith('/brand/')}
-                            className="md:hidden absolute inset-0 w-full h-full object-cover object-right"
-                            sizes="100vw"
-                            onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
-                          />
+                          <source media="(max-width: 767px)" srcSet={mobileSlideImg} />
                         )}
-                        <Image
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                           src={slide.imageUrl}
                           alt={slide.title || 'Slide quảng cáo'}
                           width={1920}
                           height={600}
-                          priority={idx === 0}
                           fetchPriority={idx === 0 ? 'high' : 'low'}
                           loading={idx === 0 ? 'eager' : 'lazy'}
-                          unoptimized={slide.imageUrl.startsWith('/brand/')}
-                          className={`${hasSeparateMobileSlide ? 'hidden md:block ' : ''}absolute inset-0 w-full h-full object-cover`}
-                          sizes="(max-width: 767px) 100vw, 1280px"
+                          decoding="async"
+                          className="absolute inset-0 w-full h-full object-cover max-md:object-right"
                           onError={() => setImageErrors((prev) => ({ ...prev, [slideKey]: true }))}
                         />
-                      </>
+                      </picture>
                     );
                   })() : (
                     <div className="w-full h-full bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center text-slate-500">
@@ -341,6 +328,7 @@ export default function SliderSection({ data }: { data: SliderSectionData }) {
                         <div className="mt-2.5 md:mt-4 pointer-events-auto">
                           <Link
                             href={slide.link!}
+                            prefetch={false}
                             tabIndex={isActive ? 0 : -1}
                             onClick={(e) => {
                               if (suppressClick.current) {

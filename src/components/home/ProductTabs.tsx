@@ -50,6 +50,32 @@ function deduplicateListingProducts(products: ProductCardProduct[]): ProductCard
   return result;
 }
 
+function TabHighlightFlameIcon({ className = 'h-4 w-4 md:h-5 md:w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
+      <path
+        d="M12.5 2C12.5 2 18.5 6.8 18.5 13.2C18.5 17.5 15.4 21 11.5 21C7.6 21 4.5 17.5 4.5 13.2C4.5 10.3 6.2 7.6 7.8 6C7.8 6 7.4 8.4 9.1 9.4C8.6 6.2 10.6 3.5 12.5 2Z"
+        fill="url(#tab-flame-outer)"
+      />
+      <path
+        d="M11.6 10.2C11.6 10.2 15 12.8 15 16C15 18.5 13.4 20.5 11.5 20.5C9.6 20.5 8 18.5 8 16C8 14.1 9.5 12 11.6 10.2Z"
+        fill="url(#tab-flame-inner)"
+      />
+      <defs>
+        <linearGradient id="tab-flame-outer" x1="11.5" y1="2" x2="11.5" y2="21" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FF9800" />
+          <stop offset="0.6" stopColor="#FF3D00" />
+          <stop offset="1" stopColor="#D50000" />
+        </linearGradient>
+        <linearGradient id="tab-flame-inner" x1="11.5" y1="10.2" x2="11.5" y2="20.5" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#FFF59D" />
+          <stop offset="1" stopColor="#FFB300" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 export default function ProductTabs({
   title,
   subtitle,
@@ -90,7 +116,7 @@ export default function ProductTabs({
   }
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={title}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         {subtitle && (
           <div className="mb-2.5 md:mb-3.5">
             <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase text-slate-900 leading-snug">{title}</h2>
@@ -133,13 +159,20 @@ export default function ProductTabs({
                       document.getElementById(`${prefix}-tab-${tabs[next].id}`)?.focus();
                     }
                   }}
-                  className={`${visCls} min-h-11 flex-1 shrink-0 items-center justify-center rounded-t-xl md:rounded-t-2xl border-2 px-2.5 md:px-4 py-1.5 md:py-2.5 text-[12px] md:text-[14px] lg:text-[16px] font-black uppercase whitespace-nowrap transition cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
+                  className={`${visCls} min-h-11 md:min-h-13 flex-1 shrink-0 items-center justify-center rounded-t-xl md:rounded-t-2xl border-2 px-2 md:px-3.5 py-1 md:py-1.5 text-[12px] md:text-[14px] lg:text-[16px] font-black uppercase whitespace-nowrap transition cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
                     safeIndex === index
-                      ? 'border-blue-500 border-b-blue-50 bg-blue-50 text-blue-700 shadow-2xs'
-                      : 'border-slate-200/90 border-b-blue-500 bg-white text-slate-700 hover:bg-blue-50/60 hover:text-blue-700'
+                      ? 'border-blue-500 border-b-blue-50 bg-blue-50 text-white'
+                      : 'border-slate-200/80 border-b-blue-500 bg-slate-100/90 text-[#0284c7] shadow-[inset_0_-2px_5px_rgba(0,0,0,0.03)] hover:bg-blue-50/70 hover:text-blue-700'
                   }`}
                 >
-                  {t.label}
+                  {safeIndex === index ? (
+                    <span className="inline-flex items-center justify-center gap-1 md:gap-2 rounded-lg md:rounded-xl border border-sky-300 bg-gradient-to-b from-[#38bdf8] via-[#0284c7] to-[#1d4ed8] px-2.5 md:px-4 py-1 md:py-1.5 text-white shadow-[0_3px_10px_rgba(2,132,199,0.35),inset_0_1px_1px_rgba(255,255,255,0.65)]">
+                      <TabHighlightFlameIcon className="h-4 w-4 md:h-5 md:w-5 shrink-0 drop-shadow-xs" />
+                      <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]">{t.label}</span>
+                    </span>
+                  ) : (
+                    <span>{t.label}</span>
+                  )}
                 </button>
               );
             })}
@@ -224,45 +257,45 @@ export function ProductCarousel({
     update();
     return () => { observer.disconnect(); el.removeEventListener('scroll', update); };
   }, [products]);
-  const spColsClass = isFlash
-    ? 'auto-cols-[calc((100%-16px)/2.3)] gap-2'
-    : oneAtATime
-      ? 'auto-cols-[calc((100%-10px)/2)] gap-2.5'
-      : 'auto-cols-[calc((100%-10px)/2)] gap-2.5';
-  return <div ref={container} className="grid grid-cols-1 md:grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-1 md:gap-2">
-    <div
-      ref={rail}
-      tabIndex={0}
-      role="region"
-      aria-label={`Sản phẩm ${label}`}
-      className={`md:col-start-2 md:row-start-1 grid ${spColsClass} grid-flow-col overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-0.5 md:px-1 pt-1.5 md:pt-2 pb-2 md:pb-3 md:gap-3 md:auto-cols-[calc((100%-24px)/3)] lg:gap-4 lg:auto-cols-[calc((100%-48px)/4)] xl:auto-cols-[calc((100%-64px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
-    >
-      {products.map((p, idx) => {
-        const hideOnMobile = Boolean(mobileLimit && mobileLimit > 0 && idx >= mobileLimit);
-        return (
-          <div key={`${p.id}:${p.variantId || ''}`} className={`min-w-0 snap-start h-full ${hideOnMobile ? 'hidden md:block' : ''}`}>
-            <ProductCard product={p} variant={cardVariant} imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'} />
-          </div>
-        );
-      })}
+  const spColsClass = 'auto-cols-[calc((100%-10px)/2)] gap-2.5';
+  void isFlash;
+  void oneAtATime;
+  return (
+    <div ref={container} className="relative group/carousel w-full">
+      <button
+        type="button"
+        aria-label="Sản phẩm trước"
+        disabled={bounds.start}
+        onClick={() => move(-1)}
+        className="hidden md:flex absolute left-1 lg:left-1.5 top-1/2 -translate-y-1/2 z-30 min-h-11 min-w-11 h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.16)] backdrop-blur-xs transition hover:bg-white hover:text-blue-600 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
+      >
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+      <button
+        type="button"
+        aria-label="Sản phẩm tiếp theo"
+        disabled={bounds.end}
+        onClick={() => move(1)}
+        className="hidden md:flex absolute right-1 lg:right-1.5 top-1/2 -translate-y-1/2 z-30 min-h-11 min-w-11 h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-slate-200/90 bg-white/95 text-slate-800 shadow-[0_4px_14px_rgba(0,0,0,0.16)] backdrop-blur-xs transition hover:bg-white hover:text-blue-600 hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
+      >
+        <ChevronRight className="h-6 w-6" />
+      </button>
+      <div
+        ref={rail}
+        tabIndex={0}
+        role="region"
+        aria-label={`Sản phẩm ${label}`}
+        className={`grid ${spColsClass} grid-flow-col overflow-x-auto overscroll-x-contain scroll-smooth motion-reduce:scroll-auto snap-x snap-mandatory scroll-px-1 hide-scrollbar px-0.5 md:px-1 pt-1.5 md:pt-2 pb-2 md:pb-3 md:gap-3 md:auto-cols-[calc((100%-24px)/3)] lg:gap-3.5 lg:auto-cols-[calc((100%-42px)/4)] xl:gap-4 xl:auto-cols-[calc((100%-64px)/5)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden`}
+      >
+        {products.map((p, idx) => {
+          const hideOnMobile = Boolean(mobileLimit && mobileLimit > 0 && idx >= mobileLimit);
+          return (
+            <div key={`${p.id}:${p.variantId || ''}`} className={`min-w-0 snap-start h-full ${hideOnMobile ? 'hidden md:block' : ''}`}>
+              <ProductCard product={p} variant={cardVariant} imageLoading={eagerImages && idx < 5 ? 'eager' : 'lazy'} />
+            </div>
+          );
+        })}
+      </div>
     </div>
-    <button
-      type="button"
-      aria-label="Sản phẩm trước"
-      disabled={bounds.start}
-      onClick={() => move(-1)}
-      className="hidden md:flex md:col-start-1 md:row-start-1 min-h-11 min-w-11 h-14 w-full cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
-    >
-      <ChevronLeft className="h-6 w-6" />
-    </button>
-    <button
-      type="button"
-      aria-label="Sản phẩm tiếp theo"
-      disabled={bounds.end}
-      onClick={() => move(1)}
-      className="hidden md:flex md:col-start-3 md:row-start-1 min-h-11 min-w-11 h-14 w-full cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-default disabled:opacity-40"
-    >
-      <ChevronRight className="h-6 w-6" />
-    </button>
-  </div>;
+  );
 }

@@ -10,8 +10,12 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { mediaEnvironment } from "@/server/media-http";
-import { publicPostList, listPostCategories } from "@/server/services/post.service";
-import { getPublishedHomepage, getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import {
+  getCachedPublicPostCategories,
+  getCachedPublicPostList,
+  getPublishedHomepage,
+  getStorefrontSettings,
+} from "@/server/services/storefront-cms.service";
 import { videoReviewsSectionDataSchema } from "@/contracts/cms/site-builder";
 import { DEFAULT_REVIEW_VIDEOS } from "@/contracts/cms/settings";
 import { businessProfile } from "@/config/business-profile";
@@ -74,18 +78,14 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   }
 
   const [categories, cmsHomepage, settings] = await Promise.all([
-    listPostCategories(env.DB, "ACTIVE"),
+    getCachedPublicPostCategories(),
     getPublishedHomepage().catch(() => null),
     getStorefrontSettings().catch(() => null),
   ]);
 
   const activeCategory = categorySlug ? categories.find((c) => c.slug === categorySlug) : undefined;
 
-  const { items, total, totalPages, page } = await publicPostList(env.DB, {
-    categoryId: activeCategory?.id,
-    page: currentPage,
-    limit: 10,
-  });
+  const { items, total, totalPages, page } = await getCachedPublicPostList(activeCategory?.id, currentPage, 10);
 
   // Extract videos from Settings or CMS Homepage video_reviews block
   let sidebarVideos: SidebarVideoItem[] =

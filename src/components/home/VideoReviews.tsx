@@ -163,7 +163,7 @@ export default function VideoReviews({
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={title}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="rounded-xl lg:rounded-2xl border border-slate-200/90 bg-white p-3 md:p-5 lg:p-6 shadow-xs overflow-hidden">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-2.5 md:gap-4 pb-3 md:pb-5 border-b border-slate-100">

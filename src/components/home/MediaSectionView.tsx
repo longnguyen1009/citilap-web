@@ -51,7 +51,7 @@ export default function MediaSectionView({
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={title}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="rounded-xl lg:rounded-2xl border border-blue-100 bg-gradient-to-b from-blue-50/70 via-white to-white p-3 md:p-5 shadow-xs">
           {/* Header */}
           <div className="mb-3 md:mb-4 flex items-center justify-between gap-2 md:gap-3">

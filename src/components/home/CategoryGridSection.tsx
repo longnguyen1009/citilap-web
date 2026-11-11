@@ -72,8 +72,8 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
         alt: cat.alt,
       }))
     : SHOWCASE_CATEGORIES;
-  const rows = Array.from({ length: Math.ceil(displayCategories.length / 8) }, (_, index) =>
-    displayCategories.slice(index * 8, (index + 1) * 8)
+  const rows = Array.from({ length: Math.ceil(displayCategories.length / 6) }, (_, index) =>
+    displayCategories.slice(index * 6, (index + 1) * 6)
   );
 
   return (
@@ -81,7 +81,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
       aria-label="Khám phá danh mục CitiLap"
       className="py-4 md:py-6"
     >
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="bg-white rounded-xl lg:rounded-2xl border border-slate-200/90 shadow-xs p-3 md:p-5 lg:p-6 relative overflow-hidden">
           {/* Header thanh danh mục */}
           <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 md:pb-4 md:mb-4 border-b border-slate-100">
@@ -108,6 +108,7 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
             <div className="flex items-center gap-2 shrink-0">
               <Link
                 href="/phan-loai"
+                prefetch={false}
                 className="min-h-11 inline-flex items-center gap-1 text-xs md:text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition"
               >
                 <span className="md:hidden">Tất cả</span>
@@ -153,18 +154,23 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
             <div className="grid md:hidden grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] gap-2 pt-1">
               {displayCategories.map((item) => {
                 const Icon = item.icon;
+                const thumbSrc =
+                  item.image && item.image.startsWith("/api/library/") && !item.image.includes("?")
+                    ? `${item.image}?size=thumb&v=2`
+                    : item.image;
                 return (
                   <Link
                     key={item.id}
                     href={item.href}
+                    prefetch={false}
                     className="group min-h-11 min-w-0 flex flex-col items-center justify-start p-1 rounded-lg active:scale-95 transition-all duration-150 motion-reduce:transition-none snap-start text-center focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                   >
                     <div className="relative mb-1.5">
-                      <div className="w-11 h-11 rounded-xl bg-slate-100/90 border border-slate-200/80 flex items-center justify-center text-slate-700 shadow-2xs">
-                        {item.image ? (
-                          <Image src={item.image} alt={item.alt || item.name} width={44} height={44} unoptimized className="w-full h-full rounded-xl object-cover" />
+                      <div className="w-14 h-14 rounded-xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-slate-700 shadow-xs">
+                        {thumbSrc ? (
+                          <Image src={thumbSrc} alt={item.alt || item.name} width={56} height={56} loading="lazy" decoding="async" unoptimized className="w-full h-full rounded-xl object-contain p-1" />
                         ) : (
-                          <Icon className="w-5 h-5 text-blue-600" />
+                          <Icon className="w-6 h-6 text-blue-600" />
                         )}
                       </div>
                       {item.badge && (
@@ -185,25 +191,30 @@ export default function CategoryGridSection({ navigation }: { navigation?: Resol
               })}
             </div>
 
-            {/* PC / Tablet (>= 768px): 2-row 8-column or responsive grid */}
-            <div className="hidden md:flex flex-col gap-3 lg:gap-4 min-w-[720px] lg:min-w-full">
+            {/* PC / Tablet (>= 768px): 6-column grid per row */}
+            <div className="hidden md:flex flex-col gap-3 min-w-[720px] lg:min-w-full">
               {rows.map((row, rowIndex) => (
-                <div key={rowIndex} className="grid grid-cols-8 gap-2.5 lg:gap-3">
+                <div key={rowIndex} className="grid grid-cols-6 gap-2.5 lg:gap-3">
                   {row.map((item) => {
                     const Icon = item.icon;
+                    const thumbSrc =
+                      item.image && item.image.startsWith("/api/library/") && !item.image.includes("?")
+                        ? `${item.image}?size=thumb&v=2`
+                        : item.image;
                     return (
                       <Link
                         key={item.id}
                         href={item.href}
-                        className="group min-h-11 flex flex-col items-center p-2.5 rounded-xl border border-transparent hover:border-slate-200 hover:bg-slate-50/90 hover:-translate-y-1 motion-reduce:hover:translate-y-0 active:scale-95 transition-all duration-150 motion-reduce:transition-none snap-start text-center cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
+                        prefetch={false}
+                        className="group min-h-11 flex flex-col items-center p-2 lg:p-2.5 rounded-2xl border-2 border-slate-300/90 bg-gradient-to-b from-white via-slate-50/70 to-blue-50/40 hover:border-blue-500 hover:from-blue-50/60 hover:to-white hover:-translate-y-1 hover:shadow-md motion-reduce:hover:translate-y-0 active:scale-95 transition-all duration-150 motion-reduce:transition-none snap-start text-center cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-xs"
                       >
-                        {/* Vòng tròn Icon */}
-                        <div className="relative mb-2">
-                          <div className="w-14 h-14 lg:w-16 lg:h-16 rounded-2xl bg-slate-100/80 border border-slate-200/70 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50 group-hover:border-blue-400 group-hover:text-blue-600 group-hover:shadow-md group-hover:shadow-blue-500/10">
-                            {item.image ? (
-                              <Image src={item.image} alt={item.alt || item.name} width={64} height={64} unoptimized className="w-full h-full rounded-2xl object-cover" />
+                        {/* Icon / Ảnh (không border, padding nhỏ) */}
+                        <div className="relative mb-1.5">
+                          <div className="w-16 h-16 lg:w-20 lg:h-20 flex items-center justify-center text-slate-700 transition-all duration-300 group-hover:text-blue-600">
+                            {thumbSrc ? (
+                              <Image src={thumbSrc} alt={item.alt || item.name} width={80} height={80} loading="lazy" decoding="async" unoptimized className="w-full h-full object-contain p-0.5 mix-blend-multiply" />
                             ) : (
-                              <Icon className="w-6 h-6 lg:w-7 lg:h-7 transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100" />
+                              <Icon className="w-7 h-7 lg:w-8 lg:h-8 transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100" />
                             )}
                           </div>
                           {item.badge && (

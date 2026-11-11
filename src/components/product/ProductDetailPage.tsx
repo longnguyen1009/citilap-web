@@ -28,9 +28,6 @@ import {
   serializeJsonLd,
 } from "@/lib/seo-helpers";
 import {
-  getRelatedProducts,
-} from "@/server/services/catalog.service";
-import {
   getPublishedNavigation,
   getPublishedStudio,
   getStorefrontSettings,
@@ -38,6 +35,7 @@ import {
   getCachedProductDetail,
   getCachedPricingContext,
   getCachedProductReviews,
+  getCachedRelatedProducts,
 } from "@/server/services/storefront-cms.service";
 import {
   calculateEffectivePrice,
@@ -372,15 +370,12 @@ export default async function ProductDetailPage({
       })
     ),
     getCachedProductReviews([displayName, product.name]),
-    getRelatedProducts(
+    getCachedRelatedProducts(
       product.id,
       product.categoryId,
       product.brandId,
       4,
       manualRelatedIds,
-      undefined,
-      pricingContext,
-      evaluatedAt
     ),
   ]);
   const accessories = accessoriesRaw.filter((item): item is NonNullable<typeof item> => item !== null);
@@ -549,7 +544,7 @@ export default async function ProductDetailPage({
 
       {/* Breadcrumb Navigation */}
       <nav aria-label="Đường dẫn trang" className="bg-white border-b border-gray-200">
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
           <ol className="flex items-center text-xs sm:text-sm text-gray-500 py-0.5 font-medium overflow-x-auto overscroll-x-contain whitespace-nowrap hide-scrollbar">
             <li className="shrink-0">
               <Link href="/" className="inline-flex min-h-11 items-center hover:text-blue-600 transition">
@@ -576,7 +571,7 @@ export default async function ProductDetailPage({
       </nav>
 
       {/* Main Content Container */}
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 mt-3 sm:mt-5">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 mt-3 sm:mt-5">
         {/* 1. TOP HERO SECTION: GALLERY, BADGES, DEAL COMBO, PURCHASING, CARDS 365 */}
         <ProductHeroSection
           key={product.id}

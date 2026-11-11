@@ -1,6 +1,6 @@
 export default function ProductDetailLoading() {
   return (
-    <div className="bg-[#f1f5f9] min-h-screen pb-16">
+    <div data-route-loading="true" className="bg-[#f1f5f9] min-h-screen pb-16">
       {/* Breadcrumb skeleton */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 max-w-[1370px]">

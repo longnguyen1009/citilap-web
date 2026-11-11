@@ -41,7 +41,7 @@ export default function FeatureStrip({ settings: customSettings }: FeatureStripP
 
   return (
     <section className="py-2 md:py-3.5" aria-label="Cam kết dịch vụ">
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 md:mx-0 md:px-0 md:grid md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
           {features.map((feature, index) => {
             const Icon = feature.icon;

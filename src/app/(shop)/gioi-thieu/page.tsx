@@ -12,15 +12,12 @@ import {
 } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
 
-import { mediaEnvironment } from "@/server/media-http";
-import { getSystemPageResolution } from "@/server/services/page.service";
-import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import { getCachedSystemPageResolution, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
-    const env = await mediaEnvironment();
-    const resolution = await getSystemPageResolution(env.DB, "ABOUT");
+    const resolution = await getCachedSystemPageResolution("ABOUT");
     if (resolution.state === "PUBLISHED") {
       const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
       const description = resolution.page.seo.description || `Tìm hiểu về ${businessProfile.brandName}.`;
@@ -57,7 +54,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
-  const settings = await getStorefrontSettings();
+  // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors)
+  const [settings, resolution] = await Promise.all([
+    getStorefrontSettings(),
+    getCachedSystemPageResolution("ABOUT"),
+  ]);
   const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
   const hanoi = {
     ...baseHanoi,
@@ -67,10 +68,6 @@ export default async function AboutPage() {
   const telHref = settings?.storePhone
     ? `tel:${settings.storePhone.replace(/[^+\d]/g, "")}`
     : businessProfile.telHref;
-
-  // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors)
-  const env = await mediaEnvironment();
-  const resolution = await getSystemPageResolution(env.DB, "ABOUT");
   const cmsPage = resolution.state === "PUBLISHED" ? resolution.page : null;
 
   return (

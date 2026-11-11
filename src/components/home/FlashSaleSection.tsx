@@ -80,7 +80,7 @@ export default async function FlashSaleSection({
     const fallbackTabs = await resolveFallbackProductTabs();
     return (
       <div className="mb-8 space-y-6">
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 space-y-4">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 space-y-4">
           {(bannerImage || mobileBannerImage) && (
             <div className="overflow-hidden rounded-lg md:rounded-xl lg:rounded-2xl shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element */}

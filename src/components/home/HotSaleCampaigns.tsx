@@ -55,31 +55,22 @@ export default function HotSaleCampaigns({
   }
   const hasSeparateMobileBanner = Boolean(mobileBannerImage && bannerImage && mobileBannerImage !== bannerImage);
   const bannerNode = (
-    <>
-      {mobileBannerImage && (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          loading="lazy"
-          decoding="async"
-          src={mobileBannerImage}
-          alt={bannerAlt || 'HOT SALE'}
-          className={`${bannerImage && hasSeparateMobileBanner ? 'md:hidden ' : ''}w-full h-auto max-h-[140px] md:max-h-[180px] object-cover`}
-        />
+    <picture className="contents">
+      {hasSeparateMobileBanner && (
+        <source media="(max-width: 767px)" srcSet={mobileBannerImage} />
       )}
-      {bannerImage && (
-        /* eslint-disable-next-line @next/next/no-img-element */
-        <img
-          loading="lazy"
-          decoding="async"
-          src={bannerImage}
-          alt={bannerAlt || 'HOT SALE'}
-          className={`${hasSeparateMobileBanner ? 'hidden md:block ' : ''}w-full h-auto max-h-[140px] md:max-h-[180px] object-cover`}
-        />
-      )}
-    </>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        loading="lazy"
+        decoding="async"
+        src={bannerImage || mobileBannerImage}
+        alt={bannerAlt || 'HOT SALE'}
+        className="w-full h-auto max-h-[140px] md:max-h-[180px] object-cover"
+      />
+    </picture>
   );
   return <section aria-label="HOT SALE" className="pb-4 md:pb-8 lg:pb-10">
-    <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+    <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
       {(bannerImage || mobileBannerImage) && (
         <div className="mb-2.5 md:mb-4 overflow-hidden rounded-lg md:rounded-xl lg:rounded-2xl shadow-sm">
           {bannerLink ? (
@@ -91,16 +82,47 @@ export default function HotSaleCampaigns({
           )}
         </div>
       )}
-      {!single && <div className="relative isolate overflow-hidden before:absolute before:inset-x-1 md:before:inset-x-3 before:bottom-0 before:top-4 md:before:top-5 before:-z-10 before:bg-gradient-to-r before:from-[#ef3b20] before:via-[#f46a49] before:to-[#ef3b20] before:[clip-path:polygon(4%_0,96%_0,100%_100%,0_100%)]">
-        <div role="tablist" aria-label="Chiến dịch HOT SALE" className="flex gap-1.5 overflow-x-auto overscroll-x-contain overflow-y-hidden px-1.5 pb-1.5 pt-1 hide-scrollbar md:gap-6 lg:gap-8 md:px-12 lg:px-20 md:pb-2">
-          {groups.map((g, index) => <button key={g.key} id={`${prefix}-tab-${index}`} type="button" role="tab" aria-selected={index === groupIndex} aria-controls={`${prefix}-panel`} tabIndex={index === groupIndex ? 0 : -1}
-            onClick={() => selectGroup(index, Date.now())} onKeyDown={e => {
-              const next = e.key === 'ArrowRight' ? (index + 1) % groups.length : e.key === 'ArrowLeft' ? (index - 1 + groups.length) % groups.length : e.key === 'Home' ? 0 : e.key === 'End' ? groups.length - 1 : -1;
-              if (next >= 0) { e.preventDefault(); selectGroup(next, Date.now()); document.getElementById(`${prefix}-tab-${next}`)?.focus(); }
-            }}
-            className={`relative isolate min-h-11 md:min-h-14 lg:min-h-16 min-w-0 md:min-w-44 flex-1 cursor-pointer rounded-t-[14px] md:rounded-t-[24px] px-2.5 py-2 md:px-4 md:py-3.5 text-[11px] leading-tight font-black uppercase italic before:absolute before:-inset-x-1 md:before:-inset-x-3 before:-bottom-1 before:-z-10 before:h-3 md:before:h-4 before:rounded-t-full before:bg-[#8f0813] focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white md:text-lg lg:text-xl ${index === groupIndex ? 'bg-gradient-to-b from-[#df2639] to-[#cc2031] text-white shadow-[inset_0_-6px_5px_-4px_#810914]' : 'bg-gradient-to-b from-[#ac1022] to-[#870812] text-[#f8b4bd] hover:from-[#bd1729] hover:to-[#980d1a]'}`}>{g.slots[0].name}</button>)}
+      {!single && (
+        <div
+          role="tablist"
+          aria-label="Chiến dịch HOT SALE"
+          className="relative z-10 -mb-[2px] md:-mb-[3px] flex gap-1.5 overflow-x-auto overscroll-x-contain overflow-y-hidden px-1.5 pt-1 hide-scrollbar md:gap-3 lg:gap-4 md:px-6 lg:px-10"
+        >
+          {groups.map((g, index) => {
+            const isActive = index === groupIndex;
+            return (
+              <button
+                key={g.key}
+                id={`${prefix}-tab-${index}`}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`${prefix}-panel`}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => selectGroup(index, Date.now())}
+                onKeyDown={e => {
+                  const next = e.key === 'ArrowRight' ? (index + 1) % groups.length : e.key === 'ArrowLeft' ? (index - 1 + groups.length) % groups.length : e.key === 'Home' ? 0 : e.key === 'End' ? groups.length - 1 : -1;
+                  if (next >= 0) { e.preventDefault(); selectGroup(next, Date.now()); document.getElementById(`${prefix}-tab-${next}`)?.focus(); }
+                }}
+                className={`relative min-h-11 md:min-h-14 lg:min-h-16 min-w-0 md:min-w-44 flex-1 inline-flex items-center justify-center cursor-pointer rounded-t-[14px] md:rounded-t-[20px] px-2 py-1.5 md:px-3.5 md:py-2.5 text-[11px] leading-tight font-black uppercase transition focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white md:text-base lg:text-lg ${
+                  isActive
+                    ? 'border-2 md:border-[3px] border-[#e8c57e] border-b-[#d60900] bg-[#d60900] text-white'
+                    : 'border-2 md:border-[3px] border-transparent border-b-[#e8c57e] bg-[#a30b18] text-white/90 hover:bg-[#b80e1d] hover:text-white'
+                }`}
+              >
+                {isActive ? (
+                  <span className="inline-flex items-center justify-center gap-1 md:gap-2 rounded-lg md:rounded-xl border border-yellow-300/90 bg-gradient-to-b from-[#ff5e3a] via-[#e6192e] to-[#b30718] px-2.5 md:px-4 py-1 md:py-1.5 text-white shadow-[0_3px_10px_rgba(0,0,0,0.28),inset_0_1px_1px_rgba(255,255,255,0.55)]">
+                    <Flame aria-hidden="true" className="h-3.5 w-3.5 md:h-5 md:w-5 shrink-0 fill-yellow-300 text-yellow-200 drop-shadow-xs" />
+                    <span className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">{g.slots[0].name}</span>
+                  </span>
+                ) : (
+                  <span>{g.slots[0].name}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
-      </div>}
+      )}
       <div role={single ? 'region' : 'tabpanel'} id={`${prefix}-panel`} aria-label={single ? campaign.name : undefined} aria-labelledby={single ? undefined : `${prefix}-tab-${groupIndex}`} tabIndex={0} className={`rounded-xl md:rounded-[24px] p-2 md:p-5 focus-visible:outline-2 focus-visible:outline-red-900 ${single ? 'bg-gradient-to-b from-[#fc3561] to-[#ff4d46]' : 'border-2 md:border-[3px] border-[#e8c57e] bg-[#d60900] shadow-[inset_0_0_0_2px_#ffedbb]'}`}>
         {single && <h2 className="flex items-center justify-center gap-1.5 md:gap-2 px-2 py-1.5 md:py-4 text-center text-base md:text-2xl lg:text-3xl font-black uppercase text-white"><Flame aria-hidden="true" className="h-5 w-5 md:h-7 md:w-7 lg:h-8 lg:w-8 shrink-0 text-yellow-200" /><span>{campaign.name} <span className="text-yellow-200">NỔI BẬT</span></span></h2>}
         {days.length > 1 && (

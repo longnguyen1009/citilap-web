@@ -55,11 +55,25 @@ const NON_CACHEABLE_SINGLE_SEGMENTS = new Set([
   '/chon-laptop',
 ]);
 
-const FRESH_MS = 60_000;
-const STORE_TTL_SECONDS = 300;
-const MEM_HTML_MAX_ENTRIES = 64;
+const FRESH_MS = 120_000;
+const STORE_TTL_SECONDS = 600;
+const MEM_HTML_MAX_ENTRIES = 128;
 
-const CACHEABLE_SEARCH_PARAMS = new Set(['sku', 'variant', 'page']);
+const CACHEABLE_SEARCH_PARAMS = new Set([
+  'sku',
+  'variant',
+  'page',
+  'category',
+  'sort',
+  'brand',
+  'type',
+  'gpu',
+  'condition',
+  'tag',
+  'pricePreset',
+  'minPrice',
+  'maxPrice',
+]);
 
 /** Admin / content mutations that invalidate the public cache. */
 const MUTATION_PREFIXES = [
@@ -297,10 +311,16 @@ export async function serveCachedRsc(
 
   let key: string;
   try {
+    const cleanPathname = url.pathname.endsWith('.rsc') ? url.pathname.slice(0, -4) || '/' : url.pathname;
+    const searchWithoutRsc = new URLSearchParams(url.searchParams);
+    searchWithoutRsc.delete('_rsc');
+    searchWithoutRsc.sort();
+    const cacheSearch = searchWithoutRsc.size ? `?${searchWithoutRsc.toString()}` : '';
     const mode = cleanHeaders.get('x-vinext-rsc-render-mode') || 'nav';
     const prefetch = cleanHeaders.get('next-router-prefetch') || '0';
     const segPrefetch = cleanHeaders.get('next-router-segment-prefetch') || '0';
-    key = `citilap:rsc:${BUILD_ID}:${await cmsVersion(kv)}:${url.pathname}${url.search}:${mode}:${prefetch}:${segPrefetch}`;
+    const slots = cleanHeaders.get('x-vinext-mounted-slots') || '';
+    key = `citilap:rsc:${BUILD_ID}:${await cmsVersion(kv)}:${cleanPathname}${cacheSearch}:${mode}:${prefetch}:${segPrefetch}:${slots}`;
     const entry = await readCachedEntry(kv, key);
     if (entry?.html) {
       if (Date.now() - entry.at <= FRESH_MS) return respond(entry, 'HIT');

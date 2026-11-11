@@ -1,11 +1,9 @@
 import Link from 'next/link';
 import { ShieldCheck, BatteryCharging, Calendar, CheckCircle2, AlertTriangle, ExternalLink, Eye } from 'lucide-react';
-import { mediaEnvironment } from '@/server/media-http';
-import { publicInspections } from '@/server/services/inspection.service';
+import { getCachedInspections } from '@/server/services/storefront-cms.service';
 
 export default async function InspectionReports({ productId, variantId }: { productId: string; variantId: string | null }) {
-  const { DB } = await mediaEnvironment();
-  const reports = await publicInspections(DB, productId, variantId);
+  const reports = await getCachedInspections(productId, variantId);
   if (!reports.length) return null;
 
   return (

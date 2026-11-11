@@ -29,34 +29,26 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
 
   return (
     <section className="py-3 md:py-5 bg-slate-50/60 border-b border-slate-200/70" aria-label="Banner nổi bật và khuyến mãi">
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2.5 sm:gap-3 lg:gap-4">
           {/* 1. MAIN HERO (Left 2fr on PC) */}
           <div className="relative w-full min-h-[188px] sm:min-h-[208px] md:h-[260px] lg:h-[360px] rounded-lg lg:rounded-xl overflow-hidden bg-[#0f172a] shadow-xs border border-slate-800/80">
-            {hasSeparateMobileHero && (
-              <Image
-                src={settings.heroMobileBgImage}
+            <picture className="contents">
+              {hasSeparateMobileHero && (
+                <source media="(max-width: 767px)" srcSet={settings.heroMobileBgImage} />
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={settings.heroBgImage}
                 alt={`${settings.heroTitle} ${settings.heroHighlight}`}
-                width={800}
-                height={540}
-                className="md:hidden absolute inset-0 w-full h-full object-cover object-right"
-                priority
+                width={1920}
+                height={600}
+                loading="eager"
                 fetchPriority="high"
-                unoptimized={settings.heroMobileBgImage.startsWith("/brand/")}
-                sizes="100vw"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover max-md:object-right"
               />
-            )}
-            <Image
-              src={settings.heroBgImage}
-              alt={`${settings.heroTitle} ${settings.heroHighlight}`}
-              width={1920}
-              height={600}
-              className={`${hasSeparateMobileHero ? "hidden md:block " : ""}absolute inset-0 w-full h-full object-cover`}
-              priority
-              fetchPriority="high"
-              unoptimized={settings.heroBgImage.startsWith("/brand/")}
-              sizes="(max-width: 1023px) 100vw, 66vw"
-            />
+            </picture>
             <div className="relative z-10 min-h-[188px] sm:min-h-[208px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent flex items-center px-3 py-3 sm:p-5 md:p-7 lg:p-8">
               <div className="max-w-lg lg:max-w-xl text-white min-w-0">
                 {settings.heroBadge && (
@@ -78,12 +70,14 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                 <div className="flex flex-wrap gap-1.5 sm:gap-2 md:gap-3">
                   <Link
                     href={settings.heroCtaPrimaryLink}
+                    prefetch={false}
                     className="min-h-11 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-2.5 sm:px-5 lg:px-6 rounded-full uppercase text-[11px] md:text-xs lg:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {settings.heroCtaPrimaryText}
                   </Link>
                   <Link
                     href={settings.heroCtaSecondaryLink}
+                    prefetch={false}
                     className="min-h-11 inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2 px-2.5 sm:px-5 lg:px-6 rounded-full uppercase text-[11px] md:text-xs lg:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {settings.heroCtaSecondaryText}
@@ -103,6 +97,8 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                 width={800}
                 height={300}
                 loading="eager"
+                decoding="async"
+                fetchPriority="low"
                 unoptimized={settings.subBanner1Image.startsWith("/brand/")}
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
                 sizes="(max-width: 1023px) 50vw, 33vw"
@@ -117,6 +113,7 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                   </p>
                   <Link
                     href={settings.subBanner1Link}
+                    prefetch={false}
                     className="min-h-11 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-1.5 px-3 lg:px-4 rounded-full uppercase text-[10px] md:text-xs shadow-xs transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden after:absolute after:inset-0"
                     aria-label={`Xem ngay ${settings.subBanner1Title}`}
                   >
@@ -134,6 +131,8 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                 width={800}
                 height={300}
                 loading="eager"
+                decoding="async"
+                fetchPriority="low"
                 unoptimized={settings.subBanner2Image.startsWith("/brand/")}
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 motion-reduce:group-hover:scale-100 transition duration-500 ease-in-out"
                 sizes="(max-width: 1023px) 50vw, 33vw"
@@ -148,6 +147,7 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
                   </p>
                   <Link
                     href={settings.subBanner2Link}
+                    prefetch={false}
                     className="min-h-11 inline-flex items-center justify-center bg-red-600 hover:bg-red-500 active:scale-95 text-white font-bold py-1.5 px-3 lg:px-4 rounded-full uppercase text-[10px] md:text-xs shadow-xs transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden after:absolute after:inset-0"
                     aria-label={`Mua ngay ${settings.subBanner2Title}`}
                   >

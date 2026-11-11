@@ -109,13 +109,13 @@ export default function ProductFloatingBar({
 
   return (
     <div
-      className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 md:px-6 py-2 md:py-2.5 safe-area-bottom z-40 shadow-[0_-8px_24px_-4px_rgba(15,23,42,0.12)] transition-all duration-300 motion-reduce:transition-none ease-out ${
+      className={`fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 md:px-4 py-2 md:py-2.5 safe-area-bottom z-40 shadow-[0_-8px_24px_-4px_rgba(15,23,42,0.12)] transition-all duration-300 motion-reduce:transition-none ease-out ${
         active
           ? "translate-y-0 opacity-100 pointer-events-auto"
           : "translate-y-full opacity-0 pointer-events-none"
       }`}
     >
-      <div className="w-full min-w-0 max-w-7xl mx-auto flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between md:gap-4">
+      <div className="w-full min-w-0 max-w-[1370px] mx-auto flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between md:gap-4">
         {/* Top on SP / Left on Tablet+PC: Thumbnail, Selected Specs & Full Price */}
         <div className="flex items-center justify-between md:justify-start gap-2.5 md:gap-3 min-w-0 md:flex-1">
           <div className="relative hidden md:block h-11 w-11 rounded-lg border border-slate-200 bg-slate-50 shrink-0 p-0.5 overflow-hidden">

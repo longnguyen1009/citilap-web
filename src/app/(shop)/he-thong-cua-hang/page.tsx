@@ -10,15 +10,12 @@ import {
 } from "lucide-react";
 import { businessProfile } from "@/config/business-profile";
 
-import { mediaEnvironment } from "@/server/media-http";
-import { getSystemPageResolution } from "@/server/services/page.service";
-import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import { getCachedSystemPageResolution, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
-    const env = await mediaEnvironment();
-    const resolution = await getSystemPageResolution(env.DB, "STORES");
+    const resolution = await getCachedSystemPageResolution("STORES");
     if (resolution.state === "PUBLISHED") {
       const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
       const description = resolution.page.seo.description || `Hệ thống showroom & chi nhánh ${businessProfile.brandName}.`;
@@ -55,15 +52,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function StoresPage() {
-  const env = await mediaEnvironment();
-
-  // 1. Resolve structured location overrides from published SiteSettings (D1)
-  let settingsDoc = null;
-  try {
-    settingsDoc = await getStorefrontSettings();
-  } catch {
-    // Fall back to base businessProfile defaults if settings table query fails
-  }
+  // 1. Resolve structured location overrides from published SiteSettings + CMS STORES Page in parallel
+  const [settingsDoc, resolution] = await Promise.all([
+    getStorefrontSettings().catch(() => null),
+    getCachedSystemPageResolution("STORES"),
+  ]);
 
   const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
   const baseBacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
@@ -87,8 +80,7 @@ export default async function StoresPage() {
       : baseBacNinh.telHref,
   };
 
-  // 2. Resolve editorial intro / presentation from CMS STORES Page
-  const resolution = await getSystemPageResolution(env.DB, "STORES");
+  // 2. Editorial intro / presentation from CMS STORES Page
   const cmsPage = resolution.state === "PUBLISHED" ? resolution.page : null;
 
   return (

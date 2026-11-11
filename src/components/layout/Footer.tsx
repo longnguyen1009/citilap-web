@@ -64,7 +64,7 @@ export default function Footer({
     <footer className="bg-[#0b1221] text-gray-300">
       {/* 1. Value Proposition Features Bar */}
       <div className="bg-[#0f172a] py-3.5 md:py-6 border-y border-gray-800">
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-5">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-3.5">
               <div className="flex items-center gap-2 sm:contents">
@@ -112,11 +112,11 @@ export default function Footer({
 
       {/* 2. Main Footer Navigation & Stores */}
       <div className="pt-6 pb-5 md:pt-10 md:pb-8">
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8 mb-5 md:mb-8">
             {/* Column 1: Brand Info & Contacts */}
             <div className="col-span-2 md:col-span-1 space-y-2.5 md:space-y-3.5">
-              <Link href="/" className="min-h-11 inline-flex flex-col justify-center">
+              <Link href="/" prefetch={false} className="min-h-11 inline-flex flex-col justify-center">
                 <span className="text-2xl sm:text-3xl font-extrabold text-blue-500 leading-tight tracking-tight">
                   {brandName}
                 </span>
@@ -258,6 +258,7 @@ export default function Footer({
                 <div>
                   <Link
                     href="/he-thong-cua-hang"
+                    prefetch={false}
                     className="min-h-11 inline-flex items-center gap-1 py-1.5 text-[12px] text-blue-400 hover:text-blue-300 font-medium underline"
                   >
                     Xem chi tiết giờ hoạt động &amp; cơ sở →
@@ -305,6 +306,7 @@ export default function Footer({
                     <li key={item.href}>
                       <Link
                         href={item.href}
+                        prefetch={false}
                         className="min-h-11 inline-flex items-center py-2 leading-snug transition hover:text-white focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:outline-hidden rounded-sm"
                       >
                         {item.label}
@@ -321,7 +323,7 @@ export default function Footer({
 
       {/* 3. Bottom Copyright, Legal Entity & MOIT badge */}
       <div className="bg-[#050a14] pt-5 pb-20 md:pb-6 text-gray-400 text-[12px] border-t border-gray-800/80">
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 flex flex-col items-center text-center gap-2.5">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 flex flex-col items-center text-center gap-2.5">
           <div className="max-w-4xl space-y-1 leading-relaxed">
             <p className="text-gray-300">
               <span className="font-semibold text-gray-200">{legalName}</span>

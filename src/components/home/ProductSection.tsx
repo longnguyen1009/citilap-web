@@ -54,7 +54,7 @@ export default async function ProductSection({
 
   return (
     <section className="py-4 md:py-6 lg:py-8">
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="bg-white rounded-xl lg:rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <SectionHeader
             title={title}

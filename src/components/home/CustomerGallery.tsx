@@ -66,7 +66,7 @@ export default function CustomerGallery({
   };
 
   return <section className="py-4 md:py-6 lg:py-8" aria-label={title}>
-    <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+    <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
       <div className="rounded-xl lg:rounded-2xl bg-white p-3 md:p-5 shadow-xs border border-slate-200/80">
         <div className="mb-3 md:mb-4">
           <div className="flex items-center gap-3">

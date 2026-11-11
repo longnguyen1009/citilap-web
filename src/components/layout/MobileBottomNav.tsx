@@ -130,6 +130,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 1. Trang chủ */}
           <Link
             href="/"
+            prefetch={false}
             aria-current={pathname === "/" ? "page" : undefined}
             className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 transition ${
               pathname === "/" ? "text-brand-primary" : "text-text-secondary"
@@ -164,6 +165,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 3. Tìm kiếm */}
           <Link
             href="/search"
+            prefetch={false}
             aria-current={pathname === "/search" ? "page" : undefined}
             className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 transition ${
               pathname === "/search" ? "text-brand-primary" : "text-text-secondary"
@@ -176,6 +178,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 4. Giỏ hàng */}
           <Link
             href="/cart"
+            prefetch={false}
             aria-current={pathname === "/cart" ? "page" : undefined}
             className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 relative transition ${
               pathname === "/cart" ? "text-brand-primary" : "text-text-secondary"
@@ -195,6 +198,7 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
           {/* 5. Tra cứu & Hỗ trợ */}
           <Link
             href="/profile"
+            prefetch={false}
             aria-current={pathname === "/profile" ? "page" : undefined}
             className={`min-h-11 min-w-11 flex flex-col items-center justify-center gap-0.5 transition ${
               pathname === "/profile" || pathname.startsWith("/order-tracking") ? "text-brand-primary" : "text-text-secondary"

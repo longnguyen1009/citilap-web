@@ -1,15 +1,12 @@
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy/PolicyLayout";
 import { businessProfile } from "@/config/business-profile";
-import { mediaEnvironment } from "@/server/media-http";
-import { getSystemPageResolution } from "@/server/services/page.service";
-import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import { getCachedSystemPageResolution, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 
 export async function generateMetadata(): Promise<Metadata> {
   try {
-    const env = await mediaEnvironment();
-    const resolution = await getSystemPageResolution(env.DB, "SHIPPING");
+    const resolution = await getCachedSystemPageResolution("SHIPPING");
     if (resolution.state === "PUBLISHED") {
       const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
       const description = resolution.page.seo.description || `Chính sách vận chuyển tại ${businessProfile.brandName}.`;
@@ -44,7 +41,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ShippingPolicyPage() {
-  const settings = await getStorefrontSettings();
+  // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors as static content)
+  const [settings, resolution] = await Promise.all([
+    getStorefrontSettings(),
+    getCachedSystemPageResolution("SHIPPING"),
+  ]);
   const baseHanoi = businessProfile.locations.find((l) => l.id === "hanoi")!;
   const baseBacNinh = businessProfile.locations.find((l) => l.id === "bac-ninh")!;
   const hanoi = {
@@ -57,10 +58,6 @@ export default async function ShippingPolicyPage() {
     address: settings?.addressBacNinh || baseBacNinh.address,
   };
   const displayPhone = settings?.storePhone || businessProfile.displayPhone;
-
-  // Fail-closed on infrastructure errors (do NOT catch and disguise DB errors as static content)
-  const env = await mediaEnvironment();
-  const resolution = await getSystemPageResolution(env.DB, "SHIPPING");
 
   // State C: Published CMS content
   if (resolution.state === "PUBLISHED") {

@@ -1,11 +1,9 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import PolicyLayout from "@/components/policy/PolicyLayout";
-import { mediaEnvironment } from "@/server/media-http";
-import { publicPageBySlug } from "@/server/services/page.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { businessProfile } from "@/config/business-profile";
-import { getPublishedNavigation } from '@/server/services/storefront-cms.service';
+import { getPublishedNavigation, getCachedPublicPage } from '@/server/services/storefront-cms.service';
 import CategoryPage, { generateMetadata as categoryMetadata } from '@/components/category/CategoryPage';
 
 interface CustomPageProps {
@@ -18,8 +16,8 @@ export async function generateMetadata({ params, searchParams }: CustomPageProps
   const navigation = await getPublishedNavigation();
   if (navigation?.categories.some(c => c.href === '/' + slug)) return categoryMetadata({params: Promise.resolve({category:[slug]}),searchParams});
   try {
-    const env = await mediaEnvironment();
-    const page = await publicPageBySlug(env.DB, slug);
+    const page = await getCachedPublicPage(slug);
+    if (!page) throw new Error("not found");
     const title = `${page.seo.title} | ${businessProfile.brandName}`;
     const description = page.seo.description || `Thông tin chính thức từ ${businessProfile.brandName}.`;
 
@@ -50,19 +48,13 @@ export default async function CustomCmsPage({ params, searchParams }: CustomPage
   const navigation = await getPublishedNavigation();
   if (navigation?.categories.some(c => c.href === '/' + slug)) return CategoryPage({params: Promise.resolve({category:[slug]}),searchParams});
 
-  let env;
-  try {
-    env = await mediaEnvironment();
-  } catch {
-    notFound();
-  }
-
   let page;
   try {
-    page = await publicPageBySlug(env.DB, slug);
+    page = await getCachedPublicPage(slug);
   } catch {
     notFound();
   }
+  if (!page) notFound();
 
   // Historical alias handling: if the slug accessed matches an old published revision,
   // Next.js App Router permanentRedirect issues HTTP 308

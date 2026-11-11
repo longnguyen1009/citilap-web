@@ -304,14 +304,16 @@ export default function Header({ categories = [], brands = [], navigation, setti
       <header ref={headerRef} className="w-full sticky top-0 z-50 shadow-md">
         {/* Top Header */}
         <div className="bg-[#0b1221] text-white py-2 md:py-2.5">
-          <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 flex items-center justify-between gap-2 md:gap-2.5 lg:gap-4">
+          <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 flex items-center justify-between gap-2 md:gap-2.5 lg:gap-4">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Link href="/" prefetch={false} className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {settings?.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={settings.logoUrl}
                   alt={settings.storeName || "CitiLap"}
+                  decoding="async"
+                  fetchPriority="high"
                   className="h-auto w-[116px] min-[375px]:w-[132px] md:w-[132px] lg:w-[172px] xl:w-[210px] object-contain"
                 />
               ) : (
@@ -349,13 +351,13 @@ export default function Header({ categories = [], brands = [], navigation, setti
                       setMenuTop(headerRef.current?.getBoundingClientRect().bottom || 0);
                     }
                   }}
-                  className={`min-h-11 flex items-center gap-2 text-white px-3 lg:px-4 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
+                  className={`min-h-11 flex items-center gap-2 text-white px-4 lg:px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
                     menuOpen
                       ? "bg-gradient-to-r from-blue-700 to-blue-800 shadow-xl shadow-blue-600/40"
                       : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40"
                   }`}
                 >
-                  {menuOpen ? <X className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" /> : <Menu className="w-4 h-4 lg:w-5 lg:h-5 shrink-0" />}
+                  {menuOpen ? <X className="w-5 h-5 shrink-0" /> : <Menu className="w-5 h-5 shrink-0" />}
                   <span>Danh mục</span>
                   <ChevronDown className={`w-3.5 h-3.5 opacity-70 transition-transform duration-200 shrink-0 ${menuOpen ? "rotate-180" : ""}`} />
                 </button>
@@ -367,7 +369,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                     role="region"
                     aria-label="Menu danh mục sản phẩm"
                     style={{ top: menuTop + 8, maxHeight: `calc(100dvh - ${menuTop + 24}px)` }}
-                    className="fixed inset-x-0 z-50 mx-auto w-full max-w-7xl px-3 md:px-6 pointer-events-none"
+                    className="fixed inset-x-0 z-50 mx-auto w-full max-w-[1370px] px-3 md:px-4 pointer-events-none"
                   >
                     <div
                       style={{ maxHeight: `calc(100dvh - ${menuTop + 24}px)` }}
@@ -380,6 +382,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                             <Link
                               key={`${item.href}-${idx}`}
                               href={item.href}
+                              prefetch={false}
                               onMouseEnter={() => setHoveredItem(idx)}
                               onFocus={() => setHoveredItem(idx)}
                               onClick={() => setMenuOpen(false)}
@@ -405,6 +408,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                                 <h2 className="text-base lg:text-lg font-extrabold">{item.name}</h2>
                                 <Link
                                   href={item.href}
+                                  prefetch={false}
                                   onClick={() => setMenuOpen(false)}
                                   className="min-h-11 inline-flex items-center px-2 text-xs font-bold text-blue-700 hover:underline"
                                 >
@@ -420,6 +424,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                                     <Link
                                       key={`${sub.href}-${subIdx}`}
                                       href={sub.href}
+                                      prefetch={false}
                                       onClick={() => setMenuOpen(false)}
                                       className="flex min-h-14 items-center gap-2.5 rounded-xl border border-slate-200 p-2.5 text-xs lg:text-sm font-semibold hover:border-blue-300 hover:bg-blue-50"
                                     >
@@ -473,6 +478,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
 
               <Link
                 href="/order-tracking"
+                prefetch={false}
                 className="hidden lg:flex items-center gap-1.5 min-h-11 hover:text-blue-400 transition"
               >
                 <ClipboardCheck className="w-5 h-5 text-gray-300 shrink-0" />
@@ -484,6 +490,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
 
               <Link
                 href="/order-tracking"
+                prefetch={false}
                 className="flex lg:hidden flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded min-w-12 min-h-11 h-11 px-2 transition"
               >
                 <ClipboardCheck className="w-4 h-4 text-gray-300 mb-0.5 shrink-0" />
@@ -492,6 +499,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
 
               <Link
                 href="/wishlist"
+                prefetch={false}
                 className="flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded min-w-12 lg:w-16 min-h-11 h-11 px-2 transition relative"
               >
                 <Heart className="w-4 h-4 text-gray-300 mb-0.5 shrink-0" />
@@ -510,10 +518,10 @@ export default function Header({ categories = [], brands = [], navigation, setti
 
         {/* Navigation Bar */}
         <div className="bg-white border-b border-gray-200 hidden md:block">
-          <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+          <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
             <ul
               ref={navListRef}
-              className="flex items-center justify-start lg:justify-between gap-x-2 lg:gap-x-1.5 xl:gap-x-3 gap-y-0 max-lg:flex-nowrap max-lg:overflow-x-auto hide-scrollbar lg:flex-wrap lg:overflow-visible"
+              className="flex items-center justify-start lg:justify-between gap-x-3 lg:gap-x-2 xl:gap-x-4 gap-y-0 max-lg:flex-nowrap max-lg:overflow-x-auto hide-scrollbar lg:flex-wrap lg:overflow-visible"
             >
               {dynamicNavItems.map((item, index) => {
                 const isChildActive = item.children?.some(
@@ -547,6 +555,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                   >
                     <Link
                       href={item.href}
+                      prefetch={false}
                       data-nav-opener="true"
                       onFocus={(event) => {
                         event.currentTarget.scrollIntoView({
@@ -556,7 +565,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                       }}
                       aria-expanded={item.children ? hoveredNav === index : undefined}
                       aria-current={pathname === item.href ? "page" : undefined}
-                      className={`min-h-11 flex items-center gap-0.5 xl:gap-1 px-0.5 py-2 text-[11px] lg:text-[11px] xl:text-[12px] font-bold uppercase tracking-tight whitespace-nowrap transition hover:text-blue-600 ${
+                      className={`min-h-11 flex items-center gap-1 px-1 py-2.5 text-[13px] xl:text-sm font-bold uppercase whitespace-nowrap transition hover:text-blue-600 ${
                         isActive
                           ? "text-blue-600 border-b-2 border-blue-600"
                           : item.hot
@@ -565,7 +574,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                       }`}
                     >
                       {item.name}
-                      {item.children && <ChevronDown className="w-3.5 h-3.5 shrink-0" />}
+                      {item.children && <ChevronDown className="w-4 h-4 shrink-0" />}
                     </Link>
 
                     {/* Dropdown */}
@@ -586,6 +595,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                             <Link
                               key={sidx}
                               href={sub.href}
+                              prefetch={false}
                               onClick={() => setHoveredNav(null)}
                               className="min-h-11 flex items-center px-3.5 py-2 text-xs lg:text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium rounded-lg"
                             >

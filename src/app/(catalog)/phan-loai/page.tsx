@@ -25,8 +25,7 @@ import {
 } from "lucide-react";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import EmptyState from "@/components/ui/EmptyState";
-import { getPublishedNavigation } from "@/server/services/storefront-cms.service";
-import { getActiveCategories } from "@/server/services/catalog.service";
+import { getPublishedNavigation, getCachedActiveCategories } from "@/server/services/storefront-cms.service";
 import { ACCESSORY_TYPES } from "@/config/accessory-taxonomy";
 import { businessProfile } from "@/config/business-profile";
 
@@ -70,7 +69,7 @@ function getAccessoryIcon(slug: string) {
 
 export default async function CategoriesPage() {
   const navigation = await getPublishedNavigation();
-  const allCategories = navigation?.categories ?? await getActiveCategories();
+  const allCategories = navigation?.categories ?? await getCachedActiveCategories();
 
   // Tách biệt nhóm Laptop và nhóm Phụ kiện
   const laptopCategories = allCategories.filter(

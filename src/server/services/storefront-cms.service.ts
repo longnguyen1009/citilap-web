@@ -289,6 +289,74 @@ export const getCachedProductReviews = cache(async (names: string[]) => {
   });
 });
 
+/** Published post by slug (null when missing). Deduped between generateMetadata and the page. */
+export const getCachedPublicPost = cache(async (slug: string) => {
+  return cachedJson(`public-post:${slug}`, PUBLIC_CMS_TTL_SECONDS, () => publishedOrNull(async () => {
+    const { publicPostBySlug } = await import('@/server/services/post.service');
+    return publicPostBySlug((await mediaEnvironment()).DB, slug);
+  }));
+});
+
+export const getCachedPublicPostList = cache(async (categoryId: string | undefined, page: number, limit: number) => {
+  return cachedJson(`public-post-list:${categoryId || ''}:p${page}:l${limit}`, PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { publicPostList } = await import('@/server/services/post.service');
+    return publicPostList((await mediaEnvironment()).DB, { categoryId, page, limit });
+  });
+});
+
+export const getCachedPublicPostCategories = cache(async () => {
+  return cachedJson('public-post-categories', PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { listPostCategories } = await import('@/server/services/post.service');
+    return listPostCategories((await mediaEnvironment()).DB, 'ACTIVE');
+  });
+});
+
+/**
+ * Related products, cached with their raw prices. Callers must re-apply live pricing
+ * (`applyPricingToHomepageProducts` is idempotent) so campaign boundaries stay exact.
+ */
+export const getCachedRelatedProducts = cache(async (
+  productId: string,
+  categoryId: string | null | undefined,
+  brandId: string | null | undefined,
+  limit: number,
+  manualIds: string[] = [],
+) => {
+  const key = `public-related:${productId}:${categoryId || ''}:${brandId || ''}:${limit}:${manualIds.join(',')}`;
+  return cachedJson(key, PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getRelatedProducts } = await import('@/server/services/catalog.service');
+    return getRelatedProducts(productId, categoryId, brandId, limit, manualIds);
+  });
+});
+
+export const getCachedInspections = cache(async (productId: string, variantId: string | null) => {
+  return cachedJson(`public-inspections:${productId}:${variantId || ''}`, PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { publicInspections } = await import('@/server/services/inspection.service');
+    return publicInspections((await mediaEnvironment()).DB, productId, variantId);
+  });
+});
+
+export const getCachedSystemPageResolution = cache(async (pageType: import('@/contracts/cms/page').PageType) => {
+  return cachedJson(`public-sys-page:${pageType}`, PUBLIC_CMS_TTL_SECONDS, async () => {
+    const { getSystemPageResolution } = await import('@/server/services/page.service');
+    return getSystemPageResolution((await mediaEnvironment()).DB, pageType);
+  });
+});
+
+export const getCachedPublicPage = cache(async (slug: string) => {
+  return cachedJson(`public-page:${slug}`, PUBLIC_CMS_TTL_SECONDS, () => publishedOrNull(async () => {
+    const { publicPageBySlug } = await import('@/server/services/page.service');
+    return publicPageBySlug((await mediaEnvironment()).DB, slug);
+  }));
+});
+
+export const getCachedBrandWithProducts = cache(async (slug: string) => {
+  return cachedJson(`public-brand:${slug}`, PUBLIC_CMS_TTL_SECONDS, () => publishedOrNull(async () => {
+    const { publicBrandWithProducts } = await import('@/server/services/brand.service');
+    return publicBrandWithProducts((await mediaEnvironment()).DB, slug);
+  }));
+});
+
 export function classifyProductPublicationById(
   productId: string,
   explicitDb?: import('@cloudflare/workers-types').D1Database

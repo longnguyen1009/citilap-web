@@ -252,7 +252,7 @@ function BannerBlock({ data }: { data: any }) {
 
     return (
       <section className="w-full relative overflow-hidden" aria-label={data.title || 'Banner'}>
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6 py-2 md:py-4">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 py-2 md:py-4">
           <div className="relative w-full h-[140px] sm:h-[168px] md:h-[200px] lg:h-[236px] rounded-lg lg:rounded-xl overflow-hidden shadow-xs border border-slate-200/80">
             {data.link ? (
               <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden" aria-label={data.title || 'Banner'}>
@@ -293,7 +293,7 @@ function BannerBlock({ data }: { data: any }) {
 
     return (
       <section className="py-4 md:py-8 bg-white border-y border-slate-100" aria-label={data.title || 'Banner'}>
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 lg:gap-8 items-center bg-slate-900 rounded-xl lg:rounded-2xl overflow-hidden p-4 sm:p-5 md:p-8 lg:p-10 text-white">
             <div className={`space-y-3 md:space-y-4 ${hideOverlayOnMobile ? 'hidden md:block' : ''}`}>
               {data.badge && (
@@ -396,7 +396,7 @@ function BannerBlock({ data }: { data: any }) {
             hideOverlayOnMobile ? 'hidden md:flex' : 'flex'
           } items-center py-3 sm:py-4 md:py-0`}
         >
-          <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+          <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
             <div className="max-w-xl lg:max-w-2xl text-white">
               {data.badge && (
                 <div className="inline-block border border-blue-500/50 rounded-md md:rounded-lg px-2.5 md:px-3.5 py-0.5 md:py-1 mb-1 sm:mb-1.5 md:mb-3 backdrop-blur-md bg-blue-900/40 shadow-lg max-w-full">
@@ -452,7 +452,7 @@ function BannerBlock({ data }: { data: any }) {
 
       {/* Quick Need & Budget Pills right below Hero Banner */}
       <div className="bg-slate-900/95 border-t border-white/10 py-2">
-        <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
           <nav aria-label="Chọn nhanh theo nhu cầu và tầm giá" className="flex flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain hide-scrollbar">
             <span className="text-[11px] font-bold text-slate-400 shrink-0 mr-0.5 hidden sm:inline">Chọn nhanh:</span>
             {[
@@ -513,7 +513,7 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={data.title}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="bg-white rounded-xl md:rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           {/* Header */}
           <div className={`${colorClass} px-3 md:px-5 lg:px-6 py-2.5 md:py-3.5 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-4 text-white`}>
@@ -650,7 +650,7 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
 
   return (
     <section className="py-4 md:py-6" aria-label={data.title || 'Danh mục nổi bật'}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         {(data.title || data.viewAllLink) && (
           <div className="mb-3 md:mb-5 flex flex-wrap items-end justify-between gap-2">
             <div className="min-w-0">
@@ -675,8 +675,8 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
         <div
           className={
             data.layout === 'board'
-              ? 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-hidden md:rounded-2xl md:p-0 md:gap-0 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-              : 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2 rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:grid-cols-3 md:gap-3 lg:grid-cols-4 lg:gap-4 xl:grid-cols-5'
+              ? 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2.5 rounded-xl border-2 border-slate-300 bg-white p-2 shadow-xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-hidden md:rounded-2xl md:p-0 md:gap-0 md:grid-cols-3 lg:grid-cols-6'
+              : 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2.5 rounded-xl border-2 border-slate-200 bg-white p-2 shadow-xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:grid-cols-3 md:gap-3 lg:grid-cols-6 lg:gap-3.5'
           }
         >
           {categories.map((c: { id: string; name: string; href: string; image: string | null }, index: number) => (
@@ -685,15 +685,15 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
               href={c.href}
               className={
                 data.layout === 'board'
-                  ? 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1 rounded-lg text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:flex-row md:items-center md:justify-start md:gap-3 md:rounded-none md:border-b md:border-r md:border-slate-100 md:p-3.5 lg:p-4 md:text-left md:hover:bg-blue-50/70 motion-reduce:transition-none'
-                  : 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1 rounded-lg text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:rounded-xl lg:rounded-2xl md:border md:border-slate-200/80 md:bg-white md:p-3.5 lg:p-4 md:shadow-xs md:hover:-translate-y-1 md:hover:border-blue-500 md:hover:shadow-md motion-reduce:md:hover:translate-y-0 motion-reduce:transition-none'
+                  ? 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1.5 rounded-xl border border-slate-200 bg-slate-50/70 text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:flex-row md:items-center md:justify-start md:gap-2.5 md:rounded-none md:border-0 md:border-b-2 md:border-r-2 md:border-slate-200 md:bg-gradient-to-b md:from-white md:to-slate-50/90 md:p-2.5 lg:p-3 md:text-left md:hover:from-blue-50/70 md:hover:to-blue-50/30 motion-reduce:transition-none'
+                  : 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-between p-1.5 rounded-xl border-2 border-slate-300/90 bg-gradient-to-b from-white via-slate-50/70 to-slate-100/80 text-center transition duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:rounded-2xl md:border-2 md:border-slate-300 md:bg-gradient-to-b md:from-white md:via-slate-50/60 md:to-blue-50/40 md:px-2.5 md:py-2.5 lg:px-3 lg:py-3 md:shadow-sm md:hover:-translate-y-1 md:hover:border-blue-500 md:hover:from-blue-50/50 md:hover:to-white md:hover:shadow-md motion-reduce:md:hover:translate-y-0 motion-reduce:transition-none'
               }
             >
               <div
-                className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-50 border border-slate-200/60 transition group-hover:scale-105 motion-reduce:group-hover:scale-100 ${
+                className={`relative flex shrink-0 items-center justify-center overflow-hidden transition duration-200 group-hover:scale-105 motion-reduce:group-hover:scale-100 ${
                   data.layout === 'board'
-                    ? 'mb-1.5 h-11 w-11 md:mb-0 md:h-14 md:w-14 lg:h-16 lg:w-16 md:bg-white md:border-slate-100'
-                    : 'mb-1.5 h-11 w-11 md:mb-2.5 md:h-14 md:w-14 lg:h-16 lg:w-16 md:bg-white md:border-0'
+                    ? 'mb-1 h-14 w-16 md:mb-0 md:h-14 md:w-16 lg:h-16 lg:w-20'
+                    : 'mb-1 h-14 w-16 md:mb-2 md:h-20 md:w-28 lg:h-22 lg:w-32'
                 }`}
               >
                 {c.image ? (() => {
@@ -703,17 +703,17 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
                       src={catImg}
                       alt={c.name}
                       fill
-                      loading={index < 5 ? 'eager' : 'lazy'}
+                      loading={index < 6 ? 'eager' : 'lazy'}
                       unoptimized={catImg.includes('size=thumb') || catImg.startsWith('/brand/')}
-                      className="object-contain p-1"
-                      sizes="(max-width: 767px) 44px, 64px"
+                      className="object-contain p-0.5 mix-blend-multiply"
+                      sizes="(max-width: 767px) 64px, 128px"
                     />
                   );
                 })() : (
-                  <Store className="w-5 h-5 md:w-6 md:h-6 text-slate-400" />
+                  <Store className="w-6 h-6 md:w-8 md:h-8 text-blue-500" />
                 )}
               </div>
-              <h3 className="text-[11px] md:text-xs lg:text-sm font-semibold md:font-bold text-slate-800 group-hover:text-blue-600 transition leading-tight line-clamp-2 w-full">
+              <h3 className="text-[11px] md:text-[12.5px] lg:text-[13px] font-bold text-slate-800 group-hover:text-blue-600 transition leading-tight line-clamp-2 w-full">
                 {c.name}
               </h3>
             </Link>
@@ -767,7 +767,7 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={data.title || col.name}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="bg-white rounded-xl lg:rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 px-3 md:px-5 lg:px-6 py-2.5 md:py-3.5 flex flex-wrap items-center justify-between gap-2 text-white">
             <div className="min-w-0">
@@ -841,7 +841,7 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
 
   return (
     <section className="py-2 md:py-3.5 bg-white border-y border-slate-100" aria-label={d.title || 'Cam kết dịch vụ'}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         {d.title && (
           <div className="text-center mb-2.5 md:mb-4">
             <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black text-slate-900 leading-snug">{d.title}</h2>
@@ -899,7 +899,7 @@ function CtaBlock({ data }: { data: unknown }) {
   const d = ctaSectionDataSchema.parse(data);
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={d.title || 'Kêu gọi hành động'}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="grid gap-4 md:gap-6 lg:gap-8 overflow-hidden rounded-xl lg:rounded-2xl bg-slate-900 text-white md:grid-cols-2 border border-slate-800 shadow-sm">
           <div className="p-4 sm:p-6 md:p-8 lg:p-10 flex flex-col justify-center">
             <h2 className="text-[18px] sm:text-[20px] lg:text-[24px] font-black leading-snug">{d.title}</h2>

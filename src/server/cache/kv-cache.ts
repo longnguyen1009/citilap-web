@@ -62,37 +62,54 @@ export async function bumpCmsVersion(kv?: KvLike | null): Promise<void> {
   }
 }
 
+function rememberInMemory(key: string, value: unknown, now = Date.now()) {
+  if (memData.size >= MEM_DATA_MAX_ENTRIES) {
+    const oldest = memData.keys().next().value;
+    if (oldest) memData.delete(oldest);
+  }
+  memData.set(key, { value, expiresAt: now + MEM_DATA_TTL_MS });
+}
+
+/** Keep background KV writes alive after the response without making the render wait for them. */
+async function runInBackground(task: Promise<unknown>): Promise<void> {
+  const guarded = task.catch(() => undefined);
+  try {
+    const mod = (await import(/* webpackIgnore: true */ /* turbopackIgnore: true */ 'cloudflare:workers')) as {
+      waitUntil?: (promise: Promise<unknown>) => void;
+    };
+    if (typeof mod.waitUntil === 'function') {
+      mod.waitUntil(guarded);
+      return;
+    }
+  } catch { /* not running in Workers */ }
+  void guarded;
+}
+
 /** Cache a JSON-serialisable loader result (including `null`) for `ttlSeconds`. */
 export async function cachedJson<T>(name: string, ttlSeconds: number, loader: () => Promise<T>): Promise<T> {
   const kv = await getCacheKv();
   if (!kv) return loader();
   const ver = await cmsVersion(kv);
   const key = `citilap:${BUILD_ID}:${ver}:${name}`;
-  const now = Date.now();
   const memHit = memData.get(key);
-  if (memHit && memHit.expiresAt > now) {
+  if (memHit && memHit.expiresAt > Date.now()) {
     return memHit.value as T;
   }
+  // Note: no cross-request promise sharing here; Workers ties I/O to the request that started it
+  // and aborted prefetches would leave other waiters hanging. React `cache()` dedupes per request.
   try {
     const hit = (await kv.get(key, { type: 'json', cacheTtl: 60 })) as { v: T } | null;
     if (hit && 'v' in hit) {
-      if (memData.size >= MEM_DATA_MAX_ENTRIES) {
-        const oldest = memData.keys().next().value;
-        if (oldest) memData.delete(oldest);
-      }
-      memData.set(key, { value: hit.v, expiresAt: now + MEM_DATA_TTL_MS });
+      rememberInMemory(key, hit.v);
       return hit.v;
     }
   } catch { /* fall through to loader */ }
   const value = await loader();
-  if (memData.size >= MEM_DATA_MAX_ENTRIES) {
-    const oldest = memData.keys().next().value;
-    if (oldest) memData.delete(oldest);
-  }
-  memData.set(key, { value, expiresAt: Date.now() + MEM_DATA_TTL_MS });
-  try {
-    await kv.put(key, JSON.stringify({ v: value ?? null }), { expirationTtl: Math.max(KV_MIN_TTL_SECONDS, ttlSeconds) });
-  } catch { /* cache write is best effort */ }
+  rememberInMemory(key, value);
+  // Cache writes are best effort and must not delay the response.
+  await runInBackground(
+    kv.put(key, JSON.stringify({ v: value ?? null }), { expirationTtl: Math.max(KV_MIN_TTL_SECONDS, ttlSeconds) }),
+  );
   return value;
 }
 

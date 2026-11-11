@@ -319,21 +319,22 @@ export async function publicPostList(db: D1Database, opts: { categoryId?: string
   }
   const whereSql = whereClauses.join(' AND ');
 
-  const countRow = await db.prepare(`SELECT count(*) AS total FROM Post p JOIN PostStudio s ON s.postId=p.id WHERE ${whereSql}`).bind(...params).first<{ total: number }>();
-  const total = countRow?.total ?? 0;
-
-  const rows = await db.prepare(`
+  const [countRow, rows] = await Promise.all([
+    db.prepare(`SELECT count(*) AS total FROM Post p JOIN PostStudio s ON s.postId=p.id WHERE ${whereSql}`).bind(...params).first<{ total: number }>(),
+    db.prepare(`
     SELECT p.id, s.publishedRevision, s.publicUpdatedAt AS updatedAt, s.publishedAt
     FROM Post p JOIN PostStudio s ON s.postId = p.id
     WHERE ${whereSql}
     ORDER BY s.publicUpdatedAt DESC, p.id DESC
     LIMIT ? OFFSET ?
-  `).bind(...params, limit, offset).all<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
+  `).bind(...params, limit, offset).all<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>(),
+  ]);
+  const total = countRow?.total ?? 0;
 
-  const items = [];
-  for (const r of rows.results || []) {
-    items.push(await toPublicPost(db, r.id, r.publishedRevision, r.updatedAt, r.publishedAt));
-  }
+  // Resolve list items concurrently instead of one post (and its ~5 lookups) at a time.
+  const items = await Promise.all(
+    (rows.results || []).map((r) => toPublicPost(db, r.id, r.publishedRevision, r.updatedAt, r.publishedAt)),
+  );
   return { items, total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) };
 }
 
@@ -345,31 +346,32 @@ export async function publicFeaturedPosts(db: D1Database, limit = 3) {
     ORDER BY s.publicUpdatedAt DESC, p.id DESC
     LIMIT ?
   `).bind(limit).all<{ id: string; publishedRevision: number; updatedAt: string; publishedAt: string }>();
-  const items = [];
-  for (const r of rows.results || []) items.push(await toPublicPost(db, r.id, r.publishedRevision, r.updatedAt, r.publishedAt));
-  return items;
+  return Promise.all((rows.results || []).map((r) => toPublicPost(db, r.id, r.publishedRevision, r.updatedAt, r.publishedAt)));
 }
 
 async function toPublicPost(db: D1Database, id: string, revision: number, updatedAt: string, publishedAt: string) {
   const d = await publishedDocument<PostDocument>(db, 'Post', id, revision);
+  // Independent lookups run in parallel: each D1 call is a network round trip from the edge.
+  const [coverAsset, ogAsset, categoryRow, relatedProductIds] = await Promise.all([
+    d.coverImage ? mediaDetail(db, d.coverImage.assetId).then((r) => r.asset) : Promise.resolve(null),
+    d.seo.ogImageAssetId ? mediaDetail(db, d.seo.ogImageAssetId).then((r) => r.asset) : Promise.resolve(null),
+    d.categoryId
+      ? db.prepare("SELECT id, name, slug FROM PostCategory WHERE id=? AND status='ACTIVE'").bind(d.categoryId).first<{ id: string; name: string; slug: string }>()
+      : Promise.resolve(null),
+    publicRelatedIds(db, d.relatedProductIds),
+  ]);
   let coverImage: { url: string; alt: string; thumbnailUrl?: string } | null = null;
-  if (d.coverImage) {
-    const { asset } = await mediaDetail(db, d.coverImage.assetId);
-    if (asset.url) coverImage = { url: asset.url, alt: d.coverImage.alt, thumbnailUrl: asset.thumbnailUrl || asset.url };
+  if (d.coverImage && coverAsset?.url) {
+    coverImage = { url: coverAsset.url, alt: d.coverImage.alt, thumbnailUrl: coverAsset.thumbnailUrl || coverAsset.url };
   }
   let ogImageUrl: string | null = null;
   if (d.seo.ogImageAssetId) {
-    const { asset } = await mediaDetail(db, d.seo.ogImageAssetId);
-    ogImageUrl = asset.url;
+    ogImageUrl = ogAsset?.url ?? null;
   } else if (coverImage) {
     ogImageUrl = coverImage.url;
   }
 
-  let category: { id: string; name: string; slug: string } | null = null;
-  if (d.categoryId) {
-    const c = await db.prepare("SELECT id, name, slug FROM PostCategory WHERE id=? AND status='ACTIVE'").bind(d.categoryId).first<{ id: string; name: string; slug: string }>();
-    if (c) category = c;
-  }
+  const category: { id: string; name: string; slug: string } | null = categoryRow ?? null;
 
   // Published-only product resolution happens in the storefront page (via the catalog
   // adapter), not here — this service only persists the ordered id list.
@@ -384,7 +386,7 @@ async function toPublicPost(db: D1Database, id: string, revision: number, update
     category,
     coverImage,
     seo: { title: d.seo.title || d.title, description: d.seo.description || d.excerpt, ogImageUrl },
-    relatedProductIds: await publicRelatedIds(db, d.relatedProductIds),
+    relatedProductIds,
     publishedAt,
     updatedAt,
   };

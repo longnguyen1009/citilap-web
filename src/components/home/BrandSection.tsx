@@ -38,7 +38,7 @@ export default function BrandSection({
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={displayTitle}>
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="bg-white rounded-xl lg:rounded-2xl shadow-xs border border-slate-200/90 overflow-hidden">
           <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 md:px-5 lg:px-6 py-2.5 md:py-3.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 md:gap-2.5 min-w-0">

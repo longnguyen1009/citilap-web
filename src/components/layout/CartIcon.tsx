@@ -8,7 +8,7 @@ export default function CartIcon() {
   const { cartCount } = useCart();
 
   return (
-    <Link href="/cart" className="relative flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-16 h-10 transition">
+    <Link href="/cart" prefetch={false} className="relative flex flex-col items-center justify-center bg-[#1f2937] hover:bg-[#374151] rounded w-16 h-10 transition">
       <ShoppingCart className="w-4 h-4 text-gray-300 mb-0.5" />
       <span className="text-[10px] text-gray-300">Giỏ hàng</span>
       {cartCount > 0 && (

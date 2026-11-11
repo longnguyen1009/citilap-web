@@ -76,7 +76,7 @@ export default function ContactSection({ settings }: { settings?: PublicStorefro
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label="Tư vấn chọn máy">
-      <div className="w-full min-w-0 mx-auto max-w-7xl px-3 md:px-6">
+      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="bg-gradient-to-br from-[#0b1221] via-blue-950 to-[#0b1221] rounded-xl lg:rounded-2xl shadow-lg p-4 md:p-8 lg:p-10 text-white relative overflow-hidden border border-blue-900/60">
           <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500 rounded-full filter blur-[150px] opacity-20 pointer-events-none"></div>
           <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-500 rounded-full filter blur-[150px] opacity-20 pointer-events-none"></div>

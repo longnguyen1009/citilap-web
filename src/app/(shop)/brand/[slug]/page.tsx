@@ -5,8 +5,8 @@ import Link from "next/link";
 import { ChevronRight, Tag, ShieldCheck, Laptop } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import ProductCard from "@/components/product/ProductCard";
-import { mediaEnvironment } from "@/server/media-http";
-import { publicBrandWithProducts } from "@/server/services/brand.service";
+import { getCachedBrandWithProducts, getCachedPricingContext } from "@/server/services/storefront-cms.service";
+import { applyPricingToHomepageProducts } from "@/server/services/pricing.service";
 
 interface BrandPageProps {
   params: Promise<{ slug: string }>;
@@ -15,8 +15,8 @@ interface BrandPageProps {
 export async function generateMetadata({ params }: BrandPageProps): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const { DB } = await mediaEnvironment();
-    const data = await publicBrandWithProducts(DB, slug);
+    const data = await getCachedBrandWithProducts(slug);
+    if (!data) throw new Error("not found");
     const brand = data.brand;
     const title = brand.seoTitle || `${brand.name} Chính Hãng - Giá Tốt Nhất | CitiLap`;
     const description =
@@ -47,19 +47,17 @@ export async function generateMetadata({ params }: BrandPageProps): Promise<Meta
 export default async function BrandPage({ params }: BrandPageProps) {
   const { slug } = await params;
 
-  let brandData: Awaited<ReturnType<typeof publicBrandWithProducts>> | null = null;
-  try {
-    const { DB } = await mediaEnvironment();
-    brandData = await publicBrandWithProducts(DB, slug);
-  } catch {
-    notFound();
-  }
+  const [brandData, pricingContext] = await Promise.all([
+    getCachedBrandWithProducts(slug).catch(() => null),
+    getCachedPricingContext().catch(() => null),
+  ]);
 
   if (!brandData) {
     notFound();
   }
 
-  const { brand, products } = brandData;
+  const { brand } = brandData;
+  const products = applyPricingToHomepageProducts(brandData.products, pricingContext, new Date());
 
   return (
     <div className="bg-slate-50/50 min-h-screen pb-16">

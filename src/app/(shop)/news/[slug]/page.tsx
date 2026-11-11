@@ -1,12 +1,16 @@
-import {getStorefrontSettings} from '@/server/services/storefront-cms.service';
+import {
+  getCachedPricingContext,
+  getCachedPublicPost,
+  getCachedPublicPostList,
+  getCachedRelatedProducts,
+  getStorefrontSettings,
+} from '@/server/services/storefront-cms.service';
+import { applyPricingToHomepageProducts } from "@/server/services/pricing.service";
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight, Calendar, User, ArrowLeft, Tag, Sparkles } from "lucide-react";
-import { mediaEnvironment } from "@/server/media-http";
-import { publicPostBySlug, publicPostList } from "@/server/services/post.service";
-import { getRelatedProducts } from "@/server/services/catalog.service";
 import ProductCard from "@/components/product/ProductCard";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { businessProfile } from "@/config/business-profile";
@@ -19,8 +23,8 @@ interface PostDetailPageProps {
 export async function generateMetadata({ params }: PostDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const env = await mediaEnvironment();
-    const post = await publicPostBySlug(env.DB, slug);
+    const post = await getCachedPublicPost(slug);
+    if (!post) throw new Error("not found");
     const title = `${post.seo.title} | ${businessProfile.brandName}`;
     const description = post.seo.description || post.excerpt || undefined;
 
@@ -58,21 +62,14 @@ export async function generateMetadata({ params }: PostDetailPageProps): Promise
 export default async function PostDetailPage({ params }: PostDetailPageProps) {
   const { slug } = await params;
 
-  const settings=await getStorefrontSettings();
+  // Settings, pricing and the post are independent cached reads: fetch them together.
+  const [settings, pricingContext, post] = await Promise.all([
+    getStorefrontSettings(),
+    getCachedPricingContext().catch(() => null),
+    getCachedPublicPost(slug).catch(() => null),
+  ]);
   const phone=settings?.storePhone || businessProfile.displayPhone;
-  let env;
-  try {
-    env = await mediaEnvironment();
-  } catch {
-    notFound();
-  }
-
-  let post;
-  try {
-    post = await publicPostBySlug(env.DB, slug);
-  } catch {
-    notFound();
-  }
+  if (!post) notFound();
 
   // Historical alias handling: if the slug accessed matches an old published revision,
   // Next.js App Router permanentRedirect issues HTTP 308 (RFC 7538 Permanent Redirect)
@@ -80,20 +77,18 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
     permanentRedirect(`/news/${encodeURIComponent(post.slug)}`);
   }
 
-  // Resolve related products safely via live catalog service (only ACTIVE, non-deleted, preserving manual order)
-  const relatedProducts = post.relatedProductIds.length > 0
-    ? await getRelatedProducts("", null, null, 8, post.relatedProductIds)
-    : [];
+  // Related products (only ACTIVE, non-deleted, preserving manual order) and more posts are independent.
+  const evaluatedAt = new Date();
+  const [rawRelatedProducts, morePostsResult] = await Promise.all([
+    post.relatedProductIds.length > 0
+      ? getCachedRelatedProducts("", null, null, 8, post.relatedProductIds).catch(() => [])
+      : Promise.resolve([]),
+    getCachedPublicPostList(post.category?.id, 1, 4).catch(() => null),
+  ]);
+  const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext, evaluatedAt);
 
-  // Fetch more posts in same category or latest
-  let morePosts: Awaited<ReturnType<typeof publicPostList>>["items"] = [];
-  try {
-    const res = await publicPostList(env.DB, {
-      categoryId: post.category?.id,
-      limit: 4,
-    });
-    morePosts = res.items.filter((p) => p.id !== post.id).slice(0, 3);
-  } catch {}
+  // More posts in same category or latest
+  const morePosts = (morePostsResult?.items ?? []).filter((p) => p.id !== post.id).slice(0, 3);
 
   const safeContent = sanitizeHtml(post.contentHtml || "");
 
