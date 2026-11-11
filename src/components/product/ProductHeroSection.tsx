@@ -13,12 +13,6 @@ import {
   ArrowRight,
   Heart,
   Scale,
-  Cpu,
-  Gpu,
-  MemoryStick,
-  HardDrive,
-  Monitor,
-  Sparkles,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useOptionalWishlist } from "@/context/WishlistContext";
@@ -113,7 +107,6 @@ export default function ProductHeroSection({
   modelCode,
   productionYear,
   brandName,
-  keySpecs = [],
   images,
   coverImage,
   discountBadge,
@@ -173,6 +166,7 @@ export default function ProductHeroSection({
   const [isQuickCheckoutOpen, setIsQuickCheckoutOpen] = useState(false);
   const [isInstallmentOpen, setIsInstallmentOpen] = useState(false);
   const [cartSuccessMsg, setCartSuccessMsg] = useState("");
+  const [dismissedTooltip, setDismissedTooltip] = useState<"wishlist" | "compare" | null>(null);
 
   // Price calculations
   const variantPrice = selectedVariant?.price ?? basePrice;
@@ -276,27 +270,20 @@ export default function ProductHeroSection({
               {productName}
             </h1>
 
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
+            <div className="mt-2 flex items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 min-w-0">
-                <a
-                  href="#danh-gia-khach-hang"
-                  className="inline-flex min-h-11 items-center gap-1 text-amber-500 font-bold hover:underline"
-                >
-                  {reviewCount > 0 ? (
-                    <>
-                      <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
-                      <span className="text-slate-800 ml-0.5">{averageRating}</span>
-                      <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
-                    </>
-                  ) : (
-                    <>
-                      <span aria-hidden="true">★</span>
-                      <span className="text-slate-600 font-medium">Gửi đánh giá</span>
-                    </>
-                  )}
-                </a>
+                {reviewCount > 0 && (
+                  <a
+                    href="#danh-gia-khach-hang"
+                    className="inline-flex min-h-11 items-center gap-1 text-amber-500 font-bold hover:underline"
+                  >
+                    <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
+                    <span className="text-slate-800 ml-0.5">{averageRating}</span>
+                    <span className="text-slate-500 font-normal">({reviewCount} đánh giá)</span>
+                  </a>
+                )}
                 {brandName && brandName.trim() && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
                     <span>
                       Hãng:{" "}
                       <strong className="text-blue-600 font-semibold">{brandName.trim()}</strong>
@@ -304,7 +291,7 @@ export default function ProductHeroSection({
                   </span>
                 )}
                 {modelCode && modelCode.trim() && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
                     <span>
                       Mã model:{" "}
                       <strong className="text-slate-800 font-semibold font-mono">
@@ -314,7 +301,7 @@ export default function ProductHeroSection({
                   </span>
                 )}
                 {!modelCode?.trim() && productionYear && productionYear.trim() && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
                     <span>
                       Năm SX:{" "}
                       <strong className="text-slate-800 font-semibold">
@@ -324,7 +311,7 @@ export default function ProductHeroSection({
                   </span>
                 )}
                 {hasSpecs && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300">
+                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
                     <button
                       type="button"
                       onClick={() => {
@@ -342,7 +329,7 @@ export default function ProductHeroSection({
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -350,15 +337,32 @@ export default function ProductHeroSection({
                     if (isLiked) wishlistCtx.removeFromWishlist(productId);
                     else wishlistCtx.addToWishlist({ productId });
                   }}
+                  onMouseEnter={() => setDismissedTooltip(null)}
+                  onFocus={() => setDismissedTooltip(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setDismissedTooltip("wishlist");
+                  }}
                   aria-pressed={isLiked}
-                  className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition cursor-pointer ${
+                  aria-label={isLiked ? "Đã lưu" : "Yêu thích"}
+                  className={`group relative inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-bold transition cursor-pointer ${
                     isLiked
                       ? "border-rose-200 bg-rose-50 text-rose-600"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:text-rose-600"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-rose-300 hover:bg-rose-50/50 hover:text-rose-600"
                   }`}
                 >
-                  <Heart className="w-3.5 h-3.5 shrink-0" fill={isLiked ? "currentColor" : "none"} />
-                  <span>{isLiked ? "Đã lưu" : "Yêu thích"}</span>
+                  <Heart className="w-4 h-4 shrink-0" fill={isLiked ? "currentColor" : "none"} />
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none group-hover:pointer-events-auto group-focus-visible:pointer-events-auto absolute bottom-full left-1/2 -translate-x-1/2 pb-1.5 z-20 opacity-0 scale-95 transition duration-150 ${
+                      dismissedTooltip === "wishlist"
+                        ? ""
+                        : "group-hover:opacity-100 group-hover:scale-100 group-focus-visible:opacity-100 group-focus-visible:scale-100"
+                    }`}
+                  >
+                    <span className="block whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-md">
+                      {isLiked ? "Đã lưu" : "Yêu thích"}
+                    </span>
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -376,50 +380,35 @@ export default function ProductHeroSection({
                       });
                     }
                   }}
+                  onMouseEnter={() => setDismissedTooltip(null)}
+                  onFocus={() => setDismissedTooltip(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") setDismissedTooltip("compare");
+                  }}
                   aria-pressed={isInCompare}
-                  className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition cursor-pointer ${
+                  aria-label={isInCompare ? "Đang so sánh" : "So sánh"}
+                  className={`group relative inline-flex h-9 w-9 items-center justify-center rounded-full border text-xs font-bold transition cursor-pointer ${
                     isInCompare
                       ? "border-blue-600 bg-blue-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-600"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:bg-blue-50/50 hover:text-blue-600"
                   }`}
                 >
-                  <Scale className="w-3.5 h-3.5 shrink-0" />
-                  <span>{isInCompare ? "Đang so sánh" : "So sánh"}</span>
+                  <Scale className="w-4 h-4 shrink-0" />
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none group-hover:pointer-events-auto group-focus-visible:pointer-events-auto absolute bottom-full left-1/2 -translate-x-1/2 pb-1.5 z-20 opacity-0 scale-95 transition duration-150 ${
+                      dismissedTooltip === "compare"
+                        ? ""
+                        : "group-hover:opacity-100 group-hover:scale-100 group-focus-visible:opacity-100 group-focus-visible:scale-100"
+                    }`}
+                  >
+                    <span className="block whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1 text-[11px] font-semibold text-white shadow-md">
+                      {isInCompare ? "Đang so sánh" : "So sánh"}
+                    </span>
+                  </span>
                 </button>
               </div>
             </div>
-
-            {/* Dải thông số chính ngay dưới tiêu đề để khách xem nhanh không cần cuộn */}
-            {(() => {
-              const liveSpecs = [
-                { key: "cpu", label: "CPU", value: selectedVariant?.cpu || keySpecs.find((k) => k.key === "cpu")?.value, icon: Cpu },
-                { key: "gpu", label: "GPU", value: selectedVariant?.gpu || keySpecs.find((k) => k.key === "gpu")?.value, icon: Gpu },
-                { key: "ram", label: "RAM", value: selectedVariant?.ram || keySpecs.find((k) => k.key === "ram")?.value, icon: MemoryStick },
-                { key: "storage", label: "Ổ cứng", value: selectedVariant?.storage || keySpecs.find((k) => k.key === "storage")?.value, icon: HardDrive },
-                { key: "display", label: "Màn hình", value: selectedVariant?.display || keySpecs.find((k) => k.key === "display")?.value, icon: Monitor },
-                { key: "extra", label: "Khác", value: keySpecs.find((k) => k.key === "extra")?.value, icon: Sparkles },
-              ].filter((s): s is { key: string; label: string; value: string; icon: typeof Cpu } => Boolean(s.value && s.value.trim()));
-              if (liveSpecs.length === 0) return null;
-              return (
-                <div
-                  aria-label="Thông số chính"
-                  className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2"
-                >
-                  {liveSpecs.slice(0, 6).map((spec) => {
-                    const Icon = spec.icon;
-                    return (
-                      <div key={spec.key} className="flex items-start gap-1.5 rounded-lg bg-white px-2.5 py-1.5 border border-slate-100 shadow-2xs min-w-0">
-                        <Icon className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" aria-hidden="true" />
-                        <div className="min-w-0 leading-tight">
-                          <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">{spec.label}</span>
-                          <span className="block text-xs font-semibold text-slate-800 break-words">{spec.value}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
           </div>
 
           {/* 2. KHỐI GIÁ NẰM TRÊN ĐẦU (DỄ THEO DÕI NHẤT) */}
@@ -477,7 +466,6 @@ export default function ProductHeroSection({
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
                   <span>CHỌN CẤU HÌNH ({variants.length}):</span>
                 </label>
-                <span className="text-[11px] sm:text-xs text-slate-500 font-medium">Bấm chọn đổi giá</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-2.5">
@@ -547,7 +535,6 @@ export default function ProductHeroSection({
                   <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-bold">2</span>
                   <span>CHỌN MÀU SẮC ({colorOptions.length}):</span>
                 </label>
-                <span className="text-[11px] sm:text-xs text-slate-500 font-medium">Đổi hình ảnh</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">

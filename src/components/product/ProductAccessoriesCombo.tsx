@@ -39,9 +39,6 @@ export function ProductAccessoriesCombo({
             Ưu đãi mua kèm tiết kiệm (Deal sốc)
           </h4>
         </div>
-        <span className="text-xs font-semibold text-[#2563EB]">
-          Tự động cộng vào giá
-        </span>
       </div>
 
       <div className="space-y-2.5">

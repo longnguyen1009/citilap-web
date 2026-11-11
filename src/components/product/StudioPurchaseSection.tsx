@@ -230,7 +230,6 @@ export default function StudioPurchaseSection({
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-bold">1</span>
               <span>CHỌN CẤU HÌNH PHẦN CỨNG ({conditionVariants.length}):</span>
             </label>
-            <span className="text-[11px] text-gray-400 font-medium">Bấm chọn đổi giá tức thì</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
