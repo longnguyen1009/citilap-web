@@ -546,6 +546,7 @@ export const ProductStudioRevisionScalarFieldEnum = {
   revision: 'revision',
   document: 'document',
   action: 'action',
+  actor: 'actor',
   createdAt: 'createdAt'
 } as const
 
@@ -759,6 +760,9 @@ export const PromotionCampaignItemScalarFieldEnum = {
   variantId: 'variantId',
   salePrice: 'salePrice',
   regularPrice: 'regularPrice',
+  quantityLimit: 'quantityLimit',
+  perCustomerLimit: 'perCustomerLimit',
+  soldCount: 'soldCount',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

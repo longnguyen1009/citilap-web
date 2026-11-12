@@ -328,11 +328,18 @@ export const productDocumentSchema = z.object({
 
 export type ProductDocument = z.infer<typeof productDocumentSchema>;
 
-export const studioWriteSchema = z.object({
-  expectedRevision: z.number().int().nonnegative(),
-  action: z.enum(['save', 'publish', 'unpublish', 'restore']),
-  document: productDocumentSchema,
-});
+export const studioWriteSchema = z.discriminatedUnion('action', [
+  z.object({
+    expectedRevision: z.number().int().nonnegative(),
+    action: z.enum(['save', 'publish', 'restore']),
+    document: productDocumentSchema,
+  }),
+  z.object({
+    expectedRevision: z.number().int().nonnegative(),
+    action: z.literal('unpublish'),
+    document: z.unknown().optional(),
+  }),
+]);
 
 export function blankProduct(template: ProductTemplate = 'LAPTOP'): ProductDocument {
   const specs = (attributeTemplates[template] || attributeTemplates.LAPTOP).map(key => ({ key, value: '' }));

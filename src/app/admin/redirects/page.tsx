@@ -49,6 +49,18 @@ export default function AdminRedirectsPage() {
   const [filterTab, setFilterTab] = useState<'ALL' | 'ENABLED' | 'DISABLED'>('ALL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyGenRef = useRef(0);
+
+  useEffect(() => {
+    return () => {
+      copyGenRef.current += 1;
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -81,6 +93,7 @@ export default function AdminRedirectsPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch of redirect rules
     void load();
   }, []);
 
@@ -164,10 +177,32 @@ export default function AdminRedirectsPage() {
     }
   }
 
-  const handleCopy = (text: string, id: string) => {
-    void navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopy = async (text: string, id: string) => {
+    const gen = ++copyGenRef.current;
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+    setCopiedId(null);
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(text);
+      if (gen !== copyGenRef.current) return;
+      setError('');
+      setCopiedId(id);
+      copyTimerRef.current = setTimeout(() => {
+        if (copyGenRef.current === gen) {
+          setCopiedId(null);
+          copyTimerRef.current = null;
+        }
+      }, 2000);
+    } catch {
+      if (gen !== copyGenRef.current) return;
+      setCopiedId(null);
+      setError('Không thể sao chép vào bộ nhớ tạm. Vui lòng thử lại.');
+    }
   };
 
   const filteredRules = useMemo(() => {
@@ -355,7 +390,7 @@ export default function AdminRedirectsPage() {
                           <button
                             type="button"
                             title="Sao chép link nguồn"
-                            onClick={() => handleCopy(r.source, `${copyKey}-src`)}
+                            onClick={() => void handleCopy(r.source, `${copyKey}-src`)}
                             className="opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-slate-600"
                           >
                             {copiedId === `${copyKey}-src` ? (
@@ -379,7 +414,7 @@ export default function AdminRedirectsPage() {
                           <button
                             type="button"
                             title="Sao chép link đích"
-                            onClick={() => handleCopy(r.target, `${copyKey}-tgt`)}
+                            onClick={() => void handleCopy(r.target, `${copyKey}-tgt`)}
                             className="opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-slate-600"
                           >
                             {copiedId === `${copyKey}-tgt` ? (

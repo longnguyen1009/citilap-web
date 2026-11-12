@@ -1,6 +1,14 @@
 'use client';
 import { useRef } from 'react';
-import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
+import {
+  useDraftAutosave,
+  useAdminActorId,
+  clearCommittedLocalDraft,
+  transferNewEntityDraftBackup,
+  writeLocalDraftBackup,
+  setFirstSaveHandoff,
+  consumeFirstSaveHandoff,
+} from '@/components/admin/useDraftAutosave';
 import DraftRecovery from '@/components/admin/DraftRecovery';
 import SchedulePanel from '@/components/admin/SchedulePanel';
 
@@ -25,8 +33,10 @@ import {
   InlineAlert,
   AdminLoadingState,
   AdminErrorState,
+  useConfirm,
+  useToast,
 } from '@/components/admin/ui';
-import { blankPage, PAGE_TYPES, type PageDocument, type PageType } from '@/contracts/cms/page';
+import { blankPage, PAGE_TYPES, pageDocumentSchema, type PageDocument, type PageType } from '@/contracts/cms/page';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
 import MediaUpload from '@/components/admin/media/MediaUpload';
@@ -54,10 +64,15 @@ interface PageRevisionItem {
 
 export default function StaticPageEditor({ id }: { id: string | null }) {
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
+  const actorId = useAdminActorId();
+  const storageKey = id ? `page-${id}` : 'page-new';
 
   const [doc, setDoc] = useState<PageDocument>(blankPage());
   const [revision, setRevision] = useState(0);
-  const latestDoc = useRef(doc), saveLock = useRef(false);
+  const [serverRevision, setServerRevision] = useState(0);
+  const latestDoc = useRef(doc), saveLock = useRef(false), editVersionRef = useRef(0);
   useEffect(() => { latestDoc.current = doc; }, [doc]);
   const [isPublished, setIsPublished] = useState(false);
   const [loading, setLoading] = useState(!!id);
@@ -79,6 +94,20 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
 
   useEffect(() => {
     if (!id) return;
+    if (refreshTrigger === 0) {
+      const handoff = consumeFirstSaveHandoff<PageDocument>(`page-${id}`, actorId);
+      if (handoff) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate first-save route handoff without discarding newer edits
+        setDoc(handoff.latestDoc);
+        latestDoc.current = handoff.latestDoc;
+        setRevision(handoff.revision);
+        setServerRevision(handoff.revision);
+        setIsPublished(handoff.published);
+        setHasUnsavedChanges(handoff.isDirty);
+        setLoading(false);
+        return;
+      }
+    }
     let ignore = false;
     async function fetchPage() {
       setError(null);
@@ -86,7 +115,9 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
         const data = await mediaRequest<{ id: string; revision: number; document: PageDocument; published: boolean }>(`/api/admin/pages/${id}`);
         if (!ignore) {
           setDoc(data.document);
+          latestDoc.current = data.document;
           setRevision(data.revision);
+          setServerRevision(data.revision);
           setIsPublished(data.published);
           setHasUnsavedChanges(false);
           setLoading(false);
@@ -100,7 +131,7 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
     }
     void fetchPage();
     return () => { ignore = true; };
-  }, [id, refreshTrigger]);
+  }, [id, refreshTrigger, actorId]);
 
   const loadPage = useCallback(() => {
     setLoading(true);
@@ -108,14 +139,24 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
   }, []);
 
   const updateDoc = <K extends keyof PageDocument>(field: K, value: PageDocument[K]) => {
-    setDoc(prev => ({ ...prev, [field]: value }));
+    editVersionRef.current += 1;
+    setDoc(prev => {
+      const next = { ...prev, [field]: value };
+      latestDoc.current = next;
+      return next;
+    });
     setHasUnsavedChanges(true);
     setSaveSuccess(null);
     setConflictError(null);
   };
 
   const updateSeo = (field: keyof PageDocument['seo'], value: unknown) => {
-    setDoc(prev => ({ ...prev, seo: { ...prev.seo, [field]: value } }));
+    editVersionRef.current += 1;
+    setDoc(prev => {
+      const next = { ...prev, seo: { ...prev.seo, [field]: value } };
+      latestDoc.current = next;
+      return next;
+    });
     setHasUnsavedChanges(true);
     setSaveSuccess(null);
     setConflictError(null);
@@ -144,7 +185,8 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
   const handleSave = async (action: 'save' | 'publish' | 'unpublish') => {
     if (saveLock.current) return false;
     saveLock.current = true;
-    const submitted = JSON.stringify(doc);
+    const submittedEditVersion = editVersionRef.current;
+    const submittedDocSnapshot = structuredClone(doc);
     setSaving(true);
     setConflictError(null);
     setSaveSuccess(null);
@@ -157,7 +199,7 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
       const payload = {
         expectedRevision: revision,
         action,
-        document: doc,
+        document: submittedDocSnapshot,
       };
 
       const result = await mediaRequest<{ id: string; revision: number; document: PageDocument; published: boolean }>(url, {
@@ -166,10 +208,47 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
         body: JSON.stringify(payload),
       });
 
+      const hasNewerEdits = editVersionRef.current !== submittedEditVersion;
       setRevision(result.revision);
+      setServerRevision(result.revision);
       setIsPublished(result.published);
-      if (JSON.stringify(latestDoc.current) === submitted) setDoc(result.document);
-      setHasUnsavedChanges(JSON.stringify(latestDoc.current) !== submitted);
+
+      if (!id && result.id) {
+        const nextEntityKey = `page-${result.id}`;
+        const currentLatestDoc = hasNewerEdits ? latestDoc.current : result.document;
+        if (hasNewerEdits) {
+          transferNewEntityDraftBackup({
+            actorId,
+            fromEntityKey: 'page-new',
+            toEntityKey: nextEntityKey,
+            submittedDraft: submittedDocSnapshot,
+            latestDraft: currentLatestDoc,
+            newBaseRevision: result.revision,
+          });
+        } else {
+          setDoc(result.document);
+          latestDoc.current = result.document;
+          setHasUnsavedChanges(false);
+          clearCommittedLocalDraft('page-new', submittedDocSnapshot, actorId);
+        }
+        setFirstSaveHandoff<PageDocument>(nextEntityKey, {
+          actorId,
+          revision: result.revision,
+          published: result.published,
+          committedDoc: result.document,
+          latestDoc: currentLatestDoc,
+          isDirty: hasNewerEdits,
+        });
+        router.replace(`/admin/pages/${result.id}`);
+      } else if (!hasNewerEdits) {
+        setDoc(result.document);
+        latestDoc.current = result.document;
+        setHasUnsavedChanges(false);
+        clearCommittedLocalDraft(storageKey, submittedDocSnapshot, actorId);
+      } else {
+        setHasUnsavedChanges(true);
+        writeLocalDraftBackup(storageKey, latestDoc.current, result.revision, actorId);
+      }
 
       if (action === 'publish') {
         setSaveSuccess('Đã xuất bản trang lên website.');
@@ -177,10 +256,6 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
         setSaveSuccess('Đã ẩn trang khỏi website.');
       } else {
         setSaveSuccess(`Đã lưu nháp (#v${result.revision}).`);
-      }
-
-      if (!id && result.id) {
-        router.replace(`/admin/pages/${result.id}`);
       }
       return true;
     } catch (err: unknown) {
@@ -197,7 +272,15 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
     }
   };
 
-  const autosaveStatus = useDraftAutosave(doc, revision, !!id && !loading, hasUnsavedChanges, saving, () => handleSave('save'));
+  const autosaveStatus = useDraftAutosave(
+    doc,
+    revision,
+    !loading,
+    hasUnsavedChanges,
+    saving,
+    () => handleSave('save'),
+    storageKey
+  );
 
   const loadHistory = async () => {
     if (!id) return;
@@ -214,7 +297,13 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
 
   const handleRestore = async (targetRev: number) => {
     if (!id || saveLock.current) return;
-    const confirmed = window.confirm(`Khôi phục phiên bản #${targetRev} thành bản nháp mới?`);
+    const confirmed = await confirm({
+      title: 'Khôi phục phiên bản trang tĩnh',
+      message: `Khôi phục phiên bản #${targetRev} của trang "${doc.title || id}" thành bản nháp mới?`,
+      confirmLabel: 'Khôi phục',
+      cancelLabel: 'Hủy',
+      variant: 'warning',
+    });
     if (!confirmed) return;
 
     saveLock.current = true;
@@ -227,12 +316,20 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
         body: JSON.stringify({ expectedRevision: revision }),
       });
       setRevision(result.newRevision);
-      if (JSON.stringify(latestDoc.current) === beforeRestore) setDoc(result.document);
+      setServerRevision(result.newRevision);
+      if (JSON.stringify(latestDoc.current) === beforeRestore) {
+        setDoc(result.document);
+        latestDoc.current = result.document;
+      }
       setHasUnsavedChanges(JSON.stringify(latestDoc.current) !== beforeRestore);
-      setSaveSuccess(`Đã khôi phục #${targetRev} thành nháp mới (rev #${result.newRevision}).`);
+      const msg = `Đã khôi phục #${targetRev} thành nháp mới (rev #${result.newRevision}).`;
+      setSaveSuccess(msg);
+      toast.success(msg);
       setHistoryOpen(false);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể khôi phục phiên bản.');
+      const msg = err instanceof Error ? err.message : 'Không thể khôi phục phiên bản.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       saveLock.current = false;
       setSaving(false);
@@ -508,7 +605,40 @@ export default function StaticPageEditor({ id }: { id: string | null }) {
 
               <div className="pt-1 space-y-2 text-xs">
                 <SchedulePanel entityType="page" entityId={id} revision={revision} dirty={hasUnsavedChanges || saving} />
-                {hasUnsavedChanges && id && <DraftRecovery draft={doc} endpoint={`/api/admin/pages/${id}`} />}
+                <DraftRecovery
+                  draft={doc}
+                  endpoint={id ? `/api/admin/pages/${id}` : undefined}
+                  storageKey={storageKey}
+                  currentRevision={revision}
+                  serverRevision={serverRevision}
+                  dirty={hasUnsavedChanges}
+                  validateDraft={candidate => {
+                    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                      return { ok: false, error: 'Bản nháp trang không đúng định dạng.' };
+                    }
+                    const raw = candidate as Record<string, unknown>;
+                    if (typeof raw.title !== 'string' || typeof raw.slug !== 'string') {
+                      return { ok: false, error: 'Thiếu tiêu đề hoặc đường dẫn trang.' };
+                    }
+                    const parsed = pageDocumentSchema.safeParse({
+                      ...raw, title: raw.title.trim() || 'draft', slug: raw.slug.trim() || 'draft',
+                    });
+                    return parsed.success
+                      ? { ok: true, data: { ...parsed.data, title: raw.title, slug: raw.slug } }
+                      : { ok: false, error: parsed.error.issues[0]?.message || 'Bản nháp không hợp lệ.' };
+                  }}
+                  onRestoreLocal={(restored, meta) => {
+                    editVersionRef.current += 1;
+                    const restoredPage = restored as PageDocument;
+                    setDoc(restoredPage);
+                    latestDoc.current = restoredPage;
+                    setRevision(meta.baseRevision);
+                    setHasUnsavedChanges(true);
+                    setConflictError(meta.isStale
+                      ? `Bản nháp dựa trên r${meta.baseRevision}; máy chủ đang ở r${serverRevision}. Lưu sẽ kiểm tra xung đột phiên bản.`
+                      : null);
+                  }}
+                />
               </div>
             </div>
           </AdminCard>

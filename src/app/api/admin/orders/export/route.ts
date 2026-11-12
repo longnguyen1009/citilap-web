@@ -14,8 +14,8 @@ async function GETHandler(request: Request) {
     const status = searchParams.get('status');
     const paymentStatus = searchParams.get('paymentStatus');
     const search = searchParams.get('search');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const startDate = searchParams.get('fromDate') || searchParams.get('startDate');
+    const endDate = searchParams.get('toDate') || searchParams.get('endDate');
 
     const orders = await getAllOrdersForExport({
       status,

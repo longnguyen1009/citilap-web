@@ -39,6 +39,7 @@ export type ProductStudioRevisionMinAggregateOutputType = {
   revision: number | null
   document: string | null
   action: string | null
+  actor: string | null
   createdAt: Date | null
 }
 
@@ -47,6 +48,7 @@ export type ProductStudioRevisionMaxAggregateOutputType = {
   revision: number | null
   document: string | null
   action: string | null
+  actor: string | null
   createdAt: Date | null
 }
 
@@ -55,6 +57,7 @@ export type ProductStudioRevisionCountAggregateOutputType = {
   revision: number
   document: number
   action: number
+  actor: number
   createdAt: number
   _all: number
 }
@@ -73,6 +76,7 @@ export type ProductStudioRevisionMinAggregateInputType = {
   revision?: true
   document?: true
   action?: true
+  actor?: true
   createdAt?: true
 }
 
@@ -81,6 +85,7 @@ export type ProductStudioRevisionMaxAggregateInputType = {
   revision?: true
   document?: true
   action?: true
+  actor?: true
   createdAt?: true
 }
 
@@ -89,6 +94,7 @@ export type ProductStudioRevisionCountAggregateInputType = {
   revision?: true
   document?: true
   action?: true
+  actor?: true
   createdAt?: true
   _all?: true
 }
@@ -184,6 +190,7 @@ export type ProductStudioRevisionGroupByOutputType = {
   revision: number
   document: string
   action: string
+  actor: string
   createdAt: Date
   _count: ProductStudioRevisionCountAggregateOutputType | null
   _avg: ProductStudioRevisionAvgAggregateOutputType | null
@@ -215,6 +222,7 @@ export type ProductStudioRevisionWhereInput = {
   revision?: Prisma.IntFilter<"ProductStudioRevision"> | number
   document?: Prisma.StringFilter<"ProductStudioRevision"> | string
   action?: Prisma.StringFilter<"ProductStudioRevision"> | string
+  actor?: Prisma.StringFilter<"ProductStudioRevision"> | string
   createdAt?: Prisma.DateTimeFilter<"ProductStudioRevision"> | Date | string
   studio?: Prisma.XOR<Prisma.ProductStudioScalarRelationFilter, Prisma.ProductStudioWhereInput>
 }
@@ -224,6 +232,7 @@ export type ProductStudioRevisionOrderByWithRelationInput = {
   revision?: Prisma.SortOrder
   document?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  actor?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   studio?: Prisma.ProductStudioOrderByWithRelationInput
 }
@@ -237,6 +246,7 @@ export type ProductStudioRevisionWhereUniqueInput = Prisma.AtLeast<{
   revision?: Prisma.IntFilter<"ProductStudioRevision"> | number
   document?: Prisma.StringFilter<"ProductStudioRevision"> | string
   action?: Prisma.StringFilter<"ProductStudioRevision"> | string
+  actor?: Prisma.StringFilter<"ProductStudioRevision"> | string
   createdAt?: Prisma.DateTimeFilter<"ProductStudioRevision"> | Date | string
   studio?: Prisma.XOR<Prisma.ProductStudioScalarRelationFilter, Prisma.ProductStudioWhereInput>
 }, "productId_revision">
@@ -246,6 +256,7 @@ export type ProductStudioRevisionOrderByWithAggregationInput = {
   revision?: Prisma.SortOrder
   document?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  actor?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.ProductStudioRevisionCountOrderByAggregateInput
   _avg?: Prisma.ProductStudioRevisionAvgOrderByAggregateInput
@@ -262,6 +273,7 @@ export type ProductStudioRevisionScalarWhereWithAggregatesInput = {
   revision?: Prisma.IntWithAggregatesFilter<"ProductStudioRevision"> | number
   document?: Prisma.StringWithAggregatesFilter<"ProductStudioRevision"> | string
   action?: Prisma.StringWithAggregatesFilter<"ProductStudioRevision"> | string
+  actor?: Prisma.StringWithAggregatesFilter<"ProductStudioRevision"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ProductStudioRevision"> | Date | string
 }
 
@@ -269,6 +281,7 @@ export type ProductStudioRevisionCreateInput = {
   revision: number
   document: string
   action: string
+  actor?: string
   createdAt?: Date | string
   studio: Prisma.ProductStudioCreateNestedOneWithoutRevisionsInput
 }
@@ -278,6 +291,7 @@ export type ProductStudioRevisionUncheckedCreateInput = {
   revision: number
   document: string
   action: string
+  actor?: string
   createdAt?: Date | string
 }
 
@@ -285,6 +299,7 @@ export type ProductStudioRevisionUpdateInput = {
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   document?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  actor?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   studio?: Prisma.ProductStudioUpdateOneRequiredWithoutRevisionsNestedInput
 }
@@ -294,6 +309,7 @@ export type ProductStudioRevisionUncheckedUpdateInput = {
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   document?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  actor?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -302,6 +318,7 @@ export type ProductStudioRevisionCreateManyInput = {
   revision: number
   document: string
   action: string
+  actor?: string
   createdAt?: Date | string
 }
 
@@ -309,6 +326,7 @@ export type ProductStudioRevisionUpdateManyMutationInput = {
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   document?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  actor?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -317,6 +335,7 @@ export type ProductStudioRevisionUncheckedUpdateManyInput = {
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   document?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  actor?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -340,6 +359,7 @@ export type ProductStudioRevisionCountOrderByAggregateInput = {
   revision?: Prisma.SortOrder
   document?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  actor?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -352,6 +372,7 @@ export type ProductStudioRevisionMaxOrderByAggregateInput = {
   revision?: Prisma.SortOrder
   document?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  actor?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -360,6 +381,7 @@ export type ProductStudioRevisionMinOrderByAggregateInput = {
   revision?: Prisma.SortOrder
   document?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  actor?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -413,6 +435,7 @@ export type ProductStudioRevisionCreateWithoutStudioInput = {
   revision: number
   document: string
   action: string
+  actor?: string
   createdAt?: Date | string
 }
 
@@ -420,6 +443,7 @@ export type ProductStudioRevisionUncheckedCreateWithoutStudioInput = {
   revision: number
   document: string
   action: string
+  actor?: string
   createdAt?: Date | string
 }
 
@@ -456,6 +480,7 @@ export type ProductStudioRevisionScalarWhereInput = {
   revision?: Prisma.IntFilter<"ProductStudioRevision"> | number
   document?: Prisma.StringFilter<"ProductStudioRevision"> | string
   action?: Prisma.StringFilter<"ProductStudioRevision"> | string
+  actor?: Prisma.StringFilter<"ProductStudioRevision"> | string
   createdAt?: Prisma.DateTimeFilter<"ProductStudioRevision"> | Date | string
 }
 
@@ -463,6 +488,7 @@ export type ProductStudioRevisionCreateManyStudioInput = {
   revision: number
   document: string
   action: string
+  actor?: string
   createdAt?: Date | string
 }
 
@@ -470,6 +496,7 @@ export type ProductStudioRevisionUpdateWithoutStudioInput = {
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   document?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  actor?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -477,6 +504,7 @@ export type ProductStudioRevisionUncheckedUpdateWithoutStudioInput = {
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   document?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  actor?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -484,6 +512,7 @@ export type ProductStudioRevisionUncheckedUpdateManyWithoutStudioInput = {
   revision?: Prisma.IntFieldUpdateOperationsInput | number
   document?: Prisma.StringFieldUpdateOperationsInput | string
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  actor?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -494,6 +523,7 @@ export type ProductStudioRevisionSelect<ExtArgs extends runtime.Types.Extensions
   revision?: boolean
   document?: boolean
   action?: boolean
+  actor?: boolean
   createdAt?: boolean
   studio?: boolean | Prisma.ProductStudioDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["productStudioRevision"]>
@@ -503,6 +533,7 @@ export type ProductStudioRevisionSelectCreateManyAndReturn<ExtArgs extends runti
   revision?: boolean
   document?: boolean
   action?: boolean
+  actor?: boolean
   createdAt?: boolean
   studio?: boolean | Prisma.ProductStudioDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["productStudioRevision"]>
@@ -512,6 +543,7 @@ export type ProductStudioRevisionSelectUpdateManyAndReturn<ExtArgs extends runti
   revision?: boolean
   document?: boolean
   action?: boolean
+  actor?: boolean
   createdAt?: boolean
   studio?: boolean | Prisma.ProductStudioDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["productStudioRevision"]>
@@ -521,10 +553,11 @@ export type ProductStudioRevisionSelectScalar = {
   revision?: boolean
   document?: boolean
   action?: boolean
+  actor?: boolean
   createdAt?: boolean
 }
 
-export type ProductStudioRevisionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"productId" | "revision" | "document" | "action" | "createdAt", ExtArgs["result"]["productStudioRevision"]>
+export type ProductStudioRevisionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"productId" | "revision" | "document" | "action" | "actor" | "createdAt", ExtArgs["result"]["productStudioRevision"]>
 export type ProductStudioRevisionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   studio?: boolean | Prisma.ProductStudioDefaultArgs<ExtArgs>
 }
@@ -545,6 +578,7 @@ export type $ProductStudioRevisionPayload<ExtArgs extends runtime.Types.Extensio
     revision: number
     document: string
     action: string
+    actor: string
     createdAt: Date
   }, ExtArgs["result"]["productStudioRevision"]>
   composites: {}
@@ -974,6 +1008,7 @@ export interface ProductStudioRevisionFieldRefs {
   readonly revision: Prisma.FieldRef<"ProductStudioRevision", 'Int'>
   readonly document: Prisma.FieldRef<"ProductStudioRevision", 'String'>
   readonly action: Prisma.FieldRef<"ProductStudioRevision", 'String'>
+  readonly actor: Prisma.FieldRef<"ProductStudioRevision", 'String'>
   readonly createdAt: Prisma.FieldRef<"ProductStudioRevision", 'DateTime'>
 }
     

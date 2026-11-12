@@ -31,6 +31,7 @@ export default function InspectionEditor({ productId }: { productId: string }) {
   }, [productId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load inspection records when productId changes
     void load();
   }, [load]);
 

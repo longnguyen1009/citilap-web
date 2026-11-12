@@ -5,8 +5,10 @@ import { getLandingPageList, writeLandingPage } from '@/server/services/site-bui
 async function GETHandler(request: Request) {
   const url = new URL(request.url);
   const q = url.searchParams.get('q') || '';
-  const page = url.searchParams.get('page') ? Number(url.searchParams.get('page')) : 1;
-  const limit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 20;
+  const rawPage = url.searchParams.get('page') ? Number(url.searchParams.get('page')) : 1;
+  const rawLimit = url.searchParams.get('limit') ? Number(url.searchParams.get('limit')) : 20;
+  const page = Math.max(1, Number.isFinite(rawPage) ? Math.trunc(rawPage) : 1);
+  const limit = Math.min(100, Math.max(1, Number.isFinite(rawLimit) ? Math.trunc(rawLimit) : 20));
   const status = url.searchParams.get('status') || undefined;
 
   return mediaAdmin(request, false, (env) =>

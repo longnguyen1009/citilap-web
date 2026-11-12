@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { withAdminContext } from '@/server/admin-request-context';
 import { requireAdmin, requireAdminMutation } from '@/lib/auth';
 import { mediaEnvironment } from '@/server/media-http';
+import { MediaError } from '@/server/services/media-library.service';
+import { validateSerialStateTransition, type SerialUnitStatus } from '@/server/services/inventory.service';
+import { adminAuditStatements } from '@/server/admin-context';
+import { z } from 'zod';
 
 const NO_STORE_HEADERS = {
   'Cache-Control': 'private, no-store, no-cache, must-revalidate',
@@ -130,42 +134,41 @@ async function POSTHandler(request: Request) {
     const nowIso = new Date().toISOString();
 
     if (action === 'CREATE_SERIAL') {
-      const productId = String(body.productId || '').trim();
-      const warehouseId = String(body.warehouseId || '').trim();
-      const serialNumber = String(body.serialNumber || '').trim().toUpperCase();
-      const condition = String(body.condition || 'LIKE_NEW').trim();
-      const status = String(body.status || 'AVAILABLE').trim();
-      const warrantyMonths = Number(body.warrantyMonths || 12);
-      const notes = String(body.notes || '').trim() || null;
-      const publicCode = String(body.publicCode || '').trim().toUpperCase();
-      const rawBattery = Number(body.batteryHealth);
-      const batteryHealth = Number.isFinite(rawBattery) ? Math.min(100, Math.max(0, Math.round(rawBattery))) : 97;
-      const appearance = String(body.appearance || 'Đẹp 99% Like New, vỏ nguyên bản, không cấn móp').trim();
-      const checks = String(
-        body.checks ||
-          'Đã vượt qua 12 bước kiểm định phần cứng CitiLap: Màn hình, Bàn phím, Cổng kết nối, Tản nhiệt, SSD, RAM, Wifi/Bluetooth, Loa, Webcam, Touchpad, Pin, Sạc zin.'
-      ).trim();
+      const input = z.object({
+        productId: z.string().trim().min(1).max(200), warehouseId: z.string().trim().min(1).max(200),
+        serialNumber: z.string().trim().min(1).max(200).transform(value => value.toUpperCase()),
+        condition: z.enum(['NEW', 'LIKE_NEW', 'USED', 'OPEN_BOX', 'REFURBISHED']).default('LIKE_NEW'),
+        status: z.enum(['AVAILABLE', 'QC_HOLD']).default('AVAILABLE'), warrantyMonths: z.number().int().min(0).max(120).default(12),
+        batteryHealth: z.number().int().min(0).max(100).nullable().default(null),
+        publicCode: z.string().trim().max(100).transform(value => value.toUpperCase()).default(''),
+        appearance: z.string().trim().max(2000).default(''), checks: z.string().trim().max(5000).default(''),
+        notes: z.string().trim().max(5000).nullable().default(null), variantId: z.string().trim().max(200).nullish(),
+      }).safeParse(body);
+      if (!input.success) throw new MediaError(input.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '), 400);
+      const { productId, warehouseId, serialNumber, condition, status, warrantyMonths, batteryHealth, publicCode, appearance, checks, notes } = input.data;
+      if (!await db.prepare("SELECT id FROM Product WHERE id=? AND deletedAt IS NULL AND status IN ('ACTIVE','DRAFT')").bind(productId).first()) throw new MediaError('Sản phẩm không còn khả dụng.', 400);
+      if (!await db.prepare("SELECT id FROM Warehouse WHERE id=? AND status='ACTIVE'").bind(warehouseId).first()) throw new MediaError('Kho không còn hoạt động.', 400);
 
-      if (!productId || !warehouseId || !serialNumber) {
-        return NextResponse.json(
-          { success: false, error: 'Vui lòng chọn sản phẩm, kho hàng và nhập mã Serial/Service Tag.' },
-          { status: 400 }
-        );
-      }
-
-      const requestedVariantId = String(body.variantId || '').trim();
+      const requestedVariantId = input.data.variantId || '';
       const variantRow = requestedVariantId
         ? await db
-            .prepare(`SELECT id FROM ProductVariant WHERE id = ? AND productId = ? LIMIT 1`)
+            .prepare(`SELECT id FROM ProductVariant WHERE id = ? AND productId = ? AND status='ACTIVE' LIMIT 1`)
             .bind(requestedVariantId, productId)
             .first<{ id: string }>()
         : await db
-            .prepare(`SELECT id FROM ProductVariant WHERE productId = ? ORDER BY createdAt ASC LIMIT 1`)
+            .prepare(`SELECT id FROM ProductVariant WHERE productId = ? AND status='ACTIVE' ORDER BY createdAt ASC LIMIT 1`)
             .bind(productId)
             .first<{ id: string }>();
+      if (requestedVariantId && !variantRow) throw new MediaError('Biến thể không thuộc sản phẩm hoặc đã ngừng bán.', 400);
 
       const serialId = 'su-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+      const createGuard = crypto.randomUUID();
       const stmts = [
+        db.prepare(`INSERT INTO AdminMutationGuard(id,allowed) SELECT ?,CASE WHEN
+          EXISTS(SELECT 1 FROM Product WHERE id=? AND deletedAt IS NULL AND status IN ('ACTIVE','DRAFT')) AND
+          EXISTS(SELECT 1 FROM Warehouse WHERE id=? AND status='ACTIVE') AND
+          (? IS NULL OR EXISTS(SELECT 1 FROM ProductVariant WHERE id=? AND productId=? AND status='ACTIVE'))
+          THEN 1 ELSE 0 END`).bind(createGuard, productId, warehouseId, variantRow?.id || null, variantRow?.id || null, productId),
         db
           .prepare(
             `INSERT INTO SerialUnit (id, productId, variantId, warehouseId, serialNumber, condition, status, warrantyMonths, notes, receivedAt, createdAt, updatedAt)
@@ -192,7 +195,7 @@ async function POSTHandler(request: Request) {
           db
             .prepare(
               `INSERT INTO ProductInspection (serialUnitId, publicCode, checkedAt, batteryHealth, appearance, checks, limitations, warranty, published, isDemo, updatedAt)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?)`
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?)`
             )
             .bind(
               serialId,
@@ -201,27 +204,43 @@ async function POSTHandler(request: Request) {
               batteryHealth,
               appearance,
               checks,
-              'Không có lỗi phần cứng; ngoại hình đạt chuẩn CitiLap tuyển chọn.',
+              '',
               `Bảo hành ${warrantyMonths} tháng tại CitiLap, lỗi 1 đổi 1 trong 7 ngày đầu tiên`,
               nowIso
             )
         );
       }
 
-      await db.batch(stmts);
+      await db.batch([...stmts, ...adminAuditStatements(db, 'inventory.create', serialId, 'Nhập serial vào kho'), db.prepare('DELETE FROM AdminMutationGuard WHERE id=?').bind(createGuard)]);
       return NextResponse.json({ success: true, id: serialId });
     }
 
     if (action === 'UPDATE_SERIAL_STATUS') {
       const serialId = String(body.id || '').trim();
       const status = String(body.status || '').trim();
-      if (!serialId || !['AVAILABLE', 'RESERVED', 'SOLD', 'QC_HOLD', 'REPAIR'].includes(status)) {
+      if (!serialId || !['AVAILABLE', 'QC_HOLD', 'REPAIR', 'DAMAGED'].includes(status)) {
         return NextResponse.json({ success: false, error: 'Trạng thái Serial không hợp lệ.' }, { status: 400 });
       }
-      await db
-        .prepare(`UPDATE SerialUnit SET status = ?, updatedAt = ? WHERE id = ?`)
-        .bind(status, nowIso, serialId)
-        .run();
+      const current = await db.prepare('SELECT status,updatedAt FROM SerialUnit WHERE id=?').bind(serialId).first<{ status: SerialUnitStatus; updatedAt: string }>();
+      if (!current) throw new MediaError('Không tìm thấy serial.', 404);
+      if (typeof body.expectedUpdatedAt !== 'string' || body.expectedUpdatedAt !== current.updatedAt) throw new MediaError('Serial đã thay đổi. Tải lại dữ liệu kho.', 409);
+      if (!['AVAILABLE', 'QC_HOLD', 'REPAIR', 'DAMAGED', 'RETURNED'].includes(current.status) || current.status === status || !validateSerialStateTransition(current.status, status as SerialUnitStatus)) throw new MediaError('Chuyển trạng thái này phải qua quy trình đơn hàng hoặc đổi trả.', 409);
+      const guard = crypto.randomUUID();
+      try {
+        await db.batch([
+          db.prepare(`INSERT INTO AdminMutationGuard(id,allowed) SELECT ?,CASE WHEN EXISTS(
+            SELECT 1 FROM SerialUnit su WHERE su.id=? AND su.status=? AND su.updatedAt=? AND su.allocatedReference IS NULL
+            AND NOT EXISTS(SELECT 1 FROM OrderItem oi JOIN [Order] o ON o.id=oi.orderId WHERE oi.serialUnitId=su.id AND o.status!='CANCELLED')
+            AND NOT EXISTS(SELECT 1 FROM InventoryReservation ir WHERE ir.serialUnitId=su.id AND ir.status='ACTIVE' AND ir.expiresAt>?)
+          ) THEN 1 ELSE 0 END`).bind(guard, serialId, current.status, body.expectedUpdatedAt, nowIso),
+          db.prepare('UPDATE SerialUnit SET status=?,updatedAt=? WHERE id=?').bind(status, nowIso, serialId),
+          ...adminAuditStatements(db, 'inventory.status', serialId, `${current.status} → ${status}`),
+          db.prepare('DELETE FROM AdminMutationGuard WHERE id=?').bind(guard),
+        ]);
+      } catch (error) {
+        if (error instanceof Error && /CHECK constraint failed/.test(error.message)) throw new MediaError('Serial đang được giữ hoặc đã thay đổi. Tải lại dữ liệu kho.', 409);
+        throw error;
+      }
       return NextResponse.json({ success: true });
     }
 
@@ -242,6 +261,9 @@ async function POSTHandler(request: Request) {
 
     return NextResponse.json({ success: false, error: 'Hành động không được hỗ trợ.' }, { status: 400 });
   } catch (error) {
+    if (error instanceof MediaError) return NextResponse.json({ success: false, error: error.message }, { status: error.status });
+    if (error instanceof SyntaxError) return NextResponse.json({ success: false, error: 'JSON không hợp lệ.' }, { status: 400 });
+    if (error instanceof Error && /UNIQUE constraint|CHECK constraint/.test(error.message)) return NextResponse.json({ success: false, error: 'Dữ liệu vừa thay đổi hoặc mã Serial/Public Code đã tồn tại. Tải lại và kiểm tra.' }, { status: 409 });
     console.error('[POST /api/admin/inventory] Failed:', error);
     return NextResponse.json(
       { success: false, error: 'Lỗi khi cập nhật dữ liệu kho & serial (kiểm tra trùng mã Serial hoặc Public Code).' },

@@ -1,9 +1,15 @@
 import { cmsMutationBatch } from '../cms-schedule-context';
 import { adminActor, adminAuditStatements } from '../admin-context';
 import type { D1Database } from '@cloudflare/workers-types';
-import { blankProduct, defaultWarrantyMonthsForCondition, formatShortWarrantyBadge, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
+import { blankProduct, defaultWarrantyMonthsForCondition, formatShortWarrantyBadge, productDocumentSchema, studioWriteSchema, type ProductDocument } from '../../contracts/cms/product-studio';
 import { sanitizeHtml } from '../../lib/sanitize-html';
 import { MediaError, mediaDetail, getAsset, resolveMediaPresentation, type MediaEnvironment } from './media-library.service';
+
+function studioError(status: number, message: string, code?: string): MediaError {
+  const err = new MediaError(message, status) as MediaError & { code?: string };
+  if (code) err.code = code;
+  return err;
+}
 
 export type ProductKind = 'LAPTOP' | 'ACCESSORY' | 'MOUSE' | 'TECH' | 'OTHER';
 
@@ -434,12 +440,30 @@ export async function studioList(db: D1Database, q = '') {
 
 function normalizeStudioDocument(rawDoc: ProductDocument, legacyStock?: number | null, legacyWarranty?: string | null): ProductDocument {
   const d = rawDoc;
-  if (['STAND', 'HARDWARE'].includes(d.template as string)) {
-    d.template = 'ACCESSORY';
+  d.schemaVersion = 1;
+  d.name = String(d.name ?? '');
+  d.slug = String(d.slug ?? '');
+  d.categoryId = String(d.categoryId ?? '');
+  d.brand = String(d.brand ?? '');
+  d.brandId ??= null;
+  if (['STAND', 'HARDWARE'].includes(d.template as string) || !d.template) {
+    d.template = d.template ? 'ACCESSORY' : 'LAPTOP';
   }
-  if ((d.availability as string) === 'IN_STOCK') {
+  d.condition ??= 'NEW';
+  if ((d.availability as string) === 'IN_STOCK' || !d.availability) {
     d.availability = 'AVAILABLE';
   }
+  d.isNewArrival = Boolean(d.isNewArrival);
+  d.isBestSeller = Boolean(d.isBestSeller);
+  d.isFeatured = Boolean(d.isFeatured);
+  d.isFlashSale = Boolean(d.isFlashSale);
+  d.tags = Array.isArray(d.tags) ? d.tags : [];
+  d.description = String(d.description ?? '');
+  d.contentHtml = String(d.contentHtml ?? '');
+  d.price = typeof d.price === 'number' && Number.isFinite(d.price) ? Math.max(0, Math.round(d.price)) : 0;
+  d.originalPrice = typeof d.originalPrice === 'number' && Number.isFinite(d.originalPrice) ? Math.max(0, Math.round(d.originalPrice)) : null;
+  d.seoTitle = String(d.seoTitle ?? '');
+  d.seoDescription = String(d.seoDescription ?? '');
   if (d.warrantyType !== 'SHOP' && d.warrantyType !== 'BRAND') {
     const rawW = String(legacyWarranty || d.warranties?.[0]?.name || '');
     d.warrantyType = /hãng|brand|manufacturer/i.test(rawW) ? 'BRAND' : 'SHOP';
@@ -466,6 +490,7 @@ function normalizeStudioDocument(rawDoc: ProductDocument, legacyStock?: number |
   if (Array.isArray(d.variants)) {
     d.variants = d.variants.map((v) => ({
       ...v,
+      condition: v.condition || 'NEW',
       availability: ((v.availability as string) === 'IN_STOCK' ? 'AVAILABLE' : v.availability) || 'AVAILABLE',
       stock: typeof v.stock === 'number' && v.stock >= 0 ? v.stock : (typeof v.options?.stock === 'string' ? parseInt(v.options.stock, 10) || 0 : undefined),
       tag: v.tag ?? v.options?.tag ?? undefined,
@@ -476,6 +501,7 @@ function normalizeStudioDocument(rawDoc: ProductDocument, legacyStock?: number |
   d.faqs ??= [];
   d.gifts ??= [];
   d.accessoryProductIds ??= [];
+  d.relatedProductIds ??= [];
   d.warranties ??= [];
   d.media ??= [];
   return d;
@@ -593,9 +619,121 @@ export async function studioDetail(db: D1Database, id: string) {
  * Critical invariant: first draft save of a legacy active product does NOT unpublish or hide it from the website!
  */
 export async function writeStudio(env: MediaEnvironment, id: string | null, input: unknown) {
-  const { expectedRevision, action, document: d } = studioWriteSchema.parse(input);
-  d.contentHtml = sanitizeHtml(d.contentHtml);
+  const parsed = studioWriteSchema.parse(input);
+  const { expectedRevision, action } = parsed;
   const db = env.DB;
+  const actor = adminActor();
+
+  const existing = id ? await studioDetail(db, id) : null;
+  if ((existing?.revision ?? 0) !== expectedRevision) {
+    throw studioError(409, 'Xung đột phiên bản, vui lòng tải lại', 'REVISION_CONFLICT');
+  }
+
+  // Check if ProductStudio record already existed in DB
+  const existingStudioRow = id
+    ? await db.prepare('SELECT revision, draft, published FROM ProductStudio WHERE productId=?').bind(id).first<{ revision: number; draft: string; published: string | null }>()
+    : null;
+
+  // Allow action === 'unpublish' to succeed even if the draft document has incomplete/invalid fields
+  if (action === 'unpublish') {
+    if (!id || !existing) {
+      throw studioError(400, 'Không thể ẩn sản phẩm chưa được tạo.');
+    }
+    const version = expectedRevision + 1;
+    let draftSnapshot = existingStudioRow?.draft ?? JSON.stringify(existing.document);
+    if (parsed.document && typeof parsed.document === 'object') {
+      const validDraft = productDocumentSchema.safeParse(parsed.document);
+      if (validDraft.success) {
+        validDraft.data.contentHtml = sanitizeHtml(validDraft.data.contentHtml || '');
+        draftSnapshot = JSON.stringify(validDraft.data);
+      } else {
+        const rawDraft = { ...existing.document, ...(parsed.document as Record<string, unknown>) };
+        if (typeof rawDraft.contentHtml === 'string') {
+          rawDraft.contentHtml = sanitizeHtml(rawDraft.contentHtml);
+        }
+        draftSnapshot = JSON.stringify(rawDraft);
+      }
+    }
+
+    const statements = [
+      db.prepare('INSERT OR IGNORE INTO ProductStudio(productId,draft,published) VALUES(?,?,NULL)').bind(id, draftSnapshot),
+      db.prepare('INSERT INTO ProductStudioRevision(productId,revision,document,action,actor) VALUES(?,?,?,?,?)').bind(id, version, draftSnapshot, 'unpublish', actor),
+      db.prepare(`
+        UPDATE ProductStudio
+        SET draft = ?,
+            revision = ?,
+            published = NULL,
+            publishedRevision = NULL,
+            updatedAt = CURRENT_TIMESTAMP
+        WHERE productId = ? AND revision = ?
+      `).bind(draftSnapshot, version, id, expectedRevision),
+      db.prepare("UPDATE Product SET status='INACTIVE', updatedAt=CURRENT_TIMESTAMP WHERE id=?").bind(id),
+      db.prepare('INSERT INTO ProductEditLog(id,productId,action,actorName,snapshot) VALUES(?,?,?,?,?)').bind(
+        crypto.randomUUID(),
+        id,
+        'STUDIO_UNPUBLISH',
+        actor,
+        draftSnapshot
+      ),
+    ];
+
+    try {
+      const batchRes = await cmsMutationBatch(db, [
+        ...statements,
+        ...adminAuditStatements(db, 'product.unpublish', id, 'CMS mutation', null, 'order', { before: expectedRevision, after: version }),
+      ]);
+      const updateRes = Array.isArray(batchRes) ? batchRes.find((_, idx) => idx === 2 || idx === 3) : null;
+      if (updateRes && typeof updateRes.meta?.changes === 'number' && updateRes.meta.changes === 0) {
+        throw studioError(409, 'Xung đột phiên bản, vui lòng tải lại', 'REVISION_CONFLICT');
+      }
+    } catch (e) {
+      if (e instanceof MediaError) throw e;
+      if (e instanceof Error && /STUDIO_CONFLICT|ProductStudioRevision|REVISION_CONFLICT/i.test(e.message)) {
+        throw studioError(409, 'Xung đột phiên bản, vui lòng tải lại', 'REVISION_CONFLICT');
+      }
+      if (e instanceof Error && /UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
+        throw studioError(409, 'Xung đột phiên bản, slug, SKU hoặc trạng thái media. Tải lại và kiểm tra dữ liệu.', 'CONFLICT');
+      }
+      throw e;
+    }
+
+    return studioDetail(db, id);
+  }
+
+  const d = parsed.document;
+  d.contentHtml = sanitizeHtml(d.contentHtml || '');
+  const productId = id || crypto.randomUUID();
+
+  // Pre-check duplicate slug across products
+  const dupSlug = await db
+    .prepare('SELECT id, name FROM Product WHERE slug=? AND id<>?')
+    .bind(d.slug, productId)
+    .first<{ id: string; name: string }>();
+  if (dupSlug) {
+    throw studioError(
+      409,
+      `Đường dẫn (slug) "${d.slug}" đã được dùng bởi sản phẩm "${dupSlug.name}"`,
+      'DUPLICATE_SLUG'
+    );
+  }
+
+  // Pre-check cross-product duplicate SKUs
+  const variantSkus = [...new Set(d.variants.map(v => v.sku.trim()).filter(Boolean))];
+  if (variantSkus.length > 0) {
+    const dupSku = await db
+      .prepare(
+        `SELECT pv.sku, p.name FROM ProductVariant pv JOIN Product p ON p.id=pv.productId WHERE pv.sku IN (${variantSkus.map(() => '?').join(', ')}) AND pv.productId<>?`
+      )
+      .bind(...variantSkus, productId)
+      .first<{ sku: string; name: string }>();
+    if (dupSku) {
+      throw studioError(
+        409,
+        `Mã SKU "${dupSku.sku}" đã tồn tại ở sản phẩm "${dupSku.name}"`,
+        'DUPLICATE_SKU'
+      );
+    }
+  }
 
   if (action === 'publish' && d.template !== 'LAPTOP' && await db.prepare("SELECT c.id FROM Category c JOIN Category parent ON parent.id=c.parentId WHERE c.slug=? AND parent.slug='phu-kien'").bind(d.slug).first()) {
     throw new MediaError('Slug sản phẩm trùng đường dẫn danh mục phụ kiện. Chọn slug khác.');
@@ -605,38 +743,48 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     throw new MediaError('Danh mục không tồn tại hoặc đã ẩn.');
   }
 
-  const existing = id ? await studioDetail(db, id) : null;
-  if ((existing?.revision ?? 0) !== expectedRevision) {
-    throw new MediaError('Sản phẩm đã được sửa ở nơi khác. Tải lại trước khi lưu.', 409);
-  }
-
-  // Check if ProductStudio record already existed in DB
-  const existingStudioRow = id
-    ? await db.prepare('SELECT revision, published FROM ProductStudio WHERE productId=?').bind(id).first<{ revision: number; published: string | null }>()
-    : null;
-
-  const productId = id || crypto.randomUUID();
-  for (const accessoryId of d.accessoryProductIds) {
-    if (accessoryId === productId || !await db.prepare('SELECT id FROM Product WHERE id=? AND deletedAt IS NULL').bind(accessoryId).first()) {
+  if (d.accessoryProductIds.length > 0) {
+    if (d.accessoryProductIds.includes(productId)) {
+      throw new MediaError('Phụ kiện mua kèm không tồn tại hoặc trùng sản phẩm chính.');
+    }
+    const accRows = await db
+      .prepare(`SELECT id FROM Product WHERE id IN (${d.accessoryProductIds.map(() => '?').join(', ')}) AND deletedAt IS NULL`)
+      .bind(...d.accessoryProductIds)
+      .all<{ id: string }>();
+    const foundAccIds = new Set((accRows.results || []).map(r => r.id));
+    if (d.accessoryProductIds.some(accId => !foundAccIds.has(accId))) {
       throw new MediaError('Phụ kiện mua kèm không tồn tại hoặc trùng sản phẩm chính.');
     }
   }
-  const assets = [];
-  for (const m of d.media) {
-    const a = await getAsset(db, m.assetId);
-    const detail = await mediaDetail(db, m.assetId);
-    if (a.state !== 'READY' || !detail.asset.url) throw new MediaError('Tệp chưa sẵn sàng.');
-    if (action === 'publish' && a.kind === 'IMAGE' && (!m.alt.trim() || !a.storageKey || !await env.PRODUCT_MEDIA.head(a.storageKey))) {
-      throw new MediaError('Ảnh xuất bản cần mô tả alt và tệp tồn tại trong R2.');
-    }
-    assets.push({ ...a, url: detail.asset.url, ...m });
-  }
+
+  const assets = await Promise.all(
+    d.media.map(async (m) => {
+      const [a, detail] = await Promise.all([
+        getAsset(db, m.assetId),
+        mediaDetail(db, m.assetId),
+      ]);
+      if (a.state !== 'READY' || !detail.asset.url) throw new MediaError('Tệp chưa sẵn sàng.');
+      if (action === 'publish' && a.kind === 'IMAGE' && (!m.alt.trim() || !a.storageKey || !await env.PRODUCT_MEDIA.head(a.storageKey))) {
+        throw new MediaError('Ảnh xuất bản cần mô tả alt và tệp tồn tại trong R2.');
+      }
+      return { ...a, url: detail.asset.url, ...m };
+    })
+  );
 
   if (action === 'publish' && !assets.some(a => a.kind === 'IMAGE')) {
     throw new MediaError('Thêm ít nhất một ảnh trước khi xuất bản.');
   }
 
-  d.contentHtml = sanitizeHtml(d.contentHtml || '');
+  // Canonicalize before serializing: public snapshot and SQL projection share one price.
+  if (action === 'publish') {
+    const activeVariants = d.variants.filter(v => (!v.availability || ['AVAILABLE', 'PREORDER'].includes(v.availability)) && v.price > 0);
+    const cheapest = activeVariants.reduce<(typeof activeVariants)[number] | null>((min, v) => !min || v.price < min.price ? v : min, null);
+    if (cheapest) {
+      d.price = cheapest.price;
+      d.originalPrice = cheapest.originalPrice != null && cheapest.originalPrice >= d.price
+        ? cheapest.originalPrice : d.originalPrice != null && d.originalPrice >= d.price ? d.originalPrice : null;
+    }
+  }
   const version = expectedRevision + 1;
   const snapshot = JSON.stringify(d);
   const statements = [];
@@ -656,8 +804,9 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     snapshot,
     action === 'publish' ? snapshot : initialPublishedSnapshot
   ));
-  statements.push(db.prepare('INSERT INTO ProductStudioRevision(productId,revision,document,action) VALUES(?,?,?,?)').bind(productId, version, snapshot, action));
+  statements.push(db.prepare('INSERT INTO ProductStudioRevision(productId,revision,document,action,actor) VALUES(?,?,?,?,?)').bind(productId, version, snapshot, action, actor));
 
+  const studioUpdateStmtIndex = statements.length;
   statements.push(db.prepare(`
     UPDATE ProductStudio
     SET draft = ?,
@@ -669,18 +818,22 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
         END,
         publishedRevision = CASE WHEN ?='publish' THEN ? WHEN ?='unpublish' THEN NULL ELSE publishedRevision END,
         updatedAt = CURRENT_TIMESTAMP
-    WHERE productId = ?
-  `).bind(snapshot, version, action, snapshot, action, action, version, action, productId));
+    WHERE productId = ? AND revision = ?
+  `).bind(snapshot, version, action, snapshot, action, action, version, action, productId, expectedRevision));
+
+  statements.push(
+    db.prepare("DELETE FROM MediaUsage WHERE ownerId=? AND ownerType LIKE 'PRODUCT_%' AND slot LIKE ?").bind(productId, `${version}:%`)
+  );
 
   for (const a of assets) {
-    statements.push(db.prepare("INSERT INTO MediaUsage(id,assetId,ownerType,ownerId,slot) VALUES(?,?,'PRODUCT_REVISION',?,?)").bind(crypto.randomUUID(), a.id, productId, `${version}:${a.id}`));
+    statements.push(db.prepare("INSERT OR IGNORE INTO MediaUsage(id,assetId,ownerType,ownerId,slot) VALUES(?,?,'PRODUCT_REVISION',?,?)").bind(crypto.randomUUID(), a.id, productId, `${version}:${a.id}`));
   }
 
   // Track MediaUsage for images embedded in rich content
   const htmlAssetMatches = [...(d.contentHtml || '').matchAll(/\/api\/media\/([a-f0-9-]{36})/gi)];
   const htmlAssetIds = [...new Set(htmlAssetMatches.map(m => m[1]))];
   for (const htmlAssetId of htmlAssetIds) {
-    statements.push(db.prepare("INSERT INTO MediaUsage(id,assetId,ownerType,ownerId,slot) VALUES(?,?,'PRODUCT_CONTENT',?,?)").bind(crypto.randomUUID(), htmlAssetId, productId, `${version}:${htmlAssetId}`));
+    statements.push(db.prepare("INSERT OR IGNORE INTO MediaUsage(id,assetId,ownerType,ownerId,slot) VALUES(?,?,'PRODUCT_CONTENT',?,?)").bind(crypto.randomUUID(), htmlAssetId, productId, `${version}:${htmlAssetId}`));
   }
 
   if (action === 'publish') {
@@ -764,10 +917,54 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
       productId
     ));
 
-    statements.push(db.prepare("UPDATE ProductVariant SET status='INACTIVE' WHERE productId=?").bind(productId));
+    // Batch variant owner check
+    if (d.variants.length > 0) {
+      const variantIds = d.variants.map(v => v.id);
+      const existingOwners = await db
+        .prepare(`SELECT id, productId FROM ProductVariant WHERE id IN (${variantIds.map(() => '?').join(', ')})`)
+        .bind(...variantIds)
+        .all<{ id: string; productId: string }>();
+      for (const row of existingOwners.results || []) {
+        if (row.productId !== productId) {
+          throw studioError(409, 'Biến thể thuộc sản phẩm khác.', 'VARIANT_OWNER_CONFLICT');
+        }
+      }
+    }
+
+    // Deactivate removed variants and suffix their SKU so admin can reuse the SKU without hitting UNIQUE(sku)
+    if (d.variants.length > 0) {
+      const activeIds = d.variants.map(v => v.id);
+      const idPlaceholders = activeIds.map(() => '?').join(', ');
+      statements.push(
+        db.prepare(`
+          UPDATE ProductVariant
+          SET status = 'INACTIVE',
+              stock = 0,
+              sku = CASE
+                WHEN instr(sku, '-archived-') > 0 THEN sku
+                ELSE sku || '-archived-' || substr(id, -6)
+              END,
+              updatedAt = CURRENT_TIMESTAMP
+          WHERE productId = ? AND id NOT IN (${idPlaceholders})
+        `).bind(productId, ...activeIds)
+      );
+    } else {
+      statements.push(
+        db.prepare(`
+          UPDATE ProductVariant
+          SET status = 'INACTIVE',
+              stock = 0,
+              sku = CASE
+                WHEN instr(sku, '-archived-') > 0 THEN sku
+                ELSE sku || '-archived-' || substr(id, -6)
+              END,
+              updatedAt = CURRENT_TIMESTAMP
+          WHERE productId = ?
+        `).bind(productId)
+      );
+    }
+
     for (const v of d.variants) {
-      const owner = await db.prepare('SELECT productId FROM ProductVariant WHERE id=?').bind(v.id).first<{ productId: string }>();
-      if (owner && owner.productId !== productId) throw new MediaError('Biến thể thuộc sản phẩm khác.', 409);
       const vStatus = (!v.availability || ['AVAILABLE', 'PREORDER'].includes(v.availability)) ? 'ACTIVE' : 'INACTIVE';
       const vCpu = (v.options?.CPU || v.options?.cpu || specs.CPU || specs.cpu || '').trim() || null;
       const vDisplay = (v.options?.['Màn hình'] || v.options?.display || specs['Màn hình'] || specs.display || '').trim() || null;
@@ -816,17 +1013,29 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     }
   }
 
-  if (action === 'unpublish') {
-    statements.push(db.prepare("UPDATE Product SET status='DRAFT',updatedAt=CURRENT_TIMESTAMP WHERE id=?").bind(productId));
-  }
-
-  statements.push(db.prepare('INSERT INTO ProductEditLog(id,productId,action,actorName,snapshot) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(), productId, `STUDIO_${action.toUpperCase()}`, adminActor(), snapshot));
+  statements.push(db.prepare('INSERT INTO ProductEditLog(id,productId,action,actorName,snapshot) VALUES(?,?,?,?,?)').bind(crypto.randomUUID(), productId, `STUDIO_${action.toUpperCase()}`, actor, snapshot));
 
   try {
-    await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'product.' + action, productId, 'CMS mutation', null, 'order', { before: expectedRevision, after: version })]);
+    const batchRes = await cmsMutationBatch(db, [...statements, ...adminAuditStatements(db, 'product.' + action, productId, 'CMS mutation', null, 'order', { before: expectedRevision, after: version })]);
+    if (Array.isArray(batchRes)) {
+      const studioUpdateRes = batchRes[studioUpdateStmtIndex] || batchRes[studioUpdateStmtIndex + 1];
+      if (studioUpdateRes && typeof studioUpdateRes.meta?.changes === 'number' && studioUpdateRes.meta.changes === 0) {
+        throw studioError(409, 'Xung đột phiên bản, vui lòng tải lại', 'REVISION_CONFLICT');
+      }
+    }
   } catch (e) {
-    if (e instanceof Error && /STUDIO_CONFLICT|UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
-      throw new MediaError('Xung đột phiên bản, slug, SKU hoặc trạng thái media. Tải lại và kiểm tra dữ liệu.', 409);
+    if (e instanceof MediaError) throw e;
+    if (e instanceof Error && /STUDIO_CONFLICT|ProductStudioRevision|REVISION_CONFLICT/i.test(e.message)) {
+      throw studioError(409, 'Xung đột phiên bản, vui lòng tải lại', 'REVISION_CONFLICT');
+    }
+    if (e instanceof Error && /Product\.slug/i.test(e.message)) {
+      throw studioError(409, `Đường dẫn (slug) "${d.slug}" đã tồn tại.`, 'DUPLICATE_SLUG');
+    }
+    if (e instanceof Error && /ProductVariant\.sku/i.test(e.message)) {
+      throw studioError(409, 'Mã SKU đã tồn tại ở sản phẩm khác.', 'DUPLICATE_SKU');
+    }
+    if (e instanceof Error && /UNIQUE constraint|MEDIA_NOT_READY/.test(e.message)) {
+      throw studioError(409, 'Xung đột phiên bản, slug, SKU hoặc trạng thái media. Tải lại và kiểm tra dữ liệu.', 'CONFLICT');
     }
     throw e;
   }
@@ -858,14 +1067,34 @@ export async function archiveProduct(db: D1Database, id: string) {
  * Lists all revisions for a product (ProductStudioRevision + audit logs).
  */
 export async function listProductRevisions(db: D1Database, productId: string) {
-  const studio = await db.prepare('SELECT revision, published, publishedRevision, draft FROM ProductStudio WHERE productId=?').bind(productId).first<{ revision: number; published: string | null; publishedRevision: number | null; draft: string }>();
-  
+  const studio = await db
+    .prepare('SELECT revision, published IS NOT NULL AS hasPublished, publishedRevision FROM ProductStudio WHERE productId=?')
+    .bind(productId)
+    .first<{ revision: number; hasPublished: number; publishedRevision: number | null }>();
+
   const studioRevs = await db.prepare(`
-    SELECT revision, action, createdAt, document
-    FROM ProductStudioRevision
-    WHERE productId=?
-    ORDER BY revision DESC
-  `).bind(productId).all<{ revision: number; action: string; createdAt: string; document: string }>();
+    SELECT
+      r.revision,
+      r.action,
+      r.actor,
+      r.createdAt,
+      json_extract(r.document, '$.name') as docName,
+      json_extract(r.document, '$.price') as docPrice,
+      COALESCE(u.name, u.email, r.actor) as resolvedActor
+    FROM ProductStudioRevision r
+    LEFT JOIN User u ON u.id = r.actor
+    WHERE r.productId=?
+    ORDER BY r.revision DESC
+    LIMIT 50
+  `).bind(productId).all<{
+    revision: number;
+    action: string;
+    actor: string | null;
+    createdAt: string;
+    docName: string | null;
+    docPrice: number | null;
+    resolvedActor: string | null;
+  }>();
 
   const logs = await db.prepare(`
     SELECT l.action, COALESCE(u.name, u.email, l.actorName) AS actorName, l.createdAt
@@ -873,25 +1102,25 @@ export async function listProductRevisions(db: D1Database, productId: string) {
     LEFT JOIN User u ON u.id = l.actorName
     WHERE l.productId=?
     ORDER BY l.createdAt DESC
+    LIMIT 50
   `).bind(productId).all<{ action: string; actorName: string; createdAt: string }>();
 
   const currentRevision = studio?.revision ?? 0;
-  const isPublished = !!studio?.published;
+  const isPublished = Boolean(studio?.hasPublished);
 
   const revisions = (studioRevs.results || []).map(r => {
-    let summary = '';
-    try {
-      const doc = JSON.parse(r.document);
-      summary = `${doc.name} · ${new Intl.NumberFormat('vi-VN').format(doc.price)}đ`;
-    } catch {
-      summary = 'Bản ghi revision';
-    }
-    const matchingLog = logs.results?.find(l => Math.abs(new Date(l.createdAt).getTime() - new Date(r.createdAt).getTime()) < 10000);
+    const summary = r.docName
+      ? `${r.docName} · ${new Intl.NumberFormat('vi-VN').format(Number(r.docPrice ?? 0))}đ`
+      : 'Bản ghi revision';
+    const matchingLog = (!r.actor || r.actor === 'admin')
+      ? logs.results?.find(l => Math.abs(new Date(l.createdAt).getTime() - new Date(r.createdAt).getTime()) < 10000)
+      : undefined;
     return {
       revision: r.revision,
       action: r.action,
+      actor: r.actor || 'admin',
       createdAt: r.createdAt,
-      actorName: matchingLog?.actorName || 'admin',
+      actorName: (r.actor && r.actor !== 'admin' ? r.resolvedActor : matchingLog?.actorName) || r.resolvedActor || r.actor || 'admin',
       summary,
       isCurrent: r.revision === currentRevision,
       isPublished: isPublished && r.revision === studio?.publishedRevision,
@@ -912,10 +1141,10 @@ export async function listProductRevisions(db: D1Database, productId: string) {
  */
 export async function getProductRevisionSnapshot(db: D1Database, productId: string, revision: number) {
   const rev = await db.prepare(`
-    SELECT revision, action, createdAt, document
+    SELECT revision, action, actor, createdAt, document
     FROM ProductStudioRevision
     WHERE productId=? AND revision=?
-  `).bind(productId, revision).first<{ revision: number; action: string; createdAt: string; document: string }>();
+  `).bind(productId, revision).first<{ revision: number; action: string; actor?: string; createdAt: string; document: string }>();
 
   if (!rev) {
     throw new MediaError('Không tìm thấy phiên bản yêu cầu.', 404);
@@ -923,7 +1152,7 @@ export async function getProductRevisionSnapshot(db: D1Database, productId: stri
 
   let doc: ProductDocument;
   try {
-    doc = JSON.parse(rev.document) as ProductDocument;
+    doc = normalizeStudioDocument(JSON.parse(rev.document) as ProductDocument);
   } catch {
     throw new MediaError('Dữ liệu phiên bản bị lỗi hoặc không hợp lệ.', 500);
   }
@@ -932,6 +1161,7 @@ export async function getProductRevisionSnapshot(db: D1Database, productId: stri
     productId,
     revision: rev.revision,
     action: rev.action,
+    actor: rev.actor || 'admin',
     createdAt: rev.createdAt,
     document: doc,
   };
@@ -949,12 +1179,13 @@ export async function restoreProductRevision(
   expectedRevision: number
 ) {
   const snapshot = await getProductRevisionSnapshot(env.DB, productId, targetRevision);
-  
+  const normalizedDocument = normalizeStudioDocument(snapshot.document);
+
   // Canonical restore writes a new draft and its audit atomically; public stays unchanged.
   const writeResult = await writeStudio(env, productId, {
     expectedRevision,
     action: 'restore',
-    document: snapshot.document,
+    document: normalizedDocument,
   });
 
   return {
@@ -962,7 +1193,7 @@ export async function restoreProductRevision(
     message: `Đã khôi phục phiên bản #${targetRevision} thành bản nháp mới (rev #${writeResult.revision}). Nội dung trên website chưa thay đổi cho đến khi bạn xuất bản.`,
     restoredFromRevision: targetRevision,
     newRevision: writeResult.revision,
-    document: snapshot.document,
+    document: normalizedDocument,
   };
 }
 

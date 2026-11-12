@@ -58,8 +58,10 @@ export default function AdminBrandsPage() {
   // Edit/Create Modal state
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null);
   const [formData, setFormData] = useState<BrandFormData>(emptyForm);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [modalError, setModalError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Logo picker modal state
@@ -69,21 +71,30 @@ export default function AdminBrandsPage() {
   // Delete modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState<boolean>(false);
   const [deletingBrand, setDeletingBrand] = useState<BrandDto | null>(null);
+  const [deletingUpdatedAt, setDeletingUpdatedAt] = useState<string | null>(null);
+  const [deleteModalError, setDeleteModalError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
 
   // Status feedback alert
   const [statusAlert, setStatusAlert] = useState<{ type: 'success' | 'error' | 'warning'; message: string } | null>(null);
 
+  const requestSeqRef = React.useRef(0);
+
   const fetchBrands = useCallback(async () => {
+    const seq = ++requestSeqRef.current;
     setLoading(true);
     setError(null);
     try {
       const res = await mediaRequest<{ items: BrandDto[]; total: number }>('/api/admin/brands');
+      if (seq !== requestSeqRef.current) return;
       setBrands(res.items || []);
     } catch (err) {
+      if (seq !== requestSeqRef.current) return;
       setError((err as Error).message || 'Không thể tải danh sách thương hiệu.');
     } finally {
-      setLoading(false);
+      if (seq === requestSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -119,13 +130,16 @@ export default function AdminBrandsPage() {
 
   const openCreateModal = () => {
     setEditingId(null);
+    setEditingUpdatedAt(null);
     setFormData(emptyForm);
     setFormErrors({});
+    setModalError(null);
     setModalOpen(true);
   };
 
   const openEditModal = (brand: BrandDto) => {
     setEditingId(brand.id);
+    setEditingUpdatedAt(brand.updatedAt);
     setFormData({
       name: brand.name,
       slug: brand.slug,
@@ -136,7 +150,15 @@ export default function AdminBrandsPage() {
       status: brand.status,
     });
     setFormErrors({});
+    setModalError(null);
     setModalOpen(true);
+  };
+
+  const openDeleteModal = (brand: BrandDto) => {
+    setDeletingBrand(brand);
+    setDeletingUpdatedAt(brand.updatedAt);
+    setDeleteModalError(null);
+    setDeleteModalOpen(true);
   };
 
   const handleSaveBrand = async (e: React.FormEvent) => {
@@ -153,16 +175,21 @@ export default function AdminBrandsPage() {
       return;
     }
 
+    setFormErrors({});
+    setModalError(null);
     setSubmitting(true);
     setStatusAlert(null);
     try {
       const endpoint = editingId ? `/api/admin/brands/${editingId}` : '/api/admin/brands';
       const method = editingId ? 'PUT' : 'POST';
+      const payload = editingId
+        ? { ...formData, expectedUpdatedAt: editingUpdatedAt }
+        : formData;
 
       await mediaRequest(endpoint, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       setStatusAlert({
@@ -173,11 +200,28 @@ export default function AdminBrandsPage() {
       });
 
       setModalOpen(false);
+      setEditingId(null);
+      setEditingUpdatedAt(null);
+      setModalError(null);
       setRefreshTrigger(n => n + 1);
     } catch (err) {
+      const message = (err as Error).message || 'Có lỗi xảy ra khi lưu.';
+      const issues = (err as { issues?: Array<{ path: string; message: string }> }).issues;
+      if (Array.isArray(issues) && issues.length > 0) {
+        const nextFieldErrors: Record<string, string> = {};
+        for (const issue of issues) {
+          if (issue.path && !nextFieldErrors[issue.path]) {
+            nextFieldErrors[issue.path] = issue.message;
+          }
+        }
+        if (Object.keys(nextFieldErrors).length > 0) {
+          setFormErrors(prev => ({ ...prev, ...nextFieldErrors }));
+        }
+      }
+      setModalError(message);
       setStatusAlert({
         type: 'error',
-        message: (err as Error).message || 'Có lỗi xảy ra khi lưu.',
+        message,
       });
     } finally {
       setSubmitting(false);
@@ -187,10 +231,13 @@ export default function AdminBrandsPage() {
   const handleDeleteBrand = async () => {
     if (!deletingBrand) return;
     setDeleting(true);
+    setDeleteModalError(null);
     setStatusAlert(null);
     try {
       await mediaRequest(`/api/admin/brands/${deletingBrand.id}`, {
         method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedUpdatedAt: deletingUpdatedAt }),
       });
 
       setStatusAlert({
@@ -199,13 +246,16 @@ export default function AdminBrandsPage() {
       });
       setDeleteModalOpen(false);
       setDeletingBrand(null);
+      setDeletingUpdatedAt(null);
+      setDeleteModalError(null);
       setRefreshTrigger(n => n + 1);
     } catch (err) {
+      const message = (err as Error).message || 'Không thể xóa thương hiệu.';
+      setDeleteModalError(message);
       setStatusAlert({
         type: 'error',
-        message: (err as Error).message || 'Không thể xóa thương hiệu.',
+        message,
       });
-      setDeleteModalOpen(false);
     } finally {
       setDeleting(false);
     }
@@ -396,10 +446,7 @@ export default function AdminBrandsPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            setDeletingBrand(b);
-                            setDeleteModalOpen(true);
-                          }}
+                          onClick={() => openDeleteModal(b)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
                           title="Gỡ"
                         >
@@ -419,9 +466,19 @@ export default function AdminBrandsPage() {
       {modalOpen && (
         <MediaDialog
           title={editingId ? 'Sửa thương hiệu' : 'Thêm thương hiệu'}
-          onClose={() => setModalOpen(false)}
+          onClose={() => {
+            if (!submitting) {
+              setModalOpen(false);
+              setModalError(null);
+            }
+          }}
         >
           <form onSubmit={handleSaveBrand} className="space-y-3.5 max-w-xl mx-auto py-1">
+            {modalError && (
+              <InlineAlert variant="error" onClose={() => setModalError(null)}>
+                {modalError}
+              </InlineAlert>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -591,8 +648,21 @@ export default function AdminBrandsPage() {
 
       {/* DELETE CONFIRMATION MODAL */}
       {deleteModalOpen && deletingBrand && (
-        <MediaDialog title="Gỡ thương hiệu" onClose={() => setDeleteModalOpen(false)}>
+        <MediaDialog
+          title="Gỡ thương hiệu"
+          onClose={() => {
+            if (!deleting) {
+              setDeleteModalOpen(false);
+              setDeleteModalError(null);
+            }
+          }}
+        >
           <div className="p-3 space-y-3 max-w-md mx-auto">
+            {deleteModalError && (
+              <InlineAlert variant="error" onClose={() => setDeleteModalError(null)}>
+                {deleteModalError}
+              </InlineAlert>
+            )}
             {deletingBrand.productCount > 0 ? (
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 space-y-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-amber-900">
@@ -614,7 +684,10 @@ export default function AdminBrandsPage() {
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => setDeleteModalOpen(false)}
+                onClick={() => {
+                  setDeleteModalOpen(false);
+                  setDeleteModalError(null);
+                }}
                 disabled={deleting}
               >
                 Đóng

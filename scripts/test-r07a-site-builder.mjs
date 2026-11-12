@@ -22,6 +22,10 @@ await build({
       export * from './src/contracts/cms/navigation';
       export * from './src/contracts/cms/settings';
       export * from './src/lib/prisma';
+      export { loginAdmin } from './src/server/services/admin-identity.service';
+      export { GET as builderListGET } from './src/app/api/admin/builder/route';
+      export { POST as previewPOST } from './src/app/api/admin/builder/[id]/preview/route';
+      export { MediaRequestError, mediaRequest } from './src/components/admin/media/MediaBrowser';
     `,
     resolveDir: process.cwd(),
   },
@@ -39,13 +43,15 @@ await build({
         }));
       },
     },
-    {
-      name: 'mock-server-only',
-      setup(b) {
-        b.onResolve({ filter: /^server-only$/ }, (args) => ({ path: args.path, namespace: 'server-only-ns' }));
-        b.onLoad({ filter: /.*/, namespace: 'server-only-ns' }, () => ({ contents: '' }));
+      {
+        name: 'mock-server-only',
+        setup(b) {
+          b.onResolve({ filter: /^server-only$/ }, (args) => ({ path: args.path, namespace: 'server-only-ns' }));
+          b.onLoad({ filter: /.*/, namespace: 'server-only-ns' }, () => ({ contents: '' }));
+          b.onResolve({ filter: /\.css$/ }, (args) => ({ path: args.path, namespace: 'css-ns' }));
+          b.onLoad({ filter: /.*/, namespace: 'css-ns' }, () => ({ contents: '' }));
+        },
       },
-    },
   ],
   outfile: 'scripts/.r07a-test-bundle.mjs',
 });
@@ -835,6 +841,96 @@ try {
     } finally {
       prismaClient.productStudio.findMany = origFindMany;
     }
+  });
+
+  // Test 11: Round 01 Builder Regression Checks (Preview Validation Issues, 409 Status, Pagination Clamp)
+  await check('Round 01 Builder regressions: preview 400 structured issues, 409 HTTP status exposure, and totalPages clamp', async () => {
+    globalThis.env = env;
+
+    // 1. Set up admin session for authenticated endpoint checks
+    process.env.ADMIN_EMAIL = 'admin@citilap.local';
+    process.env.ADMIN_PASSWORD = 'AdminPassword123456!';
+    const { token: adminSessionToken } = await api.loginAdmin(
+      { email: 'admin@citilap.local', password: 'AdminPassword123456!' },
+      DB
+    );
+    const authHeaders = {
+      'Content-Type': 'application/json',
+      Cookie: `admin_session=${adminSessionToken}`,
+      Origin: 'http://localhost',
+    };
+
+    // 2. Verify GET /api/admin/builder clamps totalPages >= 1 even when 0 items match
+    const emptyListReq = new Request(
+      'http://localhost/api/admin/builder?q=__non_existent_query_xyz__&excludeHome=true&page=1&limit=20',
+      { method: 'GET', headers: authHeaders }
+    );
+    const emptyListRes = await api.builderListGET(emptyListReq);
+    assert.equal(emptyListRes.status, 200);
+    const emptyListBody = await emptyListRes.json();
+    assert.equal(emptyListBody.success, true);
+    assert.equal(emptyListBody.data.total, 0);
+    assert.equal(emptyListBody.data.totalPages, 1, 'Builder list endpoint totalPages must be >= 1 when total is 0');
+
+    // 3. Verify mediaRequest exposes HTTP status on Error (409 conflict detection by status, not message string)
+    const origFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify({ success: false, error: 'Custom server message without code' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      let caughtErr = null;
+      try {
+        await api.mediaRequest('/api/admin/builder/home', { method: 'PUT' });
+      } catch (e) {
+        caughtErr = e;
+      }
+      assert.ok(caughtErr instanceof Error, 'mediaRequest must throw an Error instance');
+      assert.equal(caughtErr.status, 409, 'Thrown error must expose HTTP status 409');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
+
+    // 4. Preview Route: unauthenticated request returns 401
+    const unauthReq = new Request('http://localhost/api/admin/builder/home/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(homeDetail.document),
+    });
+    const unauthRes = await api.previewPOST(unauthReq, { params: Promise.resolve({ id: 'home' }) });
+    assert.equal(unauthRes.status, 401, 'Unauthenticated preview request must return 401');
+
+    // 5. Preview Route: malformed JSON returns 400 with error message and structured issues list
+    const malformedReq = new Request('http://localhost/api/admin/builder/home/preview', {
+      method: 'POST',
+      headers: authHeaders,
+      body: '{ invalid json ',
+    });
+    const malformedRes = await api.previewPOST(malformedReq, { params: Promise.resolve({ id: 'home' }) });
+    assert.equal(malformedRes.status, 400, 'Malformed JSON must return 400');
+    const malformedBody = await malformedRes.json();
+    assert.equal(malformedBody.success, false);
+    assert.match(malformedBody.error, /JSON/i);
+    assert.ok(Array.isArray(malformedBody.issues) && malformedBody.issues.length > 0, 'Malformed JSON must return structured issues array');
+
+    // 6. Preview Route: schema validation failure returns 400 with structured field issues (path & message)
+    const invalidDoc = structuredClone(homeDetail.document);
+    invalidDoc.title = ''; // violates min(1, 'Tiêu đề trang không được để trống')
+    const invalidReq = new Request('http://localhost/api/admin/builder/home/preview', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify(invalidDoc),
+    });
+    const invalidRes = await api.previewPOST(invalidReq, { params: Promise.resolve({ id: 'home' }) });
+    assert.equal(invalidRes.status, 400, 'Schema validation error must return 400');
+    const invalidBody = await invalidRes.json();
+    assert.equal(invalidBody.success, false);
+    assert.match(invalidBody.error, /title/i, 'Validation error message must remain compatible');
+    assert.ok(Array.isArray(invalidBody.issues), 'Validation error response must include structured issues array');
+    const titleIssue = invalidBody.issues.find((i) => i.path === 'title');
+    assert.ok(titleIssue, 'Structured issues must contain an entry for path="title"');
+    assert.match(titleIssue.message, /Tiêu đề trang không được để trống/, 'Structured issue for title must include message');
   });
 
   console.log(`\n========================================`);

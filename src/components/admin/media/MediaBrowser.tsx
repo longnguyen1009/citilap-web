@@ -26,16 +26,30 @@ import {
   type MediaFolderDto,
   type MediaListDto,
 } from '@/contracts/cms/media';
+import { useConfirm, useToast } from '@/components/admin/ui';
 import './media.css';
+
+export class MediaRequestError extends Error {
+  status: number;
+  issues?: Array<{ path: string; message: string }>;
+  constructor(message: string, status: number, issues?: Array<{ path: string; message: string }>) {
+    super(message);
+    this.name = 'MediaRequestError';
+    this.status = status;
+    if (Array.isArray(issues)) this.issues = issues;
+  }
+}
 
 export async function mediaRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, credentials: 'same-origin' });
-  const body = await res.json();
+  const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.success)
-    throw new Error(
+    throw new MediaRequestError(
       res.status === 401
         ? 'Phiên đăng nhập đã hết hạn. Đăng nhập lại để tiếp tục.'
         : body.error || 'Không thể xử lý yêu cầu.',
+      res.status,
+      Array.isArray(body.issues) ? body.issues : undefined,
     );
   return body.data as T;
 }
@@ -165,6 +179,8 @@ export default function MediaBrowser({
   defaultFolder?: string;
   onFolderChange?: (folder: string) => void;
 }) {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [filters, setFilters] = useState<{
     q: string;
     kind: MediaFilterKind;
@@ -289,11 +305,14 @@ export default function MediaBrowser({
 
   async function handleDeleteCurrentFolder() {
     if (!activeFolderObj || activeFolderObj.isSystem || folderBusy) return;
-    if (
-      !window.confirm(
-        `Xóa thư mục "${activeFolderObj.name}"? Các tệp bên trong (nếu có) sẽ được chuyển về thư mục "Chung / Chưa phân loại".`,
-      )
-    ) {
+    const confirmed = await confirm({
+      title: 'Xóa thư mục thư viện',
+      message: `Xóa thư mục "${activeFolderObj.name}"? Các tệp bên trong (nếu có) sẽ được chuyển về thư mục "Chung / Chưa phân loại".`,
+      confirmLabel: 'Xóa thư mục',
+      cancelLabel: 'Hủy',
+      variant: 'destructive',
+    });
+    if (!confirmed) {
       return;
     }
     setFolderBusy(true);
@@ -302,10 +321,13 @@ export default function MediaBrowser({
       await mediaRequest(`/api/admin/media/folders?slug=${encodeURIComponent(activeFolderObj.slug)}`, {
         method: 'DELETE',
       });
+      toast.success(`Đã xóa thư mục "${activeFolderObj.name}".`);
       selectFolder('ALL');
       setRetry((n) => n + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không thể xóa thư mục.');
+      const msg = e instanceof Error ? e.message : 'Không thể xóa thư mục.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setFolderBusy(false);
     }

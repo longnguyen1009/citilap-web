@@ -1,0 +1,11 @@
+# Antigravity round 07C: Analytics and dialog feedback
+
+Implement now, preserve dirty tree and other workers' edits. Read AGENTS.md and relevant installed Next docs. Scope only analytics/page.tsx, users/page.tsx, post-categories/page.tsx, components/admin/ui/Toast.tsx. No backend authorization changes, storefront, dependency, guidance CLI, deploy/commit/shared or remote DB write.
+
+Verified Analytics range=all loads every StorefrontMetric row then spreads Math.max, risking memory/argument overflow. Daily detail should be bounded/paged (native searchParams+Links, stable day DESC/event tie-break, preserve range), while totals/percentages aggregate entire selected range in SQL. No metric totals based only on page. Empty state uses selected rangeLabel, not hardcoded30 days. Display actual total days/records vs current page truthfully. Existing range uses Asia/Bangkok +7 days SQL; preserve. Handle DB failure with visible retry, no fake zero statistics. Do not add abstraction solely to test SQL.
+
+Verified Users save error renders behind native dialog. Add dialog-local error state/InlineAlert role=alert inside dialog; clear on open/retry, failed save keeps form+dialog. Preserve owner/session/security guards. Post-category deletion uses alert(); switch visible inline failure, pending ID lock, disable item action while pending; retain form state on save failure. Read latest source first, avoid duplicate feedback if already patched.
+
+Toast runtime console warning: JSX spreads lowercase `popovertarget` and `popovertargetaction` aroundline170. Use React19 native `popoverTarget`/`popoverTargetAction` props, retain browser popover behavior/accessibility. No redesign.
+
+Behavioral tests using existing isolated runtime3012, API mock writes allowed only in browser interception. Verify Users409 shown inside top-layer dialog, values retained; post-category delete failure visible/no alert; Analytics selected-range empty text, enough synthetic data to prove total is global across bounded detail pages (isolated in-memory Miniflare or private browser-state only), no unbounded Math.max. Coordinate before any fixture DB write, never use shared DB. Add ONE runnable test/harness with honest mocks/persistence notes. Typecheck/scoped lint. Report `.wrangler/admin-review-20261112/round-07c-report.md`, NEEDS_REVIEW then stop.

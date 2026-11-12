@@ -28,7 +28,12 @@ export interface MediaEnvironment {
 }
 export class MediaError extends Error {
   status: number;
-  constructor(message: string, status = 400) { super(message); this.status = status; }
+  issues?: Array<{ path: string; message: string }>;
+  constructor(message: string, status = 400, issues?: Array<{ path: string; message: string }>) {
+    super(message);
+    this.status = status;
+    if (issues) this.issues = issues;
+  }
 }
 type Row = Omit<MediaAssetDto, 'url' | 'usageCount' | 'assetType' | 'embedUrl' | 'thumbnailUrl'> & {
   storageKey: string | null;

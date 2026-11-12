@@ -32,6 +32,9 @@ import {
 } from "lucide-react";
 import AdminNotificationBell from "@/components/admin/notifications/AdminNotificationBell";
 import AdminCommandPalette from "@/components/admin/ui/AdminCommandPalette";
+import { ConfirmProvider } from "@/components/admin/ui/ConfirmDialog";
+import { AdminActorProvider } from "@/components/admin/useDraftAutosave";
+import { ToastProvider } from "@/components/admin/ui/Toast";
 import { adminCapability, canAdmin, type AdminPrincipal } from '@/lib/admin-permissions';
 import './admin.css';
 
@@ -370,7 +373,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Page Content */}
         <main id="admin-content" tabIndex={-1} className="admin-content flex-1 min-w-0 overflow-y-auto bg-slate-50">
-          {children}
+          <AdminActorProvider actorId={principal.id}>
+            <ConfirmProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </ConfirmProvider>
+          </AdminActorProvider>
         </main>
       </div>
 

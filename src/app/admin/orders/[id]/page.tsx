@@ -22,13 +22,16 @@ import {
   ExternalLink,
   Printer,
   CreditCard,
+  X,
+  ArrowRight,
 } from "lucide-react";
 import Image from "next/image";
-import { StatusBadge, InlineAlert } from "@/components/admin/ui";
+import { StatusBadge, InlineAlert, useToast } from "@/components/admin/ui";
 
 type AvailableSerial = {
   id: string;
   productId: string;
+  variantId?: string | null;
   serialNumber: string;
   status: string;
   condition: string;
@@ -40,9 +43,12 @@ type AvailableSerial = {
 type OrderItem = {
   id: string;
   productId: string;
+  variantId?: string | null;
   serialUnitId?: string | null;
   serialUnit?: {
     id: string;
+    productId?: string;
+    variantId?: string | null;
     serialNumber: string;
     status: string;
     condition: string;
@@ -131,6 +137,7 @@ export default function OrderDetailPage({
       ? use(params as Promise<{ id: string }>)
       : (params as { id: string });
   const id = unwrapped.id;
+  const toast = useToast();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [transitioning, setTransitioning] = useState(false);
@@ -139,8 +146,10 @@ export default function OrderDetailPage({
   const [shippingFeeDraft, setShippingFeeDraft] = useState<string>("");
   const [editingShipping, setEditingShipping] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
+  const isMutating = transitioning || updatingBilling || addingNote;
 
   const [reasonModal, setReasonModal] = useState<{
     open: boolean;
@@ -184,7 +193,7 @@ export default function OrderDetailPage({
       } else {
         setFeedback({
           type: "error",
-          text: result?.error || "Không thể tải thông tin đơn hàng.",
+          text: result?.error?.message || result?.error || "Không thể tải thông tin đơn hàng.",
         });
       }
     } catch {
@@ -207,7 +216,7 @@ export default function OrderDetailPage({
         } else if (!canceled) {
           setFeedback({
             type: "error",
-            text: result?.error || "Không thể tải thông tin đơn hàng.",
+            text: result?.error?.message || result?.error || "Không thể tải thông tin đơn hàng.",
           });
         }
       })
@@ -229,7 +238,7 @@ export default function OrderDetailPage({
     targetStatus: "NEW" | "CONTACTED" | "CONFIRMED" | "COMPLETED" | "CANCELLED",
     reason?: string
   ) => {
-    if (!order || transitioning) return;
+    if (!order || isMutating) return;
     setTransitioning(true);
     setFeedback(null);
     setConflictError(null);
@@ -249,49 +258,65 @@ export default function OrderDetailPage({
       const result = await response.json();
 
       if (response.status === 409) {
-        setConflictError(
+        const msg =
           result?.error?.message ||
-            "Đơn hàng vừa được chỉnh sửa bởi phiên làm việc khác. Bản nháp ghi chú của bạn đã được bảo toàn."
-        );
+          "Đơn hàng vừa được chỉnh sửa bởi phiên làm việc khác. Bản nháp của bạn đã được bảo toàn.";
+        setConflictError(msg);
+        toast.error(msg);
         return;
       }
 
       if (response.ok && result.success) {
         setOrder(result.data);
+        const msg = `Đã cập nhật trạng thái đơn hàng sang "${targetStatus}".`;
         setFeedback({
           type: "success",
-          text: `Đã cập nhật trạng thái đơn hàng sang "${targetStatus}".`,
+          text: msg,
         });
+        toast.success(msg);
         if (reasonModal.open) {
           setReasonModal((m) => ({ ...m, open: false, reasonText: "" }));
         }
       } else {
+        const errMsg = result?.error?.message || result?.error || "Không thể chuyển trạng thái đơn hàng.";
         setFeedback({
           type: "error",
-          text: result?.error?.message || result?.error || "Không thể chuyển trạng thái đơn hàng.",
+          text: errMsg,
         });
+        toast.error(errMsg);
       }
     } catch {
       setFeedback({ type: "error", text: "Lỗi kết nối khi cập nhật đơn hàng." });
+      toast.error("Lỗi kết nối khi cập nhật đơn hàng.");
     } finally {
       setTransitioning(false);
     }
   };
 
   const handleUpdateBilling = async (payload: { paymentStatus?: string; shippingFee?: number }) => {
-    if (!order || updatingBilling) return;
+    if (!order || isMutating) return;
     setUpdatingBilling(true);
     setFeedback(null);
+    setConflictError(null);
     try {
       const response = await fetch(`/api/orders/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "UPDATE_BILLING",
+          expectedRevision: order.revision,
           ...payload,
         }),
       });
       const result = await response.json();
+      if (response.status === 409) {
+        const msg =
+          result?.error?.message ||
+          "Đơn hàng vừa được chỉnh sửa bởi phiên làm việc khác. Nội dung bạn đang sửa đã được bảo toàn.";
+        setConflictError(msg);
+        toast.error(msg);
+        return;
+      }
       if (response.ok && result.success && result.data) {
         setOrder(result.data);
         setEditingShipping(false);
@@ -299,50 +324,71 @@ export default function OrderDetailPage({
           type: "success",
           text: "Đã cập nhật thông tin thanh toán / phí vận chuyển.",
         });
+        toast.success("Đã cập nhật thông tin thanh toán / phí vận chuyển.");
       } else {
+        const errMsg =
+          result?.error?.message || result?.error || "Không thể cập nhật thông tin thanh toán.";
         setFeedback({
           type: "error",
-          text: result?.error || "Không thể cập nhật thông tin thanh toán.",
+          text: errMsg,
         });
+        toast.error(errMsg);
       }
     } catch {
       setFeedback({ type: "error", text: "Lỗi kết nối khi cập nhật thanh toán." });
+      toast.error("Lỗi kết nối khi cập nhật thanh toán.");
     } finally {
       setUpdatingBilling(false);
     }
   };
 
   const handleAssignSerial = async (orderItemId: string, serialUnitId: string) => {
-    if (!order || updatingBilling) return;
+    if (!order || isMutating) return;
     setUpdatingBilling(true);
     setFeedback(null);
+    setConflictError(null);
     try {
       const response = await fetch(`/api/orders/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "ASSIGN_SERIAL",
+          expectedRevision: order.revision,
           orderItemId,
           serialUnitId: serialUnitId || null,
         }),
       });
       const result = await response.json();
+      if (response.status === 409) {
+        const msg =
+          result?.error?.message ||
+          "Đơn hàng hoặc Serial vừa được chỉnh sửa bởi phiên làm việc khác. Dữ liệu đang sửa được bảo toàn.";
+        setConflictError(msg);
+        toast.error(msg);
+        return;
+      }
       if (response.ok && result.success && result.data) {
         setOrder(result.data);
+        const msg = serialUnitId
+          ? "Đã gán Serial máy & Hồ sơ kiểm định vào đơn hàng."
+          : "Đã gỡ gán Serial máy khỏi dòng sản phẩm.";
         setFeedback({
           type: "success",
-          text: serialUnitId
-            ? "Đã gán Serial máy & Hồ sơ kiểm định vào đơn hàng."
-            : "Đã gỡ gán Serial máy khỏi dòng sản phẩm.",
+          text: msg,
         });
+        toast.success(msg);
       } else {
+        const errMsg =
+          result?.error?.message || result?.error || "Không thể gán Serial cho sản phẩm.";
         setFeedback({
           type: "error",
-          text: result?.error || "Không thể gán Serial cho sản phẩm.",
+          text: errMsg,
         });
+        toast.error(errMsg);
       }
     } catch {
       setFeedback({ type: "error", text: "Lỗi kết nối khi gán Serial." });
+      toast.error("Lỗi kết nối khi gán Serial.");
     } finally {
       setUpdatingBilling(false);
     }
@@ -350,7 +396,7 @@ export default function OrderDetailPage({
 
   const handleAddInternalNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNoteContent.trim() || addingNote) return;
+    if (!newNoteContent.trim() || isMutating) return;
 
     setAddingNote(true);
     setFeedback(null);
@@ -368,15 +414,20 @@ export default function OrderDetailPage({
       if (response.ok && result.success) {
         setNewNoteContent("");
         setFeedback({ type: "success", text: "Đã thêm ghi chú nội bộ." });
+        toast.success("Đã thêm ghi chú nội bộ.");
         void loadOrder();
       } else {
+        const errMsg =
+          result?.error?.message || result?.error || "Không thể thêm ghi chú nội bộ.";
         setFeedback({
           type: "error",
-          text: result?.error || "Không thể thêm ghi chú nội bộ.",
+          text: errMsg,
         });
+        toast.error(errMsg);
       }
     } catch {
       setFeedback({ type: "error", text: "Lỗi kết nối khi gửi ghi chú." });
+      toast.error("Lỗi kết nối khi gửi ghi chú.");
     } finally {
       setAddingNote(false);
     }
@@ -441,19 +492,19 @@ export default function OrderDetailPage({
         <div className="flex items-center gap-1.5 flex-wrap print:hidden">
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => setShowInvoiceModal(true)}
             className="bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold py-1.5 px-2.5 rounded-lg text-xs transition cursor-pointer flex items-center gap-1.5"
-            title="In phiếu giao hàng & bảo hành"
+            title="Xem trước & In hóa đơn / Phiếu giao hàng"
           >
             <Printer className="w-3.5 h-3.5 text-slate-600" />
-            <span>In phiếu BH</span>
+            <span>In hóa đơn / Phiếu giao hàng</span>
           </button>
           {(currentStatus === "NEW" || currentStatus === "PENDING") && (
             <>
               <button
                 type="button"
                 id="btn-transition-contacted"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() => void handleExecuteTransition("CONTACTED")}
                 className="bg-amber-600 hover:bg-amber-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
@@ -464,7 +515,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-transition-confirmed"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() => void handleExecuteTransition("CONFIRMED")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
@@ -475,7 +526,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-transition-cancel"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() =>
                   setReasonModal({
                     open: true,
@@ -497,7 +548,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-transition-confirmed"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() => void handleExecuteTransition("CONFIRMED")}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
@@ -508,7 +559,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-transition-cancel"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() =>
                   setReasonModal({
                     open: true,
@@ -530,7 +581,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-transition-completed"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() => void handleExecuteTransition("COMPLETED")}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3.5 rounded-lg text-xs shadow-2xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
@@ -541,7 +592,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-transition-cancel"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() =>
                   setReasonModal({
                     open: true,
@@ -562,7 +613,7 @@ export default function OrderDetailPage({
             <button
               type="button"
               id="btn-transition-reopen"
-              disabled={transitioning}
+              disabled={isMutating}
               onClick={() =>
                 setReasonModal({
                   open: true,
@@ -590,21 +641,37 @@ export default function OrderDetailPage({
       {/* Visual Order Lifecycle Pipeline Stepper */}
       <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs print:hidden">
         {currentStatus === "CANCELLED" ? (
-          <div className="flex items-center justify-between text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-rose-800 bg-rose-50 border border-rose-200 rounded-lg p-2.5">
             <div className="flex items-center gap-2">
               <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
               <span>
-                <strong>Đơn hàng đã hủy.</strong> Vui lòng xem lý do hủy trong lịch sử bên dưới. Bạn có thể bấm &quot;Mở lại đơn&quot; phía trên nếu khách đổi ý.
+                <strong>CANCELLED · Đã hủy:</strong> Đơn hàng đã bị hủy. Vui lòng xem lý do trong lịch sử bên dưới hoặc mở lại đơn nếu khách đổi ý.
               </span>
             </div>
+            <button
+              type="button"
+              disabled={isMutating}
+              onClick={() =>
+                setReasonModal({
+                  open: true,
+                  targetStatus: "NEW",
+                  title: "Mở lại đơn hàng đã hủy",
+                  reasonText: "",
+                })
+              }
+              className="inline-flex items-center gap-1 rounded-md bg-white border border-rose-300 px-2.5 py-1 text-[11px] font-bold text-rose-700 hover:bg-rose-100 cursor-pointer disabled:opacity-50"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Chuyển về Mới (NEW)</span>
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-4 gap-2 text-xs">
             {([
-              { id: "NEW", stepNum: "1", title: "Tiếp nhận mới", desc: "Khách vừa gửi yêu cầu" },
-              { id: "CONTACTED", stepNum: "2", title: "Đã liên hệ", desc: "Tư vấn & chốt cấu hình" },
-              { id: "CONFIRMED", stepNum: "3", title: "Đã xác nhận", desc: "Gán máy QC & đóng gói" },
-              { id: "COMPLETED", stepNum: "4", title: "Hoàn tất xử lý", desc: "Bàn giao & kích hoạt BH" },
+              { id: "NEW", stepNum: "1", code: "NEW", title: "Mới (Tiếp nhận)", desc: "Khách vừa gửi yêu cầu", nextActionLabel: "Chuyển sang Đã liên hệ" },
+              { id: "CONTACTED", stepNum: "2", code: "CONTACTED", title: "Đã liên hệ", desc: "Tư vấn & chốt cấu hình", nextActionLabel: "Chuyển sang Đã xác nhận" },
+              { id: "CONFIRMED", stepNum: "3", code: "CONFIRMED", title: "Đã xác nhận", desc: "Gán máy QC & đóng gói", nextActionLabel: "Chuyển sang Hoàn tất" },
+              { id: "COMPLETED", stepNum: "4", code: "COMPLETED", title: "Hoàn tất", desc: "Bàn giao & kích hoạt BH", nextActionLabel: "" },
             ] as const).map((step, idx) => {
               const stepRanks: Record<string, number> = {
                 NEW: 0,
@@ -616,11 +683,12 @@ export default function OrderDetailPage({
               const activeRank = stepRanks[currentStatus] ?? 0;
               const isPast = idx < activeRank;
               const isCurrent = idx === activeRank;
+              const isNextStep = idx === activeRank + 1;
 
               return (
                 <div
                   key={step.id}
-                  className={`p-2.5 rounded-lg border transition-all ${
+                  className={`p-2.5 rounded-lg border transition-all flex flex-col justify-between ${
                     isCurrent
                       ? "bg-blue-50/70 border-blue-400 text-blue-900 shadow-2xs"
                       : isPast
@@ -628,30 +696,43 @@ export default function OrderDetailPage({
                       : "bg-slate-50/50 border-slate-200 text-slate-400"
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span
-                      className={`inline-flex items-center justify-center size-5 rounded-full text-[11px] font-bold ${
-                        isCurrent
-                          ? "bg-blue-600 text-white"
-                          : isPast
-                          ? "bg-emerald-600 text-white"
-                          : "bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {isPast ? "✓" : step.stepNum}
-                    </span>
-                    <span
-                      className={`text-[10px] font-bold uppercase tracking-wider ${
-                        isCurrent ? "text-blue-700" : isPast ? "text-emerald-700" : "text-slate-400"
-                      }`}
-                    >
-                      {isCurrent ? "Đang xử lý" : isPast ? "Đã xong" : "Chờ"}
-                    </span>
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span
+                        className={`inline-flex items-center justify-center size-5 rounded-full text-[11px] font-bold ${
+                          isCurrent
+                            ? "bg-blue-600 text-white"
+                            : isPast
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {isPast ? "✓" : step.stepNum}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider ${
+                          isCurrent ? "text-blue-700" : isPast ? "text-emerald-700" : "text-slate-400"
+                        }`}
+                      >
+                        {isCurrent ? "Đang xử lý" : isPast ? "Đã xong" : step.code}
+                      </span>
+                    </div>
+                    <div className={`font-bold truncate ${isCurrent ? "text-blue-950 font-black" : "text-slate-900"}`}>
+                      {step.title}
+                    </div>
+                    <div className="text-[11px] text-slate-500 truncate mt-0.5">{step.desc}</div>
                   </div>
-                  <div className={`font-bold truncate ${isCurrent ? "text-blue-950 font-black" : "text-slate-900"}`}>
-                    {step.title}
-                  </div>
-                  <div className="text-[11px] text-slate-500 truncate mt-0.5">{step.desc}</div>
+                  {isNextStep && (
+                    <button
+                      type="button"
+                      disabled={isMutating}
+                      onClick={() => void handleExecuteTransition(step.id)}
+                      className="mt-2 inline-flex items-center justify-center gap-1 rounded border border-blue-300 bg-white px-2 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-50 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <span>Chuyển bước này</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -756,12 +837,26 @@ export default function OrderDetailPage({
                       {/* Serial & Public Code Assignment */}
                       <div className="mt-2 flex flex-wrap items-center gap-2 print:hidden">
                         {(() => {
-                          const productSerials = (order.availableSerials || []).filter(
-                            (su) => su.productId === item.productId
-                          );
+                          const productSerials = (order.availableSerials || []).filter((su) => {
+                            if (su.id === item.serialUnitId) return true;
+                            if (su.productId !== item.productId) return false;
+                            if (item.variantId) {
+                              if (su.variantId !== item.variantId) return false;
+                            } else if (su.variantId) {
+                              return false;
+                            }
+                            const assignedToOtherItem = order.items.some(
+                              (other) => other.id !== item.id && other.serialUnitId === su.id
+                            );
+                            return !assignedToOtherItem;
+                          });
                           const assignedInfo = productSerials.find(
                             (su) => su.id === item.serialUnitId
                           );
+                          const serialLocked =
+                            isMutating ||
+                            currentStatus === "COMPLETED" ||
+                            currentStatus === "CANCELLED";
                           return (
                             <>
                               <label className="text-[11px] font-semibold text-slate-600">
@@ -769,10 +864,10 @@ export default function OrderDetailPage({
                               </label>
                               <select
                                 aria-label={`Chọn Serial cho ${itemName}`}
-                                disabled={updatingBilling}
+                                disabled={serialLocked}
                                 value={item.serialUnitId || ""}
                                 onChange={(e) => void handleAssignSerial(item.id, e.target.value)}
-                                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-800 focus:border-blue-500 focus:outline-none cursor-pointer"
+                                className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-mono text-slate-800 focus:border-blue-500 focus:outline-none cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 <option value="">
                                   {productSerials.length > 0
@@ -844,11 +939,34 @@ export default function OrderDetailPage({
           </div>
 
           {/* Internal Staff Notes Card */}
-          <div className="bg-white rounded-xl shadow-2xs border border-slate-200 overflow-hidden p-4 space-y-3">
-            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-blue-600" />
-              Ghi chú nội bộ ({order.internalNotes?.length || 0})
-            </h2>
+          <div className="bg-white rounded-xl shadow-2xs border border-slate-200 overflow-hidden p-4 space-y-3 print:hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                Ghi chú nội bộ ({order.internalNotes?.length || 0})
+              </h2>
+              <div className="flex flex-wrap items-center gap-1">
+                {[
+                  "Đã gọi xác nhận cấu hình",
+                  "Khách hẹn giao giờ hành chính",
+                  "Đã kiểm tra QC & đóng gói",
+                  "Đã nhận chuyển khoản đủ",
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() =>
+                      setNewNoteContent((prev) =>
+                        prev.trim() ? `${prev.trim()} · ${preset}` : preset
+                      )
+                    }
+                    className="px-2 py-0.5 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-[10px] font-medium text-slate-600 transition cursor-pointer"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <form onSubmit={handleAddInternalNote} className="space-y-2">
               <textarea
@@ -857,7 +975,7 @@ export default function OrderDetailPage({
                 onChange={(e) => setNewNoteContent(e.target.value)}
                 maxLength={2000}
                 rows={2}
-                placeholder="Thêm ghi chú vận hành nội bộ..."
+                placeholder="Thêm ghi chú vận hành nội bộ (chỉ quản trị viên nhìn thấy)..."
                 className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-hidden bg-slate-50/50"
               />
               <div className="flex justify-between items-center text-[11px]">
@@ -865,7 +983,7 @@ export default function OrderDetailPage({
                 <button
                   type="submit"
                   id="btn-add-internal-note"
-                  disabled={!newNoteContent.trim() || addingNote}
+                  disabled={!newNoteContent.trim() || isMutating}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-1.5 rounded-lg text-xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <Send className="w-3 h-3" />
@@ -976,13 +1094,17 @@ export default function OrderDetailPage({
                   </span>
                   <button
                     type="button"
-                    disabled={updatingBilling}
+                    disabled={
+                      isMutating ||
+                      currentStatus === "CANCELLED" ||
+                      (currentStatus === "COMPLETED" && order.paymentStatus === "PAID")
+                    }
                     onClick={() =>
                       void handleUpdateBilling({
                         paymentStatus: order.paymentStatus === "PAID" ? "PENDING" : "PAID",
                       })
                     }
-                    className="text-[11px] font-bold text-blue-600 hover:underline disabled:opacity-50 cursor-pointer print:hidden"
+                    className="text-[11px] font-bold text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer print:hidden"
                   >
                     {order.paymentStatus === "PAID" ? "Đánh dấu chưa thu" : "Xác nhận đã thu"}
                   </button>
@@ -997,6 +1119,7 @@ export default function OrderDetailPage({
                     <input
                       type="number"
                       min={0}
+                      max={50000000}
                       step={1000}
                       value={shippingFeeDraft}
                       onChange={(e) => setShippingFeeDraft(e.target.value)}
@@ -1004,21 +1127,33 @@ export default function OrderDetailPage({
                     />
                     <button
                       type="button"
-                      disabled={updatingBilling}
+                      disabled={isMutating}
                       onClick={() => {
-                        const parsed = parseInt(shippingFeeDraft || "0", 10);
-                        if (!isNaN(parsed) && parsed >= 0) {
-                          void handleUpdateBilling({ shippingFee: parsed });
+                        const trimmed = shippingFeeDraft.trim();
+                        const parsed = Number(trimmed);
+                        if (
+                          !trimmed ||
+                          !Number.isSafeInteger(parsed) ||
+                          parsed < 0 ||
+                          parsed > 50_000_000
+                        ) {
+                          const msg =
+                            "Phí giao hàng phải là số nguyên VNĐ hợp lệ từ 0đ đến 50.000.000đ.";
+                          setFeedback({ type: "error", text: msg });
+                          toast.error(msg);
+                          return;
                         }
+                        void handleUpdateBilling({ shippingFee: parsed });
                       }}
-                      className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-bold cursor-pointer"
+                      className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-bold disabled:opacity-50 cursor-pointer"
                     >
                       Lưu
                     </button>
                     <button
                       type="button"
+                      disabled={isMutating}
                       onClick={() => setEditingShipping(false)}
-                      className="px-1.5 py-1 text-slate-500 hover:text-slate-700 text-[11px] cursor-pointer"
+                      className="px-1.5 py-1 text-slate-500 hover:text-slate-700 text-[11px] disabled:opacity-50 cursor-pointer"
                     >
                       Hủy
                     </button>
@@ -1030,11 +1165,18 @@ export default function OrderDetailPage({
                     </strong>
                     <button
                       type="button"
+                      disabled={
+                        isMutating ||
+                        currentStatus === "COMPLETED" ||
+                        currentStatus === "CANCELLED" ||
+                        order.paymentStatus === "PAID" ||
+                        order.shippingMethod === "pickup"
+                      }
                       onClick={() => {
                         setShippingFeeDraft(String(order.shippingFee || 0));
                         setEditingShipping(true);
                       }}
-                      className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer print:hidden"
+                      className="text-[11px] font-bold text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer print:hidden"
                     >
                       Sửa phí
                     </button>
@@ -1064,6 +1206,9 @@ export default function OrderDetailPage({
                     {ev.action === "CANCELLED" && `Hủy đơn: ${ev.reason}`}
                     {ev.action === "REOPENED" && `Mở lại đơn: ${ev.reason}`}
                     {ev.action === "NOTE_ADDED" && "Thêm ghi chú nội bộ"}
+                    {ev.action === "BILLING_UPDATED" && "Cập nhật thanh toán / phí giao hàng"}
+                    {ev.action === "SERIAL_ASSIGNED" && "Gán Serial máy vào đơn hàng"}
+                    {ev.action === "SERIAL_UNASSIGNED" && "Gỡ Serial máy khỏi đơn hàng"}
                   </div>
                   {ev.reason && ev.action !== "CANCELLED" && ev.action !== "REOPENED" && (
                     <p className="text-[11px] text-slate-600 italic">Lý do: {ev.reason}</p>
@@ -1079,6 +1224,174 @@ export default function OrderDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Printable Invoice / Delivery Slip Preview Modal */}
+      {showInvoiceModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-xs print:hidden"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowInvoiceModal(false);
+          }}
+        >
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-3">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-bold text-slate-900">
+                  Xem trước Hóa đơn / Phiếu giao hàng &amp; Bảo hành
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-blue-700 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>In ngay (Ctrl+P)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowInvoiceModal(false)}
+                  aria-label="Đóng xem trước hóa đơn"
+                  className="inline-grid place-items-center size-7 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 text-xs text-slate-900 space-y-4">
+              <div className="flex justify-between items-start border-b border-slate-300 pb-3">
+                <div>
+                  <div className="text-lg font-black uppercase tracking-wider">
+                    CITILAP.VN — HỆ THỐNG LAPTOP TUYỂN CHỌN
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    Showroom HN: Số 23/40 Tạ Quang Bửu, Bạch Mai, Hà Nội | Showroom BN: Số 40 Trần Hưng Đạo, TP. Bắc Ninh
+                  </div>
+                  <div className="text-[11px] text-slate-600">
+                    Hotline bảo hành &amp; kỹ thuật: {businessProfile.displayPhone} — Website: {businessProfile.canonicalSiteUrl}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-sm uppercase">Hóa đơn / Phiếu giao hàng</div>
+                  <div className="font-mono font-bold text-blue-700">Mã đơn: #{order.orderNumber || order.id}</div>
+                  <div>Ngày lập: {new Date(order.createdAt).toLocaleString("vi-VN")}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <div className="space-y-1">
+                  <div><strong>Khách hàng:</strong> {order.customerName}</div>
+                  <div><strong>Điện thoại:</strong> {order.customerPhone}</div>
+                  {order.customerEmail && <div><strong>Email:</strong> {order.customerEmail}</div>}
+                  <div><strong>Địa chỉ nhận:</strong> {order.shippingAddress || "Nhận tại Showroom CitiLap"}</div>
+                </div>
+                <div className="space-y-1">
+                  <div>
+                    <strong>Phương thức thanh toán:</strong>{" "}
+                    {order.paymentMethod === "BANK_TRANSFER" ? "Chuyển khoản VietQR" : "Thanh toán khi nhận hàng (COD)"}
+                  </div>
+                  <div>
+                    <strong>Trạng thái thanh toán:</strong>{" "}
+                    {order.paymentStatus === "PAID" ? "Đã thanh toán" : "Thu tiền khi giao"}
+                  </div>
+                  <div>
+                    <strong>Trạng thái đơn hàng:</strong> {order.status}
+                  </div>
+                </div>
+              </div>
+
+              <table className="w-full border-collapse border border-slate-300 text-[11px]">
+                <thead>
+                  <tr className="bg-slate-100">
+                    <th className="border border-slate-300 px-2.5 py-1.5 text-center w-10">#</th>
+                    <th className="border border-slate-300 px-2.5 py-1.5 text-left">Sản phẩm / Cấu hình</th>
+                    <th className="border border-slate-300 px-2.5 py-1.5 text-left">SKU / Serial / QC</th>
+                    <th className="border border-slate-300 px-2.5 py-1.5 text-right">Đơn giá</th>
+                    <th className="border border-slate-300 px-2.5 py-1.5 text-center">SL</th>
+                    <th className="border border-slate-300 px-2.5 py-1.5 text-right">Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {order.items.map((it, index) => {
+                    const assignedSu = (order.availableSerials || []).find((s) => s.id === it.serialUnitId);
+                    const sn = assignedSu?.serialNumber || it.serialUnit?.serialNumber || "Theo tem BH";
+                    const qcCode = assignedSu?.publicCode;
+                    const unitPrice = it.priceSnapshot || it.price;
+                    const sku = it.skuSnapshot || it.sku;
+                    return (
+                      <tr key={it.id}>
+                        <td className="border border-slate-300 px-2.5 py-1.5 text-center tabular-nums">{index + 1}</td>
+                        <td className="border border-slate-300 px-2.5 py-1.5 font-semibold">
+                          {it.productNameSnapshot || it.productName || "Sản phẩm"}
+                          {it.variantNameSnapshot ? ` (${it.variantNameSnapshot})` : ""}
+                        </td>
+                        <td className="border border-slate-300 px-2.5 py-1.5 font-mono">
+                          {sku ? `SKU: ${sku} · ` : ""}SN: {sn}
+                          {qcCode ? ` · QC: #${qcCode}` : ""}
+                        </td>
+                        <td className="border border-slate-300 px-2.5 py-1.5 text-right tabular-nums">
+                          {unitPrice.toLocaleString("vi-VN")}đ
+                        </td>
+                        <td className="border border-slate-300 px-2.5 py-1.5 text-center tabular-nums">{it.quantity}</td>
+                        <td className="border border-slate-300 px-2.5 py-1.5 text-right font-bold tabular-nums">
+                          {it.lineTotal.toLocaleString("vi-VN")}đ
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={5} className="border border-slate-300 px-2.5 py-1.5 text-right font-semibold">
+                      Tạm tính:
+                    </td>
+                    <td className="border border-slate-300 px-2.5 py-1.5 text-right font-bold tabular-nums">
+                      {order.subtotalAmount.toLocaleString("vi-VN")}đ
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={5} className="border border-slate-300 px-2.5 py-1.5 text-right font-semibold">
+                      Phí vận chuyển:
+                    </td>
+                    <td className="border border-slate-300 px-2.5 py-1.5 text-right font-bold tabular-nums">
+                      {order.shippingFee === 0 ? "Miễn phí" : `${order.shippingFee.toLocaleString("vi-VN")}đ`}
+                    </td>
+                  </tr>
+                  <tr className="bg-slate-50">
+                    <td colSpan={5} className="border border-slate-300 px-2.5 py-2 text-right font-black uppercase">
+                      Tổng cộng thanh toán:
+                    </td>
+                    <td className="border border-slate-300 px-2.5 py-2 text-right font-black text-red-600 text-sm tabular-nums">
+                      {order.totalAmount.toLocaleString("vi-VN")}đ
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="border-t border-slate-300 pt-3 text-[11px] space-y-1">
+                <div className="font-bold uppercase">Cam kết bảo hành &amp; Đổi trả CitiLap:</div>
+                <p>• Bảo hành phần cứng theo gói bảo hành ghi nhận trên đơn hàng (3 – 12 tháng), lỗi 1 đổi 1 trong 7 ngày đầu tiên nếu phát sinh lỗi kỹ thuật phần cứng do nhà sản xuất.</p>
+                <p>• Hỗ trợ cài đặt phần mềm, vệ sinh tra keo tản nhiệt miễn phí trọn đời máy tại hệ thống showroom CitiLap.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-8 pt-4 text-center">
+                <div>
+                  <div className="font-bold">Khách hàng ký nhận</div>
+                  <div className="text-[10px] text-slate-500">(Đã kiểm tra ngoại quan &amp; cấu hình máy)</div>
+                  <div className="h-14" />
+                </div>
+                <div>
+                  <div className="font-bold">Đại diện CitiLap</div>
+                  <div className="text-[10px] text-slate-500">(Ký &amp; ghi rõ họ tên)</div>
+                  <div className="h-14" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Print-only Warranty & Delivery Slip */}
       <div className="hidden print:block bg-white p-6 border border-slate-300 rounded-xl text-xs text-slate-900 space-y-4">
@@ -1113,6 +1426,7 @@ export default function OrderDetailPage({
             <tr className="bg-slate-100">
               <th className="border border-slate-300 px-2.5 py-1.5 text-left">Sản phẩm / Cấu hình</th>
               <th className="border border-slate-300 px-2.5 py-1.5 text-left">Serial / Mã Kiểm định (QC)</th>
+              <th className="border border-slate-300 px-2.5 py-1.5 text-right">Đơn giá</th>
               <th className="border border-slate-300 px-2.5 py-1.5 text-center">SL</th>
               <th className="border border-slate-300 px-2.5 py-1.5 text-right">Thành tiền</th>
             </tr>
@@ -1122,6 +1436,7 @@ export default function OrderDetailPage({
               const assignedSu = (order.availableSerials || []).find((s) => s.id === it.serialUnitId);
               const sn = assignedSu?.serialNumber || it.serialUnit?.serialNumber || "Theo tem bảo hành";
               const qcCode = assignedSu?.publicCode;
+              const unitPrice = it.priceSnapshot || it.price;
               return (
                 <tr key={it.id}>
                   <td className="border border-slate-300 px-2.5 py-1.5 font-semibold">
@@ -1132,6 +1447,9 @@ export default function OrderDetailPage({
                     SN: {sn}
                     {qcCode ? ` · QC: #${qcCode}` : ""}
                   </td>
+                  <td className="border border-slate-300 px-2.5 py-1.5 text-right tabular-nums">
+                    {unitPrice.toLocaleString("vi-VN")}đ
+                  </td>
                   <td className="border border-slate-300 px-2.5 py-1.5 text-center">{it.quantity}</td>
                   <td className="border border-slate-300 px-2.5 py-1.5 text-right font-bold">
                     {it.lineTotal.toLocaleString("vi-VN")}đ
@@ -1140,6 +1458,20 @@ export default function OrderDetailPage({
               );
             })}
           </tbody>
+          <tfoot>
+            <tr>
+              <td colSpan={4} className="border border-slate-300 px-2.5 py-1 text-right font-semibold">Tạm tính:</td>
+              <td className="border border-slate-300 px-2.5 py-1 text-right font-bold">{order.subtotalAmount.toLocaleString("vi-VN")}đ</td>
+            </tr>
+            <tr>
+              <td colSpan={4} className="border border-slate-300 px-2.5 py-1 text-right font-semibold">Phí giao hàng:</td>
+              <td className="border border-slate-300 px-2.5 py-1 text-right font-bold">{order.shippingFee === 0 ? "Miễn phí" : `${order.shippingFee.toLocaleString("vi-VN")}đ`}</td>
+            </tr>
+            <tr>
+              <td colSpan={4} className="border border-slate-300 px-2.5 py-1.5 text-right font-black uppercase">Tổng thanh toán:</td>
+              <td className="border border-slate-300 px-2.5 py-1.5 text-right font-black">{order.totalAmount.toLocaleString("vi-VN")}đ</td>
+            </tr>
+          </tfoot>
         </table>
         <div className="border-t border-slate-300 pt-3 text-[11px] space-y-1">
           <div className="font-bold uppercase">Cam kết bảo hành &amp; Đổi trả CitiLap:</div>
@@ -1168,14 +1500,14 @@ export default function OrderDetailPage({
           aria-labelledby="reason-modal-title"
           onCancel={(e) => {
             e.preventDefault();
-            if (!transitioning) {
+            if (!isMutating) {
               setReasonModal((m) => ({ ...m, open: false }));
             }
           }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
-              if (!transitioning) {
+              if (!isMutating) {
                 setReasonModal((m) => ({ ...m, open: false }));
               }
               return;
@@ -1204,7 +1536,7 @@ export default function OrderDetailPage({
             }
           }}
           onClick={(e) => {
-            if (e.target === e.currentTarget && !transitioning) {
+            if (e.target === e.currentTarget && !isMutating) {
               setReasonModal((m) => ({ ...m, open: false }));
             }
           }}
@@ -1236,7 +1568,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-cancel-reason-modal"
-                disabled={transitioning}
+                disabled={isMutating}
                 onClick={() => setReasonModal((m) => ({ ...m, open: false }))}
                 className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 cursor-pointer"
               >
@@ -1245,7 +1577,7 @@ export default function OrderDetailPage({
               <button
                 type="button"
                 id="btn-confirm-reason-submit"
-                disabled={reasonModal.reasonText.trim().length < 3 || transitioning}
+                disabled={reasonModal.reasonText.trim().length < 3 || isMutating}
                 onClick={() =>
                   void handleExecuteTransition(reasonModal.targetStatus, reasonModal.reasonText)
                 }

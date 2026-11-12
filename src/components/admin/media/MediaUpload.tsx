@@ -180,6 +180,7 @@ export default function MediaUpload({
 
   useEffect(() => {
     if (activeFolder && activeFolder !== 'ALL') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync folder selection from prop
       setSelectedFolder(activeFolder);
     }
   }, [activeFolder]);

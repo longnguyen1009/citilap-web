@@ -55,5 +55,21 @@ try {
   assert.ok((await api.getHotSaleCampaigns(await context(at), at)).some(c => c.id === nextSlot.id), 'Next same-day slot remains selectable before start');
   assert.equal((await context(new Date(doc.endAt))).activeCampaign.items.get('p').campaignId, nextSlot.id, 'Adjacent slot takes over exact start without overlap');
   await (await import('node:fs/promises')).writeFile('.wrangler/hot-sale-test/campaigns.json', JSON.stringify(tabs));
-  console.log('PASS: real isolated D1; multiple campaigns, draft/expiry, exact variant price, unpublished exclusion, overlap guard, legacy offers.');
+  const guarded={...doc,status:'DRAFT',items:[{...item('q'),regularPrice:999999999,soldCount:99}]};
+  for (const field of ['quantityLimit', 'perCustomerLimit']) {
+    await assert.rejects(
+      api.saveCampaign({...guarded, items:[{...item('q'), [field]: 1}]}, db),
+      e => e.issues?.some(issue => issue.path.join('.') === `items.0.${field}`),
+      `Block ${field} until atomic quota enforcement is accepted`
+    );
+  }
+  const counter=await api.saveCampaign(guarded,db);
+  assert.equal(counter.items[0].soldCount,0,'Client cannot set sold counter');
+  assert.equal(counter.items[0].regularPrice,25000000,'Regular price bounded by canonical selling/original price');
+  await assert.rejects(api.saveCampaign({...guarded,items:[{...item('q'),salePrice:20000000,regularPrice:999999999}]},db),e=>e.code==='INVALID_SALE_PRICE');
+  await assert.rejects(api.saveCampaign({...guarded,status:'PUBLISHED',items:[]},db));
+  await api.archiveCampaign(counter.id,counter.revision,db);
+  await assert.rejects(api.saveCampaign({...guarded,id:counter.id,expectedRevision:counter.revision+1,status:'PUBLISHED'},db),e=>e.code==='CAMPAIGN_ARCHIVED_CONFLICT');
+  await assert.rejects(api.saveCampaign({...doc,items:[{...item('v')}]},db),e=>e.code==='CAMPAIGN_OVERLAP_CONFLICT');
+  console.log('PASS: isolated D1; campaigns, canonical prices/counters, archived/empty guards, overlap, exact variants, expiry and legacy offers.');
 } finally { delete globalThis.env; await mf.dispose(); await rm(bundle, { force: true }); }

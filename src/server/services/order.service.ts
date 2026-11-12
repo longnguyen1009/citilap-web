@@ -224,6 +224,17 @@ export class OrderConflictError extends Error {
   }
 }
 
+export class OrderValidationError extends Error {
+  code: string;
+  status: number;
+  constructor(code: string, message: string, status = 400) {
+    super(message);
+    this.name = 'OrderValidationError';
+    this.code = code;
+    this.status = status;
+  }
+}
+
 export const SHARED_ADMIN_ACTOR = 'Admin vận hành (Phiên dùng chung)';
 
 export type OrderStatus = 'NEW' | 'CONTACTED' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED';
@@ -570,8 +581,30 @@ export async function createOrder(
     now
   );
 
+  const campaignQuotaStmts = resolvedItems.flatMap((item) => {
+    if (!item.campaignSnapshot) return [];
+    try {
+      const parsed = JSON.parse(item.campaignSnapshot) as {
+        id?: string;
+        source?: string;
+      };
+      if (parsed?.source !== 'campaign' || !parsed.id) return [];
+      return [
+        db
+          .prepare(
+            `UPDATE "PromotionCampaignItem"
+             SET "soldCount" = COALESCE("soldCount", 0) + ?, "updatedAt" = ?
+             WHERE "campaignId" = ? AND "productId" = ? AND COALESCE("variantId", '') = COALESCE(?, '')`
+          )
+          .bind(item.quantity, now, parsed.id, item.productId, item.variantId),
+      ];
+    } catch {
+      return [];
+    }
+  });
+
   try {
-    await db.batch([orderStmt, ...itemStmts, initialEventStmt, notifStmt]);
+    await db.batch([orderStmt, ...itemStmts, ...campaignQuotaStmts, initialEventStmt, notifStmt]);
   } catch (error) {
     // A concurrent retry may commit first. Read its immutable result before live validation.
     if (cleanIdempotencyKey) {
@@ -660,6 +693,8 @@ export async function getOrderById(orderId: string, d1Database?: D1Database) {
           serialUnit: {
             select: {
               id: true,
+              productId: true,
+              variantId: true,
               serialNumber: true,
               status: true,
               condition: true,
@@ -1032,6 +1067,7 @@ export async function transitionOrderStatus(
   // 2. Fetch existing order to inspect transition rules
   const existing = await prisma.order.findUnique({
     where: { id: orderId },
+    include: { items: true },
   });
 
   if (!existing) {
@@ -1115,7 +1151,57 @@ export async function transitionOrderStatus(
     orderId
   );
 
-  const [updateRes] = await db.batch([updateStmt, eventStmt, ...adminAuditStatements(db, 'order.' + action.toLowerCase(), orderId, 'Order status mutation', eventId)]);
+  const serialStmts = [];
+  const assignedSerialIds = (existing.items || [])
+    .map((it) => it.serialUnitId)
+    .filter((id): id is string => Boolean(id));
+
+  if (assignedSerialIds.length > 0) {
+    const placeholders = assignedSerialIds.map(() => '?').join(',');
+    if (targetStatus === 'COMPLETED') {
+      serialStmts.push(
+        db.prepare(
+          `UPDATE "SerialUnit"
+           SET "status" = 'SOLD', "updatedAt" = ?
+           WHERE "id" IN (${placeholders})
+             AND "status" IN ('RESERVED', 'ALLOCATED', 'AVAILABLE')
+             AND EXISTS (SELECT 1 FROM "OrderEvent" WHERE "id" = ?)`
+        ).bind(nowIso, ...assignedSerialIds, eventId)
+      );
+    } else if (targetStatus === 'CANCELLED') {
+      serialStmts.push(
+        db.prepare(
+          `UPDATE "SerialUnit"
+           SET "status" = 'AVAILABLE',
+               "allocatedReference" = NULL,
+               "allocatedAt" = NULL,
+               "updatedAt" = ?
+           WHERE "id" IN (${placeholders})
+             AND "status" IN ('RESERVED', 'ALLOCATED')
+             AND ("allocatedReference" IS NULL OR "allocatedReference" = ?)
+             AND EXISTS (SELECT 1 FROM "OrderEvent" WHERE "id" = ?)`
+        ).bind(nowIso, ...assignedSerialIds, orderId, eventId),
+        db.prepare(
+          `UPDATE "OrderItem"
+           SET "serialUnitId" = NULL, "updatedAt" = ?
+           WHERE "orderId" = ?
+             AND "serialUnitId" IN (${placeholders})
+             AND EXISTS (SELECT 1 FROM "OrderEvent" WHERE "id" = ?)`
+        ).bind(nowIso, orderId, ...assignedSerialIds, eventId)
+      );
+    }
+  }
+
+  const [updateRes] = await db.batch([
+    updateStmt,
+    eventStmt,
+    ...serialStmts,
+    ...adminAuditStatements(db, 'order.' + action.toLowerCase(), orderId, 'Order status mutation', eventId, 'order', {
+      before: expectedRevision,
+      after: nextRevision,
+      changed: true,
+    }),
+  ]);
   if ((updateRes.meta?.changes ?? 0) === 0) {
     const fresh = await prisma.order.findUnique({ where: { id: orderId } });
     if (!fresh) {
@@ -1242,4 +1328,815 @@ export async function updateOrderStatus(
     },
     db
   );
+}
+
+export interface AvailableSerialDto {
+  id: string;
+  productId: string;
+  variantId: string | null;
+  serialNumber: string;
+  status: string;
+  condition: string;
+  warrantyMonths: number;
+  warehouseName: string | null;
+  publicCode: string | null;
+}
+
+export const MAX_ORDER_SHIPPING_FEE_VND = 50_000_000;
+
+export async function getAvailableSerialsForOrder(
+  order: {
+    id: string;
+    items?: Array<{ productId: string; serialUnitId?: string | null }>;
+  } | null,
+  d1Database?: D1Database
+): Promise<AvailableSerialDto[]> {
+  const db = d1Database || getD1Database();
+  if (!db || !order || !order.items || order.items.length === 0) {
+    return [];
+  }
+
+  const productIds = Array.from(new Set(order.items.map((it) => it.productId).filter(Boolean)));
+  const assignedIds = order.items.map((it) => it.serialUnitId).filter((x): x is string => Boolean(x));
+  if (productIds.length === 0) {
+    return [];
+  }
+
+  const nowIso = new Date().toISOString();
+  const prodPlaceholders = productIds.map(() => '?').join(',');
+  const assignClause =
+    assignedIds.length > 0
+      ? `OR su."id" IN (${assignedIds.map(() => '?').join(',')})`
+      : '';
+
+  const rows = await db
+    .prepare(
+      `SELECT su."id", su."productId", su."variantId", su."serialNumber", su."status", su."condition", su."warrantyMonths",
+              w."name" AS "warehouseName", pi."publicCode"
+       FROM "SerialUnit" su
+       LEFT JOIN "Warehouse" w ON w."id" = su."warehouseId"
+       LEFT JOIN "ProductInspection" pi ON pi."serialUnitId" = su."id"
+       WHERE su."productId" IN (${prodPlaceholders})
+         AND (
+           (
+             su."status" = 'AVAILABLE'
+             AND (su."allocatedReference" IS NULL OR su."allocatedReference" = ?)
+             AND NOT EXISTS (
+               SELECT 1
+               FROM "OrderItem" oi
+               JOIN "Order" o ON o."id" = oi."orderId"
+               WHERE oi."serialUnitId" = su."id"
+                 AND o."status" != 'CANCELLED'
+                 AND o."id" != ?
+             )
+             AND NOT EXISTS (
+               SELECT 1
+               FROM "InventoryReservation" ir
+               WHERE ir."serialUnitId" = su."id"
+                 AND ir."status" = 'ACTIVE'
+                 AND ir."expiresAt" > ?
+                 AND NOT (ir."referenceType" = 'ORDER' AND ir."referenceId" = ?)
+             )
+           )
+           ${assignClause}
+         )
+       ORDER BY su."createdAt" DESC`
+    )
+    .bind(...productIds, order.id, order.id, nowIso, order.id, ...assignedIds)
+    .all<AvailableSerialDto>();
+
+  return rows.results || [];
+}
+
+export interface UpdateOrderBillingInput {
+  orderId: string;
+  expectedRevision: number;
+  paymentStatus?: unknown;
+  shippingFee?: unknown;
+}
+
+/**
+ * Atomic CAS update for Order billing fields (paymentStatus & shippingFee).
+ * Enforces expectedRevision, increments revision, validates lifecycle & finite safe VND integer bounds,
+ * and rolls back completely if CAS or preconditions fail.
+ */
+export async function updateOrderBilling(
+  input: UpdateOrderBillingInput,
+  d1Database?: D1Database
+) {
+  const db = d1Database || getD1Database();
+  if (!db) {
+    throw new Error('D1_BINDING_REQUIRED: Cloudflare D1 database binding is required for atomic order billing update');
+  }
+  const prisma = getPrismaClient(db);
+  const { orderId, expectedRevision, paymentStatus, shippingFee } = input;
+
+  // 1. Validate required expectedRevision (non-negative safe integer)
+  if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new OrderValidationError(
+      'INVALID_REVISION',
+      'expectedRevision là bắt buộc và phải là số nguyên không âm hợp lệ',
+      400
+    );
+  }
+
+  // 2. Validate provided fields strictly (no silent fallback)
+  const hasPaymentStatus = paymentStatus !== undefined;
+  const hasShippingFee = shippingFee !== undefined;
+  if (!hasPaymentStatus && !hasShippingFee) {
+    throw new OrderValidationError(
+      'INVALID_BILLING_INPUT',
+      'Cần cung cấp trạng thái thanh toán (paymentStatus) hoặc phí giao hàng (shippingFee) cần cập nhật.',
+      400
+    );
+  }
+
+  let validatedPaymentStatus: 'PENDING' | 'PAID' | undefined;
+  if (hasPaymentStatus) {
+    if (paymentStatus === 'REFUNDED') {
+      throw new OrderValidationError(
+        'UNSUPPORTED_PAYMENT_STATUS',
+        'Không được phép tự đánh dấu REFUNDED trực tiếp mà không qua quy trình hoàn tiền thực tế.',
+        400
+      );
+    }
+    if (typeof paymentStatus !== 'string' || !['PENDING', 'PAID'].includes(paymentStatus)) {
+      throw new OrderValidationError(
+        'INVALID_PAYMENT_STATUS',
+        `Trạng thái thanh toán không hợp lệ: "${String(paymentStatus)}". Chỉ chấp nhận PENDING hoặc PAID.`,
+        400
+      );
+    }
+    validatedPaymentStatus = paymentStatus as 'PENDING' | 'PAID';
+  }
+
+  let validatedShippingFee: number | undefined;
+  if (hasShippingFee) {
+    if (
+      typeof shippingFee !== 'number' ||
+      !Number.isSafeInteger(shippingFee) ||
+      shippingFee < 0 ||
+      shippingFee > MAX_ORDER_SHIPPING_FEE_VND
+    ) {
+      throw new OrderValidationError(
+        'INVALID_SHIPPING_FEE',
+        `Phí giao hàng không hợp lệ. Phải là số nguyên không âm từ 0đ đến ${MAX_ORDER_SHIPPING_FEE_VND.toLocaleString('vi-VN')}đ.`,
+        400
+      );
+    }
+    validatedShippingFee = shippingFee;
+  }
+
+  // 3. Load existing order
+  const existing = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!existing) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  // 4. Stale revision check FIRST
+  if (existing.revision !== expectedRevision) {
+    throw new OrderConflictError(
+      `Đơn hàng đã được chỉnh sửa bởi phiên khác (phiên bản hiện tại: ${existing.revision}, gửi lên: ${expectedRevision})`,
+      existing.revision
+    );
+  }
+
+  // 5. Order lifecycle & financial rules
+  if (existing.status === 'CANCELLED') {
+    throw new OrderValidationError(
+      'ORDER_CANCELLED_BILLING_LOCKED',
+      'Không thể cập nhật thanh toán hoặc phí giao hàng cho đơn hàng đã hủy (CANCELLED).',
+      400
+    );
+  }
+
+  const nextPaymentStatus = validatedPaymentStatus ?? existing.paymentStatus;
+  const nextShippingFee = validatedShippingFee ?? existing.shippingFee;
+
+  if (existing.status === 'COMPLETED') {
+    if (hasShippingFee && nextShippingFee !== existing.shippingFee) {
+      throw new OrderValidationError(
+        'ORDER_COMPLETED_SHIPPING_LOCKED',
+        'Không thể thay đổi phí giao hàng cho đơn hàng đã hoàn tất (COMPLETED).',
+        400
+      );
+    }
+    if (hasPaymentStatus && existing.paymentStatus === 'PAID' && nextPaymentStatus !== 'PAID') {
+      throw new OrderValidationError(
+        'ORDER_COMPLETED_PAYMENT_LOCKED',
+        'Đơn hàng đã hoàn tất và đã thu tiền (PAID), không thể chuyển ngược về chờ thanh toán.',
+        400
+      );
+    }
+  }
+
+  // Amount collected lock: once order is PAID (or stays PAID), shippingFee / totalAmount cannot be mutated
+  if ((existing.paymentStatus === 'PAID' || nextPaymentStatus === 'PAID') && nextShippingFee !== existing.shippingFee) {
+    throw new OrderValidationError(
+      'ORDER_PAID_SHIPPING_LOCKED',
+      'Đơn hàng đã thu tiền (PAID), không thể thay đổi phí giao hàng làm lệch số tiền đã thu.',
+      400
+    );
+  }
+
+  if (existing.shippingMethod === 'pickup' && nextShippingFee > 0) {
+    throw new OrderValidationError(
+      'PICKUP_SHIPPING_FEE_MUST_BE_ZERO',
+      'Đơn hàng nhận tại showroom (pickup) không được áp phí giao hàng lớn hơn 0đ.',
+      400
+    );
+  }
+
+  const rawTotalAmount = existing.subtotalAmount + nextShippingFee - (existing.discountAmount || 0);
+  if (!Number.isSafeInteger(rawTotalAmount) || rawTotalAmount < 0) {
+    throw new OrderValidationError(
+      'INVALID_TOTAL_AMOUNT',
+      'Tổng tiền đơn hàng sau khi tính phí giao hàng vượt giới hạn an toàn hoặc không hợp lệ.',
+      400
+    );
+  }
+  const nextTotalAmount = rawTotalAmount;
+
+  const changesDesc: string[] = [];
+  if (nextPaymentStatus !== existing.paymentStatus) {
+    changesDesc.push(`Thanh toán: ${existing.paymentStatus} → ${nextPaymentStatus}`);
+  }
+  if (nextShippingFee !== existing.shippingFee) {
+    changesDesc.push(
+      `Phí ship: ${existing.shippingFee.toLocaleString('vi-VN')}đ → ${nextShippingFee.toLocaleString('vi-VN')}đ`
+    );
+  }
+
+  if (changesDesc.length === 0) {
+    throw new OrderValidationError(
+      'BILLING_NOOP',
+      'Thông tin thanh toán và phí giao hàng không có thay đổi.',
+      400
+    );
+  }
+
+  const nextRevision = expectedRevision + 1;
+  const nowIso = new Date().toISOString();
+  const eventId = 'e' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+
+  // Guard statement: aborts the entire D1 batch if Order row/revision/status/financial preconditions changed concurrently
+  const guardStmt = db
+    .prepare(
+      `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+       SELECT NULL, ?, 'GUARD', NULL, NULL, NULL, 'system', ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM "Order"
+         WHERE "id" = ?
+           AND "revision" = ?
+           AND "status" = ?
+           AND "paymentStatus" = ?
+           AND "shippingFee" = ?
+       )`
+    )
+    .bind(
+      orderId,
+      nowIso,
+      orderId,
+      expectedRevision,
+      existing.status,
+      existing.paymentStatus,
+      existing.shippingFee
+    );
+
+  const updateStmt = db
+    .prepare(
+      `UPDATE "Order"
+       SET "paymentStatus" = ?,
+           "shippingFee" = ?,
+           "totalAmount" = ?,
+           "revision" = ?,
+           "updatedAt" = ?
+       WHERE "id" = ? AND "revision" = ?`
+    )
+    .bind(nextPaymentStatus, nextShippingFee, nextTotalAmount, nextRevision, nowIso, orderId, expectedRevision);
+
+  const eventStmt = db
+    .prepare(
+      `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+       SELECT ?, "id", 'NOTE_ADDED', ?, ?, ?, ?, ?
+       FROM "Order"
+       WHERE "id" = ? AND changes() = 1`
+    )
+    .bind(
+      eventId,
+      existing.status,
+      existing.status,
+      `Cập nhật thanh toán/vận chuyển: ${changesDesc.join(' | ')}`,
+      adminActor(SHARED_ADMIN_ACTOR),
+      nowIso,
+      orderId
+    );
+
+  try {
+    const [, updateRes] = await db.batch([
+      guardStmt,
+      updateStmt,
+      eventStmt,
+      ...adminAuditStatements(db, 'order.billing_update', orderId, changesDesc.join('; '), eventId, 'order', {
+        before: expectedRevision,
+        after: nextRevision,
+        changed: true,
+      }),
+    ]);
+
+    if ((updateRes?.meta?.changes ?? 0) === 0) {
+      const fresh = await prisma.order.findUnique({ where: { id: orderId } });
+      if (!fresh) throw new Error('ORDER_NOT_FOUND');
+      throw new OrderConflictError(
+        `Đơn hàng đã được chỉnh sửa bởi phiên khác (phiên bản hiện tại: ${fresh.revision}, gửi lên: ${expectedRevision})`,
+        fresh.revision
+      );
+    }
+  } catch (err) {
+    if (err instanceof OrderConflictError || err instanceof OrderValidationError) {
+      throw err;
+    }
+    const fresh = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!fresh) {
+      throw new Error('ORDER_NOT_FOUND');
+    }
+    if (fresh.revision !== expectedRevision) {
+      throw new OrderConflictError(
+        `Đơn hàng đã được chỉnh sửa bởi phiên khác (phiên bản hiện tại: ${fresh.revision}, gửi lên: ${expectedRevision})`,
+        fresh.revision
+      );
+    }
+    throw err;
+  }
+
+  const updatedOrder = await getOrderById(orderId, db);
+  if (!updatedOrder) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+  const availableSerials = await getAvailableSerialsForOrder(updatedOrder, db);
+  return { ...updatedOrder, availableSerials };
+}
+
+export interface AssignOrderSerialInput {
+  orderId: string;
+  orderItemId: string;
+  serialUnitId: string | null;
+  expectedRevision: number;
+}
+
+/**
+ * Atomic CAS assignment/unassignment of a physical SerialUnit to an OrderItem.
+ * Enforces:
+ * - expectedRevision CAS on Order (increments Order.revision).
+ * - Order lifecycle: blocks CANCELLED orders from holding serials; blocks COMPLETED orders from direct unassignment/reassignment (must go through return workflow).
+ * - Serial ownership & variant matching: SerialUnit must belong to same productId and variantId (respecting legacy NULL variant semantics).
+ * - Serial availability: must be AVAILABLE and not held by any other active Order or active InventoryReservation.
+ * - All-or-nothing D1 batch rollback via pre-flight/post-flight SQLite constraint guards.
+ */
+export async function assignOrderItemSerial(
+  input: AssignOrderSerialInput,
+  d1Database?: D1Database
+) {
+  const db = d1Database || getD1Database();
+  if (!db) {
+    throw new Error('D1_BINDING_REQUIRED: Cloudflare D1 database binding is required for atomic serial assignment');
+  }
+  const prisma = getPrismaClient(db);
+  const { orderId, orderItemId, expectedRevision } = input;
+
+  // 1. Validate required expectedRevision
+  if (typeof expectedRevision !== 'number' || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+    throw new OrderValidationError(
+      'INVALID_REVISION',
+      'expectedRevision là bắt buộc và phải là số nguyên không âm hợp lệ',
+      400
+    );
+  }
+
+  if (typeof orderItemId !== 'string' || !orderItemId.trim()) {
+    throw new OrderValidationError('INVALID_ORDER_ITEM', 'orderItemId không hợp lệ.', 400);
+  }
+
+  const nextSerialUnitId =
+    typeof input.serialUnitId === 'string' && input.serialUnitId.trim()
+      ? input.serialUnitId.trim()
+      : null;
+
+  // 2. Fetch existing order & items
+  const existingOrder = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: true },
+  });
+  if (!existingOrder) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+
+  // 3. Stale revision check FIRST
+  if (existingOrder.revision !== expectedRevision) {
+    throw new OrderConflictError(
+      `Đơn hàng đã được chỉnh sửa bởi phiên khác (phiên bản hiện tại: ${existingOrder.revision}, gửi lên: ${expectedRevision})`,
+      existingOrder.revision
+    );
+  }
+
+  const orderItem = existingOrder.items.find((it) => it.id === orderItemId.trim());
+  if (!orderItem) {
+    const err = new Error('ORDER_ITEM_NOT_FOUND');
+    (err as unknown as { code: string }).code = 'ORDER_ITEM_NOT_FOUND';
+    throw err;
+  }
+
+  const prevSerialUnitId = orderItem.serialUnitId || null;
+
+  // 4. Order lifecycle checks
+  if (existingOrder.status === 'CANCELLED') {
+    throw new OrderValidationError(
+      'ORDER_CANCELLED_SERIAL_LOCKED',
+      'Đơn hàng đã hủy (CANCELLED) không thể nhận giữ hoặc thay đổi Serial máy.',
+      400
+    );
+  }
+
+  if (existingOrder.status === 'COMPLETED' || existingOrder.status === 'Đã hoàn thành') {
+    throw new OrderValidationError(
+      'ORDER_COMPLETED_SERIAL_LOCKED',
+      'Đơn hàng đã hoàn tất (COMPLETED). Việc gỡ hoặc đổi máy đã bán (SOLD) phải thực hiện qua quy trình đổi trả (Return workflow), không thể gỡ trực tiếp về AVAILABLE.',
+      400
+    );
+  }
+
+  if (nextSerialUnitId === prevSerialUnitId) {
+    throw new OrderValidationError(
+      'SERIAL_ASSIGN_NOOP',
+      'Serial máy trên dòng sản phẩm không có thay đổi.',
+      400
+    );
+  }
+
+  // 5. Inspect previous serial unit if unassigning or replacing
+  if (prevSerialUnitId) {
+    const prevUnit = await db
+      .prepare(`SELECT "id", "status", "allocatedReference" FROM "SerialUnit" WHERE "id" = ?`)
+      .bind(prevSerialUnitId)
+      .first<{ id: string; status: string; allocatedReference: string | null }>();
+
+    if (prevUnit && prevUnit.status === 'SOLD') {
+      throw new OrderValidationError(
+        'SERIAL_ALREADY_SOLD',
+        'Máy Serial hiện tại đang ở trạng thái SOLD. Phải đi qua quy trình đổi trả (RETURNING → RETURNED), không thể trả trực tiếp về AVAILABLE.',
+        400
+      );
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  let serialLabel = 'Gỡ gán Serial';
+  let targetUnit: {
+    id: string;
+    productId: string;
+    variantId: string | null;
+    serialNumber: string;
+    status: string;
+    allocatedReference: string | null;
+    publicCode: string | null;
+  } | null = null;
+
+  // 6. Inspect and validate target serial unit if assigning
+  if (nextSerialUnitId) {
+    targetUnit = await db
+      .prepare(
+        `SELECT su."id", su."productId", su."variantId", su."serialNumber", su."status", su."allocatedReference", pi."publicCode"
+         FROM "SerialUnit" su
+         LEFT JOIN "ProductInspection" pi ON pi."serialUnitId" = su."id"
+         WHERE su."id" = ?`
+      )
+      .bind(nextSerialUnitId)
+      .first<{
+        id: string;
+        productId: string;
+        variantId: string | null;
+        serialNumber: string;
+        status: string;
+        allocatedReference: string | null;
+        publicCode: string | null;
+      }>();
+
+    if (!targetUnit) {
+      const err = new Error('SERIAL_UNIT_NOT_FOUND');
+      (err as unknown as { code: string }).code = 'SERIAL_UNIT_NOT_FOUND';
+      throw err;
+    }
+
+    // Must match productId
+    if (targetUnit.productId !== orderItem.productId) {
+      throw new OrderValidationError(
+        'SERIAL_PRODUCT_MISMATCH',
+        'Serial máy không thuộc sản phẩm của dòng đơn hàng này.',
+        400
+      );
+    }
+
+    // Variant matching with legacy NULL variant semantics:
+    // - If OrderItem specifies a variantId, SerialUnit.variantId must equal OrderItem.variantId.
+    // - If OrderItem.variantId is NULL (legacy/non-variant order item), SerialUnit.variantId must also be NULL unless the product has no active variants.
+    if (orderItem.variantId) {
+      if (targetUnit.variantId !== orderItem.variantId) {
+        throw new OrderValidationError(
+          'SERIAL_VARIANT_MISMATCH',
+          'Serial máy không khớp cấu hình (biến thể) đã đặt của dòng đơn hàng này.',
+          400
+        );
+      }
+    } else if (targetUnit.variantId !== null) {
+      const activeVariantsCount = await db
+        .prepare(`SELECT COUNT(*) AS cnt FROM "ProductVariant" WHERE "productId" = ? AND "status" = 'ACTIVE'`)
+        .bind(orderItem.productId)
+        .first<{ cnt: number }>();
+      if ((activeVariantsCount?.cnt ?? 0) > 0) {
+        throw new OrderValidationError(
+          'SERIAL_VARIANT_MISMATCH',
+          'Dòng đơn hàng không chỉ định biến thể nhưng Serial máy thuộc một biến thể cụ thể.',
+          400
+        );
+      }
+    }
+
+    // Check if held by another active OrderItem (including another item on the same order or another non-cancelled order)
+    const activeOrderHolder = await db
+      .prepare(
+        `SELECT oi."id" AS "orderItemId", oi."orderId", o."orderNumber", o."status"
+         FROM "OrderItem" oi
+         JOIN "Order" o ON o."id" = oi."orderId"
+         WHERE oi."serialUnitId" = ?
+           AND oi."id" != ?
+           AND o."status" != 'CANCELLED'
+         LIMIT 1`
+      )
+      .bind(nextSerialUnitId, orderItem.id)
+      .first<{ orderItemId: string; orderId: string; orderNumber: string | null; status: string }>();
+
+    if (activeOrderHolder) {
+      throw new OrderValidationError(
+        'SERIAL_HELD_BY_OTHER_ORDER',
+        `Serial #${targetUnit.serialNumber} đang được gán cho một đơn hàng còn hiệu lực khác.`,
+        409
+      );
+    }
+
+    // Check if held by an active InventoryReservation for another reference
+    const activeReservation = await db
+      .prepare(
+        `SELECT "id", "referenceType", "referenceId"
+         FROM "InventoryReservation"
+         WHERE "serialUnitId" = ?
+           AND "status" = 'ACTIVE'
+           AND "expiresAt" > ?
+           AND NOT ("referenceType" = 'ORDER' AND "referenceId" = ?)
+         LIMIT 1`
+      )
+      .bind(nextSerialUnitId, nowIso, orderId)
+      .first<{ id: string; referenceType: string; referenceId: string }>();
+
+    if (activeReservation) {
+      throw new OrderValidationError(
+        'SERIAL_RESERVED_ELSEWHERE',
+        `Serial #${targetUnit.serialNumber} đang được giữ chỗ (Reservation) bởi phiên hoặc đơn hàng khác.`,
+        409
+      );
+    }
+
+    // Check SerialUnit status & allocatedReference
+    const isReservedForThisOrder =
+      (targetUnit.status === 'RESERVED' || targetUnit.status === 'ALLOCATED') &&
+      targetUnit.allocatedReference === orderId;
+
+    if (targetUnit.status !== 'AVAILABLE' && !isReservedForThisOrder) {
+      throw new OrderValidationError(
+        'SERIAL_STATUS_UNAVAILABLE',
+        `Serial #${targetUnit.serialNumber} hiện ở trạng thái "${targetUnit.status}", không khả dụng để gán.`,
+        409
+      );
+    }
+
+    if (targetUnit.allocatedReference && targetUnit.allocatedReference !== orderId) {
+      throw new OrderValidationError(
+        'SERIAL_ALLOCATED_ELSEWHERE',
+        `Serial #${targetUnit.serialNumber} đã được phân bổ cho mã tham chiếu khác (${targetUnit.allocatedReference}).`,
+        409
+      );
+    }
+
+    serialLabel = `Gán máy Serial #${targetUnit.serialNumber}${
+      targetUnit.publicCode ? ` (Mã kiểm định: ${targetUnit.publicCode})` : ''
+    }`;
+  }
+
+  // 7. Build all-or-nothing D1 batch with CAS & invariant guards
+  const nextRevision = expectedRevision + 1;
+  const eventId = 'e' + Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+  const stmts = [];
+
+  // 7a. Pre-flight guard: Order revision & status + OrderItem current serialUnitId must match snapshot
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+         SELECT NULL, ?, 'GUARD_ORDER', NULL, NULL, NULL, 'system', ?
+         WHERE NOT EXISTS (
+           SELECT 1
+           FROM "Order" o
+           JOIN "OrderItem" oi ON oi."orderId" = o."id"
+           WHERE o."id" = ?
+             AND o."revision" = ?
+             AND o."status" = ?
+             AND o."status" NOT IN ('COMPLETED', 'Đã hoàn thành', 'CANCELLED')
+             AND oi."id" = ?
+             AND COALESCE(oi."serialUnitId", '') = ?
+         )`
+      )
+      .bind(
+        orderId,
+        nowIso,
+        orderId,
+        expectedRevision,
+        existingOrder.status,
+        orderItem.id,
+        prevSerialUnitId || ''
+      )
+  );
+
+  // 7b. Release previous serial unit if present
+  if (prevSerialUnitId) {
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE "SerialUnit"
+           SET "status" = 'AVAILABLE',
+               "allocatedReference" = NULL,
+               "allocatedAt" = NULL,
+               "updatedAt" = ?
+           WHERE "id" = ?
+             AND "status" IN ('RESERVED', 'ALLOCATED', 'AVAILABLE')
+             AND ("allocatedReference" IS NULL OR "allocatedReference" = ?)`
+        )
+        .bind(nowIso, prevSerialUnitId, orderId),
+      db
+        .prepare(
+          `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+           SELECT NULL, ?, 'GUARD_PREV_SERIAL', NULL, NULL, NULL, 'system', ?
+           WHERE changes() != 1`
+        )
+        .bind(orderId, nowIso)
+    );
+  }
+
+  // 7c. Claim target serial unit if present
+  if (nextSerialUnitId && targetUnit) {
+    stmts.push(
+      db
+        .prepare(
+          `UPDATE "SerialUnit"
+           SET "status" = 'RESERVED',
+               "allocatedReference" = ?,
+               "allocatedAt" = ?,
+               "updatedAt" = ?
+           WHERE "id" = ?
+             AND "productId" = ?
+             AND COALESCE("variantId", '') = ?
+             AND (
+               "status" = 'AVAILABLE'
+               OR ("status" IN ('RESERVED', 'ALLOCATED') AND "allocatedReference" = ?)
+             )
+             AND ("allocatedReference" IS NULL OR "allocatedReference" = ?)
+             AND NOT EXISTS (
+               SELECT 1
+               FROM "OrderItem" oi
+               JOIN "Order" o ON o."id" = oi."orderId"
+               WHERE oi."serialUnitId" = ?
+                 AND oi."id" != ?
+                 AND o."status" != 'CANCELLED'
+             )
+             AND NOT EXISTS (
+               SELECT 1
+               FROM "InventoryReservation" ir
+               WHERE ir."serialUnitId" = ?
+                 AND ir."status" = 'ACTIVE'
+                 AND ir."expiresAt" > ?
+                 AND NOT (ir."referenceType" = 'ORDER' AND ir."referenceId" = ?)
+             )`
+        )
+        .bind(
+          orderId,
+          nowIso,
+          nowIso,
+          nextSerialUnitId,
+          orderItem.productId,
+          targetUnit.variantId || '',
+          orderId,
+          orderId,
+          nextSerialUnitId,
+          orderItem.id,
+          nextSerialUnitId,
+          nowIso,
+          orderId
+        ),
+      db
+        .prepare(
+          `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+           SELECT NULL, ?, 'GUARD_NEXT_SERIAL', NULL, NULL, NULL, 'system', ?
+           WHERE changes() != 1`
+        )
+        .bind(orderId, nowIso)
+    );
+  }
+
+  // 7d. Update OrderItem.serialUnitId (strictly preserving price/snapshot columns)
+  stmts.push(
+    db
+      .prepare(
+        `UPDATE "OrderItem"
+         SET "serialUnitId" = ?, "updatedAt" = ?
+         WHERE "id" = ? AND "orderId" = ? AND COALESCE("serialUnitId", '') = ?`
+      )
+      .bind(nextSerialUnitId, nowIso, orderItem.id, orderId, prevSerialUnitId || ''),
+    db
+      .prepare(
+        `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+         SELECT NULL, ?, 'GUARD_ORDER_ITEM', NULL, NULL, NULL, 'system', ?
+         WHERE changes() != 1`
+      )
+      .bind(orderId, nowIso)
+  );
+
+  // 7e. CAS update Order.revision +1
+  stmts.push(
+    db
+      .prepare(
+        `UPDATE "Order"
+         SET "revision" = ?, "updatedAt" = ?
+         WHERE "id" = ? AND "revision" = ? AND "status" = ?`
+      )
+      .bind(nextRevision, nowIso, orderId, expectedRevision, existingOrder.status),
+    db
+      .prepare(
+        `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+         SELECT NULL, ?, 'GUARD_ORDER_CAS', NULL, NULL, NULL, 'system', ?
+         WHERE changes() != 1`
+      )
+      .bind(orderId, nowIso)
+  );
+
+  // 7f. Append OrderEvent and AdminAudit
+  stmts.push(
+    db
+      .prepare(
+        `INSERT INTO "OrderEvent" ("id", "orderId", "action", "fromStatus", "toStatus", "note", "actor", "createdAt")
+         VALUES (?, ?, 'NOTE_ADDED', ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        eventId,
+        orderId,
+        existingOrder.status,
+        existingOrder.status,
+        `${serialLabel} cho sản phẩm "${orderItem.productNameSnapshot || orderItem.productName || 'SP'}"`,
+        adminActor(SHARED_ADMIN_ACTOR),
+        nowIso
+      ),
+    ...adminAuditStatements(db, 'order.assign_serial', orderId, serialLabel, eventId, 'order', {
+      before: expectedRevision,
+      after: nextRevision,
+      changed: true,
+    })
+  );
+
+  try {
+    await db.batch(stmts);
+  } catch (err) {
+    if (err instanceof OrderConflictError || err instanceof OrderValidationError) {
+      throw err;
+    }
+    const freshOrder = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!freshOrder) {
+      throw new Error('ORDER_NOT_FOUND');
+    }
+    if (freshOrder.revision !== expectedRevision) {
+      throw new OrderConflictError(
+        `Đơn hàng đã được chỉnh sửa bởi phiên khác (phiên bản hiện tại: ${freshOrder.revision}, gửi lên: ${expectedRevision})`,
+        freshOrder.revision
+      );
+    }
+    // If Order revision was not the reason, the serial unit was concurrently claimed/mutated
+    throw new OrderValidationError(
+      'SERIAL_CONCURRENCY_CONFLICT',
+      'Serial máy vừa được đơn hàng hoặc phiên làm việc khác thay đổi. Dữ liệu đã được bảo toàn, vui lòng tải lại và chọn lại Serial.',
+      409
+    );
+  }
+
+  const freshOrder = await getOrderById(orderId, db);
+  if (!freshOrder) {
+    throw new Error('ORDER_NOT_FOUND');
+  }
+  const availableSerials = await getAvailableSerialsForOrder(freshOrder, db);
+  return { ...freshOrder, availableSerials };
 }

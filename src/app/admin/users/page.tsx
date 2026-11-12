@@ -68,6 +68,7 @@ export default function AdminUsersPage() {
   const [form, setForm] = useState(blankForm);
   const [editing, setEditing] = useState<Account | null>(null);
   const [error, setError] = useState('');
+  const [dialogError, setDialogError] = useState('');
   const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -90,12 +91,14 @@ export default function AdminUsersPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch of admin users
     void load();
   }, []);
 
   function openCreateDialog() {
     setEditing(null);
     setForm(blankForm);
+    setDialogError('');
     setError('');
     setSuccess('');
     dialogRef.current?.showModal();
@@ -111,12 +114,15 @@ export default function AdminUsersPage() {
       piiExport: Boolean(account.piiExport),
       password: '',
     });
+    setDialogError('');
     setError('');
     setSuccess('');
     dialogRef.current?.showModal();
   }
 
   function handleCancelEdit() {
+    if (busy) return;
+    setDialogError('');
     setEditing(null);
     setForm(blankForm);
     dialogRef.current?.close();
@@ -126,6 +132,7 @@ export default function AdminUsersPage() {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
+    setDialogError('');
     setError('');
     setSuccess('');
 
@@ -143,16 +150,17 @@ export default function AdminUsersPage() {
         body: JSON.stringify(payload),
       });
 
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Không thể lưu tài khoản');
 
       setSuccess(editing ? 'Đã cập nhật thông tin tài khoản thành công.' : 'Đã tạo tài khoản quản trị mới.');
+      setDialogError('');
       setEditing(null);
       setForm(blankForm);
       dialogRef.current?.close();
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Lỗi khi lưu tài khoản');
+      setDialogError(err instanceof Error ? err.message : 'Lỗi khi lưu tài khoản');
     } finally {
       setBusy(false);
     }
@@ -458,6 +466,15 @@ export default function AdminUsersPage() {
         ref={dialogRef}
         aria-labelledby="user-dialog-title"
         className="admin-modal-dialog"
+        onCancel={(e) => {
+          if (busy) {
+            e.preventDefault();
+            return;
+          }
+          setDialogError('');
+          setEditing(null);
+          setForm(blankForm);
+        }}
         onClick={(e) => {
           if (e.target === e.currentTarget) handleCancelEdit();
         }}
@@ -469,14 +486,24 @@ export default function AdminUsersPage() {
           <button
             type="button"
             onClick={handleCancelEdit}
+            disabled={busy}
             aria-label="Đóng hộp thoại"
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60"
+            className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 disabled:opacity-50"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <form onSubmit={handleSave} className="p-5 space-y-3.5 text-xs">
+          {dialogError && (
+            <InlineAlert
+              variant="error"
+              title="Không thể lưu tài khoản"
+              onClose={() => setDialogError('')}
+            >
+              {dialogError}
+            </InlineAlert>
+          )}
           <div>
             <label className="block font-semibold text-slate-700 mb-1">
               Họ và tên <span className="text-rose-500">*</span>
@@ -566,6 +593,7 @@ export default function AdminUsersPage() {
               type="button"
               variant="secondary"
               size="sm"
+              disabled={busy}
               onClick={handleCancelEdit}
             >
               Hủy

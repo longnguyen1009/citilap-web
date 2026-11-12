@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -8,8 +8,6 @@ import {
   Search,
   RefreshCw,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
   X,
 } from "lucide-react";
 import {
@@ -17,6 +15,9 @@ import {
   AdminCard,
   StatusBadge,
   InlineAlert,
+  DataTable,
+  type DataTableColumn,
+  useToast,
 } from "@/components/admin/ui";
 
 type OrderItemSummary = {
@@ -62,12 +63,13 @@ function OrdersContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const toast = useToast();
 
   const initialSearch = searchParams.get("search") || "";
   const initialStatus = searchParams.get("status") || "ALL";
   const initialPaymentStatus = searchParams.get("paymentStatus") || "ALL";
-  const initialStartDate = searchParams.get("startDate") || "";
-  const initialEndDate = searchParams.get("endDate") || "";
+  const initialStartDate = searchParams.get("fromDate") || searchParams.get("startDate") || "";
+  const initialEndDate = searchParams.get("toDate") || searchParams.get("endDate") || "";
   const initialPage = Math.max(1, Number(searchParams.get("page")) || 1);
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
@@ -76,6 +78,8 @@ function OrdersContent() {
   const [startDate, setStartDate] = useState(initialStartDate);
   const [endDate, setEndDate] = useState(initialEndDate);
   const [page, setPage] = useState(initialPage);
+  const [pageSize, setPageSize] = useState(25);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
@@ -86,6 +90,32 @@ function OrdersContent() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  const requestSeqRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const lastPushedQueryRef = useRef<string>(searchParams.toString());
+
+  useEffect(() => {
+    const currentUrlQuery = searchParams.toString();
+    if (currentUrlQuery === lastPushedQueryRef.current) {
+      return;
+    }
+    lastPushedQueryRef.current = currentUrlQuery;
+
+    const urlSearch = searchParams.get("search") || "";
+    const urlStatus = searchParams.get("status") || "ALL";
+    const urlPaymentStatus = searchParams.get("paymentStatus") || "ALL";
+    const urlStartDate = searchParams.get("fromDate") || searchParams.get("startDate") || "";
+    const urlEndDate = searchParams.get("toDate") || searchParams.get("endDate") || "";
+    const urlPage = Math.max(1, Number(searchParams.get("page")) || 1);
+
+    setSearchTerm((prev) => (prev === urlSearch ? prev : urlSearch));
+    setStatusFilter((prev) => (prev === urlStatus ? prev : urlStatus));
+    setPaymentStatusFilter((prev) => (prev === urlPaymentStatus ? prev : urlPaymentStatus));
+    setStartDate((prev) => (prev === urlStartDate ? prev : urlStartDate));
+    setEndDate((prev) => (prev === urlEndDate ? prev : urlEndDate));
+    setPage((prev) => (prev === urlPage ? prev : urlPage));
+  }, [searchParams]);
 
   const updateUrlParams = useCallback(
     (
@@ -100,11 +130,21 @@ function OrdersContent() {
       if (newSearch.trim()) params.set("search", newSearch.trim());
       if (newStatus && newStatus !== "ALL") params.set("status", newStatus);
       if (newPaymentStatus && newPaymentStatus !== "ALL") params.set("paymentStatus", newPaymentStatus);
-      if (newStart) params.set("startDate", newStart);
-      if (newEnd) params.set("endDate", newEnd);
+      if (newStart) {
+        params.set("fromDate", newStart);
+        params.set("startDate", newStart);
+      }
+      if (newEnd) {
+        params.set("toDate", newEnd);
+        params.set("endDate", newEnd);
+      }
       if (newPage > 1) params.set("page", String(newPage));
 
       const queryStr = params.toString();
+      if (queryStr === lastPushedQueryRef.current) {
+        return;
+      }
+      lastPushedQueryRef.current = queryStr;
       const targetUrl = queryStr ? `${pathname}?${queryStr}` : pathname;
       router.replace(targetUrl, { scroll: false });
     },
@@ -112,6 +152,11 @@ function OrdersContent() {
   );
 
   const fetchOrders = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const reqId = ++requestSeqRef.current;
+
     setLoading(true);
     const query = new URLSearchParams();
     if (searchTerm.trim()) query.set("search", searchTerm.trim());
@@ -120,37 +165,65 @@ function OrdersContent() {
     if (startDate) query.set("startDate", startDate);
     if (endDate) query.set("endDate", endDate);
     query.set("page", String(page));
-    query.set("limit", "25");
+    query.set("limit", String(pageSize));
 
     try {
       const res = await fetch(`/api/orders?${query.toString()}`, {
         credentials: "same-origin",
         headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal,
       });
       const result = await res.json();
-      if (result.success && Array.isArray(result.data)) {
+      if (reqId !== requestSeqRef.current || controller.signal.aborted) {
+        return;
+      }
+      if (res.ok && result.success && Array.isArray(result.data)) {
         setOrders(result.data);
+        setSelectedKeys([]);
         if (result.statusCounts) setStatusCounts(result.statusCounts);
         setFeedback(null);
         if (result.pagination) {
-          setTotal(result.pagination.total);
-          setTotalPages(result.pagination.totalPages);
+          const safeTotal = Math.max(0, Number(result.pagination.total) || 0);
+          const safeTotalPages = Math.max(1, Number(result.pagination.totalPages) || 1);
+          setTotal(safeTotal);
+          setTotalPages(safeTotalPages);
+          if (page > safeTotalPages) {
+            setPage(safeTotalPages);
+          }
         }
       } else {
         setFeedback({
           type: "error",
-          message: result?.error?.message || "Không thể tải danh sách đơn hàng.",
+          message:
+            result?.error?.message ||
+            result?.error ||
+            "Không thể tải danh sách đơn hàng.",
         });
       }
-    } catch {
+    } catch (err) {
+      if (
+        controller.signal.aborted ||
+        (err instanceof DOMException && err.name === "AbortError") ||
+        reqId !== requestSeqRef.current
+      ) {
+        return;
+      }
       setFeedback({
         type: "error",
         message: "Không thể kết nối đến máy chủ.",
       });
     } finally {
-      setLoading(false);
+      if (reqId === requestSeqRef.current && !controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [searchTerm, statusFilter, paymentStatusFilter, startDate, endDate, page]);
+  }, [searchTerm, statusFilter, paymentStatusFilter, startDate, endDate, page, pageSize]);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -171,6 +244,222 @@ function OrdersContent() {
 
     window.open(`/api/admin/orders/export?${query.toString()}`, "_blank");
   };
+
+  const handleExportSelectedCsv = () => {
+    const selectedSet = new Set(selectedKeys);
+    const targetOrders = selectedSet.size > 0
+      ? orders.filter((o) => selectedSet.has(o.id))
+      : orders;
+    if (targetOrders.length === 0) {
+      toast.warning("Không có đơn hàng nào để xuất CSV.");
+      return;
+    }
+
+    const headers = [
+      "Mã đơn",
+      "Ngày tạo",
+      "Khách hàng",
+      "Số điện thoại",
+      "Email",
+      "Địa chỉ giao hàng",
+      "Sản phẩm",
+      "Tổng tiền (VNĐ)",
+      "Phương thức TT",
+      "Trạng thái TT",
+      "Trạng thái đơn",
+    ];
+    const escapeCsv = (val: unknown) => {
+      const str = String(val ?? "");
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+    const rows = targetOrders.map((o) => {
+      const itemsText = o.items
+        ?.map((it) => `${it.productName || it.sku || "SP"} x${it.quantity}`)
+        .join("; ");
+      return [
+        o.orderNumber || o.id.slice(0, 8),
+        new Date(o.createdAt).toLocaleString("vi-VN"),
+        o.customerName,
+        o.customerPhone,
+        o.customerEmail || "",
+        o.shippingAddress || "",
+        itemsText || "",
+        o.totalAmount,
+        o.paymentMethod === "BANK_TRANSFER" ? "VietQR" : "COD",
+        o.paymentStatus === "PAID" ? "Đã thanh toán" : "Chờ thanh toán",
+        o.status,
+      ]
+        .map(escapeCsv)
+        .join(",");
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `citilap-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success(`Đã xuất CSV ${targetOrders.length} đơn hàng.`);
+  };
+
+  const columns: DataTableColumn<Order>[] = [
+    {
+      key: "orderNumber",
+      header: "Mã đơn",
+      headerText: "Mã đơn",
+      sortable: true,
+      sortType: "text",
+      sortValue: (o) => o.orderNumber || o.id,
+      isRowHeader: true,
+      render: (order) => {
+        const noteCount = order._count?.internalNotes || 0;
+        return (
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <Link
+              href={`/admin/orders/${order.id}`}
+              className="font-mono font-bold text-blue-600 hover:underline"
+            >
+              #{order.orderNumber || order.id.slice(0, 8)}
+            </Link>
+            {noteCount > 0 && (
+              <span
+                className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold tabular-nums"
+                title={`${noteCount} ghi chú vận hành nội bộ`}
+              >
+                {noteCount} ghi chú
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "customerName",
+      header: "Khách hàng",
+      headerText: "Khách hàng",
+      sortable: true,
+      sortType: "text",
+      sortValue: (o) => o.customerName,
+      render: (order) => (
+        <div className="whitespace-nowrap">
+          <div className="font-semibold text-slate-900">{order.customerName}</div>
+          <div className="text-[11px] text-slate-500 font-mono">{order.customerPhone}</div>
+        </div>
+      ),
+    },
+    {
+      key: "items",
+      header: "Sản phẩm đặt",
+      headerText: "Sản phẩm đặt",
+      sortable: true,
+      sortType: "number",
+      sortValue: (o) => o.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
+      render: (order) => {
+        const itemCount = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+        const firstItem = order.items?.[0]?.productName;
+        return (
+          <div>
+            <div className="text-slate-800 line-clamp-1 max-w-[260px]">
+              {firstItem || `${itemCount} sản phẩm`}
+            </div>
+            {itemCount > 1 && (
+              <div className="text-[11px] text-slate-400">Tổng {itemCount} SP</div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "totalAmount",
+      header: "Tổng tiền",
+      headerText: "Tổng tiền",
+      align: "right",
+      sortable: true,
+      sortType: "number",
+      sortValue: (o) => o.totalAmount,
+      render: (order) => (
+        <span className="whitespace-nowrap font-bold text-slate-900 tabular-nums">
+          {order.totalAmount.toLocaleString("vi-VN")}đ
+        </span>
+      ),
+    },
+    {
+      key: "paymentStatus",
+      header: "Thanh toán",
+      headerText: "Thanh toán",
+      align: "center",
+      sortable: true,
+      sortType: "text",
+      sortValue: (o) => o.paymentStatus || "",
+      render: (order) => {
+        const isPaid = order.paymentStatus === "PAID";
+        const methodLabel = order.paymentMethod === "BANK_TRANSFER" ? "VietQR" : "COD";
+        return (
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border whitespace-nowrap ${
+              isPaid
+                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                : "bg-slate-100 text-slate-600 border-slate-200"
+            }`}
+          >
+            <span>{methodLabel}</span>
+            <span>·</span>
+            <span>{isPaid ? "Đã thu" : "Chờ thu"}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Trạng thái",
+      headerText: "Trạng thái",
+      align: "center",
+      sortable: true,
+      sortType: "text",
+      sortValue: (o) => o.status,
+      render: (order) => <StatusBadge status={order.status} />,
+    },
+    {
+      key: "createdAt",
+      header: "Ngày đặt",
+      headerText: "Ngày đặt",
+      align: "right",
+      sortable: true,
+      sortType: "date",
+      sortValue: (o) => o.createdAt,
+      render: (order) => (
+        <span className="whitespace-nowrap text-slate-400 tabular-nums">
+          {new Date(order.createdAt).toLocaleString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            day: "2-digit",
+            month: "2-digit",
+          })}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "Thao tác",
+      headerText: "Thao tác",
+      align: "right",
+      render: (order) => (
+        <Link
+          href={`/admin/orders/${order.id}`}
+          className="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs whitespace-nowrap"
+        >
+          Mở
+        </Link>
+      ),
+    },
+  ];
 
   const applyQuickDateRange = (days: number) => {
     const end = new Date();
@@ -366,158 +655,40 @@ function OrdersContent() {
         </details>
 
 
-        {/* Orders Table */}
-        <div
-          className="table-wrapper overflow-x-auto"
-          tabIndex={0}
-          role="region"
-          aria-label="Danh sách đơn hàng"
-        >
-          <table className="admin-table w-full text-left border-collapse text-xs">
-            <thead>
-              <tr>
-                <th>Mã đơn</th>
-                <th>Khách hàng</th>
-                <th>Sản phẩm đặt</th>
-                <th className="text-right">Tổng tiền</th>
-                <th className="text-center">Thanh toán</th>
-                <th className="text-center">Trạng thái</th>
-                <th className="text-right">Ngày đặt</th>
-                <th className="text-right"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" aria-hidden="true" />
-                    <span>Đang tải...</span>
-                  </td>
-                </tr>
-              ) : orders.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-500">
-                    Không có đơn hàng phù hợp.
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => {
-                  const itemCount = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-                  const firstItem = order.items?.[0]?.productName;
-                  const isPaid = order.paymentStatus === "PAID";
-                  const methodLabel = order.paymentMethod === "BANK_TRANSFER" ? "VietQR" : "COD";
-                  const noteCount = order._count?.internalNotes || 0;
-
-                  return (
-                    <tr key={order.id} className="hover:bg-slate-50/70 transition">
-                      <td className="whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <Link
-                            href={`/admin/orders/${order.id}`}
-                            className="font-mono font-bold text-blue-600 hover:underline"
-                          >
-                            #{order.orderNumber || order.id.slice(0, 8)}
-                          </Link>
-                          {noteCount > 0 && (
-                            <span
-                              className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold tabular-nums"
-                              title={`${noteCount} ghi chú vận hành nội bộ`}
-                            >
-                              {noteCount} ghi chú
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="whitespace-nowrap">
-                        <div className="font-semibold text-slate-900">{order.customerName}</div>
-                        <div className="text-[11px] text-slate-500 font-mono">{order.customerPhone}</div>
-                      </td>
-
-                      <td>
-                        <div className="text-slate-800 line-clamp-1 max-w-[260px]">
-                          {firstItem || `${itemCount} sản phẩm`}
-                        </div>
-                        {itemCount > 1 && (
-                          <div className="text-[11px] text-slate-400">Tổng {itemCount} SP</div>
-                        )}
-                      </td>
-
-                      <td className="whitespace-nowrap text-right font-bold text-slate-900 tabular-nums">
-                        {order.totalAmount.toLocaleString("vi-VN")}đ
-                      </td>
-
-                      <td className="whitespace-nowrap text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
-                            isPaid
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-slate-100 text-slate-600 border-slate-200"
-                          }`}
-                        >
-                          <span>{methodLabel}</span>
-                          <span>·</span>
-                          <span>{isPaid ? "Đã thu" : "Chờ thu"}</span>
-                        </span>
-                      </td>
-
-                      <td className="whitespace-nowrap text-center">
-                        <StatusBadge status={order.status} />
-                      </td>
-
-                      <td className="whitespace-nowrap text-right text-slate-400 tabular-nums">
-                        {new Date(order.createdAt).toLocaleString("vi-VN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          day: "2-digit",
-                          month: "2-digit",
-                        })}
-                      </td>
-
-                      <td className="whitespace-nowrap text-right">
-                        <Link
-                          href={`/admin/orders/${order.id}`}
-                          className="px-2.5 py-1 border border-slate-200 rounded bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs"
-                        >
-                          Mở
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <div className="px-4 py-2.5 border-t border-slate-200 flex items-center justify-between bg-slate-50/60 text-xs text-slate-600">
-            <div className="tabular-nums">
-              Trang <strong>{page}</strong> / {totalPages} ({total} đơn)
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="p-1.5 border border-slate-200 bg-white rounded hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                aria-label="Trang trước"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="p-1.5 border border-slate-200 bg-white rounded hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
-                aria-label="Trang tiếp theo"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Orders DataTable */}
+        <DataTable
+          caption="Danh sách đơn hàng"
+          columns={columns}
+          data={orders}
+          rowKey={(order) => order.id}
+          loading={loading}
+          emptyTitle="Không có đơn hàng phù hợp"
+          emptyDescription="Thử thay đổi bộ lọc trạng thái, khoảng ngày hoặc từ khóa tìm kiếm."
+          selectable
+          selectedKeys={selectedKeys}
+          onSelectionChange={setSelectedKeys}
+          bulkActions={
+            <button
+              type="button"
+              onClick={handleExportSelectedCsv}
+              className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Xuất CSV đơn hàng ({selectedKeys.length})</span>
+            </button>
+          }
+          pagination={{
+            page,
+            pageSize,
+            totalItems: total,
+            totalPages,
+            onPageChange: (p) => setPage(p),
+            onPageSizeChange: (size) => {
+              setPageSize(size);
+              setPage(1);
+            },
+          }}
+        />
       </AdminCard>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   RefreshCw,
@@ -128,6 +128,10 @@ export default function AdminAuditPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const activeControllerRef = useRef<AbortController | null>(null);
+  const requestGenRef = useRef(0);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyGenRef = useRef(0);
 
   const [filterFields, setFilterFields] = useState({
     actor: '',
@@ -137,35 +141,59 @@ export default function AdminAuditPage() {
   });
 
   const load = useCallback(() => {
-    setLoading(true);
+    activeControllerRef.current?.abort();
     const controller = new AbortController();
+    activeControllerRef.current = controller;
+    const gen = ++requestGenRef.current;
+
+    setLoading(true);
     fetch(`/api/admin/audit?page=${page}&${filterStr}`, {
       cache: 'no-store',
       signal: controller.signal,
     })
       .then(async (r) => {
         const j = await r.json();
+        if (controller.signal.aborted || gen !== requestGenRef.current) return;
         if (!r.ok) throw new Error(j.error || 'Lỗi khi tải nhật ký');
         setError('');
         setRows(Array.isArray(j.data) ? j.data : []);
         setTotal(Number(j.total) || 0);
       })
-      .catch((e) => {
-        if (e.name !== 'AbortError') {
-          setError('Không thể đọc nhật ký. Vui lòng thử lại.');
-        }
+      .catch((e: unknown) => {
+        if (controller.signal.aborted || gen !== requestGenRef.current) return;
+        if (e instanceof Error && e.name === 'AbortError') return;
+        setError('Không thể đọc nhật ký. Vui lòng thử lại.');
       })
       .finally(() => {
-        setLoading(false);
+        if (!controller.signal.aborted && gen === requestGenRef.current) {
+          setLoading(false);
+        }
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+    };
   }, [page, filterStr]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch audit log on page/filter change
     const abort = load();
-    return () => abort();
+    return () => {
+      abort();
+      activeControllerRef.current?.abort();
+    };
   }, [load]);
+
+  useEffect(() => {
+    return () => {
+      activeControllerRef.current?.abort();
+      copyGenRef.current += 1;
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, []);
 
   function handleApplyFilters(e: React.FormEvent) {
     e.preventDefault();
@@ -214,10 +242,32 @@ export default function AdminAuditPage() {
     setFilterStr(p.toString());
   }
 
-  const handleCopy = (text: string, id: string) => {
-    void navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopy = async (text: string, id: string) => {
+    const gen = ++copyGenRef.current;
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+    setCopiedId(null);
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(text);
+      if (gen !== copyGenRef.current) return;
+      setError('');
+      setCopiedId(id);
+      copyTimerRef.current = setTimeout(() => {
+        if (copyGenRef.current === gen) {
+          setCopiedId(null);
+          copyTimerRef.current = null;
+        }
+      }, 2000);
+    } catch {
+      if (gen !== copyGenRef.current) return;
+      setCopiedId(null);
+      setError('Không thể sao chép vào bộ nhớ tạm. Vui lòng thử lại.');
+    }
   };
 
   const limit = 50;
@@ -466,7 +516,7 @@ export default function AdminAuditPage() {
                         {r.requestId ? (
                           <button
                             type="button"
-                            onClick={() => handleCopy(r.requestId!, r.id)}
+                            onClick={() => void handleCopy(r.requestId!, r.id)}
                             title={`Sao chép Request ID: ${r.requestId}`}
                             className="inline-flex items-center gap-1 hover:text-slate-700 transition"
                           >

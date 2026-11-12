@@ -137,6 +137,27 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
     expectedSubtotal += priceForOldSubtotal * quantity;
 
     if (resolvedPricing.campaign) {
+      if (resolvedPricing.campaign.source === 'campaign') {
+        const perCustomerLimit = resolvedPricing.campaign.perCustomerLimit;
+        const quantityLimit = resolvedPricing.campaign.quantityLimit;
+        const soldCount = resolvedPricing.campaign.soldCount ?? 0;
+
+        if (perCustomerLimit != null && quantity > perCustomerLimit) {
+          throw new CheckoutError(
+            'FLASH_SALE_LIMIT_EXCEEDED',
+            `Sản phẩm "${product.name}" chỉ áp dụng tối đa ${perCustomerLimit} suất Flash Sale cho mỗi đơn hàng.`,
+            400
+          );
+        }
+        if (quantityLimit != null && soldCount + quantity > quantityLimit) {
+          const remaining = Math.max(0, quantityLimit - soldCount);
+          throw new CheckoutError(
+            'FLASH_SALE_QUOTA_EXCEEDED',
+            `Sản phẩm "${product.name}" chỉ còn ${remaining} suất giá Flash Sale.`,
+            400
+          );
+        }
+      }
       campaignNotes.push(`${product.name}: ${resolvedPricing.campaign.name}`);
     }
 

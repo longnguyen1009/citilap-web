@@ -14,7 +14,7 @@ console.log('PASS Homepage exports revalidate = 60');
 // 2. Worker must not override Vinext's HTML/RSC cache policy (private/no-store must survive)
 const workerSource = await readFile('src/worker.ts', 'utf8');
 assert.doesNotMatch(workerSource, /s-maxage/, 'Worker must not force a shared cache header on every GET /');
-assert.match(workerSource, /return await app\.fetch\(request, env, ctx\)/, 'Worker must pass HTML/RSC responses through unchanged');
+assert.match(workerSource, /const response = await app\.fetch\(request, env, ctx\);\s*if \(invalidatesPublicCache\(request, response\)\) ctx\.waitUntil\(invalidatePublicCache\(kv\)\);\s*return response;/, 'Worker fallback must return the original response after scheduling cache invalidation');
 console.log('PASS Worker preserves Vinext HTML/RSC cache headers');
 
 // 3. Test Worker Image Compression Pipeline

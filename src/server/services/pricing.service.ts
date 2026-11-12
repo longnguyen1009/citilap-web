@@ -21,6 +21,18 @@ export function normalizeVnd(val: unknown, fallback = 0): number {
   return Math.max(0, Math.round(val));
 }
 
+export interface CampaignItemPricingContext {
+  salePrice: number;
+  regularPrice: number | null;
+  quantityLimit?: number | null;
+  perCustomerLimit?: number | null;
+  soldCount?: number;
+  campaignId?: string;
+  campaignName?: string;
+  startAt?: string;
+  endAt?: string;
+}
+
 export interface PriceEvaluationContext {
   flashSaleEnabled: boolean;
   flashSaleTitle: string;
@@ -32,28 +44,8 @@ export interface PriceEvaluationContext {
     startAt: string;
     endAt: string;
     items:
-      | Map<
-          string,
-          {
-            salePrice: number;
-            regularPrice: number | null;
-            campaignId?: string;
-            campaignName?: string;
-            startAt?: string;
-            endAt?: string;
-          }
-        >
-      | Record<
-          string,
-          {
-            salePrice: number;
-            regularPrice: number | null;
-            campaignId?: string;
-            campaignName?: string;
-            startAt?: string;
-            endAt?: string;
-          }
-        >;
+      | Map<string, CampaignItemPricingContext>
+      | Record<string, CampaignItemPricingContext>;
   } | null;
 }
 
@@ -101,6 +93,9 @@ export interface ResolvedPrice {
     startAt: string;
     endAt: string;
     discountAmount: number;
+    quantityLimit?: number | null;
+    perCustomerLimit?: number | null;
+    soldCount?: number;
   };
 }
 
@@ -141,9 +136,10 @@ export function isFlashSaleActive(
  * 1. Distinction between regularPrice, compareAtPrice, and campaignPrice.
  * 2. Variants NEVER inherit parent originalPrice (even if parent has originalPrice and variant has null).
  * 3. Variants without explicit campaign item DO NOT inherit base product campaign prices.
- * 4. isOnSale is true ONLY when there is a real, valid discount (effectivePrice < compareAtPrice).
+ * 4. isOnSale is true ONLY when there is a real, valid discount (effectivePrice < compareAtPrice AND effectivePrice < currentSellingPrice).
  * 5. Server-enforced immediate expiration: outside [startAt, endAt), campaign prices cease immediately.
- * 6. Explicit Campaign Priority: Variant campaign item > Product campaign item > Legacy Site Flash Sale.
+ * 6. Quota enforcement: if quantityLimit != null && (soldCount ?? 0) >= quantityLimit, flash sale quota is exhausted and falls back to regular price.
+ * 7. Explicit Campaign Priority: Variant campaign item > Product campaign item > Legacy Site Flash Sale.
  */
 export function calculateEffectivePrice(
   productPrice: number,
@@ -183,19 +179,12 @@ export function calculateEffectivePrice(
       : null
     : normOriginal;
 
+  let campaignQuotaExhausted = false;
+
   // 2. Check Explicit Campaign Items (Priority 1 & 2)
   if (settings?.activeCampaign) {
     const camp = settings.activeCampaign;
-    let campItem:
-      | {
-          salePrice: number;
-          regularPrice: number | null;
-          campaignId?: string;
-          campaignName?: string;
-          startAt?: string;
-          endAt?: string;
-        }
-      | undefined;
+    let campItem: CampaignItemPricingContext | undefined;
 
     const getItem = (key: string) => {
       if (!camp.items) return undefined;
@@ -231,14 +220,26 @@ export function calculateEffectivePrice(
       }
     }
 
+    // Quota check: if quantityLimit != null && (soldCount ?? 0) >= quantityLimit, quota is exhausted
+    if (
+      campItem &&
+      campItem.quantityLimit !== null &&
+      campItem.quantityLimit !== undefined &&
+      (campItem.soldCount ?? 0) >= campItem.quantityLimit
+    ) {
+      campItem = undefined;
+      campaignQuotaExhausted = true;
+    }
+
     if (campItem) {
       const salePrice = normalizeVnd(campItem.salePrice);
       const regularPrice = campItem.regularPrice
         ? normalizeVnd(campItem.regularPrice)
         : effectiveOriginal ?? normPrice;
 
-      // Sale price must be strictly less than regular price to be valid
-      if (salePrice < regularPrice && salePrice > 0) {
+      // Sale price must be strictly less than currentSellingPrice (normPrice) AND regularPrice
+      // so a flash sale can NEVER raise the price a customer pays!
+      if (salePrice < normPrice && salePrice < regularPrice && salePrice > 0) {
         const discountAmount = regularPrice - salePrice;
         const discountPercent = Math.round((discountAmount / regularPrice) * 100);
 
@@ -257,6 +258,9 @@ export function calculateEffectivePrice(
             startAt: campItem.startAt || camp.startAt,
             endAt: campItem.endAt || camp.endAt,
             discountAmount,
+            quantityLimit: campItem.quantityLimit ?? null,
+            perCustomerLimit: campItem.perCustomerLimit ?? null,
+            soldCount: campItem.soldCount ?? 0,
           },
         };
       }
@@ -266,7 +270,7 @@ export function calculateEffectivePrice(
   // 3. Check Legacy Site-Wide Flash Sale (Priority 3)
   const isSaleActive = isFlashSaleActive(settings, at);
 
-  if (isSaleActive && isProductFlashSale) {
+  if (isSaleActive && isProductFlashSale && !campaignQuotaExhausted) {
     if (isVariant) {
       // Invariant: Variant without valid sale config retains its own regular price
       // Never inherit parent originalPrice!
@@ -334,7 +338,7 @@ export function calculateEffectivePrice(
   // For legacy products marked isFlashSale with originalPrice > price, outside flash sale
   // they revert to their pre-sale regularPrice (originalPrice).
   // BUT for variants without their own originalPrice, they NEVER borrow parent's originalPrice!
-  if (!isSaleActive && isProductFlashSale) {
+  if ((!isSaleActive || campaignQuotaExhausted) && isProductFlashSale) {
     if (isVariant) {
       if (effectiveOriginal !== null && effectiveOriginal > normPrice) {
         // Variant had its own regular price before flash sale
@@ -488,7 +492,7 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
         throw new PricingTargetError('Sản phẩm không ở trạng thái mở bán', 'PRODUCT_NOT_AVAILABLE', 400);
       }
 
-      studioContext = {hasStudio: Boolean(p.studioId), published:p.published};
+      studioContext = { hasStudio: Boolean(p.studioId), published: p.published };
 
       basePrice = p.price;
       originalPrice = p.originalPrice;
@@ -545,7 +549,7 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
         throw new PricingTargetError('Sản phẩm không ở trạng thái mở bán', 'PRODUCT_NOT_AVAILABLE', 400);
       }
 
-      studioContext = {hasStudio: Boolean(p.studio), published:p.studio?.published};
+      studioContext = { hasStudio: Boolean(p.studio), published: p.studio?.published };
 
       basePrice = p.price;
       originalPrice = p.originalPrice;
@@ -569,10 +573,15 @@ export async function resolvePrice(input: ResolvePriceInput): Promise<ResolvedPr
     }
   }
 
-  try { assertPublishedStudioOrderable(studioContext, input.variantId || null); }
-  catch (error) {
+  try {
+    assertPublishedStudioOrderable(studioContext, input.variantId || null);
+  } catch (error) {
     const variantError = error instanceof Error && error.message === 'VARIANT_UNAVAILABLE';
-    throw new PricingTargetError('Sản phẩm hoặc biến thể chưa sẵn sàng đặt hàng', variantError ? 'VARIANT_NOT_AVAILABLE' : 'PRODUCT_NOT_AVAILABLE', 400);
+    throw new PricingTargetError(
+      'Sản phẩm hoặc biến thể chưa sẵn sàng đặt hàng',
+      variantError ? 'VARIANT_NOT_AVAILABLE' : 'PRODUCT_NOT_AVAILABLE',
+      400
+    );
   }
   return calculateEffectivePrice(
     basePrice,

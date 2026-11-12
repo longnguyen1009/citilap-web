@@ -14,7 +14,29 @@ export const brandSchema = z.object({
   seoTitle: z.string().trim().max(200).nullable().optional(),
   seoDescription: z.string().trim().max(400).nullable().optional(),
   status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
+  expectedUpdatedAt: z.string().nullable().optional(),
 });
+
+function parseTimestampMs(raw: string): number {
+  const trimmed = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(trimmed)) {
+    const ms = Date.parse(trimmed.replace(' ', 'T') + 'Z');
+    if (Number.isFinite(ms)) return ms;
+  }
+  const ms = Date.parse(trimmed);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function nextMillisecondTimestamp(priorRaw?: string | null): string {
+  const nowMs = Date.now();
+  const priorMs = priorRaw ? parseTimestampMs(priorRaw) : 0;
+  const nextMs = Math.max(nowMs, priorMs + 1);
+  let nextIso = new Date(nextMs).toISOString();
+  if (priorRaw && nextIso === priorRaw) {
+    nextIso = new Date(nextMs + 1).toISOString();
+  }
+  return nextIso;
+}
 
 export type BrandInput = z.infer<typeof brandSchema>;
 
@@ -163,80 +185,192 @@ export async function writeBrand(
   id: string | null,
   input: unknown
 ): Promise<BrandDto> {
-  const parsed = brandSchema.parse(input);
-  const db = env.DB;
-
-  // Check unique name and slug
-  const conflict = await db.prepare(`
-    SELECT id, name, slug FROM Brand
-    WHERE (lower(name) = lower(?) OR lower(slug) = lower(?))
-      AND id != ?
-      AND deletedAt IS NULL
-  `).bind(parsed.name, parsed.slug, id || '').first<{ id: string; name: string; slug: string }>();
-
-  if (conflict) {
-    if (conflict.name.toLowerCase() === parsed.name.toLowerCase()) {
-      throw new MediaError(`Tên thương hiệu "${parsed.name}" đã tồn tại. Vui lòng chọn tên khác.`, 409);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new MediaError('Dữ liệu thương hiệu không hợp lệ.', 400);
+  }
+  const rawInput = input as Record<string, unknown>;
+  let expectedUpdatedAt = '';
+  if (id !== null) {
+    if (typeof id !== 'string' || !id.trim()) {
+      throw new MediaError('Mã thương hiệu không hợp lệ.', 400);
     }
-    throw new MediaError(`Đường dẫn slug "${parsed.slug}" đã tồn tại. Vui lòng chọn slug khác.`, 409);
+    const rawExpected = rawInput.expectedUpdatedAt;
+    if (typeof rawExpected !== 'string' || rawExpected.trim().length === 0) {
+      throw new MediaError('Thiếu mã phiên bản (expectedUpdatedAt) hợp lệ khi cập nhật thương hiệu.', 400);
+    }
+    expectedUpdatedAt = rawExpected;
   }
 
+  const parsed = brandSchema.parse(input);
+  const db = env.DB;
   const brandId = id || crypto.randomUUID();
-
   const guard = crypto.randomUUID();
-  const statements = id ? [db.prepare('INSERT INTO AdminMutationGuard(id,allowed) SELECT ?,CASE WHEN EXISTS(SELECT 1 FROM Brand WHERE id=? AND deletedAt IS NULL) THEN 1 ELSE 0 END').bind(guard,id)] : [];
+  const nextUpdatedAt = nextMillisecondTimestamp(id ? expectedUpdatedAt : null);
+
+  const statements = [
+    id
+      ? db
+          .prepare(
+            `INSERT INTO AdminMutationGuard(id, allowed)
+             SELECT ?, CASE WHEN EXISTS (
+               SELECT 1 FROM Brand
+               WHERE id = ?
+                 AND deletedAt IS NULL
+                 AND updatedAt = ?
+             ) AND NOT EXISTS (
+               SELECT 1 FROM Brand
+               WHERE (lower(name) = lower(?) OR lower(slug) = lower(?))
+                 AND id != ?
+             ) THEN 1 ELSE 0 END`
+          )
+          .bind(guard, brandId, expectedUpdatedAt, parsed.name, parsed.slug, brandId)
+      : db
+          .prepare(
+            `INSERT INTO AdminMutationGuard(id, allowed)
+             SELECT ?, CASE WHEN NOT EXISTS (
+               SELECT 1 FROM Brand
+               WHERE (lower(name) = lower(?) OR lower(slug) = lower(?))
+                 AND id != ?
+             ) THEN 1 ELSE 0 END`
+          )
+          .bind(guard, parsed.name, parsed.slug, brandId),
+  ];
+
   if (!id) {
-    // Insert new
-    statements.push(db.prepare(`
-      INSERT INTO Brand (id, name, slug, logo, description, seoTitle, seoDescription, status, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    `).bind(
-      brandId,
-      parsed.name,
-      parsed.slug,
-      parsed.logo || null,
-      parsed.description || null,
-      parsed.seoTitle || null,
-      parsed.seoDescription || null,
-      parsed.status
-    ));
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO Brand (id, name, slug, logo, description, seoTitle, seoDescription, status, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          brandId,
+          parsed.name,
+          parsed.slug,
+          parsed.logo || null,
+          parsed.description || null,
+          parsed.seoTitle || null,
+          parsed.seoDescription || null,
+          parsed.status,
+          nextUpdatedAt,
+          nextUpdatedAt
+        )
+    );
   } else {
-    // Update existing
-    statements.push(db.prepare(`
-      UPDATE Brand SET
-        name = ?,
-        slug = ?,
-        logo = ?,
-        description = ?,
-        seoTitle = ?,
-        seoDescription = ?,
-        status = ?,
-        updatedAt = CURRENT_TIMESTAMP
-      WHERE id = ? AND deletedAt IS NULL
-    `).bind(
-      parsed.name,
-      parsed.slug,
-      parsed.logo || null,
-      parsed.description || null,
-      parsed.seoTitle || null,
-      parsed.seoDescription || null,
-      parsed.status,
-      brandId
-    ));
+    statements.push(
+      db
+        .prepare(
+          `UPDATE Brand SET
+             name = ?,
+             slug = ?,
+             logo = ?,
+             description = ?,
+             seoTitle = ?,
+             seoDescription = ?,
+             status = ?,
+             updatedAt = ?
+           WHERE id = ?
+             AND deletedAt IS NULL
+             AND updatedAt = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM Brand
+               WHERE (lower(name) = lower(?) OR lower(slug) = lower(?))
+                 AND id != ?
+             )`
+        )
+        .bind(
+          parsed.name,
+          parsed.slug,
+          parsed.logo || null,
+          parsed.description || null,
+          parsed.seoTitle || null,
+          parsed.seoDescription || null,
+          parsed.status,
+          nextUpdatedAt,
+          brandId,
+          expectedUpdatedAt,
+          parsed.name,
+          parsed.slug,
+          brandId
+        )
+    );
 
     // Synchronize Product.brand name for all products referencing this brandId
-    statements.push(db.prepare(`
-      UPDATE Product SET brand = ? WHERE brandId = ?
-    `).bind(parsed.name, brandId));
+    statements.push(
+      db
+        .prepare(
+          `UPDATE Product SET brand = ?
+           WHERE brandId = ?
+             AND EXISTS (
+               SELECT 1 FROM Brand
+               WHERE id = ?
+                 AND deletedAt IS NULL
+                 AND updatedAt = ?
+             )`
+        )
+        .bind(parsed.name, brandId, brandId, nextUpdatedAt)
+    );
   }
 
   statements.push(db.prepare("DELETE FROM MediaUsage WHERE ownerType='BRAND' AND ownerId=?").bind(brandId));
   if (parsed.logo) {
     const match = parsed.logo.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
     const assetId = match?.[0] ?? parsed.logo;
-    statements.push(db.prepare("INSERT INTO MediaUsage(id,assetId,ownerType,ownerId,slot) SELECT ?,id,'BRAND',?,'logo' FROM MediaAsset WHERE id=?").bind(crypto.randomUUID(),brandId,assetId));
+    statements.push(
+      db
+        .prepare("INSERT INTO MediaUsage(id,assetId,ownerType,ownerId,slot) SELECT ?,id,'BRAND',?,'logo' FROM MediaAsset WHERE id=?")
+        .bind(crypto.randomUUID(), brandId, assetId)
+    );
   }
-  await db.batch([...statements, ...adminAuditStatements(db, id ? 'brand.update' : 'brand.create', brandId, 'Brand mutation'), db.prepare('DELETE FROM AdminMutationGuard WHERE id=?').bind(guard)]);
+
+  try {
+    await db.batch([
+      ...statements,
+      ...adminAuditStatements(db, id ? 'brand.update' : 'brand.create', brandId, 'Brand mutation'),
+      db.prepare('DELETE FROM AdminMutationGuard WHERE id=?').bind(guard),
+    ]);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : '';
+    if (/MEDIA_NOT_READY/i.test(msg)) {
+      throw new MediaError('Ảnh logo đã bị lưu trữ hoặc không sẵn sàng.', 409);
+    }
+    if (/CHECK constraint failed|UNIQUE constraint failed/i.test(msg)) {
+      if (id) {
+        const current = await db
+          .prepare('SELECT id, updatedAt, deletedAt FROM Brand WHERE id = ?')
+          .bind(brandId)
+          .first<{ id: string; updatedAt: string; deletedAt: string | null }>();
+        if (!current || current.deletedAt !== null) {
+          throw new MediaError('Thương hiệu không tồn tại hoặc đã bị xóa ở nơi khác. Vui lòng tải lại danh sách.', 409);
+        }
+        if (current.updatedAt !== expectedUpdatedAt) {
+          throw new MediaError('Thương hiệu đã được cập nhật ở nơi khác. Vui lòng tải lại trước khi lưu.', 409);
+        }
+      }
+      const conflict = await db
+        .prepare(
+          `SELECT id, name, slug FROM Brand
+           WHERE (lower(name) = lower(?) OR lower(slug) = lower(?))
+             AND id != ?`
+        )
+        .bind(parsed.name, parsed.slug, brandId)
+        .first<{ id: string; name: string; slug: string }>();
+      if (conflict) {
+        if (conflict.name.toLowerCase() === parsed.name.toLowerCase()) {
+          throw new MediaError(`Tên thương hiệu "${parsed.name}" đã tồn tại. Vui lòng chọn tên khác.`, 409);
+        }
+        throw new MediaError(`Đường dẫn slug "${parsed.slug}" đã tồn tại. Vui lòng chọn slug khác.`, 409);
+      }
+      if (/Brand\.name/i.test(msg)) {
+        throw new MediaError(`Tên thương hiệu "${parsed.name}" đã tồn tại. Vui lòng chọn tên khác.`, 409);
+      }
+      if (/Brand\.slug/i.test(msg)) {
+        throw new MediaError(`Đường dẫn slug "${parsed.slug}" đã tồn tại. Vui lòng chọn slug khác.`, 409);
+      }
+      throw new MediaError('Thương hiệu đã thay đổi ở nơi khác hoặc dữ liệu bị trùng. Vui lòng tải lại.', 409);
+    }
+    throw error;
+  }
 
   const updated = await getBrandDetail(db, brandId);
   if (!updated) throw new MediaError('Không thể tải lại thông tin thương hiệu sau khi lưu.', 500);
@@ -248,25 +382,104 @@ export async function writeBrand(
  */
 export async function archiveBrand(
   db: D1Database,
-  id: string
+  id: string,
+  expectedInput?: unknown
 ): Promise<{ success: boolean; archived: boolean; id: string }> {
-  const brand = await db.prepare('SELECT id, name FROM Brand WHERE id=? AND deletedAt IS NULL').bind(id).first<{ id: string; name: string }>();
-  if (!brand) throw new MediaError('Không tìm thấy thương hiệu.', 404);
+  if (!id || typeof id !== 'string' || !id.trim()) {
+    throw new MediaError('Mã thương hiệu không hợp lệ.', 400);
+  }
+  const rawExpected =
+    typeof expectedInput === 'string'
+      ? expectedInput
+      : expectedInput && typeof expectedInput === 'object' && 'expectedUpdatedAt' in expectedInput
+      ? (expectedInput as { expectedUpdatedAt?: unknown }).expectedUpdatedAt
+      : undefined;
 
-  const productCount = await db.prepare(`
-    SELECT count(*) AS cnt FROM Product WHERE brandId=? AND deletedAt IS NULL
-  `).bind(id).first<{ cnt: number }>();
-
-  if (productCount && productCount.cnt > 0) {
-    throw new MediaError(
-      `Không thể xóa thương hiệu "${brand.name}" vì đang có ${productCount.cnt} sản phẩm liên kết. Vui lòng chuyển trạng thái sang Ẩn (INACTIVE) nếu không muốn hiển thị trên website.`,
-      400
-    );
+  if (typeof rawExpected !== 'string' || rawExpected.trim().length === 0) {
+    throw new MediaError('Thiếu mã phiên bản (expectedUpdatedAt) hợp lệ khi xóa thương hiệu.', 400);
   }
 
-  const [result] = await db.batch([db.prepare(`UPDATE Brand SET status='INACTIVE', deletedAt=CURRENT_TIMESTAMP, updatedAt=CURRENT_TIMESTAMP WHERE id=? AND deletedAt IS NULL AND NOT EXISTS(SELECT 1 FROM Product WHERE brandId=? AND deletedAt IS NULL)`).bind(id,id), ...adminAuditStatements(db, 'brand.archive', id, 'Brand archived', null, 'order', { changed: true })]);
+  const expectedUpdatedAt = rawExpected;
+  const archivedAt = nextMillisecondTimestamp(expectedUpdatedAt);
+  const guard = crypto.randomUUID();
 
-  if (!result.meta.changes) throw new MediaError('Thương hiệu đã thay đổi hoặc có sản phẩm liên kết.', 409);
+  try {
+    await db.batch([
+      db
+        .prepare(
+          `INSERT INTO AdminMutationGuard(id, allowed)
+           SELECT ?, CASE WHEN EXISTS (
+             SELECT 1 FROM Brand
+             WHERE id = ?
+               AND deletedAt IS NULL
+               AND updatedAt = ?
+           ) AND NOT EXISTS (
+             SELECT 1 FROM Product
+             WHERE brandId = ?
+               AND deletedAt IS NULL
+           ) THEN 1 ELSE 0 END`
+        )
+        .bind(guard, id, expectedUpdatedAt, id),
+      db
+        .prepare(
+          `UPDATE Brand
+           SET status = 'INACTIVE',
+               deletedAt = ?,
+               updatedAt = ?
+           WHERE id = ?
+             AND deletedAt IS NULL
+             AND updatedAt = ?
+             AND NOT EXISTS (
+               SELECT 1 FROM Product
+               WHERE brandId = ?
+                 AND deletedAt IS NULL
+             )`
+        )
+        .bind(archivedAt, archivedAt, id, expectedUpdatedAt, id),
+      db
+        .prepare(
+          `DELETE FROM MediaUsage
+           WHERE ownerType = 'BRAND'
+             AND ownerId = ?
+             AND EXISTS (
+               SELECT 1 FROM Brand
+               WHERE id = ?
+                 AND deletedAt = ?
+                 AND updatedAt = ?
+             )`
+        )
+        .bind(id, id, archivedAt, archivedAt),
+      ...adminAuditStatements(db, 'brand.archive', id, 'Brand archived'),
+      db.prepare('DELETE FROM AdminMutationGuard WHERE id = ?').bind(guard),
+    ]);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : '';
+    if (/CHECK constraint failed/i.test(msg)) {
+      const current = await db
+        .prepare('SELECT id, name, updatedAt, deletedAt FROM Brand WHERE id = ?')
+        .bind(id)
+        .first<{ id: string; name: string; updatedAt: string; deletedAt: string | null }>();
+      if (!current || current.deletedAt !== null) {
+        throw new MediaError('Thương hiệu không tồn tại hoặc đã bị xóa ở nơi khác. Vui lòng tải lại danh sách.', 409);
+      }
+      if (current.updatedAt !== expectedUpdatedAt) {
+        throw new MediaError('Thương hiệu đã được cập nhật ở nơi khác. Vui lòng tải lại trước khi xóa.', 409);
+      }
+      const productCount = await db
+        .prepare('SELECT count(*) AS cnt FROM Product WHERE brandId = ? AND deletedAt IS NULL')
+        .bind(id)
+        .first<{ cnt: number }>();
+      if ((productCount?.cnt ?? 0) > 0) {
+        throw new MediaError(
+          `Không thể xóa thương hiệu "${current.name}" vì đang có ${productCount!.cnt} sản phẩm liên kết. Vui lòng chuyển trạng thái sang Ẩn (INACTIVE) nếu không muốn hiển thị trên website.`,
+          409
+        );
+      }
+      throw new MediaError('Thương hiệu đã thay đổi hoặc có sản phẩm liên kết.', 409);
+    }
+    throw error;
+  }
+
   return { success: true, archived: true, id };
 }
 

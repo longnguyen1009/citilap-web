@@ -1,8 +1,13 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { PageHeader, AdminButton, AdminCard } from '@/components/admin/ui';
-import CampaignProductPicker from '@/components/admin/products/CampaignProductPicker';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  PageHeader,
+  AdminButton,
+  AdminCard,
+  useConfirm,
+  useToast,
+} from '@/components/admin/ui';
 import {
   Zap,
   Plus,
@@ -13,107 +18,56 @@ import {
   AlertCircle,
   Layers,
   X,
-  Trash2,
   Clock,
   Search,
-  ExternalLink,
-} from "lucide-react";
-import Link from "next/link";
-
-interface CampaignItemForm {
-  displayName?: string;
-  id?: string;
-  productId: string;
-  variantId?: string | null;
-  salePrice: number | string;
-  regularPrice?: number | string | null;
-}
-
-interface CampaignData {
-  id: string;
-  name: string;
-  description: string | null;
-  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
-  revision: number;
-  startAt: string;
-  endAt: string;
-  itemCount: number;
-  items?: Array<{
-    product?: { name: string };
-    variant?: { name: string } | null;
-    id: string;
-    productId: string;
-    variantId: string | null;
-    salePrice: number;
-    regularPrice: number | null;
-  }>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-function formatGmt7(isoString: string): string {
-  try {
-    const d = new Date(isoString);
-    return new Intl.DateTimeFormat("vi-VN", {
-      timeZone: "Asia/Ho_Chi_Minh",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(d);
-  } catch {
-    return isoString;
-  }
-}
-
-function isoToDatetimeLocalGmt7(isoString: string): string {
-  try {
-    const d = new Date(isoString);
-    const gmt7Date = new Date(d.getTime() + 7 * 60 * 60 * 1000);
-    return gmt7Date.toISOString().slice(0, 16);
-  } catch {
-    return "";
-  }
-}
-
-function datetimeLocalGmt7ToIso(localStr: string): string {
-  try {
-    const [datePart, timePart] = localStr.split("T");
-    const [year, month, day] = datePart.split("-").map(Number);
-    const [hour, minute] = timePart.split(":").map(Number);
-    const utcDate = new Date(Date.UTC(year, month - 1, day, hour - 7, minute, 0));
-    return utcDate.toISOString();
-  } catch {
-    return "";
-  }
-}
-
-type FilterTab = "ALL" | "ACTIVE" | "UPCOMING" | "INACTIVE";
+  Copy,
+  Eye,
+} from 'lucide-react';
+import CampaignStatsCards from '@/components/admin/campaigns/CampaignStatsCards';
+import CampaignFormModal from '@/components/admin/campaigns/CampaignFormModal';
+import {
+  type CampaignData,
+  type CampaignItemForm,
+  type BannerSettingsState,
+  type FilterTab,
+  formatGmt7,
+  isoToDatetimeLocalGmt7,
+  datetimeLocalGmt7ToIso,
+  calculateBulkDiscountedPrice,
+} from '@/components/admin/campaigns/types';
 
 export default function AdminCampaignsPage() {
+  const confirm = useConfirm();
+  const toast = useToast();
+
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [loading, setLoading] = useState(true);
   const [nowMs, setNowMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [filterTab, setFilterTab] = useState<FilterTab>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [filterTab, setFilterTab] = useState<FilterTab>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Storefront Flash Sale / Hot Sale Banner fallback settings
   const [bannerSettingsOpen, setBannerSettingsOpen] = useState(false);
-  const [bannerSettings, setBannerSettings] = useState<{
-    hotSaleBannerImage: string;
-    hotSaleBannerLink: string;
-    flashSaleEnabled: boolean;
-    flashSaleTitle: string;
-    flashSaleStartAt: string;
-    flashSaleEndAt: string;
-  } | null>(null);
+  const [bannerSettings, setBannerSettings] = useState<BannerSettingsState | null>(null);
   const [settingsRevision, setSettingsRevision] = useState<number>(0);
   const [fullSettingsDoc, setFullSettingsDoc] = useState<Record<string, unknown> | null>(null);
   const [savingBannerSettings, setSavingBannerSettings] = useState(false);
+
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<CampaignData | null>(null);
+  const [formName, setFormName] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formEnabled, setFormEnabled] = useState(true);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [formStartLocal, setFormStartLocal] = useState('');
+  const [formEndLocal, setFormEndLocal] = useState('');
+  const [durationHours, setDurationHours] = useState('');
+  const [formItems, setFormItems] = useState<CampaignItemForm[]>([]);
+  const [formRevision, setFormRevision] = useState<number>(0);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const loadBannerSettings = useCallback(async () => {
     try {
@@ -160,95 +114,91 @@ export default function AdminCampaignsPage() {
       }
       setSettingsRevision(json.data.revision);
       setFullSettingsDoc(json.data.document);
-      setSuccessMsg('Đã lưu cấu hình Banner HOT SALE & chế độ Flash Sale dự phòng.');
+      const msg = 'Đã lưu cấu hình Banner HOT SALE & chế độ Flash Sale dự phòng.';
+      setSuccessMsg(msg);
+      toast.success(msg);
       setBannerSettingsOpen(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Lỗi khi lưu cấu hình.');
+      const msg = e instanceof Error ? e.message : 'Lỗi khi lưu cấu hình.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingBannerSettings(false);
     }
   };
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<CampaignData | null>(null);
-  const [formName, setFormName] = useState("");
-  const [formDescription, setFormDescription] = useState("");
-  const [formEnabled, setFormEnabled] = useState(true);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [formStartLocal, setFormStartLocal] = useState("");
-  const [formEndLocal, setFormEndLocal] = useState("");
-  const [durationHours, setDurationHours] = useState('');
-  const [formItems, setFormItems] = useState<CampaignItemForm[]>([]);
-  const [formRevision, setFormRevision] = useState<number>(0);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!isEditorOpen) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const dialog = document.getElementById('campaign-editor');
-    dialog?.focus();
-    const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); setIsEditorOpen(false); }
-      if (event.key !== 'Tab' || !dialog) return;
-      const items = [...dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href]')];
-      const first = items[0], last = items.at(-1);
-      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first?.focus(); }
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => { document.removeEventListener('keydown', handleKey); previous?.focus(); };
-  }, [isEditorOpen]);
 
   const fetchCampaigns = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/campaigns");
-      const json = (await res.json()) as { success: boolean; data?: CampaignData[]; error?: string };
+      const res = await fetch('/api/admin/campaigns');
+      const json = (await res.json()) as {
+        success: boolean;
+        data?: CampaignData[];
+        error?: string;
+      };
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Không thể tải danh sách chiến dịch");
+        throw new Error(json.error || 'Không thể tải danh sách chiến dịch');
       }
       setCampaigns(json.data || []);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Lỗi khi tải chiến dịch");
+      const msg = e instanceof Error ? e.message : 'Lỗi khi tải chiến dịch';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
-    const timer = setTimeout(() => { setNowMs(Date.now()); void fetchCampaigns(); }, 0);
+    const timer = setTimeout(() => {
+      setNowMs(Date.now());
+      void fetchCampaigns();
+    }, 0);
     const clock = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => { clearTimeout(timer); clearInterval(clock); };
+    return () => {
+      clearTimeout(timer);
+      clearInterval(clock);
+    };
   }, [fetchCampaigns]);
 
   const campaignCounts = useMemo(() => {
-    let active = 0, upcoming = 0, inactive = 0;
+    let active = 0;
+    let upcoming = 0;
+    let inactive = 0;
     for (const c of campaigns) {
       const startMs = new Date(c.startAt).getTime();
       const endMs = new Date(c.endAt).getTime();
-      if (c.status === "PUBLISHED" && nowMs >= startMs && nowMs < endMs) active++;
-      else if (c.status === "PUBLISHED" && nowMs < startMs) upcoming++;
+      if (c.status === 'PUBLISHED' && nowMs >= startMs && nowMs < endMs) active++;
+      else if (c.status === 'PUBLISHED' && nowMs < startMs) upcoming++;
       else inactive++;
     }
-    return { ALL: campaigns.length, ACTIVE: active, UPCOMING: upcoming, INACTIVE: inactive };
+    return {
+      ALL: campaigns.length,
+      ACTIVE: active,
+      UPCOMING: upcoming,
+      INACTIVE: inactive,
+    };
   }, [campaigns, nowMs]);
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        if (!c.name.toLowerCase().includes(q) && !(c.description || "").toLowerCase().includes(q)) {
+        if (
+          !c.name.toLowerCase().includes(q) &&
+          !(c.description || '').toLowerCase().includes(q)
+        ) {
           return false;
         }
       }
       const startMs = new Date(c.startAt).getTime();
       const endMs = new Date(c.endAt).getTime();
-      const isActive = c.status === "PUBLISHED" && nowMs >= startMs && nowMs < endMs;
-      const isUpcoming = c.status === "PUBLISHED" && nowMs < startMs;
-      if (filterTab === "ACTIVE") return isActive;
-      if (filterTab === "UPCOMING") return isUpcoming;
-      if (filterTab === "INACTIVE") return !isActive && !isUpcoming;
+      const isActive = c.status === 'PUBLISHED' && nowMs >= startMs && nowMs < endMs;
+      const isUpcoming = c.status === 'PUBLISHED' && nowMs < startMs;
+      if (filterTab === 'ACTIVE') return isActive;
+      if (filterTab === 'UPCOMING') return isUpcoming;
+      if (filterTab === 'INACTIVE') return !isActive && !isUpcoming;
       return true;
     });
   }, [campaigns, searchQuery, filterTab, nowMs]);
@@ -257,12 +207,12 @@ export default function AdminCampaignsPage() {
     setFormEnabled(true);
     setDurationHours('');
     setEditingCampaign(null);
-    setFormName("");
-    setFormDescription("");
+    setFormName('');
+    setFormDescription('');
     const now = new Date();
-    const tomorrow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     setFormStartLocal(isoToDatetimeLocalGmt7(now.toISOString()));
-    setFormEndLocal(isoToDatetimeLocalGmt7(tomorrow.toISOString()));
+    setFormEndLocal(isoToDatetimeLocalGmt7(twoHoursLater.toISOString()));
     setFormItems([]);
     setFormRevision(0);
     setFormError(null);
@@ -274,7 +224,7 @@ export default function AdminCampaignsPage() {
     setDurationHours('');
     setEditingCampaign(c);
     setFormName(c.name);
-    setFormDescription(c.description || "");
+    setFormDescription(c.description || '');
     setFormStartLocal(isoToDatetimeLocalGmt7(c.startAt));
     setFormEndLocal(isoToDatetimeLocalGmt7(c.endAt));
     setFormRevision(c.revision);
@@ -284,14 +234,30 @@ export default function AdminCampaignsPage() {
       const res = await fetch(`/api/admin/campaigns/${c.id}`);
       const json = (await res.json()) as { success: boolean; data?: CampaignData };
       if (res.ok && json.data?.items) {
+        setEditingCampaign((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: json.data!.status,
+                revision: json.data!.revision,
+              }
+            : json.data!
+        );
         setFormItems(
           json.data.items.map((it) => ({
             displayName: [it.product?.name, it.variant?.name].filter(Boolean).join(' · '),
             id: it.id,
             productId: it.productId,
-            variantId: it.variantId || "",
+            variantId: it.variantId || '',
             salePrice: it.salePrice,
-            regularPrice: it.regularPrice || "",
+            regularPrice:
+              it.regularPrice ??
+              it.variant?.price ??
+              it.product?.price ??
+              '',
+            quantityLimit: it.quantityLimit ?? '',
+            perCustomerLimit: it.perCustomerLimit ?? '',
+            soldCount: it.soldCount ?? 0,
           }))
         );
         setFormRevision(json.data.revision);
@@ -299,7 +265,9 @@ export default function AdminCampaignsPage() {
         throw new Error('Không tải được sản phẩm chiến dịch. Thử lại để tránh mất danh sách.');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không tải được chiến dịch');
+      const msg = e instanceof Error ? e.message : 'Không tải được chiến dịch';
+      setError(msg);
+      toast.error(msg);
       return false;
     }
 
@@ -307,20 +275,56 @@ export default function AdminCampaignsPage() {
     return true;
   };
 
+  const handleCloneCampaign = async (campaign: CampaignData) => {
+    if (!(await openEditEditor(campaign))) return;
+    setEditingCampaign(null);
+    setFormRevision(0);
+    setFormEnabled(false);
+    setFormName(`${campaign.name} (Bản sao)`);
+    setFormItems((items) =>
+      items.map((item) => ({
+        ...item,
+        id: undefined,
+        soldCount: 0,
+      }))
+    );
+    const now = new Date();
+    const twoHoursLater = new Date(now.getTime() + 2 * 3600000);
+    setFormStartLocal(isoToDatetimeLocalGmt7(now.toISOString()));
+    setFormEndLocal(isoToDatetimeLocalGmt7(twoHoursLater.toISOString()));
+    toast.info(`Đã tạo bản nháp nhân bản từ "${campaign.name}". Hãy kiểm tra khung giờ và bấm Lưu.`);
+  };
+
   const addTimeSlot = async (campaign: CampaignData) => {
-    if (!await openEditEditor(campaign)) return;
+    if (!(await openEditEditor(campaign))) return;
     setEditingCampaign(null);
     setFormRevision(0);
     setFormEnabled(true);
-    setFormItems(items => items.map(item => ({ ...item, id: undefined })));
+    setFormItems((items) =>
+      items.map((item) => ({
+        ...item,
+        id: undefined,
+        soldCount: 0,
+      }))
+    );
     setFormStartLocal(isoToDatetimeLocalGmt7(campaign.endAt));
-    setFormEndLocal(isoToDatetimeLocalGmt7(new Date(Date.parse(campaign.endAt) + 2 * 3600000).toISOString()));
+    setFormEndLocal(
+      isoToDatetimeLocalGmt7(new Date(Date.parse(campaign.endAt) + 2 * 3600000).toISOString())
+    );
   };
 
   const handleAddItem = () => {
     setFormItems((prev) => [
       ...prev,
-      { productId: "", variantId: "", salePrice: "", regularPrice: "" },
+      {
+        productId: '',
+        variantId: '',
+        salePrice: '',
+        regularPrice: '',
+        quantityLimit: '',
+        perCustomerLimit: '',
+        soldCount: 0,
+      },
     ]);
   };
 
@@ -335,28 +339,40 @@ export default function AdminCampaignsPage() {
   };
 
   const applyBulkDiscountPct = (pct: number) => {
-    setFormItems(prev =>
-      prev.map(it => {
+    setFormItems((prev) =>
+      prev.map((it) => {
         const reg = Number(it.regularPrice);
         if (!Number.isFinite(reg) || reg <= 0) return it;
-        const discounted = Math.max(1000, Math.round((reg * (1 - pct / 100)) / 10000) * 10000);
+        const discounted = calculateBulkDiscountedPrice(reg, pct);
         return { ...it, salePrice: discounted };
       })
     );
   };
 
   const handleSave = async (enabled = formEnabled) => {
+    if (editingCampaign?.status === 'ARCHIVED') {
+      const msg = 'Chiến dịch đã lưu trữ không thể chỉnh sửa hoặc xuất bản lại.';
+      setFormError(msg);
+      toast.error(msg);
+      return;
+    }
+
     setFormError(null);
     setSaving(true);
 
     try {
       if (!formName.trim()) {
-        throw new Error("Vui lòng nhập tên chiến dịch");
+        throw new Error('Vui lòng nhập tên chiến dịch');
       }
       if (!formStartLocal || !formEndLocal) {
-        throw new Error("Vui lòng nhập thời gian bắt đầu và kết thúc");
+        throw new Error('Vui lòng nhập thời gian bắt đầu và kết thúc');
       }
-      if (durationHours && (!Number.isFinite(Number(durationHours)) || Number(durationHours) < 0.25 || Number(durationHours) > 8760)) {
+      if (
+        durationHours &&
+        (!Number.isFinite(Number(durationHours)) ||
+          Number(durationHours) < 0.25 ||
+          Number(durationHours) > 8760)
+      ) {
         throw new Error('Thời lượng phải từ 0,25 đến 8760 giờ.');
       }
 
@@ -364,7 +380,14 @@ export default function AdminCampaignsPage() {
       const endUtc = datetimeLocalGmt7ToIso(formEndLocal);
 
       if (new Date(startUtc).getTime() >= new Date(endUtc).getTime()) {
-        throw new Error("Thời điểm bắt đầu phải trước thời điểm kết thúc.");
+        throw new Error('Thời điểm bắt đầu phải trước thời điểm kết thúc.');
+      }
+
+      const targetStatus =
+        enabled && new Date(endUtc).getTime() > Date.now() ? 'PUBLISHED' : 'DRAFT';
+
+      if (targetStatus === 'PUBLISHED' && formItems.length < 1) {
+        throw new Error('Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.');
       }
 
       const parsedItems = formItems.map((it, idx) => {
@@ -376,25 +399,62 @@ export default function AdminCampaignsPage() {
           throw new Error(`Dòng ${idx + 1}: Giá khuyến mại phải là số nguyên dương.`);
         }
         const regularPrice =
-          it.regularPrice !== undefined && it.regularPrice !== "" && it.regularPrice !== null
+          it.regularPrice !== undefined && it.regularPrice !== '' && it.regularPrice !== null
             ? Number(it.regularPrice)
             : null;
         if (regularPrice !== null && salePrice >= regularPrice) {
-          throw new Error(`Dòng ${idx + 1}: Giá sale (${salePrice.toLocaleString()}₫) phải nhỏ hơn giá thường (${regularPrice.toLocaleString()}₫).`);
+          throw new Error(
+            `Dòng ${idx + 1}: Giá sale (${salePrice.toLocaleString('vi-VN')}₫) phải nhỏ hơn giá thường (${regularPrice.toLocaleString('vi-VN')}₫).`
+          );
         }
+
+        const quantityLimit =
+          it.quantityLimit !== undefined && it.quantityLimit !== '' && it.quantityLimit !== null
+            ? Number(it.quantityLimit)
+            : null;
+        if (quantityLimit !== null && (!Number.isInteger(quantityLimit) || quantityLimit <= 0)) {
+          throw new Error(`Dòng ${idx + 1}: Giới hạn suất phải là số nguyên dương.`);
+        }
+
+        const perCustomerLimit =
+          it.perCustomerLimit !== undefined &&
+          it.perCustomerLimit !== '' &&
+          it.perCustomerLimit !== null
+            ? Number(it.perCustomerLimit)
+            : null;
+        if (
+          perCustomerLimit !== null &&
+          (!Number.isInteger(perCustomerLimit) || perCustomerLimit <= 0)
+        ) {
+          throw new Error(`Dòng ${idx + 1}: Giới hạn mỗi khách phải là số nguyên dương.`);
+        }
+
+        if (
+          quantityLimit !== null &&
+          perCustomerLimit !== null &&
+          perCustomerLimit > quantityLimit
+        ) {
+          throw new Error(
+            `Dòng ${idx + 1}: Giới hạn mỗi khách (${perCustomerLimit}) không được lớn hơn tổng giới hạn suất (${quantityLimit}).`
+          );
+        }
+
         return {
           id: it.id,
           productId: it.productId.trim(),
           variantId: it.variantId && it.variantId.trim() ? it.variantId.trim() : null,
           salePrice: Math.round(salePrice),
           regularPrice: regularPrice !== null ? Math.round(regularPrice) : null,
+          quantityLimit,
+          perCustomerLimit,
+          soldCount: typeof it.soldCount === 'number' && it.soldCount >= 0 ? it.soldCount : 0,
         };
       });
 
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || null,
-        status: enabled && new Date(endUtc).getTime() > Date.now() ? "PUBLISHED" : "DRAFT",
+        status: targetStatus,
         startAt: startUtc,
         endAt: endUtc,
         items: parsedItems,
@@ -405,11 +465,11 @@ export default function AdminCampaignsPage() {
       const url = editingCampaign
         ? `/api/admin/campaigns/${editingCampaign.id}`
         : `/api/admin/campaigns`;
-      const method = editingCampaign ? "PUT" : "POST";
+      const method = editingCampaign ? 'PUT' : 'POST';
 
       const res = await fetch(url, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -421,24 +481,26 @@ export default function AdminCampaignsPage() {
       };
 
       if (!res.ok || !json.success) {
-        if (json.code === "CAMPAIGN_OVERLAP_CONFLICT") {
+        if (json.code === 'CAMPAIGN_OVERLAP_CONFLICT') {
           throw new Error(`Xung đột khung giờ: ${json.error}`);
         }
-        if (json.code === "CAMPAIGN_REVISION_CONFLICT") {
+        if (json.code === 'CAMPAIGN_REVISION_CONFLICT') {
           throw new Error(`Xung đột phiên bản (CAS): ${json.error}`);
         }
-        throw new Error(json.error || "Lỗi khi lưu chiến dịch.");
+        throw new Error(json.error || 'Lỗi khi lưu chiến dịch.');
       }
 
-      setSuccessMsg(
-        editingCampaign
-          ? `Đã cập nhật chiến dịch "${formName}" thành công.`
-          : `Đã tạo chiến dịch "${formName}" thành công.`
-      );
+      const msg = editingCampaign
+        ? `Đã cập nhật chiến dịch "${formName}" thành công.`
+        : `Đã tạo chiến dịch "${formName}" thành công.`;
+      setSuccessMsg(msg);
+      toast.success(msg);
       setIsEditorOpen(false);
-      fetchCampaigns();
+      void fetchCampaigns();
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : "Lỗi khi lưu chiến dịch");
+      const msg = e instanceof Error ? e.message : 'Lỗi khi lưu chiến dịch';
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -450,39 +512,66 @@ export default function AdminCampaignsPage() {
     try {
       const detail = await fetch(`/api/admin/campaigns/${c.id}`);
       const current = await detail.json();
-      if (!detail.ok || !current.success) throw new Error(current.error || 'Không tải được chiến dịch.');
+      if (!detail.ok || !current.success) {
+        throw new Error(current.error || 'Không tải được chiến dịch.');
+      }
+      // Use freshly fetched revision from current.data.revision instead of stale c.revision
+      const freshRevision = current.data.revision;
       const res = await fetch(`/api/admin/campaigns/${c.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...current.data, status: enabled ? 'PUBLISHED' : 'DRAFT', expectedRevision: c.revision }),
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...current.data,
+          status: enabled ? 'PUBLISHED' : 'DRAFT',
+          revision: freshRevision,
+          expectedRevision: freshRevision,
+        }),
       });
       const json = (await res.json()) as { success: boolean; error?: string };
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Không thể xuất bản chiến dịch.");
+        throw new Error(json.error || 'Không thể đổi trạng thái chiến dịch.');
       }
-      setSuccessMsg(`Đã ${enabled ? 'bật' : 'tắt'} chiến dịch "${c.name}".`);
+      const msg = `Đã ${enabled ? 'bật' : 'tắt'} chiến dịch "${c.name}".`;
+      setSuccessMsg(msg);
+      toast.success(msg);
       await fetchCampaigns();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Không đổi được trạng thái chiến dịch.');
-    } finally { setTogglingId(null); }
+      const msg = e instanceof Error ? e.message : 'Không đổi được trạng thái chiến dịch.';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const handleArchive = async (c: CampaignData) => {
-    if (!confirm(`Bạn có chắc muốn lưu trữ chiến dịch "${c.name}"? Giá sẽ không còn áp dụng.`)) return;
+    const ok = await confirm({
+      title: 'Lưu trữ chiến dịch',
+      message: `Bạn có chắc muốn lưu trữ chiến dịch "${c.name}"? Giá khuyến mại sẽ ngừng áp dụng và chiến dịch đã lưu trữ không thể chỉnh sửa lại.`,
+      confirmLabel: 'Lưu trữ',
+      cancelLabel: 'Hủy',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
     try {
       const res = await fetch(`/api/admin/campaigns/${c.id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expectedRevision: c.revision }),
       });
       const json = (await res.json()) as { success: boolean; error?: string };
       if (!res.ok || !json.success) {
-        throw new Error(json.error || "Không thể lưu trữ chiến dịch.");
+        throw new Error(json.error || 'Không thể lưu trữ chiến dịch.');
       }
-      setSuccessMsg(`Đã lưu trữ chiến dịch "${c.name}".`);
-      fetchCampaigns();
+      const msg = `Đã lưu trữ chiến dịch "${c.name}".`;
+      setSuccessMsg(msg);
+      toast.success(msg);
+      void fetchCampaigns();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Lỗi khi lưu trữ");
+      const msg = e instanceof Error ? e.message : 'Lỗi khi lưu trữ chiến dịch';
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -502,15 +591,15 @@ export default function AdminCampaignsPage() {
               size="sm"
               onClick={() => {
                 if (!bannerSettings) void loadBannerSettings();
-                setBannerSettingsOpen(prev => !prev);
+                setBannerSettingsOpen((prev) => !prev);
               }}
             >
-              Cấu hình Banner & Dự phòng
+              Cấu hình Banner &amp; Dự phòng
             </AdminButton>
             <AdminButton
               variant="secondary"
               size="sm"
-              onClick={fetchCampaigns}
+              onClick={() => void fetchCampaigns()}
               disabled={loading}
               aria-label="Làm mới"
               icon={<RefreshCw className={loading ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'} />}
@@ -522,83 +611,6 @@ export default function AdminCampaignsPage() {
         }
       />
 
-      {bannerSettingsOpen && bannerSettings && (
-        <AdminCard title="Cấu hình Banner HOT SALE & Chế độ Flash Sale dự phòng">
-          <div className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label className="block font-semibold text-slate-700">
-                Ảnh Banner HOT SALE ngang (1600×160)
-                <input
-                  type="text"
-                  value={bannerSettings.hotSaleBannerImage}
-                  onChange={e => setBannerSettings({ ...bannerSettings, hotSaleBannerImage: e.target.value })}
-                  placeholder="/api/library/... hoặc https://..."
-                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-1.5 font-normal"
-                />
-              </label>
-              <label className="block font-semibold text-slate-700">
-                Liên kết khi bấm vào Banner
-                <input
-                  type="text"
-                  value={bannerSettings.hotSaleBannerLink}
-                  onChange={e => setBannerSettings({ ...bannerSettings, hotSaleBannerLink: e.target.value })}
-                  placeholder="/laptop-gaming"
-                  className="mt-1 w-full border border-slate-200 rounded-lg px-3 py-1.5 font-normal"
-                />
-              </label>
-            </div>
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-              <label className="inline-flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={bannerSettings.flashSaleEnabled}
-                  onChange={e => setBannerSettings({ ...bannerSettings, flashSaleEnabled: e.target.checked })}
-                  className="w-4 h-4 rounded text-red-600"
-                />
-                <span>Bật chế độ Flash Sale dự phòng toàn trang (áp dụng cho SP gắn cờ Flash Sale khi không có chiến dịch riêng)</span>
-              </label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <label className="block font-semibold text-slate-600">
-                  Tiêu đề khối Flash Sale
-                  <input
-                    type="text"
-                    value={bannerSettings.flashSaleTitle}
-                    onChange={e => setBannerSettings({ ...bannerSettings, flashSaleTitle: e.target.value })}
-                    className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-normal"
-                  />
-                </label>
-                <label className="block font-semibold text-slate-600">
-                  Bắt đầu dự phòng (GMT+7)
-                  <input
-                    type="datetime-local"
-                    value={isoToDatetimeLocalGmt7(bannerSettings.flashSaleStartAt)}
-                    onChange={e => setBannerSettings({ ...bannerSettings, flashSaleStartAt: datetimeLocalGmt7ToIso(e.target.value) })}
-                    className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-mono font-normal"
-                  />
-                </label>
-                <label className="block font-semibold text-slate-600">
-                  Kết thúc dự phòng (GMT+7)
-                  <input
-                    type="datetime-local"
-                    value={isoToDatetimeLocalGmt7(bannerSettings.flashSaleEndAt)}
-                    onChange={e => setBannerSettings({ ...bannerSettings, flashSaleEndAt: datetimeLocalGmt7ToIso(e.target.value) })}
-                    className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-mono font-normal"
-                  />
-                </label>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <AdminButton variant="secondary" size="sm" onClick={() => setBannerSettingsOpen(false)}>
-                Đóng
-              </AdminButton>
-              <AdminButton variant="primary" size="sm" loading={savingBannerSettings} onClick={() => void handleSaveBannerSettings()}>
-                Lưu cấu hình Banner
-              </AdminButton>
-            </div>
-          </div>
-        </AdminCard>
-      )}
-
       {/* Alerts */}
       {successMsg && (
         <div className="px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center justify-between">
@@ -606,7 +618,10 @@ export default function AdminCampaignsPage() {
             <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+          <button
+            onClick={() => setSuccessMsg(null)}
+            className="text-emerald-600 hover:text-emerald-800 cursor-pointer"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -618,61 +633,40 @@ export default function AdminCampaignsPage() {
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{error}</span>
           </div>
-          <button onClick={() => setError(null)} className="text-rose-600 hover:text-rose-800 cursor-pointer">
+          <button
+            onClick={() => setError(null)}
+            className="text-rose-600 hover:text-rose-800 cursor-pointer"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Live Storefront Status Banner */}
-      {(() => {
-        const activeCampaign = campaigns.find(
-          (c) => c.status === "PUBLISHED" && nowMs >= new Date(c.startAt).getTime() && nowMs < new Date(c.endAt).getTime()
-        );
-        if (activeCampaign) {
-          return (
-            <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between gap-3 text-emerald-900 shadow-2xs">
-              <div className="flex items-center gap-2.5">
-                <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-                </span>
-                <div className="text-xs">
-                  <strong>Đang chạy Flash Sale trên Storefront:</strong> &quot;{activeCampaign.name}&quot; ({activeCampaign.itemCount} sản phẩm).
-                  <span className="ml-1.5 text-emerald-700">Kết thúc lúc {formatGmt7(activeCampaign.endAt)}</span>
-                </div>
-              </div>
-              <Link
-                href="/"
-                target="_blank"
-                className="text-xs font-semibold text-emerald-800 hover:text-emerald-950 underline flex items-center gap-1 shrink-0"
-              >
-                Xem ngoài Storefront <ExternalLink className="w-3 h-3" />
-              </Link>
-            </div>
-          );
-        }
-        return (
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-xs text-slate-600">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <span>Hiện không có Flash Sale nào đang trực tiếp trên Storefront. Bạn có thể bật một chiến dịch hoặc tạo khung giờ mới.</span>
-            </div>
-          </div>
-        );
-      })()}
+      <CampaignStatsCards
+        campaigns={campaigns}
+        nowMs={nowMs}
+        counts={campaignCounts}
+        bannerSettingsOpen={bannerSettingsOpen}
+        bannerSettings={bannerSettings}
+        savingBannerSettings={savingBannerSettings}
+        onChangeBannerSettings={setBannerSettings}
+        onCloseBannerSettings={() => setBannerSettingsOpen(false)}
+        onSaveBannerSettings={() => void handleSaveBannerSettings()}
+      />
 
       {/* Unified Single-Card Workspace */}
       <AdminCard bodyClassName="p-0 overflow-hidden">
         {/* Top Bar: Tabs + Search */}
         <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/60 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1" role="tablist" aria-label="Lọc trạng thái chiến dịch">
-            {([
-              { key: "ALL", label: "Tất cả" },
-              { key: "ACTIVE", label: "Đang diễn ra" },
-              { key: "UPCOMING", label: "Sắp chạy" },
-              { key: "INACTIVE", label: "Đã tắt / Kết thúc" },
-            ] as const).map((t) => {
+            {(
+              [
+                { key: 'ALL', label: 'Tất cả' },
+                { key: 'ACTIVE', label: 'Đang diễn ra' },
+                { key: 'UPCOMING', label: 'Sắp chạy' },
+                { key: 'INACTIVE', label: 'Đã tắt / Kết thúc' },
+              ] as const
+            ).map((t) => {
               const active = filterTab === t.key;
               return (
                 <button
@@ -683,8 +677,8 @@ export default function AdminCampaignsPage() {
                   onClick={() => setFilterTab(t.key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     active
-                      ? "bg-slate-900 text-white shadow-2xs"
-                      : "text-slate-600 hover:bg-slate-200/70 hover:text-slate-900"
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
                   }`}
                 >
                   {t.label} <span className="opacity-75">({campaignCounts[t.key]})</span>
@@ -706,7 +700,7 @@ export default function AdminCampaignsPage() {
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => setSearchQuery('')}
                   aria-label="Xóa tìm kiếm"
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
@@ -744,19 +738,23 @@ export default function AdminCampaignsPage() {
                 {filteredCampaigns.map((c) => {
                   const startMs = new Date(c.startAt).getTime();
                   const endMs = new Date(c.endAt).getTime();
-                  const isCurrentlyActive = c.status === "PUBLISHED" && nowMs >= startMs && nowMs < endMs;
+                  const isCurrentlyActive =
+                    c.status === 'PUBLISHED' && nowMs >= startMs && nowMs < endMs;
+                  const isArchived = c.status === 'ARCHIVED';
 
                   return (
                     <tr key={c.id} className="hover:bg-slate-50/80 transition">
                       <td className="py-2.5 px-4">
                         <div className="font-semibold text-slate-900">{c.name}</div>
                         {c.description && (
-                          <div className="text-[11px] text-slate-400 truncate max-w-xs">{c.description}</div>
+                          <div className="text-[11px] text-slate-400 truncate max-w-xs">
+                            {c.description}
+                          </div>
                         )}
                         <div className="text-[10px] text-slate-400 font-mono">rev #{c.revision}</div>
                       </td>
                       <td className="py-2.5 px-4 whitespace-nowrap">
-                        {c.status === "PUBLISHED" ? (
+                        {c.status === 'PUBLISHED' ? (
                           isCurrentlyActive ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-100 text-emerald-800">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
@@ -772,7 +770,7 @@ export default function AdminCampaignsPage() {
                               Đã kết thúc
                             </span>
                           )
-                        ) : c.status === "DRAFT" ? (
+                        ) : c.status === 'DRAFT' ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800">
                             Đã tắt
                           </span>
@@ -792,12 +790,25 @@ export default function AdminCampaignsPage() {
                           role="switch"
                           aria-label={`Hiển thị ${c.name} trên homepage`}
                           aria-checked={c.status === 'PUBLISHED' && nowMs < endMs}
-                          disabled={togglingId !== null || nowMs >= endMs || c.status === 'ARCHIVED'}
-                          onClick={() => handleToggle(c, c.status !== 'PUBLISHED')}
-                          title={nowMs >= endMs ? 'Đã kết thúc. Sửa thời gian để bật lại.' : 'Bật/tắt hiển thị'}
+                          disabled={togglingId !== null || nowMs >= endMs || isArchived}
+                          onClick={() => void handleToggle(c, c.status !== 'PUBLISHED')}
+                          title={
+                            isArchived
+                              ? 'Chiến dịch đã lưu trữ không thể xuất bản lại.'
+                              : nowMs >= endMs
+                              ? 'Đã kết thúc. Sửa thời gian để bật lại.'
+                              : 'Bật/tắt hiển thị'
+                          }
                           className="inline-flex items-center gap-1.5 rounded-lg py-1 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-blue-600 disabled:opacity-50 cursor-pointer"
                         >
-                          <span aria-hidden="true" className={`flex h-5 w-9 rounded-full p-0.5 transition ${c.status === 'PUBLISHED' && nowMs < endMs ? 'justify-end bg-blue-600' : 'justify-start bg-slate-300'}`}>
+                          <span
+                            aria-hidden="true"
+                            className={`flex h-5 w-9 rounded-full p-0.5 transition ${
+                              c.status === 'PUBLISHED' && nowMs < endMs
+                                ? 'justify-end bg-blue-600'
+                                : 'justify-start bg-slate-300'
+                            }`}
+                          >
                             <span className="h-4 w-4 rounded-full bg-white shadow-2xs" />
                           </span>
                           <span>{c.status === 'PUBLISHED' && nowMs < endMs ? 'Bật' : 'Tắt'}</span>
@@ -813,25 +824,38 @@ export default function AdminCampaignsPage() {
                         <div className="inline-flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => addTimeSlot(c)}
+                            onClick={() => void handleCloneCampaign(c)}
+                            aria-label={`Nhân bản chiến dịch ${c.name}`}
+                            title="Nhân bản chiến dịch"
+                            className="rounded-md p-1.5 text-slate-500 hover:text-blue-700 hover:bg-blue-50 transition cursor-pointer"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void addTimeSlot(c)}
                             aria-label={`Thêm khung giờ ${c.name}`}
                             title="Nhân bản sang khung giờ tiếp theo"
-                            className="rounded-md p-1.5 text-blue-700 hover:bg-blue-50 cursor-pointer"
+                            className="rounded-md p-1.5 text-blue-700 hover:bg-blue-50 transition cursor-pointer"
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => openEditEditor(c)}
+                            onClick={() => void openEditEditor(c)}
                             className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition cursor-pointer"
-                            title="Sửa chiến dịch"
+                            title={isArchived ? 'Xem chiến dịch đã lưu trữ' : 'Sửa chiến dịch'}
                           >
-                            <Edit2 className="w-3.5 h-3.5" />
+                            {isArchived ? (
+                              <Eye className="w-3.5 h-3.5" />
+                            ) : (
+                              <Edit2 className="w-3.5 h-3.5" />
+                            )}
                           </button>
-                          {c.status !== "ARCHIVED" && (
+                          {!isArchived && (
                             <button
                               type="button"
-                              onClick={() => handleArchive(c)}
+                              onClick={() => void handleArchive(c)}
                               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md transition cursor-pointer"
                               title="Lưu trữ chiến dịch"
                             >
@@ -849,400 +873,47 @@ export default function AdminCampaignsPage() {
         )}
       </AdminCard>
 
-      {/* Editor Modal */}
-      {isEditorOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div
-            id="campaign-editor"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="campaign-editor-title"
-            tabIndex={-1}
-            className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden"
-          >
-            {/* Modal Header */}
-            <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-amber-500" />
-                <h2 id="campaign-editor-title" className="font-bold text-slate-900 text-sm">
-                  {editingCampaign ? `Sửa chiến dịch: ${editingCampaign.name}` : "Tạo chiến dịch mới"}
-                </h2>
-                {editingCampaign && (
-                  <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-mono">
-                    rev #{formRevision}
-                  </span>
-                )}
-              </div>
-              <button
-                aria-label="Đóng trình sửa chiến dịch"
-                onClick={() => setIsEditorOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-5 overflow-y-auto space-y-4 flex-grow text-xs">
-              {formError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-                  <span>{formError}</span>
-                </div>
-              )}
-
-              {/* Basic Fields */}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
-                <div className="sm:col-span-8">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Tên chiến dịch <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    placeholder="VD: Flash Sale Cuối Tuần"
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div className="sm:col-span-4 pt-5">
-                  <label className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-blue-900 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formEnabled}
-                      onChange={e => setFormEnabled(e.target.checked)}
-                      className="h-4 w-4 rounded text-blue-600"
-                    />
-                    <span>Bật trên homepage</span>
-                  </label>
-                </div>
-
-                <div className="sm:col-span-12">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Mô tả ngắn
-                  </label>
-                  <input
-                    type="text"
-                    value={formDescription}
-                    onChange={(e) => setFormDescription(e.target.value)}
-                    placeholder="Ghi chú hoặc mô tả ngắn cho chương trình (tuỳ chọn)"
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Date/Time & Full Datetime-local */}
-              <fieldset className="grid grid-cols-1 gap-2.5 rounded-xl border border-slate-200 p-3 sm:grid-cols-4 bg-slate-50/50">
-                <legend className="px-1.5 text-[11px] font-bold text-slate-700">Chọn nhanh khung giờ trong ngày (GMT+7)</legend>
-                <label className="text-[11px] font-semibold text-slate-600">
-                  Ngày sale
-                  <input
-                    type="date"
-                    value={formStartLocal.slice(0, 10)}
-                    onChange={e => {
-                      if (e.target.value) {
-                        setFormStartLocal(`${e.target.value}T${formStartLocal.slice(11) || '10:00'}`);
-                        setFormEndLocal(`${e.target.value}T${formEndLocal.slice(11) || '12:00'}`);
-                        setDurationHours('');
-                      }
-                    }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-                  />
-                </label>
-                <label className="text-[11px] font-semibold text-slate-600">
-                  Bắt đầu
-                  <input
-                    type="time"
-                    value={formStartLocal.slice(11)}
-                    onChange={e => {
-                      setFormStartLocal(`${formStartLocal.slice(0, 10)}T${e.target.value}`);
-                      setDurationHours('');
-                    }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-                  />
-                </label>
-                <label className="text-[11px] font-semibold text-slate-600">
-                  Kết thúc
-                  <input
-                    type="time"
-                    value={formEndLocal.slice(11)}
-                    onChange={e => {
-                      const datePart = formEndLocal.slice(0, 10) || formStartLocal.slice(0, 10);
-                      setFormEndLocal(`${datePart}T${e.target.value}`);
-                      setDurationHours('');
-                    }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-                  />
-                </label>
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block">
-                    Số giờ chạy
-                  </label>
-                  <input
-                    type="number"
-                    min="0.25"
-                    max="8760"
-                    step="0.25"
-                    value={durationHours}
-                    placeholder="VD: 2, 6, 24"
-                    onChange={e => {
-                      const value = e.target.value;
-                      setDurationHours(value);
-                      const hours = Number(value);
-                      if (formStartLocal && Number.isFinite(hours) && hours > 0 && hours <= 8760) {
-                        setFormEndLocal(isoToDatetimeLocalGmt7(new Date(new Date(datetimeLocalGmt7ToIso(formStartLocal)).getTime() + hours * 3600000).toISOString()));
-                      }
-                    }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-normal"
-                  />
-                </div>
-                <div className="sm:col-span-4 flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/70">
-                  <span className="text-[11px] text-slate-500 font-semibold">Tăng nhanh kết thúc:</span>
-                  {[
-                    { label: '2 giờ', h: 2 },
-                    { label: '4 giờ', h: 4 },
-                    { label: '8 giờ', h: 8 },
-                    { label: '24 giờ (1 ngày)', h: 24 },
-                    { label: '3 ngày', h: 72 },
-                    { label: '7 ngày', h: 168 },
-                  ].map(({ label, h }) => (
-                    <button
-                      key={h}
-                      type="button"
-                      onClick={() => {
-                        if (!formStartLocal) return;
-                        setDurationHours(String(h));
-                        const endIso = new Date(new Date(datetimeLocalGmt7ToIso(formStartLocal)).getTime() + h * 3600000).toISOString();
-                        setFormEndLocal(isoToDatetimeLocalGmt7(endIso));
-                      }}
-                      className="px-2 py-0.5 rounded bg-white hover:bg-slate-200 border border-slate-300 text-[11px] font-medium text-slate-700 transition cursor-pointer"
-                    >
-                      +{label}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Thời điểm bắt đầu (GMT+7) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formStartLocal}
-                    onChange={(e) => {
-                      setFormStartLocal(e.target.value);
-                      const hours = Number(durationHours);
-                      if (e.target.value && durationHours && Number.isFinite(hours) && hours >= 0.25 && hours <= 8760) {
-                        setFormEndLocal(isoToDatetimeLocalGmt7(new Date(new Date(datetimeLocalGmt7ToIso(e.target.value)).getTime() + hours * 3600000).toISOString()));
-                      }
-                    }}
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Thời điểm kết thúc (GMT+7) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formEndLocal}
-                    onChange={(e) => { setDurationHours(''); setFormEndLocal(e.target.value); }}
-                    className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* Items Section */}
-              <div className="pt-3 border-t border-slate-200 space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-xs font-bold text-slate-900">
-                      Sản phẩm khuyến mại ({formItems.length})
-                    </h3>
-                    {formItems.length > 0 && (
-                      <div className="flex items-center gap-1 text-[11px]">
-                        <span className="text-slate-500">Giảm nhanh theo giá gốc:</span>
-                        {[3, 5, 10, 15, 20].map(pct => (
-                          <button
-                            key={pct}
-                            type="button"
-                            onClick={() => applyBulkDiscountPct(pct)}
-                            className="px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold cursor-pointer transition"
-                            title={`Áp dụng giảm ${pct}% trên giá gốc cho tất cả sản phẩm`}
-                          >
-                            -{pct}%
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddItem}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg transition cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Thêm dòng
-                  </button>
-                </div>
-
-                <CampaignProductPicker
-                  onAdd={items =>
-                    setFormItems(prev => [
-                      ...prev,
-                      ...items.filter(item => !prev.some(p => p.productId === item.productId && (p.variantId || null) === item.variantId)),
-                    ])
-                  }
-                />
-
-                {formItems.length === 0 ? (
-                  <div className="p-4 border border-dashed border-slate-200 rounded-xl text-center text-xs text-slate-400">
-                    Tìm chọn sản phẩm phía trên hoặc bấm &quot;Thêm dòng&quot;.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="hidden sm:grid grid-cols-12 gap-2 px-3 py-1.5 bg-slate-100 rounded-lg text-[10px] font-bold text-slate-600 uppercase tracking-wide">
-                      <div className="col-span-6">Sản phẩm &amp; Cấu hình</div>
-                      <div className="col-span-3">Giá Sale (₫)</div>
-                      <div className="col-span-2">Giá gốc (₫) / % Giảm</div>
-                      <div className="col-span-1 text-right">Xóa</div>
-                    </div>
-                    {formItems.map((it, idx) => {
-                      const sale = Number(it.salePrice);
-                      const reg = Number(it.regularPrice);
-                      const hasDiscount = Number.isFinite(sale) && Number.isFinite(reg) && reg > 0 && sale > 0;
-                      const discountPct = hasDiscount ? Math.round((1 - sale / reg) * 100) : null;
-
-                      return (
-                        <div
-                          key={idx}
-                          className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
-                        >
-                          <div className="sm:col-span-6 min-w-0">
-                            {it.displayName ? (
-                              <div>
-                                <p className="text-xs font-semibold text-slate-900 truncate" title={it.displayName}>
-                                  {it.displayName}
-                                </p>
-                                <p className="text-[10px] text-slate-400 font-mono truncate">
-                                  ID: {it.productId}{it.variantId ? ` · SKU: ${it.variantId}` : ' · Bản gốc'}
-                                </p>
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                                <input
-                                  type="text"
-                                  value={it.productId}
-                                  onChange={(e) => handleItemChange(idx, "productId", e.target.value)}
-                                  placeholder="Product ID (UUID)"
-                                  aria-label="Product ID"
-                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
-                                />
-                                <input
-                                  type="text"
-                                  value={it.variantId || ""}
-                                  onChange={(e) => handleItemChange(idx, "variantId", e.target.value)}
-                                  placeholder="Variant ID (trống = bản gốc)"
-                                  aria-label="Variant ID"
-                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono"
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="sm:col-span-3">
-                            <span className="block text-[10px] text-slate-400 mb-0.5 sm:hidden font-semibold">Giá sale (₫):</span>
-                            <input
-                              type="number"
-                              value={it.salePrice}
-                              onChange={(e) => handleItemChange(idx, "salePrice", e.target.value)}
-                              placeholder="Giá sale (₫)"
-                              aria-label="Giá sale"
-                              className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono tabular-nums font-bold text-red-600"
-                            />
-                          </div>
-
-                          <div className="sm:col-span-2">
-                            <div className="flex items-center justify-between mb-0.5 sm:hidden">
-                              <span className="text-[10px] text-slate-400 font-semibold">Giá gốc (₫):</span>
-                            </div>
-                            <div className="space-y-1">
-                              <input
-                                type="number"
-                                value={it.regularPrice || ""}
-                                onChange={(e) => handleItemChange(idx, "regularPrice", e.target.value)}
-                                placeholder="Giá gốc (₫)"
-                                aria-label="Giá gốc"
-                                className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono tabular-nums text-slate-600"
-                              />
-                              {discountPct !== null && (
-                                <div className="flex items-center gap-1">
-                                  {discountPct > 0 ? (
-                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-700">
-                                      -{discountPct}%
-                                    </span>
-                                  ) : (
-                                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-700" title="Giá sale không được lớn hơn hoặc bằng giá gốc">
-                                      Không hợp lệ
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="sm:col-span-1 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(idx)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                              title="Xóa mục này"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setIsEditorOpen(false)}
-                className="px-3.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-white transition cursor-pointer"
-              >
-                Hủy
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => handleSave(false)}
-                  className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg text-xs font-medium transition cursor-pointer"
-                >
-                  {saving ? "Đang lưu..." : "Lưu & Tắt"}
-                </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => handleSave()}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                >
-                  {saving ? "Đang xử lý..." : "Lưu chiến dịch"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CampaignFormModal
+        open={isEditorOpen}
+        editingCampaign={editingCampaign}
+        nowMs={nowMs}
+        formName={formName}
+        formDescription={formDescription}
+        formEnabled={formEnabled}
+        formStartLocal={formStartLocal}
+        formEndLocal={formEndLocal}
+        durationHours={durationHours}
+        formItems={formItems}
+        formRevision={formRevision}
+        saving={saving}
+        formError={formError}
+        onClose={() => setIsEditorOpen(false)}
+        onChangeName={setFormName}
+        onChangeDescription={setFormDescription}
+        onChangeEnabled={setFormEnabled}
+        onChangeStartLocal={setFormStartLocal}
+        onChangeEndLocal={setFormEndLocal}
+        onChangeDurationHours={setDurationHours}
+        onAddEmptyItem={handleAddItem}
+        onPickerAddItems={(items) =>
+          setFormItems((prev) => [
+            ...prev,
+            ...items.filter(
+              (item) =>
+                !prev.some(
+                  (p) =>
+                    p.productId === item.productId &&
+                    (p.variantId || null) === item.variantId
+                )
+            ),
+          ])
+        }
+        onRemoveItem={handleRemoveItem}
+        onChangeItem={handleItemChange}
+        onApplyBulkDiscountPct={applyBulkDiscountPct}
+        onSave={(enabled) => void handleSave(enabled)}
+        onCloneCampaign={(campaign) => void handleCloneCampaign(campaign)}
+      />
     </div>
   );
 }

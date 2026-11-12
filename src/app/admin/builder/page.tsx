@@ -18,6 +18,8 @@ import {
   PageHeader,
   AdminCard,
   AdminButton,
+  useConfirm,
+  useToast,
 } from '@/components/admin/ui';
 import { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import type { LandingPageListItem, LandingPageStudioResponse } from '@/contracts/cms/site-builder';
@@ -32,6 +34,8 @@ interface LandingPageListResponse {
 
 export default function AdminBuilderListPage() {
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [data, setData] = useState<LandingPageListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,9 +95,10 @@ export default function AdminBuilderListPage() {
 
         const res = await mediaRequest<LandingPageListResponse>(`/api/admin/builder?${params.toString()}`);
         if (!ignore) {
-          setData(res);
+          const safeTotalPages = Math.max(1, res.totalPages || 1);
+          setData({ ...res, totalPages: safeTotalPages });
           setError(null);
-          if (page > res.totalPages) setPage(res.totalPages);
+          if (page > safeTotalPages) setPage(safeTotalPages);
         }
       } catch (err: unknown) {
         if (!ignore) {
@@ -157,13 +162,35 @@ export default function AdminBuilderListPage() {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Bạn có chắc muốn xoá trang "${name}"?`)) return;
+  const handleDelete = async (lp: LandingPageListItem) => {
+    const statusLabel =
+      lp.status === 'PUBLISHED'
+        ? 'Đang hiển thị (PUBLISHED)'
+        : lp.status === 'ARCHIVED'
+        ? 'Đã ẩn (ARCHIVED)'
+        : 'Bản nháp (DRAFT)';
+    const displayName =
+      lp.internalName && lp.internalName !== lp.title
+        ? `${lp.title} (${lp.internalName})`
+        : lp.title;
+    const ok = await confirm({
+      title: `Xoá trang đích "${lp.title}"?`,
+      message: `Bạn có chắc muốn xoá trang "${displayName}" tại đường dẫn /landing/${lp.slug} (Trạng thái: ${statusLabel})?`,
+      description:
+        lp.status === 'PUBLISHED'
+          ? 'CẢNH BÁO: Trang này đang hiển thị công khai! Nếu xóa, trang sẽ ngừng phục vụ ngay lập tức trên cửa hàng và khách hàng truy cập đường dẫn này sẽ gặp lỗi 404.'
+          : 'Trang sẽ bị ẩn khỏi danh sách quản trị và hủy các lịch xuất bản đang chờ (nếu có).',
+      confirmLabel: 'Xoá trang',
+      cancelLabel: 'Hủy',
+      variant: 'destructive',
+    });
+    if (!ok) return;
     try {
-      await mediaRequest(`/api/admin/builder/${id}`, { method: 'DELETE' });
+      await mediaRequest(`/api/admin/builder/${lp.id}`, { method: 'DELETE' });
+      toast.success(`Đã xoá trang "${lp.title}" (/landing/${lp.slug}).`);
       setReloadKey((k) => k + 1);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể xoá trang.');
+      toast.error(err instanceof Error ? err.message : 'Không thể xoá trang.');
     }
   };
 
@@ -409,7 +436,7 @@ export default function AdminBuilderListPage() {
                         </Link>
                         <button
                           type="button"
-                          onClick={() => handleDelete(lp.id, lp.title)}
+                          onClick={() => handleDelete(lp)}
                           className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 cursor-pointer"
                           title="Xoá trang"
                         >

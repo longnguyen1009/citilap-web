@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, X } from "lucide-react";
 import type { ProductDocument } from "@/contracts/cms/product-studio";
-import { AdminButton, InlineAlert } from "@/components/admin/ui";
+import { AdminButton, InlineAlert, useConfirm, useToast } from "@/components/admin/ui";
 
 export interface QuickEditItem {
   id: string;
@@ -36,6 +36,8 @@ export default function ProductQuickEditDrawer({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const saveLock = useRef(false);
+  const confirm = useConfirm();
+  const toast = useToast();
   const [detail, setDetail] = useState<Detail | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -76,12 +78,16 @@ export default function ProductQuickEditDrawer({
     event.preventDefault();
     if (!detail || saveLock.current) return;
     const action = (event.nativeEvent as SubmitEvent).submitter?.getAttribute("value") === "publish" ? "publish" : "save";
-    if (
-      action === "publish" &&
-      item.hasUnpublishedDraft &&
-      !window.confirm("Sản phẩm có bản nháp chưa xuất bản. Xuất bản sẽ áp dụng toàn bộ bản nháp lên website. Tiếp tục?")
-    )
-      return;
+    if (action === "publish" && item.hasUnpublishedDraft) {
+      const ok = await confirm({
+        title: "Xuất bản bản nháp",
+        message: "Sản phẩm có bản nháp chưa xuất bản. Xuất bản sẽ áp dụng toàn bộ bản nháp lên website. Tiếp tục?",
+        confirmLabel: "Xuất bản",
+        cancelLabel: "Hủy",
+        variant: "warning",
+      });
+      if (!ok) return;
+    }
     saveLock.current = true;
     setSaving(true);
     setError("");
@@ -93,10 +99,14 @@ export default function ProductQuickEditDrawer({
       });
       const json = await response.json();
       if (!response.ok || json.success !== true) throw new Error(json.error || "Không thể lưu. Thử lại.");
-      onSaved(action === "publish" ? "Đã cập nhật lên website." : "Đã lưu nháp.");
+      const msg = action === "publish" ? "Đã cập nhật lên website." : "Đã lưu nháp.";
+      toast.success(msg);
+      onSaved(msg);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể lưu. Thử lại.");
+      const errMsg = err instanceof Error ? err.message : "Không thể lưu. Thử lại.";
+      setError(errMsg);
+      toast.error(errMsg);
     } finally {
       saveLock.current = false;
       setSaving(false);

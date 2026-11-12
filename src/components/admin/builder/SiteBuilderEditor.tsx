@@ -1,9 +1,6 @@
 'use client';
 
-import {useDraftAutosave} from '../useDraftAutosave';
-import SchedulePanel from '../SchedulePanel';
-import DraftRecovery from '../DraftRecovery';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Save,
@@ -16,254 +13,104 @@ import {
   Copy,
   Plus,
   EyeOff,
-  Sliders,
-  Grid,
-  Tag,
-  FolderTree,
-  Bookmark,
-  Newspaper,
-  Info,
-  Sparkles,
   ChevronRight,
   AlertTriangle,
-  Smartphone,
-  Monitor,
   CheckCircle,
   X,
-  Search,
-  Image as ImageIcon,
-  Flame,
+  Undo2,
+  Redo2,
+  Download,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
-import { youtubeId, tiktokVideoId } from '@/contracts/cms/media';
-import { categoryHref } from '@/lib/category-paths';
-import type {
-  LandingPageStudioResponse,
-  SectionItem,
-  SectionType,
-  ProductRuleCriteria,
+import {
+  landingPageDocumentSchema,
+  type LandingPageStudioResponse,
+  type SectionItem,
+  type SectionType,
 } from '@/contracts/cms/site-builder';
-import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
+import MediaBrowser, { mediaRequest, MediaRequestError } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
 import MediaUpload from '@/components/admin/media/MediaUpload';
-import BlockRenderer from '@/components/builder/BlockRenderer';
-import { WishlistProvider } from '@/context/WishlistContext';
-import { CompareProvider } from '@/context/CompareContext';
+import { useConfirm, useToast } from '@/components/admin/ui';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
-
-interface ProductItem {
-  id: string;
-  name: string;
-  status: string;
-}
-
-interface RevisionItem {
-  id: string;
-  revision: number;
-  action: string;
-  actor: string;
-  createdAt: string;
-}
+import {
+  useDraftAutosave,
+  useAdminActorId,
+  clearCommittedLocalDraft,
+  writeLocalDraftBackup,
+} from '../useDraftAutosave';
+import SchedulePanel from '../SchedulePanel';
+import DraftRecovery, { type DraftRestoreMeta } from '../DraftRecovery';
+import {
+  SECTION_TYPE_META,
+  createDefaultSection,
+  getSectionBlockSummary,
+  type RevisionItem,
+} from './builder-defaults';
+import BuilderAddSectionModal from './BuilderAddSectionModal';
+import BuilderPreviewModal from './BuilderPreviewModal';
+import BuilderRevisionsModal from './BuilderRevisionsModal';
+import { ProductSelectorDialog, PostSelectorDialog } from './BuilderPickers';
+import {
+  BannerForm,
+  SliderForm,
+  ProductGridForm,
+  FeaturedCategoriesForm,
+  FeaturedBrandsForm,
+  FeaturedCollectionForm,
+  NewsReviewsForm,
+  IntroForm,
+  CtaForm,
+  VideoReviewsForm,
+  CustomerGalleryForm,
+} from './BuilderSectionForms';
 
 export interface SiteBuilderEditorProps {
   pageId: string;
 }
 
-const SECTION_TYPE_META: Record<
-  SectionType,
-  { label: string; icon: React.ElementType; desc: string }
-> = {
-  banner: { label: 'Banner quảng cáo', icon: ImageIcon, desc: 'Banner đơn nổi bật với nút kêu gọi hành động' },
-  slider: { label: 'Slider trình chiếu', icon: Sliders, desc: 'Băng chuyền hình ảnh chạy ngang' },
-  product_grid: { label: 'Lưới sản phẩm', icon: Grid, desc: 'Danh sách sản phẩm chọn thủ công hoặc theo bộ lọc' },
-  featured_categories: { label: 'Danh mục nổi bật', icon: FolderTree, desc: 'Các danh mục chính kèm icon' },
-  featured_brands: { label: 'Thương hiệu đối tác', icon: Tag, desc: 'Logo các hãng sản xuất lớn' },
-  featured_collection: { label: 'Bộ sưu tập', icon: Bookmark, desc: 'Gắn một bộ sưu tập từ hệ thống' },
-  news_reviews: { label: 'Tin tức & Đánh giá', icon: Newspaper, desc: 'Các bài viết hoặc đánh giá nổi bật' },
-  intro: { label: 'Giới thiệu & Số liệu', icon: Info, desc: 'Khối giới thiệu thương hiệu và các chỉ số' },
-  cta: { label: 'Kêu gọi hành động (CTA)', icon: Sparkles, desc: 'Khối chốt hành động với nút nổi bật' },
-  video_reviews: { label: 'Video review', icon: Eye, desc: 'Video YouTube và TikTok' },
-  customer_gallery: { label: 'Ảnh khách hàng', icon: ImageIcon, desc: 'Ảnh trải nghiệm tại cửa hàng' },
+const MAX_HISTORY = 30;
+
+/**
+ * Sections whose storefront behaviour is bound to their id (see BlockRenderer / ProductGridForm).
+ * Deleting or duplicating them would silently lose that behaviour, so they are locked in the editor.
+ */
+const SYSTEM_SECTION_IDS: Record<string, string> = {
+  'sec-hot-sale': 'Khối hệ thống HOT SALE: nội dung lấy từ Chiến dịch & Cài đặt, không thể xóa/nhân bản (có thể ẩn).',
+  'sec-discover': 'Khối hệ thống Tab sản phẩm: không thể xóa/nhân bản (có thể ẩn).',
 };
 
-function createDefaultSection(type: SectionType): SectionItem {
-  const id = `sec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  switch (type) {
-    case 'video_reviews':
-      return { id, type, name: 'Video review', enabled: true, data: { type, title: 'Video review sản phẩm', videos: [] } };
-    case 'customer_gallery':
-      return { id, type, name: 'Ảnh khách hàng', enabled: true, data: { type, title: 'Hình ảnh khách hàng tại CitiLap', images: [] } };
-    case 'banner':
-      return {
-        id,
-        type: 'banner',
-        name: 'Banner Quảng Cáo',
-        enabled: true,
-        data: {
-          type: 'banner',
-          title: '',
-          subtitle: '',
-          badge: '',
-          imageUrl: '',
-          imageAssetId: null,
-          link: '',
-          buttonText: '',
-          secondaryLink: '',
-          secondaryButtonText: '',
-          layout: 'hero',
-        },
-      };
-    case 'slider':
-      return {
-        id,
-        type: 'slider',
-        name: 'Slider Trình Chiếu',
-        enabled: true,
-        data: {
-          type: 'slider',
-          autoplay: true,
-          intervalSec: 5,
-          slides: [
-            {
-              id: `slide_${Date.now()}_1`,
-              title: '',
-              subtitle: '',
-              badge: '',
-              imageUrl: '',
-              imageAssetId: null,
-              link: '',
-              buttonText: '',
-            },
-          ],
-        },
-      };
-    case 'product_grid':
-      return {
-        id,
-        type: 'product_grid',
-        name: 'Lưới Sản Phẩm',
-        enabled: true,
-        data: {
-          type: 'product_grid',
-          title: 'Sản Phẩm Nổi Bật',
-          subtitle: 'Các dòng máy được khách hàng ưa chuộng',
-          badge: 'Nổi Bật',
-          badgeColor: 'bg-blue-600 text-white',
-          colorTheme: 'blue',
-          links: [],
-          sourceMode: 'rule',
-          manualProductIds: [],
-          ruleCriteria: {
-            productType: 'laptop',
-            categoryId: null,
-            brandId: null,
-            tag: 'all',
-            availability: 'all',
-            sort: 'newest',
-            limit: 8,
-          },
-          rankNumbering: false,
-          viewAllLink: '/laptop-gaming',
-        },
-      };
-    case 'featured_categories':
-      return {
-        id,
-        type: 'featured_categories',
-        name: 'Danh Mục Nổi Bật',
-        enabled: true,
-        data: {
-          type: 'featured_categories',
-          title: 'Khám Phá Hệ Sinh Thái Danh Mục',
-          subtitle: 'Lựa chọn dòng máy phù hợp nhất theo nhu cầu',
-          categoryIds: [],
-          items: [],
-        },
-      };
-    case 'featured_brands':
-      return {
-        id,
-        type: 'featured_brands',
-        name: 'Thương Hiệu Đối Tác',
-        enabled: true,
-        data: {
-          type: 'featured_brands',
-          title: 'Khám Phá Theo Thương Hiệu',
-          subtitle: 'Đối tác phân phối thiết bị công nghệ chính hãng',
-          brandIds: [],
-        },
-      };
-    case 'featured_collection':
-      return {
-        id,
-        type: 'featured_collection',
-        name: 'Bộ Sưu Tập Nổi Bật',
-        enabled: true,
-        data: {
-          type: 'featured_collection',
-          title: 'Bộ Sưu Tập Tuyển Chọn',
-          subtitle: '',
-          collectionId: '',
-          limit: 12,
-        },
-      };
-    case 'news_reviews':
-      return {
-        id,
-        type: 'news_reviews',
-        name: 'Góc Tin Tức & Đánh Giá',
-        enabled: true,
-        data: {
-          type: 'news_reviews',
-          title: 'Góc CitiLap Media & Đánh Giá',
-          subtitle: 'Chia sẻ kinh nghiệm chọn mua và sử dụng thiết bị',
-          postIds: [],
-          limit: 4,
-          categoryId: null,
-        },
-      };
-    case 'intro':
-      return {
-        id,
-        type: 'intro',
-        name: 'Giới Thiệu & Cam Kết',
-        enabled: true,
-        data: {
-          type: 'intro',
-          title: 'Cam Kết Chất Lượng CitiLap',
-          subtitle: '4 tiêu chuẩn dịch vụ vượt trội dành cho khách hàng',
-          contentHtml: '',
-          features: [
-            { id: 'f1', icon: 'star', title: 'Máy lướt, giá tốt', description: 'Like-new 99%, tiết kiệm 30 - 50%' },
-            { id: 'f2', icon: 'shield', title: 'Cam kết nguyên zin', description: '100% linh kiện chuẩn, chưa sửa chữa' },
-            { id: 'f3', icon: 'refresh', title: 'Dịch vụ vượt trội', description: 'Bảo hành chu đáo, 1 đổi 1 linh hoạt' },
-            { id: 'f4', icon: 'truck', title: 'Giao hàng hỏa tốc', description: 'Đồng kiểm máy trước khi thanh toán' },
-          ],
-        },
-      };
-    case 'cta':
-      return {
-        id,
-        type: 'cta',
-        name: 'Kêu Gọi Hành Động (CTA)',
-        enabled: true,
-        data: {
-          type: 'cta',
-          title: 'Bạn Cần Tư Vấn Cấu Hình Laptop Phù Hợp?',
-          subtitle: 'Chuyên viên CitiLap sẵn sàng tư vấn trực tiếp 1-1 qua Zalo hoặc Hotline.',
-          primaryText: 'Chat Zalo Ngay',
-          primaryLink: 'https://zalo.me',
-          phone: '0987654321',
-          secondaryText: 'Gọi Hotline',
-          secondaryLink: 'tel:0987654321',
-          bgImageUrl: '',
-        },
-      };
-  }
+function LayoutIconFallback(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
+    </svg>
+  );
 }
 
 export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
+  const confirm = useConfirm();
+  const toast = useToast();
+  const actorId = useAdminActorId();
+  const storageKey = `builder-${pageId}`;
+
   const [data, setData] = useState<LandingPageStudioResponse | null>(null);
+  const [expectedRevision, setExpectedRevision] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -283,12 +130,111 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   const [seoDesc, setSeoDesc] = useState('');
   const [ogImageAssetId, setOgImageAssetId] = useState<string | null>(null);
 
-  // Dirty detection
+  // Undo / Redo stacks for sections
+  const [past, setPast] = useState<SectionItem[][]>([]);
+  const [future, setFuture] = useState<SectionItem[][]>([]);
+  const sectionsRef = useRef<SectionItem[]>([]);
+  const pastRef = useRef<SectionItem[][]>([]);
+  const futureRef = useRef<SectionItem[][]>([]);
+  const lastHistoryPushRef = useRef<number>(0);
+
+  useEffect(() => {
+    sectionsRef.current = sections;
+  }, [sections]);
+
+  const cloneSections = useCallback((items: SectionItem[]): SectionItem[] => {
+    return typeof structuredClone === 'function'
+      ? structuredClone(items)
+      : JSON.parse(JSON.stringify(items));
+  }, []);
+
+  const applySectionsUpdate = useCallback(
+    (
+      updater: SectionItem[] | ((prev: SectionItem[]) => SectionItem[]),
+      options?: { coalesce?: boolean }
+    ) => {
+      const prev = sectionsRef.current;
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (next === prev) return;
+      const now = Date.now();
+      const shouldCoalesce = Boolean(
+        options?.coalesce && now - lastHistoryPushRef.current < 800
+      );
+      if (!shouldCoalesce) {
+        const snapshot = cloneSections(prev);
+        const nextPast = [...pastRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
+        pastRef.current = nextPast;
+        setPast(nextPast);
+        lastHistoryPushRef.current = now;
+      }
+      futureRef.current = [];
+      setFuture([]);
+      sectionsRef.current = next;
+      setSections(next);
+    },
+    [cloneSections]
+  );
+
+  const handleUndo = useCallback(() => {
+    if (pastRef.current.length === 0) return;
+    const nextPast = pastRef.current.slice(0, -1);
+    const previous = pastRef.current[pastRef.current.length - 1];
+    const currentSnap = cloneSections(sectionsRef.current);
+    const nextFuture = [currentSnap, ...futureRef.current.slice(0, MAX_HISTORY - 1)];
+
+    pastRef.current = nextPast;
+    futureRef.current = nextFuture;
+    sectionsRef.current = previous;
+    lastHistoryPushRef.current = 0;
+
+    setPast(nextPast);
+    setFuture(nextFuture);
+    setSections(previous);
+    setSelectedSectionId((sel) =>
+      sel && previous.some((s) => s.id === sel) ? sel : previous[0]?.id || null
+    );
+  }, [cloneSections]);
+
+  const handleRedo = useCallback(() => {
+    if (futureRef.current.length === 0) return;
+    const [next, ...restFuture] = futureRef.current;
+    const currentSnap = cloneSections(sectionsRef.current);
+    const nextPast = [...pastRef.current.slice(-(MAX_HISTORY - 1)), currentSnap];
+
+    pastRef.current = nextPast;
+    futureRef.current = restFuture;
+    sectionsRef.current = next;
+    lastHistoryPushRef.current = 0;
+
+    setPast(nextPast);
+    setFuture(restFuture);
+    setSections(next);
+    setSelectedSectionId((sel) =>
+      sel && next.some((s) => s.id === sel) ? sel : next[0]?.id || null
+    );
+  }, [cloneSections]);
+
+  // Dirty detection (memoized so JSON.stringify is not called twice on every render)
   const [initialJson, setInitialJson] = useState('');
-  const currentJson=JSON.stringify({sections,internalName,title,slug,seoTitle,seoDesc,ogImageAssetId});
-  const latest=useRef(currentJson),lock=useRef(false);
-  useEffect(()=>{latest.current=currentJson;},[currentJson]);
-  const isDirty = initialJson !== JSON.stringify({ sections, internalName, title, slug, seoTitle, seoDesc, ogImageAssetId });
+  const draftPayload = useMemo(
+    () => ({
+      sections,
+      internalName,
+      title,
+      slug,
+      seoTitle,
+      seoDesc,
+      ogImageAssetId,
+    }),
+    [sections, internalName, title, slug, seoTitle, seoDesc, ogImageAssetId]
+  );
+  const currentJson = useMemo(() => JSON.stringify(draftPayload), [draftPayload]);
+  const latest = useRef(currentJson);
+  const lock = useRef(false);
+  useEffect(() => {
+    latest.current = currentJson;
+  }, [currentJson]);
+  const isDirty = initialJson !== '' && initialJson !== currentJson;
 
   // Dialogs
   const [showAddMenu, setShowAddMenu] = useState(false);
@@ -299,11 +245,26 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
   const [previewViewport, setPreviewViewport] = useState<'desktop' | 'mobile'>('desktop');
   const [previewSections, setPreviewSections] = useState<ResolvedSectionItem[]>([]);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [showRevisionsModal, setShowRevisionsModal] = useState(false);
   const [revisions, setRevisions] = useState<RevisionItem[]>([]);
   const [revisionsLoading, setRevisionsLoading] = useState(false);
+  const [revisionsError, setRevisionsError] = useState<string | null>(null);
 
-  // Load initial page data
+  const previewTriggerRef = useRef<HTMLElement | null>(null);
+  const revisionsTriggerRef = useRef<HTMLElement | null>(null);
+
+  const closePreviewModal = useCallback(() => {
+    setShowPreviewModal(false);
+    previewTriggerRef.current?.focus();
+  }, []);
+
+  const closeRevisionsModal = useCallback(() => {
+    setShowRevisionsModal(false);
+    revisionsTriggerRef.current?.focus();
+  }, []);
+
+  // Load initial page data (without selectedSectionId in dependencies to prevent data loss on section click)
   const loadPageData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -312,30 +273,46 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res = await mediaRequest<any>(`/api/admin/builder/${pageId}`);
       setData(res);
+      setExpectedRevision(res.revision ?? 0);
 
       const doc = res.document || res;
-      setInternalName(doc.internalName || doc.name || '');
-      setTitle(doc.title || '');
-      setSlug(doc.slug || '');
-      setSeoTitle(doc.seo?.title || '');
-      setSeoDesc(doc.seo?.description || '');
-      setOgImageAssetId(doc.seo?.ogImageAssetId || null);
+      const nextInternalName = doc.internalName || doc.name || '';
+      const nextTitle = doc.title || '';
+      const nextSlug = doc.slug || '';
+      const nextSeoTitle = doc.seo?.title || '';
+      const nextSeoDesc = doc.seo?.description || '';
+      const nextOgAssetId = doc.seo?.ogImageAssetId || null;
+      const nextSections: SectionItem[] = doc.sections || [];
 
-      const loadedSections: SectionItem[] = doc.sections || [];
-      setSections(loadedSections);
+      setInternalName(nextInternalName);
+      setTitle(nextTitle);
+      setSlug(nextSlug);
+      setSeoTitle(nextSeoTitle);
+      setSeoDesc(nextSeoDesc);
+      setOgImageAssetId(nextOgAssetId);
 
-      if (loadedSections.length > 0 && !selectedSectionId) {
-        setSelectedSectionId(loadedSections[0].id);
-      }
+      sectionsRef.current = nextSections;
+      setSections(nextSections);
+      pastRef.current = [];
+      futureRef.current = [];
+      setPast([]);
+      setFuture([]);
+      lastHistoryPushRef.current = 0;
+
+      setSelectedSectionId((prev) =>
+        prev && nextSections.some((s) => s.id === prev)
+          ? prev
+          : nextSections[0]?.id || null
+      );
 
       const snapshot = JSON.stringify({
-        sections: loadedSections,
-        internalName: doc.internalName || doc.name || '',
-        title: doc.title || '',
-        slug: doc.slug || '',
-        seoTitle: doc.seo?.title || '',
-        seoDesc: doc.seo?.description || '',
-        ogImageAssetId: doc.seo?.ogImageAssetId || null,
+        sections: nextSections,
+        internalName: nextInternalName,
+        title: nextTitle,
+        slug: nextSlug,
+        seoTitle: nextSeoTitle,
+        seoDesc: nextSeoDesc,
+        ogImageAssetId: nextOgAssetId,
       });
       setInitialJson(snapshot);
     } catch (err: unknown) {
@@ -343,139 +320,180 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
     } finally {
       setLoading(false);
     }
-  }, [pageId, selectedSectionId]);
+  }, [pageId]);
 
   useEffect(() => {
     void Promise.resolve().then(loadPageData);
   }, [loadPageData]);
 
-  // Warning when leaving with unsaved changes
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isDirty) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isDirty]);
-
-  // Close popovers & menus on Escape key
+  // Close popovers & menus on Escape key, and handle Ctrl+Z / Ctrl+Y for Undo / Redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (mediaPickerTarget) setMediaPickerTarget(null);
         else if (productPickerTarget) setProductPickerTarget(null);
+        else if (postPickerTarget) setPostPickerTarget(null);
         else if (showAddMenu) setShowAddMenu(false);
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === 'z' && !e.shiftKey) {
+          if (pastRef.current.length > 0) {
+            e.preventDefault();
+            handleUndo();
+          }
+        } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+          if (futureRef.current.length > 0) {
+            e.preventDefault();
+            handleRedo();
+          }
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mediaPickerTarget, productPickerTarget, showAddMenu]);
+  }, [mediaPickerTarget, productPickerTarget, postPickerTarget, showAddMenu, handleUndo, handleRedo]);
 
-  const previewModalRef = useRef<HTMLDivElement>(null);
-  const previewTriggerRef = useRef<HTMLElement | null>(null);
-  const revisionsModalRef = useRef<HTMLDivElement>(null);
-  const revisionsTriggerRef = useRef<HTMLElement | null>(null);
-
-  const closePreviewModal = () => {
-    setShowPreviewModal(false);
-    previewTriggerRef.current?.focus();
-  };
-
-  const closeRevisionsModal = () => {
-    setShowRevisionsModal(false);
-    revisionsTriggerRef.current?.focus();
-  };
-
-  // Focus trap for Preview Modal
-  useEffect(() => {
-    if (!showPreviewModal) return;
-
-    const timer = setTimeout(() => {
-      const closeBtn = previewModalRef.current?.querySelector<HTMLElement>('button[aria-label="Đóng cửa sổ xem trước"]');
-      closeBtn?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closePreviewModal();
-        return;
+  // Restore local draft backup into sections, pageName (internalName / title), and pageSlug (slug)
+  const handleRestoreLocalDraft = useCallback(
+    (restoredDraft: unknown, meta: DraftRestoreMeta) => {
+      if (!restoredDraft || typeof restoredDraft !== 'object') return;
+      const d = restoredDraft as Record<string, unknown>;
+      if (Array.isArray(d.sections)) {
+        applySectionsUpdate(d.sections as SectionItem[]);
       }
-      if (e.key === 'Tab' && previewModalRef.current) {
-        const focusables = previewModalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      if (typeof d.internalName === 'string') setInternalName(d.internalName);
+      else if (typeof d.pageName === 'string') setInternalName(d.pageName);
+      if (typeof d.title === 'string') setTitle(d.title);
+      if (typeof d.slug === 'string') setSlug(d.slug);
+      else if (typeof d.pageSlug === 'string') setSlug(d.pageSlug);
+      if (typeof d.seoTitle === 'string') setSeoTitle(d.seoTitle);
+      if (typeof d.seoDesc === 'string') setSeoDesc(d.seoDesc);
+      if ('ogImageAssetId' in d) {
+        setOgImageAssetId(typeof d.ogImageAssetId === 'string' ? d.ogImageAssetId : null);
+      }
+      setExpectedRevision(meta.baseRevision);
+      if (meta.isStale) {
+        setConflictError(
+          `Đã khôi phục bản nháp từ phiên bản cũ (r${meta.baseRevision}, máy chủ hiện tại r${data?.revision ?? 0}). Lưu trực tiếp sẽ kiểm tra xung đột phiên bản để không ghi đè nhầm dữ liệu mới.`
         );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
+        toast.warning('Đã khôi phục bản nháp (phiên bản gốc cũ hơn máy chủ).');
+      } else {
+        setConflictError(null);
+        toast.success('Đã khôi phục bản nháp tạm từ trình duyệt.');
       }
-    };
+    },
+    [applySectionsUpdate, data?.revision, toast]
+  );
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [showPreviewModal]);
+  const draftRecovery = (
+    <DraftRecovery
+                    draft={draftPayload}
+                    endpoint={`/api/admin/builder/${pageId}`}
+                    storageKey={storageKey}
+                    currentRevision={expectedRevision}
+                    serverRevision={data?.revision ?? 0}
+                    dirty={isDirty}
+                    validateDraft={(candidate) => {
+                      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                        return { ok: false, error: 'Bản nháp Site Builder không đúng định dạng đối tượng.' };
+                      }
+                      const rec = candidate as Record<string, unknown>;
+                      if (!Array.isArray(rec.sections)) {
+                        return { ok: false, error: 'Thiếu danh sách khối nội dung (sections).' };
+                      }
+                      const docCandidate = {
+                        schemaVersion: 1 as const,
+                        internalName:
+                          typeof rec.internalName === 'string' && rec.internalName.trim()
+                            ? rec.internalName
+                            : 'draft',
+                        title:
+                          typeof rec.title === 'string' && rec.title.trim() ? rec.title : 'draft',
+                        slug:
+                          pageId === 'home'
+                            ? ''
+                            : typeof rec.slug === 'string' && rec.slug.trim()
+                            ? rec.slug
+                            : 'draft',
+                        seo: {
+                          title: typeof rec.seoTitle === 'string' ? rec.seoTitle : '',
+                          description: typeof rec.seoDesc === 'string' ? rec.seoDesc : '',
+                          ogImageAssetId:
+                            typeof rec.ogImageAssetId === 'string' ? rec.ogImageAssetId : null,
+                        },
+                        sections: rec.sections,
+                      };
+                      const parsed = landingPageDocumentSchema.safeParse(docCandidate);
+                      if (!parsed.success) {
+                        return {
+                          ok: false,
+                          error:
+                            parsed.error.issues[0]?.message ||
+                            'Cấu trúc khối nội dung Site Builder không hợp lệ.',
+                        };
+                      }
+                      return {
+                        ok: true,
+                        data: {
+                          sections: parsed.data.sections,
+                          internalName:
+                            typeof rec.internalName === 'string'
+                              ? rec.internalName
+                              : parsed.data.internalName,
+                          title: typeof rec.title === 'string' ? rec.title : parsed.data.title,
+                          slug:
+                            pageId === 'home'
+                              ? ''
+                              : typeof rec.slug === 'string'
+                              ? rec.slug
+                              : parsed.data.slug,
+                          seoTitle: parsed.data.seo.title,
+                          seoDesc: parsed.data.seo.description,
+                          ogImageAssetId: parsed.data.seo.ogImageAssetId,
+                        },
+                      };
+                    }}
+                    onRestoreLocal={handleRestoreLocalDraft}
+                  />
+  );
 
-  // Focus trap for Revisions Modal
-  useEffect(() => {
-    if (!showRevisionsModal) return;
-
-    const timer = setTimeout(() => {
-      const closeBtn = revisionsModalRef.current?.querySelector<HTMLElement>('button[aria-label="Đóng lịch sử phiên bản"]');
-      closeBtn?.focus();
-    }, 50);
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeRevisionsModal();
-        return;
-      }
-      if (e.key === 'Tab' && revisionsModalRef.current) {
-        const focusables = revisionsModalRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [showRevisionsModal]);
+  // Download draft JSON helper (used in conflict recovery)
+  const handleDownloadDraftJson = useCallback(() => {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(draftPayload, null, 2)], { type: 'application/json' })
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `builder-${pageId}-draft.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, [draftPayload, pageId]);
 
   // Section manipulation helpers
   const handleAddSection = (type: SectionType) => {
     const newSec = createDefaultSection(type);
-    setSections((prev) => [...prev, newSec]);
+    applySectionsUpdate((prev) => [...prev, newSec]);
     setSelectedSectionId(newSec.id);
     setShowAddMenu(false);
   };
 
   const handleDuplicateSection = (index: number) => {
     const sec = sections[index];
-    if (!sec) return;
+    if (!sec || SYSTEM_SECTION_IDS[sec.id]) return;
     const deepCopiedData =
       typeof structuredClone === 'function'
         ? structuredClone(sec.data)
@@ -488,25 +506,44 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
     } as SectionItem;
     const next = [...sections];
     next.splice(index + 1, 0, clone);
-    setSections(next);
+    applySectionsUpdate(next);
     setSelectedSectionId(clone.id);
+    toast.success(`Đã nhân bản khối "${sec.name}".`);
   };
 
-  const handleDeleteSection = (id: string) => {
+  const handleDeleteSection = async (id: string) => {
+    if (SYSTEM_SECTION_IDS[id]) return;
     const target = sections.find((s) => s.id === id);
-    const confirmMessage = target
-      ? `Bạn có chắc chắn muốn xóa khối "${target.name}"?`
-      : 'Bạn có chắc chắn muốn xóa khối này?';
-    if (!window.confirm(confirmMessage)) return;
+    const ok = await confirm({
+      title: 'Xóa khối nội dung?',
+      message: target
+        ? `Bạn có chắc chắn muốn xóa khối "${target.name}"?`
+        : 'Bạn có chắc chắn muốn xóa khối này?',
+      description: 'Bạn có thể bấm Hoàn tác (Ctrl+Z) nếu xóa nhầm.',
+      confirmLabel: 'Xóa khối',
+      cancelLabel: 'Hủy',
+      variant: 'destructive',
+    });
+    if (!ok) return;
+
     const next = sections.filter((s) => s.id !== id);
-    setSections(next);
+    applySectionsUpdate(next);
     if (selectedSectionId === id) {
       setSelectedSectionId(next[0]?.id || null);
     }
+    toast.show({
+      title: 'Đã xóa khối nội dung',
+      message: `Đã xóa khối "${target?.name || id}".`,
+      variant: 'info',
+      action: {
+        label: 'Hoàn tác',
+        onClick: () => handleUndo(),
+      },
+    });
   };
 
   const handleToggleVisible = (id: string) => {
-    setSections((prev) =>
+    applySectionsUpdate((prev) =>
       prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s))
     );
   };
@@ -517,45 +554,68 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
     const next = [...sections];
     const [moved] = next.splice(index, 1);
     next.splice(nextIndex, 0, moved);
-    setSections(next);
+    applySectionsUpdate(next);
   };
 
-  const updateSelectedSectionMeta = (patch: Partial<Pick<SectionItem, 'name' | 'enabled' | 'deviceVisibility'>>) => {
+  const updateSelectedSectionMeta = (
+    patch: Partial<Pick<SectionItem, 'name' | 'enabled' | 'deviceVisibility'>>
+  ) => {
     if (!selectedSectionId) return;
-    setSections((prev) =>
-      prev.map((s) => (s.id === selectedSectionId ? ({ ...s, ...patch } as SectionItem) : s))
+    applySectionsUpdate(
+      (prev) =>
+        prev.map((s) => (s.id === selectedSectionId ? ({ ...s, ...patch } as SectionItem) : s)),
+      { coalesce: true }
     );
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const updateSelectedSectionData = (patch: Record<string, any>) => {
     if (!selectedSectionId) return;
-    setSections((prev) =>
-      prev.map((s) => {
-        if (s.id !== selectedSectionId) return s;
-        return {
-          ...s,
-          data: {
-            ...s.data,
-            ...patch,
-          },
-        } as SectionItem;
-      })
+    applySectionsUpdate(
+      (prev) =>
+        prev.map((s) => {
+          if (s.id !== selectedSectionId) return s;
+          return {
+            ...s,
+            data: {
+              ...s.data,
+              ...patch,
+            },
+          } as SectionItem;
+        }),
+      { coalesce: true }
     );
   };
 
   // Save / Publish / Unpublish actions
   const handleSave = async (action: 'save' | 'publish' | 'unpublish') => {
     if (!data || lock.current) return false;
+    if (pageId === 'home' && action === 'unpublish') return false;
     if (action === 'publish') {
-      const confirmed = window.confirm(
-        'Bạn có chắc chắn muốn xuất bản ngay?\nThay đổi này sẽ hiển thị trực tiếp cho khách hàng trên website.'
-      );
+      if (pageId === 'home' && !sections.some((s) => s.enabled)) {
+        toast.error(
+          'Không thể xuất bản trang chủ không có khối nào đang bật — trang chủ sẽ tự quay về giao diện mặc định cũ. Hãy bật hoặc thêm ít nhất một khối.'
+        );
+        return false;
+      }
+      const confirmed = await confirm({
+        title: 'Xuất bản ngay?',
+        message:
+          'Bạn có chắc chắn muốn xuất bản ngay? Thay đổi này sẽ hiển thị trực tiếp cho khách hàng trên website.',
+        confirmLabel: 'Xuất bản ngay',
+        cancelLabel: 'Hủy',
+        variant: 'primary',
+      });
       if (!confirmed) return false;
     } else if (action === 'unpublish') {
-      const confirmed = window.confirm(
-        'Bạn có chắc chắn muốn gỡ xuất bản?\nTrang này sẽ chuyển về trạng thái lưu trữ/ẩn.'
-      );
+      const confirmed = await confirm({
+        title: 'Gỡ xuất bản trang?',
+        message:
+          'Bạn có chắc chắn muốn gỡ xuất bản? Trang này sẽ chuyển về trạng thái lưu trữ/ẩn và ngừng hiển thị công khai.',
+        confirmLabel: 'Gỡ xuất bản',
+        cancelLabel: 'Hủy',
+        variant: 'warning',
+      });
       if (!confirmed) return false;
     }
     lock.current = true;
@@ -566,7 +626,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
     setSuccessMsg(null);
 
     const payload = {
-      expectedRevision: data.revision ?? 0,
+      expectedRevision,
       action,
       document: {
         schemaVersion: 1,
@@ -591,15 +651,30 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       });
 
       setData(res);
+      setExpectedRevision(res.revision ?? 0);
       const doc = res.document || res;
-      if(latest.current===submitted){
-      setInternalName(doc.internalName || doc.name || '');
-      setTitle(doc.title || '');
-      setSlug(doc.slug || '');
-      setSeoTitle(doc.seo?.title || '');
-      setSeoDesc(doc.seo?.description || '');
-      setOgImageAssetId(doc.seo?.ogImageAssetId || null);
-      setSections(doc.sections || []);
+      if (latest.current === submitted) {
+        const nextSections: SectionItem[] = doc.sections || [];
+        setInternalName(doc.internalName || doc.name || '');
+        setTitle(doc.title || '');
+        setSlug(doc.slug || '');
+        setSeoTitle(doc.seo?.title || '');
+        setSeoDesc(doc.seo?.description || '');
+        setOgImageAssetId(doc.seo?.ogImageAssetId || null);
+        sectionsRef.current = nextSections;
+        setSections(nextSections);
+        clearCommittedLocalDraft(storageKey, JSON.parse(submitted), actorId);
+      } else {
+        try {
+          writeLocalDraftBackup(
+            storageKey,
+            JSON.parse(latest.current),
+            res.revision ?? 0,
+            actorId
+          );
+        } catch {
+          // Ignore parse/storage errors
+        }
       }
 
       const snapshot = JSON.stringify({
@@ -614,34 +689,52 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       setInitialJson(snapshot);
 
       if (action === 'publish') {
-        setSuccessMsg(`Xuất bản thành công! Đang hiển thị bản r${res.publishedRevision || res.revision}.`);
+        const msg = `Xuất bản thành công! Đang hiển thị bản r${res.publishedRevision || res.revision}.`;
+        setSuccessMsg(msg);
+        toast.success(msg);
       } else if (action === 'unpublish') {
-        setSuccessMsg('Đã hủy xuất bản trang.');
+        const msg = 'Đã hủy xuất bản trang.';
+        setSuccessMsg(msg);
+        toast.info(msg);
       } else {
-        setSuccessMsg(`Đã lưu bản nháp r${res.revision}.`);
+        const msg = `Đã lưu bản nháp r${res.revision}.`;
+        setSuccessMsg(msg);
+        toast.success(msg);
       }
       return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Lỗi khi lưu trang.';
-      if (msg.includes('409') || msg.includes('Xung đột') || msg.includes('CONFLICT')) {
+      if (err instanceof MediaRequestError && err.status === 409) {
         setConflictError(
-          'Xung đột phiên bản (409): Trang đã được sửa đổi ở nơi khác. Dữ liệu của bạn vẫn được giữ trên màn hình này. Hãy kiểm tra hoặc tải lại.'
+          'Xung đột phiên bản (409): Trang đã được sửa đổi ở nơi khác. Dữ liệu của bạn vẫn được giữ trên màn hình này. Bạn có thể tải bản nháp JSON để lưu trữ hoặc tải lại bản mới từ máy chủ.'
         );
+        toast.warning('Xung đột phiên bản (409): Trang đã được sửa ở nơi khác.');
       } else {
         setError(msg);
+        toast.error(msg);
       }
       return false;
     } finally {
-      lock.current=false;
+      lock.current = false;
       setSaving(false);
     }
   };
 
-  const autosaveStatus=useDraftAutosave(currentJson,data?.revision||0,!!data&&!loading,isDirty,saving,()=>handleSave('save'));
-  // Live Preview Modal
+  const autosaveStatus = useDraftAutosave(
+    draftPayload,
+    expectedRevision,
+    !!data && !loading,
+    isDirty,
+    saving,
+    () => handleSave('save'),
+    storageKey
+  );
+
+  // Live Preview Modal (surfaces validation errors clearly instead of silently falling back)
   const handleOpenPreview = async () => {
     setShowPreviewModal(true);
     setPreviewLoading(true);
+    setPreviewError(null);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res = await mediaRequest<any>(`/api/admin/builder/${pageId}/preview`, {
@@ -661,24 +754,32 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
         }),
       });
       setPreviewSections(res.sections || []);
-    } catch {
-      // Graceful fallback to client sections
-      setPreviewSections(sections as unknown as ResolvedSectionItem[]);
+    } catch (err: unknown) {
+      const errMsg =
+        err instanceof Error
+          ? err.message
+          : 'Không thể dựng bản xem trước do dữ liệu không hợp lệ.';
+      setPreviewError(errMsg);
+      setPreviewSections([]);
     } finally {
       setPreviewLoading(false);
     }
   };
 
-  // Revisions Modal
+  // Revisions Modal (stores error state and allows retry instead of swallowing errors)
   const handleOpenRevisions = async () => {
     setShowRevisionsModal(true);
     setRevisionsLoading(true);
+    setRevisionsError(null);
     try {
       const res = await mediaRequest<{ revisions: RevisionItem[] }>(
         `/api/admin/builder/${pageId}/revisions`
       );
       setRevisions(res.revisions || []);
-    } catch {
+    } catch (err: unknown) {
+      setRevisionsError(
+        err instanceof Error ? err.message : 'Không thể tải danh sách lịch sử phiên bản.'
+      );
       setRevisions([]);
     } finally {
       setRevisionsLoading(false);
@@ -697,7 +798,17 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
   const handleRestoreRevision = async (targetRev: number) => {
     if (!data || lock.current) return;
-    if (!confirm(`Bạn có chắc muốn khôi phục bản nháp từ phiên bản r${targetRev}?`)) return;
+    const confirmed = await confirm({
+      title: `Khôi phục phiên bản r${targetRev}?`,
+      message: `Bạn có chắc muốn khôi phục bản nháp từ phiên bản r${targetRev}?`,
+      description: isDirty
+        ? 'CẢNH BÁO: Bạn đang có các thay đổi chưa lưu! Việc khôi phục phiên bản cũ sẽ ghi đè toàn bộ thay đổi chưa lưu hiện tại.'
+        : 'Phiên bản được chọn sẽ được khôi phục thành bản nháp mới nhất.',
+      confirmLabel: 'Khôi phục phiên bản',
+      cancelLabel: 'Hủy',
+      variant: isDirty ? 'warning' : 'primary',
+    });
+    if (!confirmed) return;
 
     lock.current = true;
     setSaving(true);
@@ -713,9 +824,11 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       });
       closeRevisionsModal();
       await loadPageData();
-      setSuccessMsg(`Đã khôi phục thành công bản r${targetRev} thành bản nháp mới.`);
+      const msg = `Đã khôi phục thành công bản r${targetRev} thành bản nháp mới.`;
+      setSuccessMsg(msg);
+      toast.success(msg);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Lỗi khi khôi phục phiên bản.');
+      toast.error(err instanceof Error ? err.message : 'Lỗi khi khôi phục phiên bản.');
     } finally {
       lock.current = false;
       setSaving(false);
@@ -829,6 +942,31 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
+          {/* Undo / Redo Buttons */}
+          <div className="hidden sm:inline-flex items-center rounded-lg border border-slate-200 bg-white overflow-hidden">
+            <button
+              type="button"
+              disabled={past.length === 0}
+              onClick={handleUndo}
+              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 transition cursor-pointer"
+              title="Hoàn tác (Ctrl+Z)"
+              aria-label="Hoàn tác"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <div className="w-px h-4 bg-slate-200" />
+            <button
+              type="button"
+              disabled={future.length === 0}
+              onClick={handleRedo}
+              className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-30 transition cursor-pointer"
+              title="Làm lại (Ctrl+Y)"
+              aria-label="Làm lại"
+            >
+              <Redo2 className="w-4 h-4" />
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={openRevisionsModal}
@@ -850,18 +988,18 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
           <button
             type="button"
             disabled={saving || !isDirty}
-            onClick={() => handleSave('save')}
+            onClick={() => void handleSave('save')}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition disabled:opacity-40 cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{saving ? 'Đang lưu...' : 'Lưu nháp'}</span>
           </button>
 
-          {data?.status === 'PUBLISHED' && (
+          {data?.status === 'PUBLISHED' && pageId !== 'home' && (
             <button
               type="button"
               disabled={saving}
-              onClick={() => handleSave('unpublish')}
+              onClick={() => void handleSave('unpublish')}
               className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition disabled:opacity-40 cursor-pointer"
             >
               <EyeOff className="w-3.5 h-3.5" />
@@ -872,7 +1010,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
           <button
             type="button"
             disabled={saving}
-            onClick={() => handleSave('publish')}
+            onClick={() => void handleSave('publish')}
             className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition disabled:opacity-40 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
@@ -900,17 +1038,29 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       )}
 
       {conflictError && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between text-xs text-amber-900">
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>{conflictError}</span>
           </div>
-          <button
-            onClick={loadPageData}
-            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold cursor-pointer"
-          >
-            Tải lại bản mới nhất
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleDownloadDraftJson}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-amber-100 border border-amber-300 text-amber-900 rounded text-xs font-semibold cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Tải bản nháp JSON</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void loadPageData()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-bold cursor-pointer"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Tải lại bản mới từ máy chủ</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -973,38 +1123,10 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     <span>Thêm khối</span>
                   </button>
 
-                  {/* Add Dropdown Menu */}
-                  {showAddMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-2 z-30 space-y-1">
-                      <div className="px-2 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        Chọn loại khối
-                      </div>
-                      {(Object.keys(SECTION_TYPE_META) as SectionType[]).map((type) => {
-                        const meta = SECTION_TYPE_META[type];
-                        const Icon = meta.icon;
-                        return (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => handleAddSection(type)}
-                            className="w-full flex items-start gap-2.5 p-2 rounded-lg hover:bg-blue-50/70 text-left transition group cursor-pointer"
-                          >
-                            <span className="p-1.5 rounded-md bg-slate-100 text-slate-600 group-hover:bg-blue-600 group-hover:text-white transition">
-                              <Icon className="w-4 h-4" />
-                            </span>
-                            <div>
-                              <div className="text-xs font-bold text-slate-800 group-hover:text-blue-700">
-                                {meta.label}
-                              </div>
-                              <div className="text-[11px] text-slate-500 leading-tight">
-                                {meta.desc}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <BuilderAddSectionModal
+                    open={showAddMenu}
+                    onAddSection={handleAddSection}
+                  />
                 </div>
               </div>
 
@@ -1023,36 +1145,7 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     };
                     const Icon = meta.icon;
                     const isSelected = sec.id === selectedSectionId;
-
-                    let blockSummary = meta.label;
-                    if (sec.data.type === 'banner') {
-                      blockSummary = `Banner (${sec.data.layout || 'hero'})`;
-                    } else if (sec.data.type === 'intro') {
-                      const count = (sec.data.features || []).filter((f) => f.enabled !== false).length;
-                      blockSummary = `Cam kết dịch vụ • ${count} ô`;
-                    } else if (sec.data.type === 'featured_categories') {
-                      const count = (sec.data.items || []).filter((i) => i.enabled !== false).length || sec.data.categoryIds?.length || 0;
-                      blockSummary = `${sec.data.layout === 'board' ? 'Bảng phân loại' : 'Thẻ danh mục'} • ${count} mục`;
-                    } else if (sec.data.type === 'product_grid') {
-                      if (sec.id === 'sec-hot-sale') {
-                        blockSummary = `HOT SALE / Flash Sale`;
-                      } else if (sec.data.tabs?.length) {
-                        const tabCount = sec.data.tabs.filter((t) => t.enabled !== false).length;
-                        blockSummary = `Khối Tab sản phẩm • ${tabCount} tab`;
-                      } else {
-                        const lim = sec.data.ruleCriteria?.limit || 12;
-                        const linkCount = sec.data.links?.length || 0;
-                        blockSummary = `${sec.data.sourceMode === 'manual' ? `Thủ công (${sec.data.manualProductIds?.length || 0})` : 'Tự động'} • Tối đa ${lim} SP${linkCount ? ` • ${linkCount} link` : ''}`;
-                      }
-                    } else if (sec.data.type === 'video_reviews') {
-                      const count = (sec.data.videos || []).filter((v) => v.enabled !== false).length;
-                      blockSummary = `Video Review • ${count} video`;
-                    } else if (sec.data.type === 'news_reviews') {
-                      blockSummary = `Tin tức Media • Tối đa ${sec.data.limit || 5} bài`;
-                    } else if (sec.data.type === 'customer_gallery') {
-                      const count = (sec.data.images || []).filter((i) => i.enabled !== false).length;
-                      blockSummary = `Ảnh khách hàng • ${count} ảnh`;
-                    }
+                    const blockSummary = getSectionBlockSummary(sec, meta.label);
 
                     return (
                       <div
@@ -1078,8 +1171,11 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                             <Icon className="w-4 h-4" />
                           </span>
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-900 truncate">
-                              {sec.name || meta.label}
+                            <div className="text-xs font-bold text-slate-900 truncate flex items-center gap-1">
+                              {SYSTEM_SECTION_IDS[sec.id] && (
+                                <Lock className="w-3 h-3 text-slate-400 shrink-0" aria-label="Khối hệ thống" />
+                              )}
+                              <span className="truncate">{sec.name || meta.label}</span>
                             </div>
                             <div className="text-[10px] text-slate-500 truncate">
                               {blockSummary}
@@ -1103,7 +1199,11 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                             className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
                               sec.enabled ? 'bg-emerald-500' : 'bg-slate-300'
                             }`}
-                            title={sec.enabled ? 'Đang bật hiển thị (Bấm để ẩn khối)' : 'Đang ẩn (Bấm để bật hiển thị khối)'}
+                            title={
+                              sec.enabled
+                                ? 'Đang bật hiển thị (Bấm để ẩn khối)'
+                                : 'Đang ẩn (Bấm để bật hiển thị khối)'
+                            }
                           >
                             <span
                               className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
@@ -1131,17 +1231,21 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                           </button>
                           <button
                             type="button"
+                            disabled={Boolean(SYSTEM_SECTION_IDS[sec.id])}
                             onClick={() => handleDuplicateSection(idx)}
-                            className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100 cursor-pointer"
-                            title="Nhân bản"
+                            className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-slate-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                            title={SYSTEM_SECTION_IDS[sec.id] || 'Nhân bản'}
+                            aria-label="Nhân bản"
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDeleteSection(sec.id)}
-                            className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100 cursor-pointer"
-                            title="Xóa khối"
+                            disabled={Boolean(SYSTEM_SECTION_IDS[sec.id])}
+                            onClick={() => void handleDeleteSection(sec.id)}
+                            className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-slate-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                            title={SYSTEM_SECTION_IDS[sec.id] || 'Xóa khối'}
+                            aria-label="Xóa khối"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1168,6 +1272,10 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     </p>
                   </div>
                 )}
+
+                <div className="pt-2">
+                  {draftRecovery}
+                </div>
               </div>
             </div>
           ) : (
@@ -1269,15 +1377,10 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                 />
               </div>
 
-              {isDirty && (
-                <div className="pt-3 border-t border-slate-200">
-                  <h4 className="font-bold text-slate-800 text-sm mb-2">Sao lưu & Khôi phục nháp</h4>
-                  <DraftRecovery
-                    draft={JSON.parse(currentJson)}
-                    endpoint={`/api/admin/builder/${pageId}`}
-                  />
-                </div>
-              )}
+              <div className="pt-3 border-t border-slate-200">
+                <h4 className="font-bold text-slate-800 text-sm mb-2">Sao lưu & Khôi phục nháp</h4>
+                {draftRecovery}
+              </div>
             </div>
           )}
         </aside>
@@ -1322,7 +1425,9 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                 {/* Common Section Name & Device Visibility fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1 text-xs">Tên khối nội dung (Quản trị)</label>
+                    <label className="font-bold text-slate-700 block mb-1 text-xs">
+                      Tên khối nội dung (Quản trị)
+                    </label>
                     <input
                       type="text"
                       value={selectedSection.name}
@@ -1332,7 +1437,9 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                     />
                   </div>
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1 text-xs">Hiển thị theo thiết bị (PC / Smartphone SP)</label>
+                    <label className="font-bold text-slate-700 block mb-1 text-xs">
+                      Hiển thị theo thiết bị (PC / Smartphone SP)
+                    </label>
                     <select
                       value={selectedSection.deviceVisibility || 'all'}
                       onChange={(e) =>
@@ -1364,7 +1471,9 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
                       onPickMedia={(slideIdx) => setMediaPickerTarget(`slide_image:${slideIdx}`)}
-                      onPickMobileMedia={(slideIdx) => setMediaPickerTarget(`slide_mobile_image:${slideIdx}`)}
+                      onPickMobileMedia={(slideIdx) =>
+                        setMediaPickerTarget(`slide_mobile_image:${slideIdx}`)
+                      }
                     />
                   )}
                   {selectedSection.data.type === 'product_grid' && (
@@ -1452,65 +1561,103 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
             <MediaBrowser
               picker
               onSelect={(asset) => {
-              if (mediaPickerTarget === 'banner_image' && selectedSection?.data.type === 'banner') {
-                updateSelectedSectionData({ imageUrl: asset.url || '', imageAssetId: asset.id });
-              } else if (mediaPickerTarget === 'banner_mobile_image' && selectedSection?.data.type === 'banner') {
-                updateSelectedSectionData({ mobileImageUrl: asset.url || '', mobileImageAssetId: asset.id });
-              } else if (mediaPickerTarget === 'og_image') {
-                setOgImageAssetId(asset.id);
-              } else if (mediaPickerTarget === 'cta_bg_image' && selectedSection?.data.type === 'cta') {
-                updateSelectedSectionData({ bgImageUrl: asset.url || '' });
-              } else if (mediaPickerTarget.startsWith('cat_item_image:') && selectedSection?.data.type === 'featured_categories') {
-                const cIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
-                const items = [...(selectedSection.data.items || [])];
-                if (items[cIdx]) {
-                  items[cIdx] = { ...items[cIdx], customImage: asset.url || '' };
-                  updateSelectedSectionData({ items });
+                if (mediaPickerTarget === 'banner_image' && selectedSection?.data.type === 'banner') {
+                  updateSelectedSectionData({ imageUrl: asset.url || '', imageAssetId: asset.id });
+                } else if (
+                  mediaPickerTarget === 'banner_mobile_image' &&
+                  selectedSection?.data.type === 'banner'
+                ) {
+                  updateSelectedSectionData({
+                    mobileImageUrl: asset.url || '',
+                    mobileImageAssetId: asset.id,
+                  });
+                } else if (mediaPickerTarget === 'og_image') {
+                  setOgImageAssetId(asset.id);
+                } else if (mediaPickerTarget === 'cta_bg_image' && selectedSection?.data.type === 'cta') {
+                  updateSelectedSectionData({ bgImageUrl: asset.url || '' });
+                } else if (
+                  mediaPickerTarget.startsWith('cat_item_image:') &&
+                  selectedSection?.data.type === 'featured_categories'
+                ) {
+                  const cIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                  const items = [...(selectedSection.data.items || [])];
+                  if (items[cIdx]) {
+                    items[cIdx] = { ...items[cIdx], customImage: asset.url || '' };
+                    updateSelectedSectionData({ items });
+                  }
+                } else if (
+                  mediaPickerTarget.startsWith('brand_logo:') &&
+                  selectedSection?.data.type === 'featured_brands'
+                ) {
+                  const bIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                  const items = [...(selectedSection.data.items || [])];
+                  if (items[bIdx]) {
+                    items[bIdx] = { ...items[bIdx], logo: asset.url || '' };
+                    updateSelectedSectionData({ items });
+                  }
+                } else if (
+                  mediaPickerTarget.startsWith('slide_image:') &&
+                  selectedSection?.data.type === 'slider'
+                ) {
+                  const sIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                  const slides = [...(selectedSection.data.slides || [])];
+                  if (slides[sIdx]) {
+                    slides[sIdx] = {
+                      ...slides[sIdx],
+                      imageUrl: asset.url || '',
+                      imageAssetId: asset.id,
+                    };
+                    updateSelectedSectionData({ slides });
+                  }
+                } else if (
+                  mediaPickerTarget.startsWith('slide_mobile_image:') &&
+                  selectedSection?.data.type === 'slider'
+                ) {
+                  const sIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                  const slides = [...(selectedSection.data.slides || [])];
+                  if (slides[sIdx]) {
+                    slides[sIdx] = {
+                      ...slides[sIdx],
+                      mobileImageUrl: asset.url || '',
+                      mobileImageAssetId: asset.id,
+                    };
+                    updateSelectedSectionData({ slides });
+                  }
+                } else if (
+                  mediaPickerTarget.startsWith('video_thumb:') &&
+                  selectedSection?.data.type === 'video_reviews'
+                ) {
+                  const vIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                  const videos = [...(selectedSection.data.videos || [])];
+                  if (videos[vIdx]) {
+                    videos[vIdx] = { ...videos[vIdx], thumbnail: asset.url || '' };
+                    updateSelectedSectionData({ videos });
+                  }
+                } else if (
+                  mediaPickerTarget.startsWith('gallery_image:') &&
+                  selectedSection?.data.type === 'customer_gallery'
+                ) {
+                  const gIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                  const images = [...(selectedSection.data.images || [])];
+                  if (images[gIdx]) {
+                    images[gIdx] = { ...images[gIdx], url: asset.url || '' };
+                    updateSelectedSectionData({ images });
+                  }
+                } else if (
+                  mediaPickerTarget === 'gallery_image_add' &&
+                  selectedSection?.data.type === 'customer_gallery'
+                ) {
+                  const current = selectedSection.data.images || [];
+                  updateSelectedSectionData({
+                    images: [
+                      ...current,
+                      { url: asset.url || '', alt: 'Khách hàng CitiLap', enabled: true },
+                    ],
+                  });
                 }
-              } else if (mediaPickerTarget.startsWith('brand_logo:') && selectedSection?.data.type === 'featured_brands') {
-                const bIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
-                const items = [...(selectedSection.data.items || [])];
-                if (items[bIdx]) {
-                  items[bIdx] = { ...items[bIdx], logo: asset.url || '' };
-                  updateSelectedSectionData({ items });
-                }
-              } else if (mediaPickerTarget.startsWith('slide_image:') && selectedSection?.data.type === 'slider') {
-                const sIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
-                const slides = [...(selectedSection.data.slides || [])];
-                if (slides[sIdx]) {
-                  slides[sIdx] = { ...slides[sIdx], imageUrl: asset.url || '', imageAssetId: asset.id };
-                  updateSelectedSectionData({ slides });
-                }
-              } else if (mediaPickerTarget.startsWith('slide_mobile_image:') && selectedSection?.data.type === 'slider') {
-                const sIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
-                const slides = [...(selectedSection.data.slides || [])];
-                if (slides[sIdx]) {
-                  slides[sIdx] = { ...slides[sIdx], mobileImageUrl: asset.url || '', mobileImageAssetId: asset.id };
-                  updateSelectedSectionData({ slides });
-                }
-              } else if (mediaPickerTarget.startsWith('video_thumb:') && selectedSection?.data.type === 'video_reviews') {
-                const vIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
-                const videos = [...(selectedSection.data.videos || [])];
-                if (videos[vIdx]) {
-                  videos[vIdx] = { ...videos[vIdx], thumbnail: asset.url || '' };
-                  updateSelectedSectionData({ videos });
-                }
-              } else if (mediaPickerTarget.startsWith('gallery_image:') && selectedSection?.data.type === 'customer_gallery') {
-                const gIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
-                const images = [...(selectedSection.data.images || [])];
-                if (images[gIdx]) {
-                  images[gIdx] = { ...images[gIdx], url: asset.url || '' };
-                  updateSelectedSectionData({ images });
-                }
-              } else if (mediaPickerTarget === 'gallery_image_add' && selectedSection?.data.type === 'customer_gallery') {
-                const current = selectedSection.data.images || [];
-                updateSelectedSectionData({
-                  images: [...current, { url: asset.url || '', alt: 'Khách hàng CitiLap', enabled: true }],
-                });
-              }
-              setMediaPickerTarget(null);
-            }}
-          />
+                setMediaPickerTarget(null);
+              }}
+            />
           </div>
         </MediaDialog>
       )}
@@ -1558,3711 +1705,28 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
       )}
 
       {/* 5. PREVIEW MODAL */}
-      {showPreviewModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="preview-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closePreviewModal();
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 sm:p-6"
-        >
-          <div
-            ref={previewModalRef}
-            className="bg-white rounded-2xl w-full max-w-6xl h-[90vh] flex flex-col shadow-2xl overflow-hidden"
-          >
-            {/* Modal Header */}
-            <div className="h-14 px-5 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-blue-600" />
-                <span id="preview-modal-title" className="text-sm font-bold text-slate-900">
-                  Xem trước bản dựng
-                </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                  DRAFT PREVIEW
-                </span>
-              </div>
-
-              {/* Viewport switch */}
-              <div className="flex items-center gap-1 bg-white border border-slate-200 p-0.5 rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setPreviewViewport('desktop')}
-                  className={`p-1.5 rounded flex items-center gap-1 text-xs font-semibold cursor-pointer ${
-                    previewViewport === 'desktop'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Monitor className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Desktop</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreviewViewport('mobile')}
-                  className={`p-1.5 rounded flex items-center gap-1 text-xs font-semibold cursor-pointer ${
-                    previewViewport === 'mobile'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Smartphone className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Mobile (390px)</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={closePreviewModal}
-                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
-                aria-label="Đóng cửa sổ xem trước"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body with Renderer */}
-            <div className="flex-1 overflow-y-auto bg-slate-200 flex justify-center p-4">
-              <div
-                className={`bg-white shadow-xl transition-all overflow-y-auto ${
-                  previewViewport === 'mobile'
-                    ? 'w-[390px] min-h-[700px] rounded-3xl border-8 border-slate-800'
-                    : 'w-full max-w-5xl rounded-xl'
-                }`}
-              >
-                {previewLoading ? (
-                  <div className="flex items-center justify-center p-20 text-slate-400 text-sm">
-                    Đang dựng bản xem trước với dữ liệu thực tế...
-                  </div>
-                ) : (
-                  <div className="p-4 sm:p-6 space-y-6">
-                    <WishlistProvider>
-                      <CompareProvider>
-                        <BlockRenderer sections={previewSections} />
-                      </CompareProvider>
-                    </WishlistProvider>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <BuilderPreviewModal
+        open={showPreviewModal}
+        pageId={pageId}
+        viewport={previewViewport}
+        onViewportChange={setPreviewViewport}
+        sections={previewSections}
+        loading={previewLoading}
+        error={previewError}
+        onRetry={() => void handleOpenPreview()}
+        onClose={closePreviewModal}
+      />
 
       {/* 6. REVISIONS MODAL */}
-      {showRevisionsModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="revisions-modal-title"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeRevisionsModal();
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
-        >
-          <div
-            ref={revisionsModalRef}
-            className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
-          >
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-blue-600" />
-                <h3 id="revisions-modal-title" className="text-sm font-bold text-slate-900">
-                  Lịch sử các phiên bản
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={closeRevisionsModal}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded cursor-pointer"
-                aria-label="Đóng lịch sử phiên bản"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {revisionsLoading ? (
-                <p className="text-center text-slate-400 text-xs py-8">Đang tải lịch sử...</p>
-              ) : revisions.length === 0 ? (
-                <p className="text-center text-slate-400 text-xs py-8">Chưa có lịch sử phiên bản nào.</p>
-              ) : (
-                revisions.map((rev) => (
-                  <div
-                    key={rev.id}
-                    className="p-3 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div>
-                      <div className="font-bold text-slate-800 flex items-center gap-1.5">
-                        <span>Phiên bản r{rev.revision}</span>
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 uppercase">
-                          {rev.action}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">
-                        {new Date(rev.createdAt).toLocaleString('vi-VN')} • Bởi {rev.actor}
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRestoreRevision(rev.revision)}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer"
-                    >
-                      Khôi phục
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <BuilderRevisionsModal
+        open={showRevisionsModal}
+        revisions={revisions}
+        loading={revisionsLoading}
+        error={revisionsError}
+        onRetry={() => void handleOpenRevisions()}
+        onRestore={(rev) => void handleRestoreRevision(rev)}
+        onClose={closeRevisionsModal}
+      />
     </div>
   );
 }
-
-function LayoutIconFallback(props: React.SVGProps<SVGSVGElement>) {
-  return <LayoutGrid {...props} />;
-}
-
-function LayoutGrid(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <rect width="7" height="7" x="3" y="3" rx="1" />
-      <rect width="7" height="7" x="14" y="3" rx="1" />
-      <rect width="7" height="7" x="14" y="14" rx="1" />
-      <rect width="7" height="7" x="3" y="14" rx="1" />
-    </svg>
-  );
-}
-
-function ProductSelectorDialog({
-  onClose,
-  onSelect,
-}: {
-  onClose: () => void;
-  onSelect: (p: ProductItem) => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<{ items: ProductItem[]; hasMore: boolean } | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let ignore = false;
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await mediaRequest<{ items: ProductItem[]; hasMore: boolean }>(
-          `/api/admin/navigation/products?q=${encodeURIComponent(query)}&page=${page}`
-        );
-        if (!ignore) {
-          setData(res);
-          setLoading(false);
-        }
-      } catch {
-        if (!ignore) setLoading(false);
-      }
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      ignore = true;
-    };
-  }, [query, page]);
-
-  return (
-    <MediaDialog title="Chọn sản phẩm vào lưới" onClose={onClose}>
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Tìm kiếm theo tên sản phẩm..."
-            className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-
-        <div className="max-h-60 overflow-y-auto space-y-1">
-          {loading ? (
-            <p className="text-center text-slate-400 text-xs py-6">Đang tìm kiếm...</p>
-          ) : !data || data.items.length === 0 ? (
-            <p className="text-center text-slate-400 text-xs py-6">Không tìm thấy sản phẩm nào.</p>
-          ) : (
-            data.items.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  onSelect(p);
-                  onClose();
-                }}
-                className="w-full flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50 text-left transition cursor-pointer"
-              >
-                <div>
-                  <div className="text-xs font-bold text-slate-900">{p.name}</div>
-                  <div className="text-[10px] text-slate-500 font-mono">ID: {p.id}</div>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    p.status === 'ACTIVE'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {p.status === 'ACTIVE' ? 'Đã xuất bản' : 'Bản nháp'}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-
-        {data && (
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-30"
-            >
-              Trang trước
-            </button>
-            <span className="text-slate-500">Trang {page}</span>
-            <button
-              type="button"
-              disabled={!data.hasMore}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-30"
-            >
-              Trang sau
-            </button>
-          </div>
-        )}
-      </div>
-    </MediaDialog>
-  );
-}
-
-interface PostItem {
-  id: string;
-  title: string;
-  slug: string;
-  status: string;
-}
-
-function PostSelectorDialog({
-  onClose,
-  onSelect,
-}: {
-  onClose: () => void;
-  onSelect: (p: PostItem) => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<{ items: PostItem[]; total: number } | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let ignore = false;
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await mediaRequest<{ items: PostItem[]; total: number }>(
-          `/api/admin/posts?q=${encodeURIComponent(query)}&page=${page}&limit=10`
-        );
-        if (!ignore) {
-          setData(res);
-          setLoading(false);
-        }
-      } catch {
-        if (!ignore) setLoading(false);
-      }
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      ignore = true;
-    };
-  }, [query, page]);
-
-  return (
-    <MediaDialog title="Chọn bài viết công nghệ / media" onClose={onClose}>
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Tìm kiếm bài viết theo tiêu đề..."
-            className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-
-        <div className="max-h-60 overflow-y-auto space-y-1">
-          {loading ? (
-            <p className="text-center text-slate-400 text-xs py-6">Đang tìm kiếm...</p>
-          ) : !data || data.items.length === 0 ? (
-            <p className="text-center text-slate-400 text-xs py-6">Không tìm thấy bài viết nào.</p>
-          ) : (
-            data.items.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  onSelect(p);
-                  onClose();
-                }}
-                className="w-full flex items-center justify-between p-2.5 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50 text-left transition cursor-pointer"
-              >
-                <div>
-                  <div className="text-xs font-bold text-slate-900">{p.title}</div>
-                  <div className="text-[10px] text-slate-500 font-mono">/news/{p.slug}</div>
-                </div>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    p.status === 'PUBLISHED'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {p.status === 'PUBLISHED' ? 'Đã xuất bản' : 'Bản nháp'}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-
-        {data && (
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200 text-xs">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-30 cursor-pointer"
-            >
-              Trang trước
-            </button>
-            <span className="text-slate-500">
-              Trang {page} ({data.total} bài)
-            </span>
-            <button
-              type="button"
-              disabled={page * 10 >= data.total}
-              onClick={() => setPage((p) => p + 1)}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 rounded disabled:opacity-30 cursor-pointer"
-            >
-              Trang sau
-            </button>
-          </div>
-        )}
-      </div>
-    </MediaDialog>
-  );
-}
-
-interface CategoryOption {
-  id: string;
-  name: string;
-  slug: string;
-  parentId?: string | null;
-  image?: string | null;
-}
-interface BrandOption {
-  id: string;
-  name: string;
-  slug: string;
-  logo?: string | null;
-  description?: string | null;
-}
-interface PostCategoryOption {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-function useCatalogOptions() {
-  const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [brands, setBrands] = useState<BrandOption[]>([]);
-  const [postCategories, setPostCategories] = useState<PostCategoryOption[]>([]);
-
-  useEffect(() => {
-    let ignore = false;
-    async function load() {
-      try {
-        const [navRes, brandRes, postCatRes] = await Promise.allSettled([
-          mediaRequest<{ document?: { categories?: CategoryOption[] } }>('/api/admin/navigation'),
-          mediaRequest<{ items: BrandOption[] }>('/api/admin/brands?status=ACTIVE'),
-          mediaRequest<PostCategoryOption[]>('/api/admin/post-categories?status=ACTIVE'),
-        ]);
-        if (!ignore) {
-          if (navRes.status === 'fulfilled' && navRes.value?.document?.categories) {
-            setCategories(navRes.value.document.categories);
-          }
-          if (brandRes.status === 'fulfilled' && Array.isArray(brandRes.value?.items)) {
-            setBrands(brandRes.value.items);
-          }
-          if (postCatRes.status === 'fulfilled' && Array.isArray(postCatRes.value)) {
-            setPostCategories(postCatRes.value);
-          }
-        }
-      } catch {
-        // fail-soft
-      }
-    }
-    void load();
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  return { categories, brands, postCategories };
-}
-
-// ==========================================
-// TYPED FORM SUB-COMPONENTS FOR 9 SECTION TYPES
-// ==========================================
-
-type BannerData = Extract<SectionItem['data'], { type: 'banner' }>;
-type SliderData = Extract<SectionItem['data'], { type: 'slider' }>;
-type ProductGridData = Extract<SectionItem['data'], { type: 'product_grid' }>;
-type FeaturedCategoriesData = Extract<SectionItem['data'], { type: 'featured_categories' }>;
-type FeaturedBrandsData = Extract<SectionItem['data'], { type: 'featured_brands' }>;
-type FeaturedCollectionData = Extract<SectionItem['data'], { type: 'featured_collection' }>;
-type NewsReviewsData = Extract<SectionItem['data'], { type: 'news_reviews' }>;
-type IntroData = Extract<SectionItem['data'], { type: 'intro' }>;
-type CtaData = Extract<SectionItem['data'], { type: 'cta' }>;
-type VideoReviewsData = Extract<SectionItem['data'], { type: 'video_reviews' }>;
-type CustomerGalleryData = Extract<SectionItem['data'], { type: 'customer_gallery' }>;
-
-function BannerForm({
-  data,
-  update,
-  onPickMedia,
-  onPickMobileMedia,
-}: {
-  data: BannerData;
-  update: (p: Partial<BannerData>) => void;
-  onPickMedia: () => void;
-  onPickMobileMedia: () => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề banner (PC / Mặc định)</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Tiêu đề chính..."
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Huy hiệu (Badge)</label>
-          <input
-            type="text"
-            value={data.badge || ''}
-            onChange={(e) => update({ badge: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Ví dụ: Giảm giá sốc"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Mô tả phụ (Subtitle)</label>
-        <input
-          type="text"
-          value={data.subtitle || ''}
-          onChange={(e) => update({ subtitle: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Mô tả ngắn gọn"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Bố cục (Layout)</label>
-          <select
-            value={data.layout || 'hero'}
-            onChange={(e) => update({ layout: e.target.value as 'hero' | 'split' | 'fullwidth' })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          >
-            <option value="hero">Hero (Toàn cảnh nổi bật)</option>
-            <option value="split">Split (Chia 2 cột)</option>
-            <option value="fullwidth">Full Width (Rộng toàn màn)</option>
-          </select>
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Ảnh Banner trên PC (URL)</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={data.imageUrl || ''}
-              onChange={(e) => update({ imageUrl: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-              placeholder="/brand/citilap-hero.webp hoặc https://..."
-            />
-            <button
-              type="button"
-              onClick={onPickMedia}
-              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
-            >
-              Chọn ảnh
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {data.imageUrl && (
-        <div className="h-32 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={data.imageUrl} alt="Banner Preview" className="w-full h-full object-cover" />
-        </div>
-      )}
-
-      {/* Smartphone (SP) Custom Content & Image */}
-      <div className="p-3.5 rounded-xl border border-blue-200 bg-blue-50/40 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 font-bold text-blue-900 text-xs">
-            <Smartphone className="w-4 h-4 text-blue-600" />
-            <span>Tùy chỉnh riêng cho Smartphone (SP)</span>
-          </div>
-          <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={Boolean(data.hideOverlayOnMobile)}
-              onChange={(e) => update({ hideOverlayOnMobile: e.target.checked })}
-              className="rounded text-blue-600"
-            />
-            <span>Ẩn chữ đè lên ảnh trên SP</span>
-          </label>
-        </div>
-
-        <div>
-          <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
-            Ảnh Banner riêng cho Smartphone (SP) — để trống sẽ tự dùng ảnh tối ưu cho SP
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={data.mobileImageUrl || ''}
-              onChange={(e) => update({ mobileImageUrl: e.target.value })}
-              className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
-              placeholder="/brand/citilap-hero-mobile.webp hoặc chọn ảnh từ thư viện..."
-            />
-            <button
-              type="button"
-              onClick={onPickMobileMedia}
-              className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
-            >
-              Chọn ảnh SP
-            </button>
-          </div>
-          {data.mobileImageUrl && (
-            <div className="mt-2 h-28 w-44 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={data.mobileImageUrl} alt="Mobile Banner Preview" className="w-full h-full object-cover" />
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
-              Tiêu đề ngắn gọn trên SP (tùy chọn)
-            </label>
-            <input
-              type="text"
-              value={data.mobileTitle || ''}
-              onChange={(e) => update({ mobileTitle: e.target.value })}
-              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
-              placeholder="Để trống nếu dùng chung tiêu đề PC"
-            />
-          </div>
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1 text-[11px]">
-              Mô tả ngắn trên SP (tùy chọn)
-            </label>
-            <input
-              type="text"
-              value={data.mobileSubtitle || ''}
-              onChange={(e) => update({ mobileSubtitle: e.target.value })}
-              className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
-              placeholder="Để trống nếu dùng chung mô tả PC"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Chữ nút chính (Primary CTA)</label>
-          <input
-            type="text"
-            value={data.buttonText || ''}
-            onChange={(e) => update({ buttonText: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Khám phá ngay"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Liên kết nút chính</label>
-          <input
-            type="text"
-            value={data.link || ''}
-            onChange={(e) => update({ link: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="/laptop-gaming"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Chữ nút phụ (Secondary CTA)</label>
-          <input
-            type="text"
-            value={data.secondaryButtonText || ''}
-            onChange={(e) => update({ secondaryButtonText: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Xem thêm"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Liên kết nút phụ</label>
-          <input
-            type="text"
-            value={data.secondaryLink || ''}
-            onChange={(e) => update({ secondaryLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="/laptop-van-phong"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SliderForm({
-  data,
-  update,
-  onPickMedia,
-  onPickMobileMedia,
-}: {
-  data: SliderData;
-  update: (p: Partial<SliderData>) => void;
-  onPickMedia: (slideIdx: number) => void;
-  onPickMobileMedia: (slideIdx: number) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="flex items-center gap-2 cursor-pointer pt-2">
-          <input
-            type="checkbox"
-            checked={data.autoplay ?? true}
-            onChange={(e) => update({ autoplay: e.target.checked })}
-            className="rounded text-blue-600"
-          />
-          <span className="font-bold text-slate-700">Tự động chuyển slide (Autoplay)</span>
-        </label>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Thời gian mỗi slide (Giây)</label>
-          <input
-            type="number"
-            min={2}
-            max={20}
-            value={data.intervalSec ?? 5}
-            onChange={(e) =>
-              update({ intervalSec: Math.max(2, Math.min(20, parseInt(e.target.value) || 5)) })
-            }
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800">Danh sách Slide ({data.slides?.length || 0})</span>
-          <button
-            type="button"
-            onClick={() => {
-              const currentSlides = data.slides || [];
-              const newSlide = {
-                id: `slide_${Date.now()}_${currentSlides.length + 1}`,
-                title: `Slide ${currentSlides.length + 1}`,
-                subtitle: 'Mô tả ngắn gọn ưu đãi hoặc cấu hình',
-                badge: 'Hot Deal',
-                imageUrl: '/brand/marketing-banner.webp',
-                imageAssetId: null,
-                link: '/laptop-gaming',
-                buttonText: 'Khám phá ngay',
-              };
-              update({ slides: [...currentSlides, newSlide] });
-            }}
-            className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
-          >
-            + Thêm slide
-          </button>
-        </div>
-
-        {data.slides?.map((slide, sIdx) => (
-          <div key={slide.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <span className="font-bold text-slate-700 text-xs">Slide #{sIdx + 1}</span>
-              <div className="flex items-center gap-2">
-                {sIdx > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = [...data.slides];
-                      const [moved] = next.splice(sIdx, 1);
-                      next.splice(sIdx - 1, 0, moved);
-                      update({ slides: next });
-                    }}
-                    className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded text-xs"
-                    title="Di chuyển lên"
-                  >
-                    ↑
-                  </button>
-                )}
-                {sIdx < data.slides.length - 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = [...data.slides];
-                      const [moved] = next.splice(sIdx, 1);
-                      next.splice(sIdx + 1, 0, moved);
-                      update({ slides: next });
-                    }}
-                    className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded text-xs"
-                    title="Di chuyển xuống"
-                  >
-                    ↓
-                  </button>
-                )}
-                {data.slides.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!window.confirm(`Xóa slide #${sIdx + 1}?`)) return;
-                      const next = data.slides.filter((_, idx) => idx !== sIdx);
-                      update({ slides: next });
-                    }}
-                    className="text-red-500 hover:text-red-700 text-xs font-medium cursor-pointer"
-                  >
-                    Xóa slide
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div className="sm:col-span-2">
-                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Tiêu đề slide</label>
-                <input
-                  type="text"
-                  value={slide.title}
-                  onChange={(e) => {
-                    const next = [...data.slides];
-                    next[sIdx] = { ...next[sIdx], title: e.target.value };
-                    update({ slides: next });
-                  }}
-                  placeholder="Tiêu đề chính"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Huy hiệu (Badge)</label>
-                <input
-                  type="text"
-                  value={slide.badge || ''}
-                  onChange={(e) => {
-                    const next = [...data.slides];
-                    next[sIdx] = { ...next[sIdx], badge: e.target.value };
-                    update({ slides: next });
-                  }}
-                  placeholder="Ví dụ: Hot Deal"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Mô tả phụ (Subtitle)</label>
-              <input
-                type="text"
-                value={slide.subtitle || ''}
-                onChange={(e) => {
-                  const next = [...data.slides];
-                  next[sIdx] = { ...next[sIdx], subtitle: e.target.value };
-                  update({ slides: next });
-                }}
-                placeholder="Mô tả phụ của slide"
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Ảnh nền / banner trên PC (URL)</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={slide.imageUrl}
-                  onChange={(e) => {
-                    const next = [...data.slides];
-                    next[sIdx] = { ...next[sIdx], imageUrl: e.target.value };
-                    update({ slides: next });
-                  }}
-                  placeholder="URL hình ảnh PC"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => onPickMedia(sIdx)}
-                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
-                >
-                  Chọn ảnh
-                </button>
-              </div>
-              {slide.imageUrl && (
-                <div className="mt-2 h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 max-w-xs">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={slide.imageUrl} alt={slide.title || 'Slide preview'} className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="text-[11px] font-semibold text-blue-700 block mb-0.5">
-                Ảnh riêng trên Smartphone SP (Tùy chọn)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={slide.mobileImageUrl || ''}
-                  onChange={(e) => {
-                    const next = [...data.slides];
-                    next[sIdx] = { ...next[sIdx], mobileImageUrl: e.target.value };
-                    update({ slides: next });
-                  }}
-                  placeholder="Để trống nếu dùng chung ảnh PC"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => onPickMobileMedia(sIdx)}
-                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
-                >
-                  Chọn ảnh SP
-                </button>
-              </div>
-              {slide.mobileImageUrl && (
-                <div className="mt-2 h-20 w-36 rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={slide.mobileImageUrl} alt={slide.title || 'Slide SP preview'} className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Liên kết nút (Link)</label>
-                <input
-                  type="text"
-                  value={slide.link || ''}
-                  onChange={(e) => {
-                    const next = [...data.slides];
-                    next[sIdx] = { ...next[sIdx], link: e.target.value };
-                    update({ slides: next });
-                  }}
-                  placeholder="/laptop-gaming"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Chữ nút bấm (Button Text)</label>
-                <input
-                  type="text"
-                  value={slide.buttonText || ''}
-                  onChange={(e) => {
-                    const next = [...data.slides];
-                    next[sIdx] = { ...next[sIdx], buttonText: e.target.value };
-                    update({ slides: next });
-                  }}
-                  placeholder="Khám phá ngay"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ProductGridForm({
-  sectionId,
-  data,
-  update,
-  onPickProduct,
-}: {
-  sectionId?: string;
-  data: ProductGridData;
-  update: (p: Partial<ProductGridData>) => void;
-  onPickProduct: (target?: string) => void;
-}) {
-  const { categories, brands } = useCatalogOptions();
-  const [productNames, setProductNames] = useState<Record<string, string>>({});
-  const [newQuickLabel, setNewQuickLabel] = useState('');
-  const [newQuickHref, setNewQuickHref] = useState('');
-
-  // Collect all product IDs in main shelf and all tabs to resolve product names
-  const allReferencedIds = [
-    ...(data.manualProductIds || []),
-    ...(data.tabs || []).flatMap((t) => t.productIds || []),
-  ];
-
-  useEffect(() => {
-    let ignore = false;
-    const missingIds = [...new Set(allReferencedIds)].filter((id) => !productNames[id]);
-    if (missingIds.length === 0) return;
-
-    async function fetchMissingNames() {
-      try {
-        const res = await mediaRequest<{ items: Array<{ id: string; name: string }> }>(
-          `/api/admin/products?ids=${encodeURIComponent(missingIds.join(','))}&limit=${Math.min(100, Math.max(50, missingIds.length))}`
-        );
-        if (!ignore && res?.items) {
-          const map: Record<string, string> = {};
-          for (const it of res.items) {
-            map[it.id] = it.name;
-          }
-          setProductNames((prev) => ({ ...prev, ...map }));
-        }
-      } catch {
-        // fail-soft
-      }
-    }
-    void fetchMissingNames();
-    return () => {
-      ignore = true;
-    };
-  }, [allReferencedIds, productNames]);
-
-  const isHotSaleSection = sectionId === 'sec-hot-sale';
-  const hasTabs = Boolean(data.tabs && data.tabs.length > 0);
-
-  const addQuickLink = () => {
-    if (!newQuickLabel.trim() || !newQuickHref.trim()) return;
-    const current = data.links || [];
-    update({ links: [...current, { label: newQuickLabel.trim(), href: newQuickHref.trim() }] });
-    setNewQuickLabel('');
-    setNewQuickHref('');
-  };
-
-  return (
-    <div className="space-y-5">
-      {/* 1. HOT SALE SPECIAL NOTICE */}
-      {isHotSaleSection && (
-        <div className="p-4 rounded-xl bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 text-xs space-y-2">
-          <div className="flex items-center gap-2 font-bold text-red-700 text-sm">
-            <Flame className="w-4 h-4 text-red-600 shrink-0" />
-            <span>Khối HOT SALE / Flash Sale trang chủ</span>
-          </div>
-          <p className="text-slate-700 leading-relaxed">
-            Trên trang chủ công khai, khối này hiển thị các sản phẩm Flash Sale đang hoạt động. Bạn có thể tạo đợt giảm giá, cấu hình % giảm và thời gian đếm ngược tại{' '}
-            <Link href="/admin/campaigns" target="_blank" className="font-bold text-red-700 underline hover:text-red-800">
-              Quản lý Chiến dịch Khuyến mãi ↗
-            </Link>
-            .
-          </p>
-          <p className="text-slate-500 text-[11px]">
-            Cấu hình bên dưới dùng cho tiêu đề, liên kết &quot;Tất cả ưu đãi&quot; và sản phẩm hiển thị dự phòng khi không có chiến dịch nào kích hoạt.
-          </p>
-        </div>
-      )}
-
-      {/* 2. TAB MANAGER (E.G. KHÁM PHÁ LAPTOP) */}
-      {(hasTabs || sectionId === 'sec-discover') && (
-        <div className="space-y-3 rounded-2xl border border-blue-200 bg-blue-50/30 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="p-1 rounded-lg bg-blue-600 text-white shadow-2xs">
-                <Grid className="w-4 h-4" />
-              </span>
-              <div>
-                <h3 className="font-bold text-slate-900 text-xs sm:text-sm">
-                  Cấu hình các Tab sản phẩm ({data.tabs?.length || 0} Tab)
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Hiển thị dạng thanh Tab chuyển đổi linh hoạt trên trang chủ (Khám phá laptop)
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const current = data.tabs || [];
-                const newTabId = `tab-${Date.now()}`;
-                update({
-                  tabs: [
-                    ...current,
-                    {
-                      id: newTabId,
-                      label: `Tab #${current.length + 1}`,
-                      href: '/search?category=laptop',
-                      limit: 15,
-                      productIds: [],
-                      enabled: true,
-                      sourceMode: 'manual',
-                    },
-                  ],
-                });
-              }}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
-            >
-              <Plus className="w-3.5 h-3.5" /> Thêm Tab mới
-            </button>
-          </div>
-
-          <div className="space-y-3 pt-1">
-            {data.tabs?.map((tab, tIdx) => (
-              <div key={tab.id} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                      {tIdx + 1}
-                    </span>
-                    <span className="font-bold text-xs text-slate-800 truncate">{tab.label}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">({tab.id})</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
-                      <input
-                        type="checkbox"
-                        checked={tab.enabled !== false}
-                        onChange={(e) => {
-                          const next = [...(data.tabs || [])];
-                          next[tIdx] = { ...next[tIdx], enabled: e.target.checked };
-                          update({ tabs: next });
-                        }}
-                        className="rounded text-blue-600"
-                      />
-                      <span>Bật</span>
-                    </label>
-                    <button
-                      type="button"
-                      disabled={tIdx === 0}
-                      onClick={() => {
-                        const next = [...(data.tabs || [])];
-                        [next[tIdx], next[tIdx - 1]] = [next[tIdx - 1], next[tIdx]];
-                        update({ tabs: next });
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                      title="Di chuyển lên"
-                    >
-                      <ArrowUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={tIdx === (data.tabs?.length || 0) - 1}
-                      onClick={() => {
-                        const next = [...(data.tabs || [])];
-                        [next[tIdx], next[tIdx + 1]] = [next[tIdx + 1], next[tIdx]];
-                        update({ tabs: next });
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                      title="Di chuyển xuống"
-                    >
-                      <ArrowDown className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!window.confirm(`Xóa tab "${tab.label}"?`)) return;
-                        update({ tabs: data.tabs?.filter((_, idx) => idx !== tIdx) });
-                      }}
-                      className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                      title="Xóa tab"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Tên tab hiển thị *</label>
-                    <input
-                      type="text"
-                      value={tab.label}
-                      onChange={(e) => {
-                        const next = [...(data.tabs || [])];
-                        next[tIdx] = { ...next[tIdx], label: e.target.value };
-                        update({ tabs: next });
-                      }}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-                      placeholder="Ví dụ: Laptop Mới"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Mã định danh (ID) *</label>
-                    <input
-                      type="text"
-                      value={tab.id}
-                      onChange={(e) => {
-                        const next = [...(data.tabs || [])];
-                        next[tIdx] = { ...next[tIdx], id: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') };
-                        update({ tabs: next });
-                      }}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs font-mono"
-                      placeholder="new-arrivals"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Liên kết &quot;Xem tất cả&quot;</label>
-                    <input
-                      type="text"
-                      value={tab.href || ''}
-                      onChange={(e) => {
-                        const next = [...(data.tabs || [])];
-                        next[tIdx] = { ...next[tIdx], href: e.target.value };
-                        update({ tabs: next });
-                      }}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-                      placeholder="/search?category=laptop-moi"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-bold text-slate-700">Nguồn sản phẩm tab:</span>
-                    <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
-                      <input
-                        type="radio"
-                        name={`tab_src_${tab.id}`}
-                        checked={tab.sourceMode !== 'rule'}
-                        onChange={() => {
-                          const next = [...(data.tabs || [])];
-                          next[tIdx] = { ...next[tIdx], sourceMode: 'manual' };
-                          update({ tabs: next });
-                        }}
-                      />
-                      <span>Thủ công ({tab.productIds?.length || 0} SP)</span>
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 text-xs cursor-pointer">
-                      <input
-                        type="radio"
-                        name={`tab_src_${tab.id}`}
-                        checked={tab.sourceMode === 'rule'}
-                        onChange={() => {
-                          const next = [...(data.tabs || [])];
-                          next[tIdx] = {
-                            ...next[tIdx],
-                            sourceMode: 'rule',
-                            ruleCriteria: next[tIdx].ruleCriteria || {
-                              productType: 'laptop',
-                              categoryId: null,
-                              brandId: null,
-                              condition: tab.id === 'new' ? 'NEW' : tab.id === 'like-new' ? 'LIKE_NEW' : tab.id === 'clearance' ? 'ON_SALE' : 'all',
-                              tag: 'all',
-                              availability: 'all',
-                              sort: 'newest',
-                              limit: 15,
-                            },
-                          };
-                          update({ tabs: next });
-                        }}
-                      />
-                      <span>Theo điều kiện tự động</span>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-[11px] font-semibold text-slate-600 whitespace-nowrap">
-                      Số lượng hiển thị (Limit):
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={48}
-                      value={tab.limit || 15}
-                      onChange={(e) => {
-                        const next = [...(data.tabs || [])];
-                        next[tIdx] = { ...next[tIdx], limit: Math.min(48, Math.max(1, parseInt(e.target.value) || 15)) };
-                        update({ tabs: next });
-                      }}
-                      className="w-16 px-2 py-1 border border-slate-300 rounded text-xs text-center"
-                    />
-                  </div>
-                </div>
-
-                {tab.sourceMode === 'rule' ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tình trạng máy</label>
-                      <select
-                        value={tab.ruleCriteria?.condition || 'all'}
-                        onChange={(e) => {
-                          const next = [...(data.tabs || [])];
-                          const base = next[tIdx].ruleCriteria || {
-                            productType: 'laptop' as const,
-                            categoryId: null,
-                            brandId: null,
-                            condition: 'all' as const,
-                            tag: 'all' as const,
-                            availability: 'all' as const,
-                            sort: 'newest' as const,
-                            limit: tab.limit || 15,
-                          };
-                          next[tIdx] = {
-                            ...next[tIdx],
-                            ruleCriteria: { ...base, condition: e.target.value as any },
-                          };
-                          update({ tabs: next });
-                        }}
-                        className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
-                      >
-                        <option value="all">Tất cả tình trạng</option>
-                        <option value="NEW">Chỉ máy Mới 100%</option>
-                        <option value="LIKE_NEW">Chỉ máy Like-New 99%</option>
-                        <option value="USED">Hàng cũ tuyển chọn</option>
-                        <option value="ON_SALE">Đang giảm giá sốc (Flash Sale)</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Sắp xếp</label>
-                      <select
-                        value={tab.ruleCriteria?.sort || 'newest'}
-                        onChange={(e) => {
-                          const next = [...(data.tabs || [])];
-                          const base = next[tIdx].ruleCriteria || {
-                            productType: 'laptop' as const,
-                            categoryId: null,
-                            brandId: null,
-                            condition: 'all' as const,
-                            tag: 'all' as const,
-                            availability: 'all' as const,
-                            sort: 'newest' as const,
-                            limit: tab.limit || 15,
-                          };
-                          next[tIdx] = {
-                            ...next[tIdx],
-                            ruleCriteria: { ...base, sort: e.target.value as any },
-                          };
-                          update({ tabs: next });
-                        }}
-                        className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
-                      >
-                        <option value="newest">Mới nhất cập nhật</option>
-                        <option value="best-selling">Bán chạy nhất</option>
-                        <option value="price-asc">Giá thấp đến cao</option>
-                        <option value="price-desc">Giá cao xuống thấp</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Loại sản phẩm</label>
-                      <select
-                        value={tab.ruleCriteria?.productType || 'laptop'}
-                        onChange={(e) => {
-                          const next = [...(data.tabs || [])];
-                          const base = next[tIdx].ruleCriteria || {
-                            productType: 'laptop' as const,
-                            categoryId: null,
-                            brandId: null,
-                            condition: 'all' as const,
-                            tag: 'all' as const,
-                            availability: 'all' as const,
-                            sort: 'newest' as const,
-                            limit: tab.limit || 15,
-                          };
-                          next[tIdx] = {
-                            ...next[tIdx],
-                            ruleCriteria: { ...base, productType: e.target.value as any },
-                          };
-                          update({ tabs: next });
-                        }}
-                        className="w-full px-2 py-1.5 border border-slate-300 rounded bg-white"
-                      >
-                        <option value="laptop">Chỉ Laptop</option>
-                        <option value="accessory">Phụ kiện & Đồ chơi</option>
-                        <option value="all">Tất cả sản phẩm</option>
-                      </select>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-slate-700">
-                        Sản phẩm đã chọn: {tab.productIds?.length || 0} máy
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => onPickProduct(`product_tab:${tIdx}`)}
-                        className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
-                      >
-                        + Chọn sản phẩm vào tab
-                      </button>
-                    </div>
-
-                    {tab.productIds && tab.productIds.length > 0 ? (
-                      <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
-                        {tab.productIds.map((pId, pIdx) => (
-                          <div
-                            key={pId}
-                            className="flex items-center justify-between p-1.5 bg-white border border-slate-200 rounded text-xs"
-                          >
-                            <div className="flex items-center gap-2 min-w-0 pr-2">
-                              <span className="w-4 h-4 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
-                                {pIdx + 1}
-                              </span>
-                              <span className="font-semibold text-slate-800 truncate">
-                                {productNames[pId] || `Sản phẩm ${pId}`}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                disabled={pIdx === 0}
-                                onClick={() => {
-                                  const nextTabs = [...(data.tabs || [])];
-                                  const pList = [...nextTabs[tIdx].productIds];
-                                  [pList[pIdx], pList[pIdx - 1]] = [pList[pIdx - 1], pList[pIdx]];
-                                  nextTabs[tIdx] = { ...nextTabs[tIdx], productIds: pList };
-                                  update({ tabs: nextTabs });
-                                }}
-                                className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                                title="Lên"
-                              >
-                                <ArrowUp className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                disabled={pIdx === tab.productIds.length - 1}
-                                onClick={() => {
-                                  const nextTabs = [...(data.tabs || [])];
-                                  const pList = [...nextTabs[tIdx].productIds];
-                                  [pList[pIdx], pList[pIdx + 1]] = [pList[pIdx + 1], pList[pIdx]];
-                                  nextTabs[tIdx] = { ...nextTabs[tIdx], productIds: pList };
-                                  update({ tabs: nextTabs });
-                                }}
-                                className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                                title="Xuống"
-                              >
-                                <ArrowDown className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const nextTabs = [...(data.tabs || [])];
-                                  nextTabs[tIdx] = {
-                                    ...nextTabs[tIdx],
-                                    productIds: nextTabs[tIdx].productIds.filter((x) => x !== pId),
-                                  };
-                                  update({ tabs: nextTabs });
-                                }}
-                                className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                                title="Xóa"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-slate-400 text-[11px] italic py-1">
-                        Tab chưa có sản phẩm. Bấm &quot;+ Chọn sản phẩm vào tab&quot; phía trên.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-        {!hasTabs && (
-          <div className="flex items-center justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                update({
-                  tabs: [
-                    {
-                      id: `tab-${Date.now()}`,
-                      label: 'Tab 1',
-                      href: data.viewAllLink || '/search',
-                      limit: data.ruleCriteria?.limit || 10,
-                      productIds: data.manualProductIds || [],
-                      enabled: true,
-                      sourceMode: data.sourceMode || 'manual',
-                      ruleCriteria: data.ruleCriteria,
-                    },
-                  ],
-                });
-              }}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50/70 hover:bg-blue-100 text-blue-700 font-semibold text-xs cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> Chuyển kệ này sang dạng nhiều Tab
-            </button>
-          </div>
-        )}
-
-      {/* 3. HEADER & APPEARANCE SETTINGS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề kệ sản phẩm *</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Ví dụ: Laptop Gaming, Laptop Văn Phòng..."
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ (dòng nhỏ dưới tiêu đề)</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Ví dụ: Trang bị GPU RTX 4000 series mạnh mẽ..."
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Huy hiệu (Badge)</label>
-          <input
-            type="text"
-            value={data.badge || ''}
-            onChange={(e) => update({ badge: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Hot Deal / Best Seller"
-          />
-        </div>
-
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Màu chủ đề (Header Gradient)</label>
-          <select
-            value={data.colorTheme || 'blue'}
-            onChange={(e) => update({ colorTheme: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          >
-            <option value="blue">Xanh dương (Văn phòng / Doanh nhân)</option>
-            <option value="red">Đỏ Gaming (Chiến thần đồ họa)</option>
-            <option value="indigo">Chàm / Apple (MacBook)</option>
-            <option value="gray">Xám đậm (Workstation Máy trạm)</option>
-            <option value="emerald">Xanh lục (Phụ kiện & Setup)</option>
-            <option value="orange">Cam (Bán chạy nhất)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Biểu tượng tiêu đề (Icon)</label>
-          <select
-            value={data.icon || 'auto'}
-            onChange={(e) => update({ icon: e.target.value === 'auto' ? undefined : e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          >
-            <option value="auto">Tự động theo chủ đề kệ</option>
-            <option value="zap">⚡ Tia sét (Gaming)</option>
-            <option value="briefcase">💼 Cặp xách (Ultrabook/Văn phòng)</option>
-            <option value="server">🖥️ Máy trạm (Workstation)</option>
-            <option value="headphones">🎧 Tai nghe (Phụ kiện)</option>
-            <option value="sparkles">✨ Ngôi sao lấp lánh (Mới nhất)</option>
-            <option value="trending">📈 Biểu đồ xu hướng (Bán chạy)</option>
-            <option value="star">⭐ Ngôi sao (Đánh giá cao)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* 4. HEADER QUICK LINKS MANAGER */}
-      <div className="space-y-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50/60">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="font-bold text-slate-800 text-xs block">
-              Liên kết nhanh đầu kệ (Header Quick Links)
-            </span>
-            <span className="text-[11px] text-slate-500">
-              Các link ngắn hiển thị ngang trên thanh tiêu đề (Ví dụ: RTX 4060, RTX 4070, Legion, ROG Strix...)
-            </span>
-          </div>
-          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
-            {data.links?.length || 0} link
-          </span>
-        </div>
-
-        {/* Existing links */}
-        {data.links && data.links.length > 0 ? (
-          <div className="space-y-2">
-            {data.links.map((link, lIdx) => (
-              <div key={lIdx} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200 text-xs">
-                <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
-                  {lIdx + 1}
-                </span>
-                <input
-                  type="text"
-                  value={link.label}
-                  onChange={(e) => {
-                    const next = [...(data.links || [])];
-                    next[lIdx] = { ...next[lIdx], label: e.target.value };
-                    update({ links: next });
-                  }}
-                  className="w-1/3 px-2 py-1 border border-slate-300 rounded text-xs"
-                  placeholder="Tên link (Ví dụ: Legion)"
-                />
-                <input
-                  type="text"
-                  value={link.href}
-                  onChange={(e) => {
-                    const next = [...(data.links || [])];
-                    next[lIdx] = { ...next[lIdx], href: e.target.value };
-                    update({ links: next });
-                  }}
-                  className="flex-1 px-2 py-1 border border-slate-300 rounded text-xs font-mono"
-                  placeholder="/laptop-gaming?brand=lenovo"
-                />
-                <button
-                  type="button"
-                  disabled={lIdx === 0}
-                  onClick={() => {
-                    const next = [...(data.links || [])];
-                    [next[lIdx], next[lIdx - 1]] = [next[lIdx - 1], next[lIdx]];
-                    update({ links: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển lên"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={lIdx === (data.links?.length || 0) - 1}
-                  onClick={() => {
-                    const next = [...(data.links || [])];
-                    [next[lIdx], next[lIdx + 1]] = [next[lIdx + 1], next[lIdx]];
-                    update({ links: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển xuống"
-                >
-                  <ArrowDown className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    update({ links: data.links?.filter((_, i) => i !== lIdx) });
-                  }}
-                  className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                  title="Xóa link"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-slate-400 text-xs italic">Chưa có liên kết nhanh nào trên thanh tiêu đề.</p>
-        )}
-
-        {/* Add new link form */}
-        <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-200">
-          <input
-            type="text"
-            value={newQuickLabel}
-            onChange={(e) => setNewQuickLabel(e.target.value)}
-            className="w-full sm:w-1/3 px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
-            placeholder="Tên link mới (e.g. RTX 4060)"
-          />
-          <input
-            type="text"
-            value={newQuickHref}
-            onChange={(e) => setNewQuickHref(e.target.value)}
-            className="w-full sm:flex-1 px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs bg-white font-mono"
-            placeholder="Đường dẫn (e.g. /laptop-gaming?gpu=RTX+4060)"
-          />
-          <button
-            type="button"
-            onClick={addQuickLink}
-            disabled={!newQuickLabel.trim() || !newQuickHref.trim()}
-            className="w-full sm:w-auto px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white rounded-lg text-xs font-semibold cursor-pointer shrink-0"
-          >
-            + Thêm link
-          </button>
-        </div>
-      </div>
-
-      {/* 5. PRODUCT DISPLAY CONDITIONS & LIMIT */}
-      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
-          <div>
-            <label className="font-bold text-slate-800 text-xs block">Nguồn &amp; Số lượng sản phẩm hiển thị</label>
-            <span className="text-[11px] text-slate-500">
-              Chọn tự động theo tiêu chí hoặc tự tay chọn từng sản phẩm
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-700">Tối đa (PC):</span>
-              <input
-                type="number"
-                min={1}
-                max={48}
-                value={data.ruleCriteria?.limit || 10}
-                onChange={(e) => {
-                  const limitVal = Math.min(48, Math.max(1, parseInt(e.target.value) || 10));
-                  update({
-                    ruleCriteria: {
-                      ...(data.ruleCriteria || {}),
-                      limit: limitVal,
-                    },
-                  });
-                }}
-                className="w-14 px-2 py-1 border border-slate-300 rounded-lg text-xs font-bold text-center bg-white"
-              />
-              <span className="text-xs text-slate-500">SP</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Smartphone className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-xs font-bold text-blue-700">Trên SP:</span>
-              <input
-                type="number"
-                min={1}
-                max={48}
-                value={data.mobileLimit ?? ''}
-                placeholder="Tất cả"
-                onChange={(e) => {
-                  const raw = e.target.value.trim();
-                  update({
-                    mobileLimit: raw ? Math.min(48, Math.max(1, parseInt(raw) || 4)) : null,
-                  });
-                }}
-                className="w-16 px-2 py-1 border border-blue-200 rounded-lg text-xs font-bold text-center bg-white"
-              />
-              <span className="text-xs text-slate-500">SP</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-4">
-          <label className="inline-flex items-center gap-2 cursor-pointer text-xs">
-            <input
-              type="radio"
-              name={`sourceMode_${sectionId || 'grid'}`}
-              value="rule"
-              checked={data.sourceMode === 'rule'}
-              onChange={() => update({ sourceMode: 'rule' })}
-            />
-            <span className="font-bold text-slate-800">Theo điều kiện tự động (Rule-based)</span>
-          </label>
-          <label className="inline-flex items-center gap-2 cursor-pointer text-xs">
-            <input
-              type="radio"
-              name={`sourceMode_${sectionId || 'grid'}`}
-              value="manual"
-              checked={data.sourceMode === 'manual'}
-              onChange={() => update({ sourceMode: 'manual' })}
-            />
-            <span className="font-bold text-slate-800">
-              Chọn thủ công từng sản phẩm ({data.manualProductIds?.length || 0} đã chọn)
-            </span>
-          </label>
-        </div>
-
-        {data.sourceMode === 'rule' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 p-3.5 border border-slate-200 rounded-xl bg-white text-xs">
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Loại sản phẩm</label>
-              <select
-                value={data.ruleCriteria?.productType || 'all'}
-                onChange={(e) =>
-                  update({
-                    ruleCriteria: {
-                      ...data.ruleCriteria,
-                      productType: e.target.value as ProductRuleCriteria['productType'],
-                    },
-                  })
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-              >
-                <option value="all">Tất cả sản phẩm</option>
-                <option value="laptop">Chỉ Laptop</option>
-                <option value="accessory">Chỉ Phụ kiện &amp; Đồ chơi</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Danh mục máy</label>
-              <select
-                value={data.ruleCriteria?.categoryId || ''}
-                onChange={(e) =>
-                  update({
-                    ruleCriteria: {
-                      ...data.ruleCriteria,
-                      categoryId: e.target.value ? e.target.value : null,
-                    },
-                  })
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-              >
-                <option value="">Tất cả danh mục</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.parentId ? `↳ ${c.name}` : c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Thương hiệu</label>
-              <select
-                value={data.ruleCriteria?.brandId || ''}
-                onChange={(e) =>
-                  update({
-                    ruleCriteria: {
-                      ...data.ruleCriteria,
-                      brandId: e.target.value ? e.target.value : null,
-                    },
-                  })
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-              >
-                <option value="">Tất cả thương hiệu</option>
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Tình trạng máy</label>
-              <select
-                value={(data.ruleCriteria as any)?.condition || 'all'}
-                onChange={(e) =>
-                  update({
-                    ruleCriteria: {
-                      ...data.ruleCriteria,
-                      condition: e.target.value as any,
-                    },
-                  })
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-              >
-                <option value="all">Tất cả tình trạng</option>
-                <option value="NEW">Chỉ máy Mới 100%</option>
-                <option value="LIKE_NEW">Chỉ máy Like-New 99%</option>
-                <option value="USED">Hàng cũ tuyển chọn</option>
-                <option value="ON_SALE">Đang giảm giá sốc (Flash Sale)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Thẻ đánh dấu (Tag)</label>
-              <select
-                value={data.ruleCriteria?.tag || 'all'}
-                onChange={(e) =>
-                  update({
-                    ruleCriteria: {
-                      ...data.ruleCriteria,
-                      tag: e.target.value as ProductRuleCriteria['tag'],
-                    },
-                  })
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-              >
-                <option value="all">Tất cả nhãn</option>
-                <option value="isFeatured">Sản phẩm Nổi bật</option>
-                <option value="isNewArrival">Hàng Mới Về</option>
-                <option value="isBestSeller">Bán Chạy Nhất</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Tình trạng kho</label>
-              <select
-                value={data.ruleCriteria?.availability || 'all'}
-                onChange={(e) =>
-                  update({
-                    ruleCriteria: {
-                      ...data.ruleCriteria,
-                      availability: e.target.value as ProductRuleCriteria['availability'],
-                    },
-                  })
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-              >
-                <option value="all">Tất cả trạng thái</option>
-                <option value="AVAILABLE">Còn hàng trong kho</option>
-                <option value="PREORDER">Nhận đặt trước (Pre-order)</option>
-                <option value="CONTACT">Liên hệ trực tiếp</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="font-bold text-slate-700 block mb-1">Sắp xếp theo</label>
-              <select
-                value={data.ruleCriteria?.sort || 'newest'}
-                onChange={(e) =>
-                  update({
-                    ruleCriteria: {
-                      ...data.ruleCriteria,
-                      sort: e.target.value as ProductRuleCriteria['sort'],
-                    },
-                  })
-                }
-                className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-xs"
-              >
-                <option value="newest">Mới nhất cập nhật</option>
-                <option value="price-asc">Giá từ thấp đến cao</option>
-                <option value="price-desc">Giá từ cao xuống thấp</option>
-                <option value="name-asc">Tên sản phẩm (A-Z)</option>
-                <option value="best-selling">Bán chạy nhất</option>
-              </select>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-3 p-3.5 border border-slate-200 rounded-xl bg-white">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-700 text-xs">
-                Đã chọn: {data.manualProductIds?.length || 0} sản phẩm (Hiển thị tối đa{' '}
-                {data.ruleCriteria?.limit || 10} SP theo thiết lập trên)
-              </span>
-              <button
-                type="button"
-                onClick={() => onPickProduct()}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-2xs"
-              >
-                + Chọn sản phẩm
-              </button>
-            </div>
-
-            {data.manualProductIds && data.manualProductIds.length > 0 ? (
-              <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                {data.manualProductIds.map((pId: string, idx: number) => (
-                  <div
-                    key={pId}
-                    className="flex items-center justify-between p-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-lg text-xs transition"
-                  >
-                    <div className="flex items-center gap-2 min-w-0 pr-2">
-                      <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-slate-900 truncate">
-                          {productNames[pId] || `Sản phẩm ${pId}`}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-mono truncate">ID: {pId}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => {
-                          const next = [...(data.manualProductIds || [])];
-                          [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
-                          update({ manualProductIds: next });
-                        }}
-                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                        title="Di chuyển lên"
-                      >
-                        <ArrowUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={idx === (data.manualProductIds?.length || 0) - 1}
-                        onClick={() => {
-                          const next = [...(data.manualProductIds || [])];
-                          [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-                          update({ manualProductIds: next });
-                        }}
-                        className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                        title="Di chuyển xuống"
-                      >
-                        <ArrowDown className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          update({
-                            manualProductIds: data.manualProductIds?.filter((x: string) => x !== pId),
-                          });
-                        }}
-                        className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                        title="Xóa khỏi danh sách"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-slate-400 text-xs italic py-2">
-                Chưa có sản phẩm nào được chọn. Hãy bấm nút &quot;+ Chọn sản phẩm&quot; phía trên.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* 6. FOOTER SETTINGS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Đường dẫn nút &quot;Xem tất cả&quot;</label>
-          <input
-            type="text"
-            value={data.viewAllLink || ''}
-            onChange={(e) => update({ viewAllLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="/laptop-gaming"
-          />
-        </div>
-        <div className="pt-6">
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={data.rankNumbering || false}
-              onChange={(e) => update({ rankNumbering: e.target.checked })}
-              className="rounded text-blue-600"
-            />
-            <span className="font-bold text-slate-700">Hiển thị huy hiệu xếp hạng TOP 1, 2, 3</span>
-          </label>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FeaturedCategoriesForm({
-  data,
-  update,
-  onPickMedia,
-}: {
-  data: FeaturedCategoriesData;
-  update: (p: Partial<FeaturedCategoriesData>) => void;
-  onPickMedia: (itemIdx: number) => void;
-}) {
-  const { categories } = useCatalogOptions();
-
-  const resolveCatHref = (cat: CategoryOption) => {
-    try {
-      return categoryHref(
-        { id: cat.id, slug: cat.slug, parentId: cat.parentId || null },
-        categories.map(c => ({ id: c.id, slug: c.slug, parentId: c.parentId || null }))
-      );
-    } catch {
-      return `/${cat.slug}`;
-    }
-  };
-
-  const handleSyncFromCatalog = () => {
-    if (!categories.length) return;
-    const synced = categories.slice(0, 10).map((c) => ({
-      categoryId: c.id,
-      customName: c.name,
-      customImage: c.image || '',
-      href: resolveCatHref(c),
-      enabled: true,
-    }));
-    update({ items: synced, categoryIds: synced.map((x) => x.categoryId) });
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">Bố cục hiển thị</label>
-          <select
-            value={data.layout || 'cards'}
-            onChange={(e) => update({ layout: e.target.value as 'cards' | 'board' })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
-          >
-            <option value="cards">Thẻ danh mục lớn (10 ô - Hệ sinh thái danh mục)</option>
-            <option value="board">Bảng phân loại (Lưới ô vuông - Phụ kiện góc làm việc)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Số lượng ô hiển thị tối đa</label>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={data.limit || 10}
-            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 10)) })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối danh mục</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Khám Phá Hệ Sinh Thái Danh Mục"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Lựa chọn dòng máy phù hợp nhất theo nhu cầu..."
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Đường dẫn &quot;Xem tất cả&quot; (tùy chọn)</label>
-        <input
-          type="text"
-          value={data.viewAllLink || ''}
-          onChange={(e) => update({ viewAllLink: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="/phan-loai"
-        />
-      </div>
-
-      {/* ITEMS LIST */}
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="font-bold text-slate-800 text-xs block">
-              Danh sách các ô danh mục ({data.items?.length || 0})
-            </span>
-            <span className="text-[11px] text-slate-500">
-              Mỗi ô có thể gắn hình ảnh riêng, đổi tên hiển thị và gán liên kết khi bấm.
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {(!data.items || data.items.length === 0) && (
-              <button
-                type="button"
-                onClick={handleSyncFromCatalog}
-                className="px-2.5 py-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer"
-              >
-                Đồng bộ từ catalog
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                const current = data.items || [];
-                update({
-                  items: [
-                    ...current,
-                    {
-                      categoryId: '',
-                      customName: `Mục #${current.length + 1}`,
-                      customImage: '',
-                      href: '/search',
-                      enabled: true,
-                    },
-                  ],
-                });
-              }}
-              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> Thêm ô
-            </button>
-          </div>
-        </div>
-
-        {data.items?.map((item, index) => (
-          <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                  {index + 1}
-                </span>
-                <span className="font-bold text-xs text-slate-800 truncate">
-                  {item.customName || `Ô #${index + 1}`}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
-                  <input
-                    type="checkbox"
-                    checked={item.enabled !== false}
-                    onChange={(e) => {
-                      const next = [...data.items];
-                      next[index] = { ...next[index], enabled: e.target.checked };
-                      update({ items: next });
-                    }}
-                    className="rounded text-blue-600"
-                  />
-                  <span>Bật</span>
-                </label>
-                <button
-                  type="button"
-                  disabled={index === 0}
-                  onClick={() => {
-                    const next = [...data.items];
-                    [next[index], next[index - 1]] = [next[index - 1], next[index]];
-                    update({ items: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển lên"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={index === data.items.length - 1}
-                  onClick={() => {
-                    const next = [...data.items];
-                    [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                    update({ items: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển xuống"
-                >
-                  <ArrowDown className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    update({ items: data.items.filter((_, i) => i !== index) });
-                  }}
-                  className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                  title="Xóa ô"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Tên hiển thị *</label>
-                <input
-                  type="text"
-                  value={item.customName || ''}
-                  onChange={(e) => {
-                    const next = [...data.items];
-                    next[index] = { ...next[index], customName: e.target.value };
-                    update({ items: next });
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                  placeholder="Ví dụ: Laptop Gaming"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Liên kết khi bấm (URL) *</label>
-                <input
-                  type="text"
-                  value={item.href || ''}
-                  onChange={(e) => {
-                    const next = [...data.items];
-                    next[index] = { ...next[index], href: e.target.value };
-                    update({ items: next });
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
-                  placeholder="/category/laptop-gaming"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Danh mục hệ thống liên kết</label>
-                <select
-                  value={item.categoryId || ''}
-                  onChange={(e) => {
-                    const next = [...data.items];
-                    const selectedCat = categories.find((c) => c.id === e.target.value);
-                    next[index] = {
-                      ...next[index],
-                      categoryId: e.target.value,
-                      customName: next[index].customName || selectedCat?.name || '',
-                      href: selectedCat ? resolveCatHref(selectedCat) : next[index].href || '',
-                    };
-                    update({ items: next });
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                >
-                  <option value="">-- Tùy chỉnh (không gắn ID) --</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-slate-700 mb-0.5">Ảnh đại diện icon / ô</label>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="text"
-                  value={item.customImage || ''}
-                  onChange={(e) => {
-                    const next = [...data.items];
-                    next[index] = { ...next[index], customImage: e.target.value };
-                    update({ items: next });
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
-                  placeholder="URL ảnh hoặc chọn từ thư viện"
-                />
-                <button
-                  type="button"
-                  onClick={() => onPickMedia(index)}
-                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
-                >
-                  Chọn ảnh
-                </button>
-                {item.customImage && (
-                  <div className="w-9 h-9 rounded-lg border border-slate-200 bg-white p-0.5 shrink-0 overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={item.customImage} alt="" className="w-full h-full object-contain" />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FeaturedBrandsForm({
-  data,
-  update,
-}: {
-  data: FeaturedBrandsData;
-  update: (p: Partial<FeaturedBrandsData>) => void;
-  onPickMedia?: (bIdx: number) => void;
-}) {
-  const { brands } = useCatalogOptions();
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối thương hiệu</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Khám Phá Theo Thương Hiệu"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Đối tác phân phối thiết bị công nghệ chính hãng..."
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Số lượng thương hiệu hiển thị</label>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={data.limit || 8}
-            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 8)) })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Đường dẫn Xem tất cả</label>
-          <input
-            type="text"
-            value={data.viewAllLink || ''}
-            onChange={(e) => update({ viewAllLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="/phan-loai"
-          />
-        </div>
-      </div>
-
-      <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-1">
-        <div className="font-bold flex items-center justify-between">
-          <span>Tự động đồng bộ từ thương hiệu hệ thống:</span>
-          <Link href="/admin/brands" target="_blank" className="text-blue-700 hover:underline font-bold">
-            Quản lý thương hiệu ↗
-          </Link>
-        </div>
-        <p>
-          Các thương hiệu lớn đang hoạt động ({brands.map((b) => b.name).join(', ')}) sẽ được tự động hiển thị kèm logo và liên kết tương ứng theo giới hạn {data.limit || 8} hãng.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function FeaturedCollectionForm({
-  data,
-  update,
-}: {
-  data: FeaturedCollectionData;
-  update: (p: Partial<FeaturedCollectionData>) => void;
-}) {
-  const [collections, setCollections] = useState<Array<{ id: string; name: string; slug: string }>>([]);
-
-  useEffect(() => {
-    let ignore = false;
-    async function loadCollections() {
-      try {
-        const res = await mediaRequest<{ document?: { collections?: Array<{ id: string; name: string; slug: string }> } }>('/api/admin/navigation');
-        if (!ignore && res?.document?.collections) {
-          setCollections(res.document.collections);
-        }
-      } catch {
-        // fail-soft
-      }
-    }
-    void loadCollections();
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  return (
-    <div className="space-y-4">
-      {collections.length > 0 && (
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Chọn từ bộ sưu tập đã có</label>
-          <select
-            value={collections.some((c) => c.id === data.collectionId || c.slug === data.collectionId) ? data.collectionId : ''}
-            onChange={(e) => {
-              const sel = collections.find((c) => c.id === e.target.value || c.slug === e.target.value);
-              if (sel) {
-                update({
-                  collectionId: sel.id,
-                  title: data.title || sel.name,
-                });
-              }
-            }}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
-          >
-            <option value="">-- Chọn bộ sưu tập sẵn có --</option>
-            {collections.map((col) => (
-              <option key={col.id} value={col.id}>
-                {col.name} ({col.slug})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề bộ sưu tập (Tùy chọn ghi đè)</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Để trống sẽ lấy tên bộ sưu tập"
-          />
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="font-bold text-slate-700 block">Mã Bộ sưu tập (Collection ID / Slug)</label>
-            <Link
-              href="/admin/navigation?tab=collections"
-              target="_blank"
-              className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold"
-            >
-              Quản lý Bộ sưu tập ↗
-            </Link>
-          </div>
-          <input
-            type="text"
-            value={data.collectionId || ''}
-            onChange={(e) => update({ collectionId: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Ví dụ: col-gaming-deals"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Ví dụ: Tuyển chọn các dòng máy bán chạy nhất"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Số lượng hiển thị (Limit)</label>
-          <input
-            type="number"
-            min={1}
-            max={48}
-            value={data.limit || 12}
-            onChange={(e) => update({ limit: Math.min(48, Math.max(1, parseInt(e.target.value) || 12)) })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="12"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NewsReviewsForm({
-  data,
-  update,
-  onPickPost,
-}: {
-  data: NewsReviewsData;
-  update: (p: Partial<NewsReviewsData>) => void;
-  onPickPost?: () => void;
-}) {
-  const { postCategories } = useCatalogOptions();
-  const [postTitles, setPostTitles] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    let ignore = false;
-    const missingIds = (data.postIds || []).filter((id) => !postTitles[id]);
-    if (missingIds.length === 0) return;
-
-    async function loadPostTitles() {
-      try {
-        const res = await mediaRequest<{ items: Array<{ id: string; title: string }> }>(
-          `/api/admin/posts?limit=50`
-        );
-        if (!ignore && res?.items) {
-          const map: Record<string, string> = {};
-          for (const item of res.items) {
-            map[item.id] = item.title;
-          }
-          setPostTitles((prev) => ({ ...prev, ...map }));
-        }
-      } catch {
-        // fail-soft
-      }
-    }
-    void loadPostTitles();
-    return () => {
-      ignore = true;
-    };
-  }, [data.postIds, postTitles]);
-
-  const hasSpecificPosts = Boolean(data.postIds && data.postIds.length > 0);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề tin tức *</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Góc CitiLap Media & Đánh Giá"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Cập nhật tin công nghệ và thủ thuật sử dụng..."
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Số bài hiển thị (Limit)</label>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={data.limit || 5}
-            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 5)) })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Bố cục hiển thị</label>
-          <select
-            value={data.layout || 'grid'}
-            onChange={(e) => update({ layout: e.target.value as 'grid' | 'featured' })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
-          >
-            <option value="grid">Lưới bài viết có thanh cuộn ngang (Trang chủ)</option>
-            <option value="featured">Bài nổi bật lớn + Danh sách bên cạnh</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Đường dẫn &quot;Xem tất cả&quot;</label>
-          <input
-            type="text"
-            value={data.viewAllLink || ''}
-            onChange={(e) => update({ viewAllLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
-            placeholder="/news"
-          />
-        </div>
-      </div>
-
-      {/* SOURCE MODE & SPECIFIC POSTS */}
-      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-        <div className="flex items-center justify-between">
-          <label className="font-bold text-slate-800 text-xs block">Nguồn bài viết hiển thị:</label>
-          <div className="flex gap-4 text-xs">
-            <label className="inline-flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="radio"
-                name="news_source"
-                checked={!hasSpecificPosts}
-                onChange={() => update({ postIds: [] })}
-              />
-              <span>Tự động theo chuyên mục</span>
-            </label>
-            <label className="inline-flex items-center gap-1.5 cursor-pointer">
-              <input
-                type="radio"
-                name="news_source"
-                checked={hasSpecificPosts}
-                onChange={() => {
-                  if (!data.postIds?.length && onPickPost) onPickPost();
-                }}
-              />
-              <span>Chọn bài viết cụ thể ({data.postIds?.length || 0})</span>
-            </label>
-          </div>
-        </div>
-
-        {!hasSpecificPosts ? (
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Lọc theo chuyên mục bài viết (Để trống để lấy tất cả chuyên mục)
-            </label>
-            <select
-              value={data.categoryId || ''}
-              onChange={(e) => update({ categoryId: e.target.value || null })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white"
-            >
-              <option value="">Tất cả chuyên mục bài viết</option>
-              {postCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-600">
-                Đã chọn {data.postIds.length} bài viết (Hiển thị tối đa {data.limit || 5} bài)
-              </span>
-              {onPickPost && (
-                <button
-                  type="button"
-                  onClick={onPickPost}
-                  className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs cursor-pointer shadow-2xs"
-                >
-                  + Chọn thêm bài viết
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-              {data.postIds.map((pId, idx) => (
-                <div
-                  key={pId}
-                  className="flex items-center justify-between p-2 bg-white border border-slate-200 rounded-lg text-xs"
-                >
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-slate-900 truncate">
-                        {postTitles[pId] || `Bài viết ${pId}`}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono truncate">ID: {pId}</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      disabled={idx === 0}
-                      onClick={() => {
-                        const next = [...data.postIds];
-                        [next[idx], next[idx - 1]] = [next[idx - 1], next[idx]];
-                        update({ postIds: next });
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                      title="Lên"
-                    >
-                      <ArrowUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={idx === data.postIds.length - 1}
-                      onClick={() => {
-                        const next = [...data.postIds];
-                        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-                        update({ postIds: next });
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                      title="Xuống"
-                    >
-                      <ArrowDown className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        update({ postIds: data.postIds.filter((x) => x !== pId) });
-                      }}
-                      className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                      title="Xóa"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function IntroForm({
-  data,
-  update,
-}: {
-  data: IntroData;
-  update: (p: Partial<IntroData>) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề cam kết dịch vụ</label>
-          <input
-            type="text"
-            value={data.title || ''}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Cam Kết Chất Lượng CitiLap"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="4 tiêu chuẩn dịch vụ vượt trội dành cho khách hàng"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800 text-xs">
-            Danh sách các cam kết dịch vụ ({data.features?.length || 0}/8)
-          </span>
-          <button
-            type="button"
-            disabled={(data.features?.length || 0) >= 8}
-            onClick={() => {
-              const current = data.features || [];
-              update({
-                features: [
-                  ...current,
-                  {
-                    id: `feat-${Date.now()}`,
-                    icon: 'star',
-                    title: `Cam kết #${current.length + 1}`,
-                    description: 'Mô tả tiêu chuẩn dịch vụ',
-                    href: '',
-                    enabled: true,
-                  },
-                ],
-              });
-            }}
-            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer disabled:opacity-40"
-          >
-            <Plus className="w-3.5 h-3.5" /> Thêm cam kết
-          </button>
-        </div>
-
-        {data.features?.map((feat, fIdx) => (
-          <div key={feat.id || fIdx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                  {fIdx + 1}
-                </span>
-                <span className="font-bold text-xs text-slate-800 truncate">{feat.title}</span>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
-                  <input
-                    type="checkbox"
-                    checked={feat.enabled !== false}
-                    onChange={(e) => {
-                      const next = [...(data.features || [])];
-                      next[fIdx] = { ...next[fIdx], enabled: e.target.checked };
-                      update({ features: next });
-                    }}
-                    className="rounded text-blue-600"
-                  />
-                  <span>Bật</span>
-                </label>
-                <button
-                  type="button"
-                  disabled={fIdx === 0}
-                  onClick={() => {
-                    const next = [...(data.features || [])];
-                    [next[fIdx], next[fIdx - 1]] = [next[fIdx - 1], next[fIdx]];
-                    update({ features: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển lên"
-                >
-                  <ArrowUp className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  disabled={fIdx === (data.features?.length || 0) - 1}
-                  onClick={() => {
-                    const next = [...(data.features || [])];
-                    [next[fIdx], next[fIdx + 1]] = [next[fIdx + 1], next[fIdx]];
-                    update({ features: next });
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                  title="Di chuyển xuống"
-                >
-                  <ArrowDown className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    update({ features: data.features?.filter((_, i) => i !== fIdx) });
-                  }}
-                  className="p-1 text-red-500 hover:text-red-700 cursor-pointer"
-                  title="Xóa cam kết"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Biểu tượng (Icon)</label>
-                <select
-                  value={feat.icon || 'star'}
-                  onChange={(e) => {
-                    const next = [...(data.features || [])];
-                    next[fIdx] = { ...next[fIdx], icon: e.target.value };
-                    update({ features: next });
-                  }}
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                >
-                  <option value="star">⭐ Ngôi sao (Máy lướt/chất)</option>
-                  <option value="shield">🛡️ Khiên bảo vệ (Nguyên zin/Bảo hành)</option>
-                  <option value="refresh">🔄 Mũi tên đổi mới (Đổi lỗi 7 ngày)</option>
-                  <option value="truck">🚚 Xe tải (Giao hàng toàn quốc)</option>
-                  <option value="store">🏬 Cửa hàng (Showroom)</option>
-                  <option value="zap">⚡ Tia sét (Tốc độ)</option>
-                  <option value="headphones">🎧 Tai nghe (Hỗ trợ 24/7)</option>
-                  <option value="sparkles">✨ Lấp lánh (Ưu đãi đặc biệt)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Tiêu đề cam kết *</label>
-                <input
-                  type="text"
-                  value={feat.title}
-                  onChange={(e) => {
-                    const next = [...(data.features || [])];
-                    next[fIdx] = { ...next[fIdx], title: e.target.value };
-                    update({ features: next });
-                  }}
-                  placeholder="Ví dụ: Theo đúng nhu cầu"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Chi tiết mô tả</label>
-                <input
-                  type="text"
-                  value={feat.description}
-                  onChange={(e) => {
-                    const next = [...(data.features || [])];
-                    next[fIdx] = { ...next[fIdx], description: e.target.value };
-                    update({ features: next });
-                  }}
-                  placeholder="Ví dụ: Tư vấn cấu hình chuẩn xác"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Liên kết khi bấm (tùy chọn)</label>
-                <input
-                  type="text"
-                  value={feat.href || ''}
-                  onChange={(e) => {
-                    const next = [...(data.features || [])];
-                    next[fIdx] = { ...next[fIdx], href: e.target.value };
-                    update({ features: next });
-                  }}
-                  placeholder="/chinh-sach-bao-hanh"
-                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
-                />
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CtaForm({
-  data,
-  update,
-  onPickMedia,
-}: {
-  data: CtaData;
-  update: (p: Partial<CtaData>) => void;
-  onPickMedia?: () => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Tiêu đề kêu gọi</label>
-        <input
-          type="text"
-          value={data.title || ''}
-          onChange={(e) => update({ title: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Bạn Cần Tư Vấn Cấu Hình Laptop Phù Hợp?"
-        />
-      </div>
-      <div>
-        <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-        <input
-          type="text"
-          value={data.subtitle || ''}
-          onChange={(e) => update({ subtitle: e.target.value })}
-          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          placeholder="Chuyên viên CitiLap sẵn sàng tư vấn trực tiếp 1-1 qua Zalo hoặc Hotline."
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Nút bấm chính (Zalo)</label>
-          <input
-            type="text"
-            value={data.primaryText || ''}
-            onChange={(e) => update({ primaryText: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Chat Zalo Ngay"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Liên kết nút chính</label>
-          <input
-            type="text"
-            value={data.primaryLink || ''}
-            onChange={(e) => update({ primaryLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
-            placeholder="https://zalo.me"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Nút bấm phụ (Hotline)</label>
-          <input
-            type="text"
-            value={data.secondaryText || ''}
-            onChange={(e) => update({ secondaryText: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Gọi Hotline"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Liên kết nút phụ</label>
-          <input
-            type="text"
-            value={data.secondaryLink || ''}
-            onChange={(e) => update({ secondaryLink: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
-            placeholder="tel:0988123456"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Số điện thoại hiển thị</label>
-          <input
-            type="text"
-            value={data.phone || ''}
-            onChange={(e) => update({ phone: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="0988 123 456"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Ảnh nền (tùy chọn)</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={data.bgImageUrl || ''}
-              onChange={(e) => update({ bgImageUrl: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
-              placeholder="URL hình ảnh"
-            />
-            {onPickMedia && (
-              <button
-                type="button"
-                onClick={onPickMedia}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold shrink-0 cursor-pointer"
-              >
-                Chọn ảnh
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function VideoReviewsForm({
-  data,
-  update,
-  onPickMedia,
-}: {
-  data: VideoReviewsData;
-  update: (p: Partial<VideoReviewsData>) => void;
-  onPickMedia: (videoIdx: number) => void;
-}) {
-  const [syncingYt, setSyncingYt] = useState(false);
-  const [quickUrl, setQuickUrl] = useState('');
-  const [resolvingQuick, setResolvingQuick] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
-
-  const handleSyncYt = async () => {
-    const channel = (data.youtubeUrl || '').trim();
-    if (!channel || syncingYt) return;
-    setSyncingYt(true);
-    setStatusMsg(null);
-    try {
-      const res = await fetch(`/api/admin/fetch-videos?channelUrl=${encodeURIComponent(channel)}&limit=${data.limit || 6}`);
-      const json = await res.json().catch(() => ({}));
-      if (res.ok && json.success && Array.isArray(json.data)) {
-        const existing = data.videos || [];
-        const existingUrls = new Set(existing.map((v) => v.url));
-        const newItems = json.data
-          .filter((v: { url: string }) => !existingUrls.has(v.url))
-          .map((v: { title: string; url: string; thumbnail: string }) => ({
-            title: v.title,
-            url: v.url,
-            thumbnail: v.thumbnail,
-            href: '',
-            enabled: true,
-          }));
-        update({ videos: [...newItems, ...existing].slice(0, 12) });
-        setStatusMsg(`Đã lấy thành công ${newItems.length} video mới nhất từ YouTube.`);
-      } else {
-        setStatusMsg(json.error || 'Không thể lấy video từ kênh YouTube này.');
-      }
-    } catch {
-      setStatusMsg('Lỗi kết nối khi đồng bộ video.');
-    } finally {
-      setSyncingYt(false);
-    }
-  };
-
-  const handleAddQuickUrl = async () => {
-    const raw = quickUrl.trim();
-    if (!raw || resolvingQuick) return;
-    setResolvingQuick(true);
-    setStatusMsg(null);
-    try {
-      const urls = raw.split(/[\n,\s]+/).map((u) => u.trim()).filter(Boolean);
-      let items: Array<{ title: string; url: string; thumbnail: string }> = [];
-      if (urls.length > 1) {
-        const res = await fetch('/api/admin/fetch-videos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ urls }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (json.success && Array.isArray(json.data)) {
-          items = json.data;
-        }
-      } else {
-        const res = await fetch(`/api/admin/fetch-videos?videoUrl=${encodeURIComponent(raw)}`);
-        const json = await res.json().catch(() => ({}));
-        if (json.success && json.data) {
-          items = [json.data];
-        }
-      }
-
-      if (items.length > 0) {
-        const existing = data.videos || [];
-        const existingUrls = new Set(existing.map((v) => v.url));
-        const newItems = items
-          .filter((v) => !existingUrls.has(v.url))
-          .map((v) => ({
-            title: v.title,
-            url: v.url,
-            thumbnail: v.thumbnail,
-            href: '',
-            enabled: true,
-          }));
-        update({ videos: [...newItems, ...existing].slice(0, 12) });
-        setQuickUrl('');
-        setStatusMsg(`Đã thêm ${items.length} video.`);
-      } else {
-        setStatusMsg('Không thể phân giải video từ URL đã nhập.');
-      }
-    } catch {
-      setStatusMsg('Lỗi kết nối khi thêm video.');
-    } finally {
-      setResolvingQuick(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối video review *</label>
-          <input
-            type="text"
-            value={data.title}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Video review sản phẩm"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Tổng hợp video đánh giá chuyên sâu và trải nghiệm thực tế..."
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Số lượng video hiển thị tối đa</label>
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={data.limit || 5}
-            onChange={(e) => update({ limit: Math.min(12, Math.max(1, parseInt(e.target.value) || 5)) })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="font-bold text-slate-700 text-xs">Link Kênh YouTube</label>
-            {data.youtubeUrl && (
-              <button
-                type="button"
-                disabled={syncingYt}
-                onClick={() => void handleSyncYt()}
-                className="text-[10px] text-rose-600 hover:underline font-semibold inline-flex items-center gap-0.5 cursor-pointer disabled:opacity-50"
-              >
-                {syncingYt ? <RefreshCw className="w-2.5 h-2.5 animate-spin" /> : null}
-                Lấy video mới
-              </button>
-            )}
-          </div>
-          <input
-            type="text"
-            value={data.youtubeUrl || ''}
-            onChange={(e) => update({ youtubeUrl: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
-            placeholder="https://www.youtube.com/@thinkview/videos"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Link Kênh TikTok</label>
-          <input
-            type="text"
-            value={data.tiktokUrl || ''}
-            onChange={(e) => update({ tiktokUrl: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs font-mono"
-            placeholder="https://www.tiktok.com/@citilapvn"
-          />
-        </div>
-      </div>
-
-      {/* Quick Video URL input */}
-      <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-2">
-        <label className="font-bold text-slate-700 text-xs block">
-          Dán nhanh link YouTube hoặc TikTok (tự lấy tiêu đề &amp; ảnh thu nhỏ):
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={quickUrl}
-            onChange={(e) => setQuickUrl(e.target.value)}
-            placeholder="Dán URL video YouTube hoặc TikTok (hỗ trợ nhiều link cách nhau bởi xuống dòng)"
-            className="flex-1 px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
-          />
-          <button
-            type="button"
-            disabled={!quickUrl.trim() || resolvingQuick}
-            onClick={() => void handleAddQuickUrl()}
-            className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs inline-flex items-center gap-1 cursor-pointer shrink-0"
-          >
-            {resolvingQuick ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-            Thêm
-          </button>
-        </div>
-        {statusMsg && <p className="text-[11px] text-blue-700 font-medium">{statusMsg}</p>}
-      </div>
-
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800 text-xs">
-            Danh sách video ({data.videos?.length || 0}) • Hiển thị tối đa {data.limit || 5} video
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              const current = data.videos || [];
-              update({
-                videos: [
-                  ...current,
-                  {
-                    title: `Video đánh giá #${current.length + 1}`,
-                    url: '',
-                    thumbnail: '',
-                    href: '',
-                    enabled: true,
-                  },
-                ],
-              });
-            }}
-            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" /> Thêm video
-          </button>
-        </div>
-
-        {data.videos?.map((v, index) => {
-          const ytMatch = youtubeId(v.url || '');
-          return (
-            <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-              <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold flex items-center justify-center shrink-0">
-                    {index + 1}
-                  </span>
-                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shrink-0 ${
-                    v.url?.includes('tiktok.com') || tiktokVideoId(v.url || '')
-                      ? 'bg-slate-900 text-cyan-300'
-                      : 'bg-red-600 text-white'
-                  }`}>
-                    {v.url?.includes('tiktok.com') || tiktokVideoId(v.url || '') ? 'TikTok' : 'YouTube'}
-                  </span>
-                  <span className="font-bold text-xs text-slate-800 truncate">{v.title}</span>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
-                    <input
-                      type="checkbox"
-                      checked={v.enabled !== false}
-                      onChange={(e) => {
-                        const next = [...data.videos];
-                        next[index] = { ...next[index], enabled: e.target.checked };
-                        update({ videos: next });
-                      }}
-                      className="rounded text-blue-600"
-                    />
-                    <span>Bật</span>
-                  </label>
-                  <button
-                    type="button"
-                    disabled={index === 0}
-                    onClick={() => {
-                      const next = [...data.videos];
-                      [next[index], next[index - 1]] = [next[index - 1], next[index]];
-                      update({ videos: next });
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                    title="Di chuyển lên"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={index === data.videos.length - 1}
-                    onClick={() => {
-                      const next = [...data.videos];
-                      [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                      update({ videos: next });
-                    }}
-                    className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                    title="Di chuyển xuống"
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
-                    onClick={() => {
-                      if (!window.confirm(`Xóa video #${index + 1}?`)) return;
-                      update({ videos: data.videos.filter((_, i) => i !== index) });
-                    }}
-                  >
-                    Xóa
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Tiêu đề video *</label>
-                  <input
-                    type="text"
-                    value={v.title}
-                    onChange={(e) => {
-                      const next = [...data.videos];
-                      next[index] = { ...next[index], title: e.target.value };
-                      update({ videos: next });
-                    }}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
-                    placeholder="Ví dụ: Đánh giá chi tiết laptop Lenovo Legion 5"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-0.5">
-                    URL video (YouTube hoặc TikTok) *
-                  </label>
-                  <input
-                    type="text"
-                    value={v.url}
-                    onChange={(e) => {
-                      const next = [...data.videos];
-                      const newUrl = e.target.value;
-                      const yt = youtubeId(newUrl);
-                      next[index] = {
-                        ...next[index],
-                        url: newUrl,
-                        thumbnail: next[index].thumbnail || (yt ? `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` : ''),
-                      };
-                      update({ videos: next });
-                    }}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <div className="flex items-center justify-between mb-0.5">
-                    <label className="text-[11px] font-bold text-slate-700 block">Ảnh đại diện (Thumbnail)</label>
-                    {ytMatch && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const next = [...data.videos];
-                          next[index] = { ...next[index], thumbnail: `https://i.ytimg.com/vi/${ytMatch}/hqdefault.jpg` };
-                          update({ videos: next });
-                        }}
-                        className="text-[10px] text-blue-600 hover:underline font-bold"
-                      >
-                        Lấy từ YouTube ⚡
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <input
-                      type="text"
-                      value={v.thumbnail || ''}
-                      onChange={(e) => {
-                        const next = [...data.videos];
-                        next[index] = { ...next[index], thumbnail: e.target.value };
-                        update({ videos: next });
-                      }}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
-                      placeholder="URL thumbnail"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onPickMedia(index)}
-                      className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
-                    >
-                      Chọn ảnh
-                    </button>
-                    {v.thumbnail && (
-                      <div className="w-12 h-8 rounded border border-slate-200 bg-slate-100 overflow-hidden shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 block mb-0.5">
-                    Liên kết sản phẩm liên quan (tùy chọn)
-                  </label>
-                  <input
-                    type="text"
-                    value={(v as any).href || ''}
-                    onChange={(e) => {
-                      const next = [...data.videos];
-                      next[index] = { ...next[index], href: e.target.value } as any;
-                      update({ videos: next });
-                    }}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
-                    placeholder="/laptop/lenovo-legion-5-pro"
-                  />
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function CustomerGalleryForm({
-  data,
-  update,
-  onPickMedia,
-  onAddMedia,
-}: {
-  data: CustomerGalleryData;
-  update: (p: Partial<CustomerGalleryData>) => void;
-  onPickMedia: (imgIdx: number) => void;
-  onAddMedia: () => void;
-}) {
-  const images = data.images || [];
-  const uniqueUrlCount = new Set(images.map((img) => img.url.trim())).size;
-  const hasDuplicates = images.length > uniqueUrlCount;
-
-  const handleRemoveDuplicates = () => {
-    const seen = new Set<string>();
-    const deduplicated = images.filter((img) => {
-      const url = img.url.trim();
-      if (!url || seen.has(url)) return false;
-      seen.add(url);
-      return true;
-    });
-    update({ images: deduplicated });
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Tiêu đề khối ảnh khách hàng *</label>
-          <input
-            type="text"
-            value={data.title}
-            onChange={(e) => update({ title: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Hình ảnh khách hàng tại CitiLap"
-          />
-        </div>
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Mô tả phụ</label>
-          <input
-            type="text"
-            value={data.subtitle || ''}
-            onChange={(e) => update({ subtitle: e.target.value })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-            placeholder="Hình ảnh khách hàng tin tưởng mua sắm và nhận máy..."
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="font-bold text-slate-700 block mb-1">Số lượng ảnh hiển thị tối đa</label>
-          <input
-            type="number"
-            min={1}
-            max={20}
-            value={data.limit || 10}
-            onChange={(e) => update({ limit: Math.min(20, Math.max(1, parseInt(e.target.value) || 10)) })}
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
-          />
-        </div>
-        {hasDuplicates && (
-          <div className="pt-5">
-            <button
-              type="button"
-              onClick={handleRemoveDuplicates}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs cursor-pointer shadow-xs"
-            >
-              <span>Phát hiện ảnh trùng lặp: Bấm để dọn dẹp</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-3 pt-2">
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-slate-800 text-xs">
-            Danh sách ảnh ({images.length}) • Hiển thị tối đa {data.limit || 10} ảnh
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onAddMedia}
-              className="px-2.5 py-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg cursor-pointer"
-            >
-              + Chọn từ thư viện
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                update({
-                  images: [
-                    ...images,
-                    {
-                      url: '',
-                      alt: `Khách hàng trải nghiệm laptop tại CitiLap #${images.length + 1}`,
-                      href: '',
-                      enabled: true,
-                    },
-                  ],
-                });
-              }}
-              className="px-2.5 py-1 text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer"
-            >
-              + Nhập URL
-            </button>
-          </div>
-        </div>
-
-        {images.map((img, index) => {
-          const isDuplicate = images.findIndex((other) => other.url.trim() === img.url.trim()) !== index;
-          return (
-            <div key={index} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex gap-3 items-start">
-              <div className="w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shrink-0 relative">
-                {img.url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={img.url} alt={img.alt || 'Gallery image'} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-400 text-[10px]">
-                    Chưa có ảnh
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-700 text-xs">Ảnh #{index + 1}</span>
-                    {isDuplicate && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
-                        Trùng lặp URL
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <label className="flex items-center gap-1 text-[11px] text-slate-600 cursor-pointer mr-1">
-                      <input
-                        type="checkbox"
-                        checked={(img as any).enabled !== false}
-                        onChange={(e) => {
-                          const next = [...images];
-                          next[index] = { ...next[index], enabled: e.target.checked } as any;
-                          update({ images: next });
-                        }}
-                        className="rounded text-blue-600"
-                      />
-                      <span>Bật</span>
-                    </label>
-                    <button
-                      type="button"
-                      disabled={index === 0}
-                      onClick={() => {
-                        const next = [...images];
-                        [next[index], next[index - 1]] = [next[index - 1], next[index]];
-                        update({ images: next });
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                      title="Di chuyển lên"
-                    >
-                      <ArrowUp className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      disabled={index === images.length - 1}
-                      onClick={() => {
-                        const next = [...images];
-                        [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                        update({ images: next });
-                      }}
-                      className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-20 cursor-pointer"
-                      title="Di chuyển xuống"
-                    >
-                      <ArrowDown className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="text-xs text-red-500 hover:text-red-700 font-medium cursor-pointer ml-1"
-                      onClick={() => {
-                        if (!window.confirm(`Xóa ảnh #${index + 1}?`)) return;
-                        update({ images: images.filter((_, i) => i !== index) });
-                      }}
-                    >
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">URL ảnh *</label>
-                  <div className="flex gap-1.5">
-                    <input
-                      type="text"
-                      value={img.url}
-                      onChange={(e) => {
-                        const next = [...images];
-                        next[index] = { ...next[index], url: e.target.value };
-                        update({ images: next });
-                      }}
-                      className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
-                      placeholder="https://... hoặc /brand/store-photo-02.webp"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onPickMedia(index)}
-                      className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
-                    >
-                      Chọn ảnh
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Mô tả ảnh (Alt)</label>
-                    <input
-                      type="text"
-                      value={img.alt}
-                      onChange={(e) => {
-                        const next = [...images];
-                        next[index] = { ...next[index], alt: e.target.value };
-                        update({ images: next });
-                      }}
-                      className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white"
-                      placeholder="Ví dụ: Khách hàng mua laptop tại CitiLap"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-600 block mb-0.5">Liên kết khi click (tùy chọn)</label>
-                    <input
-                      type="text"
-                      value={(img as any).href || ''}
-                      onChange={(e) => {
-                        const next = [...images];
-                        next[index] = { ...next[index], href: e.target.value } as any;
-                        update({ images: next });
-                      }}
-                      className="w-full px-2.5 py-1 border border-slate-300 rounded text-xs bg-white font-mono"
-                      placeholder="/laptop-gaming"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-

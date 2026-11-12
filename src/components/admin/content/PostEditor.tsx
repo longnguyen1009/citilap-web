@@ -1,6 +1,14 @@
 'use client';
 import { useRef } from 'react';
-import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
+import {
+  useDraftAutosave,
+  useAdminActorId,
+  clearCommittedLocalDraft,
+  transferNewEntityDraftBackup,
+  writeLocalDraftBackup,
+  setFirstSaveHandoff,
+  consumeFirstSaveHandoff,
+} from '@/components/admin/useDraftAutosave';
 import DraftRecovery from '@/components/admin/DraftRecovery';
 import SchedulePanel from '@/components/admin/SchedulePanel';
 
@@ -30,8 +38,10 @@ import {
   InlineAlert,
   AdminLoadingState,
   AdminErrorState,
+  useConfirm,
+  useToast,
 } from '@/components/admin/ui';
-import { blankPost, type PostDocument } from '@/contracts/cms/post';
+import { blankPost, postDocumentSchema, type PostDocument } from '@/contracts/cms/post';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
 import MediaUpload from '@/components/admin/media/MediaUpload';
@@ -67,10 +77,15 @@ interface PostRevisionItem {
 
 export default function PostEditor({ id }: { id: string | null }) {
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
+  const actorId = useAdminActorId();
+  const storageKey = id ? `post-${id}` : 'post-new';
 
   const [doc, setDoc] = useState<PostDocument>(blankPost());
   const [revision, setRevision] = useState(0);
-  const latestDoc = useRef(doc), saveLock = useRef(false);
+  const [serverRevision, setServerRevision] = useState(0);
+  const latestDoc = useRef(doc), saveLock = useRef(false), editVersionRef = useRef(0);
   useEffect(() => { latestDoc.current = doc; }, [doc]);
   const [isPublished, setIsPublished] = useState(false);
   const [loading, setLoading] = useState(!!id);
@@ -106,6 +121,20 @@ export default function PostEditor({ id }: { id: string | null }) {
 
   useEffect(() => {
     if (!id) return;
+    if (refreshTrigger === 0) {
+      const handoff = consumeFirstSaveHandoff<PostDocument>(`post-${id}`, actorId);
+      if (handoff) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate first-save route handoff without discarding newer edits
+        setDoc(handoff.latestDoc);
+        latestDoc.current = handoff.latestDoc;
+        setRevision(handoff.revision);
+        setServerRevision(handoff.revision);
+        setIsPublished(handoff.published);
+        setHasUnsavedChanges(handoff.isDirty);
+        setLoading(false);
+        return;
+      }
+    }
     let ignore = false;
     async function fetchPost() {
       setError(null);
@@ -113,7 +142,9 @@ export default function PostEditor({ id }: { id: string | null }) {
         const data = await mediaRequest<{ id: string; revision: number; document: PostDocument; published: boolean }>(`/api/admin/posts/${id}`);
         if (!ignore) {
           setDoc(data.document);
+          latestDoc.current = data.document;
           setRevision(data.revision);
+          setServerRevision(data.revision);
           setIsPublished(data.published);
           setHasUnsavedChanges(false);
           setLoading(false);
@@ -127,7 +158,7 @@ export default function PostEditor({ id }: { id: string | null }) {
     }
     void fetchPost();
     return () => { ignore = true; };
-  }, [id, refreshTrigger]);
+  }, [id, refreshTrigger, actorId]);
 
   const loadPost = useCallback(() => {
     setLoading(true);
@@ -153,14 +184,24 @@ export default function PostEditor({ id }: { id: string | null }) {
   }, [doc.relatedProductIds, relatedProductDetails]);
 
   const updateDoc = <K extends keyof PostDocument>(field: K, value: PostDocument[K]) => {
-    setDoc(prev => ({ ...prev, [field]: value }));
+    editVersionRef.current += 1;
+    setDoc(prev => {
+      const next = { ...prev, [field]: value };
+      latestDoc.current = next;
+      return next;
+    });
     setHasUnsavedChanges(true);
     setSaveSuccess(null);
     setConflictError(null);
   };
 
   const updateSeo = (field: keyof PostDocument['seo'], value: unknown) => {
-    setDoc(prev => ({ ...prev, seo: { ...prev.seo, [field]: value } }));
+    editVersionRef.current += 1;
+    setDoc(prev => {
+      const next = { ...prev, seo: { ...prev.seo, [field]: value } };
+      latestDoc.current = next;
+      return next;
+    });
     setHasUnsavedChanges(true);
     setSaveSuccess(null);
     setConflictError(null);
@@ -182,7 +223,8 @@ export default function PostEditor({ id }: { id: string | null }) {
   const handleSave = async (action: 'save' | 'publish' | 'unpublish') => {
     if (saveLock.current) return false;
     saveLock.current = true;
-    const submitted = JSON.stringify(doc);
+    const submittedEditVersion = editVersionRef.current;
+    const submittedDocSnapshot = structuredClone(doc);
     setSaving(true);
     setConflictError(null);
     setSaveSuccess(null);
@@ -195,7 +237,7 @@ export default function PostEditor({ id }: { id: string | null }) {
       const payload = {
         expectedRevision: revision,
         action,
-        document: doc,
+        document: submittedDocSnapshot,
       };
 
       const result = await mediaRequest<{ id: string; revision: number; document: PostDocument; published: boolean }>(url, {
@@ -204,10 +246,47 @@ export default function PostEditor({ id }: { id: string | null }) {
         body: JSON.stringify(payload),
       });
 
+      const hasNewerEdits = editVersionRef.current !== submittedEditVersion;
       setRevision(result.revision);
+      setServerRevision(result.revision);
       setIsPublished(result.published);
-      if (JSON.stringify(latestDoc.current) === submitted) setDoc(result.document);
-      setHasUnsavedChanges(JSON.stringify(latestDoc.current) !== submitted);
+
+      if (!id && result.id) {
+        const nextEntityKey = `post-${result.id}`;
+        const currentLatestDoc = hasNewerEdits ? latestDoc.current : result.document;
+        if (hasNewerEdits) {
+          transferNewEntityDraftBackup({
+            actorId,
+            fromEntityKey: 'post-new',
+            toEntityKey: nextEntityKey,
+            submittedDraft: submittedDocSnapshot,
+            latestDraft: currentLatestDoc,
+            newBaseRevision: result.revision,
+          });
+        } else {
+          setDoc(result.document);
+          latestDoc.current = result.document;
+          setHasUnsavedChanges(false);
+          clearCommittedLocalDraft('post-new', submittedDocSnapshot, actorId);
+        }
+        setFirstSaveHandoff<PostDocument>(nextEntityKey, {
+          actorId,
+          revision: result.revision,
+          published: result.published,
+          committedDoc: result.document,
+          latestDoc: currentLatestDoc,
+          isDirty: hasNewerEdits,
+        });
+        router.replace(`/admin/posts/${result.id}`);
+      } else if (!hasNewerEdits) {
+        setDoc(result.document);
+        latestDoc.current = result.document;
+        setHasUnsavedChanges(false);
+        clearCommittedLocalDraft(storageKey, submittedDocSnapshot, actorId);
+      } else {
+        setHasUnsavedChanges(true);
+        writeLocalDraftBackup(storageKey, latestDoc.current, result.revision, actorId);
+      }
 
       if (action === 'publish') {
         setSaveSuccess('Đã xuất bản bài viết lên website.');
@@ -215,10 +294,6 @@ export default function PostEditor({ id }: { id: string | null }) {
         setSaveSuccess('Đã ẩn bài viết khỏi website.');
       } else {
         setSaveSuccess(`Đã lưu nháp (#v${result.revision}).`);
-      }
-
-      if (!id && result.id) {
-        router.replace(`/admin/posts/${result.id}`);
       }
       return true;
     } catch (err: unknown) {
@@ -235,7 +310,15 @@ export default function PostEditor({ id }: { id: string | null }) {
     }
   };
 
-  const autosaveStatus = useDraftAutosave(doc, revision, !!id && !loading, hasUnsavedChanges, saving, () => handleSave('save'));
+  const autosaveStatus = useDraftAutosave(
+    doc,
+    revision,
+    !loading,
+    hasUnsavedChanges,
+    saving,
+    () => handleSave('save'),
+    storageKey
+  );
 
   const loadHistory = async () => {
     if (!id) return;
@@ -252,7 +335,13 @@ export default function PostEditor({ id }: { id: string | null }) {
 
   const handleRestore = async (targetRev: number) => {
     if (!id || saveLock.current) return;
-    const confirmed = window.confirm(`Khôi phục phiên bản #${targetRev} thành bản nháp mới?`);
+    const confirmed = await confirm({
+      title: 'Khôi phục phiên bản bài viết',
+      message: `Khôi phục phiên bản #${targetRev} của bài viết "${doc.title || id}" thành bản nháp mới?`,
+      confirmLabel: 'Khôi phục',
+      cancelLabel: 'Hủy',
+      variant: 'warning',
+    });
     if (!confirmed) return;
 
     saveLock.current = true;
@@ -265,12 +354,20 @@ export default function PostEditor({ id }: { id: string | null }) {
         body: JSON.stringify({ expectedRevision: revision }),
       });
       setRevision(result.newRevision);
-      if (JSON.stringify(latestDoc.current) === beforeRestore) setDoc(result.document);
+      setServerRevision(result.newRevision);
+      if (JSON.stringify(latestDoc.current) === beforeRestore) {
+        setDoc(result.document);
+        latestDoc.current = result.document;
+      }
       setHasUnsavedChanges(JSON.stringify(latestDoc.current) !== beforeRestore);
-      setSaveSuccess(`Đã khôi phục #${targetRev} thành nháp mới (rev #${result.newRevision}).`);
+      const msg = `Đã khôi phục #${targetRev} thành nháp mới (rev #${result.newRevision}).`;
+      setSaveSuccess(msg);
+      toast.success(msg);
       setHistoryOpen(false);
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể khôi phục phiên bản.');
+      const msg = err instanceof Error ? err.message : 'Không thể khôi phục phiên bản.';
+      setError(msg);
+      toast.error(msg);
     } finally {
       saveLock.current = false;
       setSaving(false);
@@ -292,7 +389,7 @@ export default function PostEditor({ id }: { id: string | null }) {
   const addRelatedProduct = (product: ProductPickerOption) => {
     if (doc.relatedProductIds.includes(product.id)) return;
     if (doc.relatedProductIds.length >= 10) {
-      alert('Tối đa 10 sản phẩm liên quan.');
+      toast.warning('Tối đa 10 sản phẩm liên quan.');
       return;
     }
     setRelatedProductDetails(prev => ({ ...prev, [product.id]: product }));
@@ -699,7 +796,71 @@ export default function PostEditor({ id }: { id: string | null }) {
 
               <div className="pt-1 space-y-2 text-xs">
                 <SchedulePanel entityType="post" entityId={id} revision={revision} dirty={hasUnsavedChanges || saving} />
-                {hasUnsavedChanges && id && <DraftRecovery draft={doc} endpoint={`/api/admin/posts/${id}`} />}
+                <DraftRecovery
+                  draft={doc}
+                  endpoint={id ? `/api/admin/posts/${id}` : undefined}
+                  storageKey={storageKey}
+                  currentRevision={revision}
+                  serverRevision={serverRevision}
+                  dirty={hasUnsavedChanges}
+                  validateDraft={(candidate) => {
+                    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+                      return { ok: false, error: 'Bản nháp bài viết không đúng định dạng đối tượng.' };
+                    }
+                    const rec = candidate as Record<string, unknown>;
+                    if (
+                      typeof rec.title !== 'string' ||
+                      typeof rec.slug !== 'string' ||
+                      typeof rec.contentHtml !== 'string'
+                    ) {
+                      return { ok: false, error: 'Thiếu trường thông tin cơ bản của bài viết.' };
+                    }
+                    const direct = postDocumentSchema.safeParse(candidate);
+                    if (direct.success) {
+                      return { ok: true, data: direct.data };
+                    }
+                    const withPlaceholders = postDocumentSchema.safeParse({
+                      ...rec,
+                      title: rec.title.trim() || 'draft',
+                      slug: rec.slug.trim() || 'draft',
+                      contentHtml: rec.contentHtml.trim() || '<p>draft</p>',
+                    });
+                    if (withPlaceholders.success) {
+                      return {
+                        ok: true,
+                        data: {
+                          ...withPlaceholders.data,
+                          title: rec.title,
+                          slug: rec.slug,
+                          contentHtml: rec.contentHtml,
+                        },
+                      };
+                    }
+                    return {
+                      ok: false,
+                      error:
+                        direct.error.issues[0]?.message ||
+                        'Cấu trúc dữ liệu bài viết không hợp lệ.',
+                    };
+                  }}
+                  onRestoreLocal={(restored, meta) => {
+                    const validDoc = restored as PostDocument;
+                    editVersionRef.current += 1;
+                    setDoc(validDoc);
+                    latestDoc.current = validDoc;
+                    setRevision(meta.baseRevision);
+                    setHasUnsavedChanges(true);
+                    if (meta.isStale) {
+                      setConflictError(
+                        `Đã khôi phục bản nháp từ phiên bản cũ (r${meta.baseRevision}, máy chủ hiện tại r${serverRevision}). Lưu trực tiếp sẽ kiểm tra xung đột phiên bản để không ghi đè nhầm dữ liệu mới.`
+                      );
+                      toast.warning('Đã khôi phục bản nháp (phiên bản gốc cũ hơn máy chủ).');
+                    } else {
+                      setConflictError(null);
+                      toast.success('Đã khôi phục bản nháp tạm từ trình duyệt.');
+                    }
+                  }}
+                />
               </div>
             </div>
           </AdminCard>

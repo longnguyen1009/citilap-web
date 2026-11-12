@@ -63,7 +63,7 @@ async function POSTHandler(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Dữ liệu chiến dịch không hợp lệ.',
+          error: error.issues[0]?.message || 'Dữ liệu chiến dịch không hợp lệ.',
           details: error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
         },
         { status: 400 }

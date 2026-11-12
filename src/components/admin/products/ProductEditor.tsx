@@ -1,16 +1,36 @@
 'use client';
-import { useRef } from 'react';
-import { useDraftAutosave } from '@/components/admin/useDraftAutosave';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  useDraftAutosave,
+  useAdminActorId,
+  clearCommittedLocalDraft,
+  transferNewEntityDraftBackup,
+  writeLocalDraftBackup,
+  setFirstSaveHandoff,
+  consumeFirstSaveHandoff,
+} from '@/components/admin/useDraftAutosave';
 import DraftRecovery from '@/components/admin/DraftRecovery';
 import SchedulePanel from '@/components/admin/SchedulePanel';
 import InspectionEditor from './InspectionEditor';
 import ProductStorefrontFields from './ProductStorefrontFields';
+import VariantMatrixGeneratorPanel, {
+  deduplicateSku,
+  slugifySkuPart,
+} from './VariantMatrixGeneratorPanel';
+import {
+  ProductRevisionHistoryTab,
+  ProductRevisionModals,
+  type RevisionItem,
+  type SnapshotDetail,
+} from './ProductRevisionsModal';
+import {
+  ProductSeoChecklistPanel,
+  ProductPreviewModal,
+  RelatedProductsPickerModal,
+} from './ProductSeoAndModals';
 import { productHref } from '@/lib/product-paths';
-
-
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { catalogNeedTag } from '@/lib/catalog-needs';
 
 const NEED_PRESETS = [
@@ -32,12 +52,10 @@ import {
   Plus,
   Trash2,
   Image as ImageIcon,
-  AlertTriangle,
   Layers,
   Cpu,
   DollarSign,
   FileText,
-  Search,
   ExternalLink,
   History,
   ArrowUp,
@@ -56,6 +74,7 @@ import {
   InlineAlert,
   AdminLoadingState,
   AdminErrorState,
+  useToast,
 } from '@/components/admin/ui';
 import {
   attributeTemplates,
@@ -107,25 +126,6 @@ interface ProductEditorProps {
 
 type TabKey = 'info' | 'specs' | 'pricing' | 'media' | 'content' | 'extras' | 'inspection' | 'seo' | 'history';
 
-interface RevisionItem {
-  revision: number;
-  action: string;
-  createdAt: string;
-  actorName: string;
-  summary: string;
-  isCurrent: boolean;
-  isPublished: boolean;
-  isLegacy: boolean;
-}
-
-interface SnapshotDetail {
-  productId: string;
-  revision: number;
-  action: string;
-  createdAt: string;
-  document: ProductDocument;
-}
-
 const money = (n: number) => new Intl.NumberFormat('vi-VN').format(n) + 'đ';
 
 const formatNumberDots = (n: number | null | undefined): string => {
@@ -148,16 +148,24 @@ const VARIANT_TAG_PRESETS = ['Đa nhiệm mượt', 'Bán chạy', 'Đáng mua',
 
 export default function ProductEditor({ id }: ProductEditorProps) {
   const router = useRouter();
+  const toast = useToast();
+  const actorId = useAdminActorId();
+  const draftStorageKey = id ? `product-${id}` : 'product-new';
   const [activeTab, setActiveTab] = useState<TabKey>('info');
   const [doc, setDoc] = useState<ProductDocument | null>(null);
   const [revision, setRevision] = useState<number>(0);
-  const latestDoc=useRef(doc), saveLock=useRef(false);
+  const [serverRevision, setServerRevision] = useState<number>(0);
+  const latestDoc = useRef(doc);
+  const saveLock = useRef(false);
   const createdId = useRef<string | null>(null);
-  useEffect(()=>{latestDoc.current=doc;},[doc]);
+  const editVersionRef = useRef<number>(0);
+  useEffect(() => {
+    latestDoc.current = doc;
+  }, [doc]);
   const [isPublished, setIsPublished] = useState<boolean>(false);
   const [publishedSummary, setPublishedSummary] = useState<DetailResponse['publishedSummary']>(null);
   const [hasUnpublishedDraft, setHasUnpublishedDraft] = useState(false);
-  const [baseline, setBaseline] = useState<string>('');
+  const [isDirty, setIsDirty] = useState<boolean>(false);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [brands, setBrands] = useState<BrandOption[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -192,10 +200,35 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [newSpecValue, setNewSpecValue] = useState<string>('');
   const [historyOpen, setHistoryOpen] = useState<boolean>(false);
 
-  const isDirty = !!doc && JSON.stringify(doc) !== baseline;
+  const markDirty = useCallback(() => {
+    editVersionRef.current += 1;
+    setIsDirty(true);
+  }, []);
 
   // Load categories, brands, and product data
   const loadData = useCallback(async () => {
+    if (id) {
+      const handoff = consumeFirstSaveHandoff<ProductDocument>(`product-${id}`, actorId);
+      if (handoff) {
+        if (Array.isArray(handoff.categories)) {
+          setCategories(handoff.categories as CategoryOption[]);
+        }
+        if (Array.isArray(handoff.brands)) {
+          setBrands(handoff.brands as BrandOption[]);
+        }
+        setDoc(handoff.latestDoc);
+        latestDoc.current = handoff.latestDoc;
+        setRevision(handoff.revision);
+        setServerRevision(handoff.revision);
+        setIsPublished(handoff.published);
+        setPublishedSummary((handoff.publishedSummary as DetailResponse['publishedSummary']) ?? null);
+        setHasUnpublishedDraft(Boolean(handoff.hasUnpublishedDraft));
+        setIsDirty(handoff.isDirty);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     setLoadError(null);
     try {
@@ -210,31 +243,41 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       // 3. Fetch product if editing
       if (detail) {
         setDoc(detail.document);
+        latestDoc.current = detail.document;
         setRevision(detail.revision);
+        setServerRevision(detail.revision);
         setIsPublished(detail.published);
         setPublishedSummary(detail.publishedSummary);
         setHasUnpublishedDraft(detail.hasUnpublishedDraft);
-        setBaseline(JSON.stringify(detail.document));
+        setIsDirty(false);
       } else {
         const initial = blankProduct();
         setDoc(initial);
+        latestDoc.current = initial;
         setRevision(0);
+        setServerRevision(0);
         setIsPublished(false);
         setPublishedSummary(null);
         setHasUnpublishedDraft(false);
-        setBaseline(JSON.stringify(initial));
+        setIsDirty(false);
       }
     } catch (err) {
       setLoadError((err as Error).message || 'Không thể tải dữ liệu sản phẩm.');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, actorId]);
 
   const [errorTabs, setErrorTabs] = useState<Set<TabKey>>(new Set());
 
   const updateDoc = <K extends keyof ProductDocument>(key: K, value: ProductDocument[K]) => {
-    setDoc(prev => (prev ? { ...prev, [key]: value } : prev));
+    markDirty();
+    setDoc(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, [key]: value };
+      latestDoc.current = next;
+      return next;
+    });
     setErrorTabs(prev => {
       if (prev.size === 0) return prev;
       const next = new Set(prev);
@@ -250,6 +293,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   };
 
   const handleAssignVariantImage = (variantId: string, assetId: string | null, assetFallbackAlt?: string) => {
+    markDirty();
     setDoc(prev => {
       if (!prev) return prev;
       const targetVariant = prev.variants.find(v => v.id === variantId);
@@ -295,7 +339,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const [matrixRAMs, setMatrixRAMs] = useState<string[]>(['16GB DDR5', '32GB DDR5']);
   const [matrixSSDs, setMatrixSSDs] = useState<string[]>(['512GB NVMe', '1TB NVMe']);
   const [matrixGPU, setMatrixGPU] = useState<string>('RTX 4060 8GB');
-  const [matrixBasePrice, setMatrixBasePrice] = useState<number>(25000000);
+  const [matrixBasePrice, setMatrixBasePrice] = useState<number>(0);
   const [matrixStepPrice, setMatrixStepPrice] = useState<number>(2000000);
 
   const [quickAddName, setQuickAddName] = useState<string>('');
@@ -315,7 +359,16 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     const name = quickAddName.trim();
     const priceNum = parseNumberDots(quickAddPrice);
     const price = priceNum !== null && priceNum >= 0 ? priceNum : doc.price;
-    const sku = (quickAddSku.trim() || `${doc.slug || 'SP'}-${doc.variants.length + 1}`).toUpperCase();
+    const takenSkus = new Set(doc.variants.map(v => v.sku.trim().toUpperCase()).filter(Boolean));
+    const ramSlug = quickAddRam.trim() ? slugifySkuPart(quickAddRam.trim().split(/\s+/)[0] || quickAddRam.trim()) : '';
+    const ssdSlug = quickAddStorage.trim() ? slugifySkuPart(quickAddStorage.trim().split(/\s+/)[0] || quickAddStorage.trim()) : '';
+    const gpuSlug = quickAddGpu.trim() ? slugifySkuPart(quickAddGpu.trim()) : '';
+    const autoSkuParts = [doc.slug || 'SP', ramSlug, ssdSlug, gpuSlug].filter(Boolean);
+    const rawCandidateSku =
+      quickAddSku.trim() ||
+      (autoSkuParts.length > 1 ? autoSkuParts.join('-') : `${doc.slug || 'SP'}-${doc.variants.length + 1}`);
+    const sku = deduplicateSku(rawCandidateSku, takenSkus);
+
     const origPriceNum = parseNumberDots(quickAddOriginalPrice);
     const originalPrice = origPriceNum !== null && origPriceNum >= 0 ? origPriceNum : null;
     const stockNum = parseInt(quickAddStock, 10);
@@ -359,7 +412,11 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     if (!doc) return;
     const source = doc.variants[idx];
     if (!source) return;
-    const newSku = `${source.sku || doc.slug || 'SP'}-COPY-${doc.variants.length + 1}`.toUpperCase();
+    const takenSkus = new Set(doc.variants.map(v => v.sku.trim().toUpperCase()).filter(Boolean));
+    const gpuSuffix = source.gpu && !source.sku?.toUpperCase().includes(slugifySkuPart(source.gpu))
+      ? `-${slugifySkuPart(source.gpu)}`
+      : '';
+    const newSku = deduplicateSku(`${source.sku || doc.slug || 'SP'}${gpuSuffix}-COPY`, takenSkus);
     const cloned = {
       ...source,
       id: crypto.randomUUID(),
@@ -372,6 +429,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   };
 
   const handleDeleteVariant = (variantId: string) => {
+    markDirty();
     setDoc(current => current && ({
       ...current,
       variants: current.variants.filter(v => v.id !== variantId),
@@ -383,19 +441,24 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     if (!doc) return;
     const rams = matrixRAMs.length > 0 ? matrixRAMs : ['16GB DDR5'];
     const ssds = matrixSSDs.length > 0 ? matrixSSDs : ['512GB NVMe'];
+    const base = matrixBasePrice > 0 ? matrixBasePrice : doc.price;
+    const takenSkus = new Set(doc.variants.map(v => v.sku.trim().toUpperCase()).filter(Boolean));
+    const gpuClean = matrixGPU.trim();
+    const gpuSlug = gpuClean ? `-${slugifySkuPart(gpuClean)}` : '';
     const newVariants = [];
     let stepIndex = 0;
 
     for (const r of rams) {
       for (const s of ssds) {
-        const variantPrice = (matrixBasePrice || doc.price) + (stepIndex * matrixStepPrice);
+        const variantPrice = base + (stepIndex * matrixStepPrice);
         stepIndex++;
         const ramShort = r.split(' ')[0] || r;
         const ssdShort = s.split(' ')[0] || s;
+        const sku = deduplicateSku(`${doc.slug || 'SP'}-${ramShort}-${ssdShort}${gpuSlug}`, takenSkus);
         newVariants.push({
           id: crypto.randomUUID(),
-          name: `${ramShort} · ${ssdShort}${matrixGPU ? ' · ' + matrixGPU.split(' ')[0] : ''}`,
-          sku: `${doc.slug || 'SP'}-${ramShort}-${ssdShort}`.toUpperCase(),
+          name: `${ramShort} · ${ssdShort}${gpuClean ? ' · ' + gpuClean.split(' ')[0] : ''}`,
+          sku,
           condition: 'NEW' as const,
           price: variantPrice,
           originalPrice: null,
@@ -403,7 +466,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
           availability: 'AVAILABLE' as const,
           ram: r,
           storage: s,
-          gpu: matrixGPU || undefined,
+          gpu: gpuClean || undefined,
           options: {},
           image: '',
         });
@@ -474,51 +537,56 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
   const handleSave = useCallback(async (action: 'save' | 'publish' | 'unpublish') => {
     if (!doc || saveLock.current) return false;
-    const validation = productDocumentSchema.safeParse(doc);
-    if (!validation.success) {
-      const issue = validation.error.issues[0];
-      const field = String(issue.path[0] || '');
-      const labels: Record<string, string> = {
-        name: 'Tên sản phẩm',
-        slug: 'Đường dẫn',
-        categoryId: 'Danh mục',
-        price: 'Giá bán',
-        originalPrice: 'Giá gốc',
-        variants: 'Cấu hình',
-        specs: 'Thông số',
-        media: 'Ảnh',
-        warranties: 'Bảo hành',
-        tags: 'Thẻ tag',
-        faqs: 'Câu hỏi',
-        gifts: 'Quà tặng',
-        seoTitle: 'Tiêu đề SEO',
-        seoDescription: 'Mô tả SEO',
-      };
+    if (action !== 'unpublish') {
+      const validation = productDocumentSchema.safeParse(doc);
+      if (!validation.success) {
+        const issue = validation.error.issues[0];
+        const field = String(issue.path[0] || '');
+        const labels: Record<string, string> = {
+          name: 'Tên sản phẩm',
+          slug: 'Đường dẫn',
+          categoryId: 'Danh mục',
+          price: 'Giá bán',
+          originalPrice: 'Giá gốc',
+          variants: 'Cấu hình',
+          specs: 'Thông số',
+          media: 'Ảnh',
+          warranties: 'Bảo hành',
+          tags: 'Thẻ tag',
+          faqs: 'Câu hỏi',
+          gifts: 'Quà tặng',
+          seoTitle: 'Tiêu đề SEO',
+          seoDescription: 'Mô tả SEO',
+        };
 
-      const invalidTabs = new Set<TabKey>();
-      for (const iss of validation.error.issues) {
-        const f = String(iss.path[0] || '');
-        if (['price', 'originalPrice', 'variants', 'warranties'].includes(f)) invalidTabs.add('pricing');
-        else if (f === 'media') invalidTabs.add('media');
-        else if (f === 'specs') invalidTabs.add('specs');
-        else if (['faqs', 'gifts', 'accessoryProductIds'].includes(f)) invalidTabs.add('extras');
-        else if (['seoTitle', 'seoDescription'].includes(f)) invalidTabs.add('seo');
-        else if (f === 'contentHtml') invalidTabs.add('content');
-        else invalidTabs.add('info');
-      }
-      setErrorTabs(invalidTabs);
-      setActiveTab(Array.from(invalidTabs)[0] || 'info');
-      setStatusMessage({
-        type: 'error',
-        text: field
+        const invalidTabs = new Set<TabKey>();
+        for (const iss of validation.error.issues) {
+          const f = String(iss.path[0] || '');
+          if (['price', 'originalPrice', 'variants', 'warranties'].includes(f)) invalidTabs.add('pricing');
+          else if (f === 'media') invalidTabs.add('media');
+          else if (f === 'specs') invalidTabs.add('specs');
+          else if (['faqs', 'gifts', 'accessoryProductIds'].includes(f)) invalidTabs.add('extras');
+          else if (['seoTitle', 'seoDescription'].includes(f)) invalidTabs.add('seo');
+          else if (f === 'contentHtml') invalidTabs.add('content');
+          else invalidTabs.add('info');
+        }
+        setErrorTabs(invalidTabs);
+        setActiveTab(Array.from(invalidTabs)[0] || 'info');
+        const msg = field
           ? `${labels[field] || field}: ${issue.code === 'custom' ? issue.message : 'kiểm tra giá trị, độ dài và trường bắt buộc.'}`
-          : issue.message,
-      });
-      return false;
+          : issue.message;
+        setStatusMessage({
+          type: 'error',
+          text: msg,
+        });
+        toast.error(msg);
+        return false;
+      }
     }
     setErrorTabs(new Set());
-    saveLock.current=true;
-    const submitted=JSON.stringify(doc);
+    saveLock.current = true;
+    const submittedEditVersion = editVersionRef.current;
+    const submittedDocSnapshot = structuredClone(doc);
     setSaving(true);
     setStatusMessage(null);
 
@@ -533,29 +601,73 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         body: JSON.stringify({
           expectedRevision: revision,
           action,
-          document: doc,
+          document: submittedDocSnapshot,
         }),
       });
 
-      if(JSON.stringify(latestDoc.current)===submitted)setDoc(result.document);
+      const hasNewerEdits = editVersionRef.current !== submittedEditVersion;
       setRevision(result.revision);
+      setServerRevision(result.revision);
       setIsPublished(result.published);
       setPublishedSummary(result.publishedSummary);
       setHasUnpublishedDraft(result.hasUnpublishedDraft);
-      setBaseline(JSON.stringify(result.document));
 
+      if (!id && result.id) {
+        const nextEntityKey = `product-${result.id}`;
+        const currentLatestDoc =
+          hasNewerEdits && latestDoc.current ? latestDoc.current : result.document;
+        if (hasNewerEdits) {
+          transferNewEntityDraftBackup({
+            actorId,
+            fromEntityKey: 'product-new',
+            toEntityKey: nextEntityKey,
+            submittedDraft: submittedDocSnapshot,
+            latestDraft: currentLatestDoc,
+            newBaseRevision: result.revision,
+          });
+        } else {
+          if (action !== 'unpublish') {
+            setDoc(result.document);
+            latestDoc.current = result.document;
+          }
+          setIsDirty(false);
+          clearCommittedLocalDraft('product-new', submittedDocSnapshot, actorId);
+        }
+        setFirstSaveHandoff<ProductDocument>(nextEntityKey, {
+          actorId,
+          revision: result.revision,
+          published: result.published,
+          publishedSummary: result.publishedSummary,
+          hasUnpublishedDraft: result.hasUnpublishedDraft,
+          committedDoc: result.document,
+          latestDoc: currentLatestDoc,
+          isDirty: hasNewerEdits,
+          categories,
+          brands,
+        });
+        createdId.current = result.id;
+        router.replace(`/admin/products/${result.id}`);
+      } else if (!hasNewerEdits) {
+        if (action !== 'unpublish') {
+          setDoc(result.document);
+          latestDoc.current = result.document;
+        }
+        setIsDirty(false);
+        clearCommittedLocalDraft(draftStorageKey, submittedDocSnapshot, actorId);
+      } else if (latestDoc.current) {
+        // User edited during pending save: preserve newer in-memory edits and update local backup baseRevision
+        writeLocalDraftBackup(draftStorageKey, latestDoc.current, result.revision, actorId);
+      }
 
       if (action === 'publish') {
         setStatusMessage({ type: 'success', text: 'Đã xuất bản sản phẩm lên website thành công.' });
+        toast.success('Đã xuất bản sản phẩm lên website thành công.');
       } else if (action === 'unpublish') {
         setStatusMessage({ type: 'warning', text: 'Đã ẩn sản phẩm khỏi website.' });
+        toast.warning('Đã ẩn sản phẩm khỏi website.');
       } else {
         setStatusMessage({ type: 'success', text: 'Đã lưu bản nháp an toàn.' });
-      }
-
-      if (!id && result.id) {
-        createdId.current = result.id;
-        router.replace(`/admin/products/${result.id}`);
+        toast.success('Đã lưu bản nháp an toàn.');
       }
       return true;
     } catch (err) {
@@ -564,31 +676,28 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         type: 'error',
         text: `${errorMsg} Nội dung vẫn giữ trong trình soạn thảo. Lưu lại trước khi rời trang.`,
       });
+      toast.error(errorMsg);
       return false;
     } finally {
-      saveLock.current=false;
+      saveLock.current = false;
       setSaving(false);
     }
-  }, [doc, id, revision, router]);
+  }, [doc, id, revision, router, draftStorageKey, toast, actorId, categories, brands]);
 
-  const autosaveStatus=useDraftAutosave(doc,revision,!!id && !loading && productDocumentSchema.safeParse(doc).success,isDirty,saving,()=>handleSave('save'));
+  const autosaveStatus = useDraftAutosave(
+    doc,
+    revision,
+    !loading && !!doc,
+    isDirty,
+    saving,
+    () => handleSave('save'),
+    draftStorageKey
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data hydration from API
     void loadData();
   }, [loadData]);
-
-  // Keyboard shortcut Ctrl+S / Cmd+S
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (!saving && doc) void handleSave('save');
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saving, doc, handleSave]);
 
   const fetchRevisions = useCallback(async () => {
     if (!id) return;
@@ -635,7 +744,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
   const handleRestore = async (targetRev: number) => {
     if (!id || saveLock.current) return;
     saveLock.current = true;
-    const beforeRestore = JSON.stringify(latestDoc.current);
+    const submittedEditVersion = editVersionRef.current;
     setRestoring(true);
     setSaving(true);
     setStatusMessage(null);
@@ -652,16 +761,22 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         body: JSON.stringify({ expectedRevision: revision }),
       });
 
-      if (JSON.stringify(latestDoc.current) === beforeRestore) setDoc(res.document);
+      if (editVersionRef.current === submittedEditVersion) {
+        setDoc(res.document);
+        latestDoc.current = res.document;
+        setIsDirty(false);
+      }
       setRevision(res.newRevision);
-      setBaseline(JSON.stringify(res.document));
+      setServerRevision(res.newRevision);
       setHasUnpublishedDraft(isPublished);
       setRestoreConfirmRev(null);
       setSelectedRevisionSnapshot(null);
+      const msg = `Đã khôi phục phiên bản #${targetRev} thành bản nháp mới (rev #${res.newRevision}). Website vẫn hiển thị phiên bản hiện tại cho đến khi bạn xuất bản lại.`;
       setStatusMessage({
         type: 'success',
-        text: `Đã khôi phục phiên bản #${targetRev} thành bản nháp mới (rev #${res.newRevision}). Website vẫn hiển thị phiên bản hiện tại cho đến khi bạn xuất bản lại.`,
+        text: msg,
       });
+      toast.success(msg);
       void fetchRevisions();
     } catch (err) {
       const msg = (err as Error).message || 'Không thể khôi phục phiên bản.';
@@ -669,6 +784,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         type: 'error',
         text: msg,
       });
+      toast.error(msg);
     } finally {
       saveLock.current = false;
       setSaving(false);
@@ -706,6 +822,16 @@ export default function ProductEditor({ id }: ProductEditorProps) {
     { key: 'inspection', label: 'Kiểm định', icon: Cpu },
     { key: 'seo', label: 'SEO', icon: Globe },
   ];
+
+  const targetVariantForPicker = variantImagePickerId
+    ? doc.variants.find(v => v.id === variantImagePickerId)
+    : undefined;
+  const currentAssignedVariantAssetId = variantImagePickerId
+    ? doc.media.find(m => m.variantId === variantImagePickerId)?.assetId ||
+      (targetVariantForPicker?.image && doc.media.some(m => m.assetId === targetVariantForPicker.image)
+        ? targetVariantForPicker.image
+        : '')
+    : '';
 
   return (
     <div className="product-editor space-y-4 pb-12">
@@ -1535,6 +1661,32 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">đ</span>
                 </div>
                 <span className="text-xs text-slate-500 mt-1 block">Hiển thị: {money(doc.price)}</span>
+                {(() => {
+                  const activeVariants = doc.variants.filter(
+                    v => (!v.availability || ['AVAILABLE', 'PREORDER'].includes(v.availability)) && v.price > 0
+                  );
+                  if (activeVariants.length === 0) return null;
+                  const lowestVariant = activeVariants.reduce(
+                    (min, cur) => (cur.price < min.price ? cur : min),
+                    activeVariants[0]
+                  );
+                  if (lowestVariant.price === doc.price) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateDoc('price', lowestVariant.price);
+                        if (lowestVariant.originalPrice != null && lowestVariant.originalPrice > lowestVariant.price) {
+                          updateDoc('originalPrice', lowestVariant.originalPrice);
+                        }
+                        toast.info(`Đã đồng bộ giá theo cấu hình thấp nhất (${money(lowestVariant.price)})`);
+                      }}
+                      className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[11px] font-semibold text-amber-800 transition cursor-pointer"
+                    >
+                      Đồng bộ theo giá biến thể thấp nhất ({money(lowestVariant.price)})
+                    </button>
+                  );
+                })()}
               </div>
               <div>
                 <label htmlFor="product-orig-price-tab" className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1627,7 +1779,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                       size="sm"
                       icon={<Plus className="w-3.5 h-3.5" />}
                       onClick={() => {
-                        const newSku = `${doc.slug || 'SP'}-${doc.variants.length + 1}`.toUpperCase();
+                        const existingSkus = new Set(doc.variants.map(v => (v.sku || '').toUpperCase()).filter(Boolean));
+                        const baseSku = `${slugifySkuPart(doc.slug || doc.name) || 'SP'}-${doc.variants.length + 1}`.toUpperCase();
+                        const newSku = deduplicateSku(baseSku, existingSkus);
                         updateDoc('variants', [
                           ...doc.variants,
                           {
@@ -1674,111 +1828,21 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
                 {/* Collapsible Matrix Generator */}
                 {showMatrixGen && (
-                  <div className="matrix-generator-panel mb-4">
-                    <div className="flex items-center justify-between mb-2.5">
-                      <strong className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                        Sinh nhanh (RAM × SSD)
-                      </strong>
-                      <button
-                        type="button"
-                        onClick={() => setShowMatrixGen(false)}
-                        className="text-xs text-slate-500 hover:text-slate-800 cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                      <div className="bg-white p-2.5 rounded-lg border border-blue-100">
-                        <span className="text-[11px] font-bold text-blue-900 block mb-1.5">RAM</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {['8GB DDR5', '16GB DDR5', '32GB DDR5', '64GB DDR5'].map(r => (
-                            <label key={r} className="generator-chip-label">
-                              <input
-                                type="checkbox"
-                                checked={matrixRAMs.includes(r)}
-                                onChange={e => {
-                                  setMatrixRAMs(prev => (e.target.checked ? [...prev, r] : prev.filter(x => x !== r)));
-                                }}
-                              />
-                              <span>{r}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-2.5 rounded-lg border border-blue-100">
-                        <span className="text-[11px] font-bold text-blue-900 block mb-1.5">SSD</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {['512GB NVMe', '1TB NVMe', '2TB NVMe'].map(s => (
-                            <label key={s} className="generator-chip-label">
-                              <input
-                                type="checkbox"
-                                checked={matrixSSDs.includes(s)}
-                                onChange={e => {
-                                  setMatrixSSDs(prev => (e.target.checked ? [...prev, s] : prev.filter(x => x !== s)));
-                                }}
-                              />
-                              <span>{s}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-2.5 rounded-lg border border-blue-100 space-y-2">
-                        <div>
-                          <span className="text-[11px] font-bold text-blue-900 block mb-0.5">GPU & Giá</span>
-                          <input
-                            type="text"
-                            value={matrixGPU}
-                            onChange={e => setMatrixGPU(e.target.value)}
-                            placeholder="GPU mặc định"
-                            className="w-full text-xs border border-slate-300 rounded px-2 py-1 mb-1.5"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <label className="text-[10px] text-slate-500 block">Giá từ</label>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={formatNumberDots(matrixBasePrice)}
-                              onChange={e => setMatrixBasePrice(parseNumberDots(e.target.value) ?? 0)}
-                              className="w-full text-xs font-bold text-blue-700 border border-slate-300 rounded px-2 py-1"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="text-[10px] text-slate-500 block">Bước giá (+)</label>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={formatNumberDots(matrixStepPrice)}
-                              onChange={e => setMatrixStepPrice(parseNumberDots(e.target.value) ?? 0)}
-                              className="w-full text-xs border border-slate-300 rounded px-2 py-1"
-                            />
-                          </div>
-                        </div>
-                        <div className="text-[10px] text-slate-500 bg-slate-50 p-1.5 rounded border border-slate-200">
-                          <span className="font-semibold text-slate-700">Tăng theo bậc: </span>
-                          {money(matrixBasePrice)} → {money(matrixBasePrice + matrixStepPrice)} → {money(matrixBasePrice + matrixStepPrice * 2)}...
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end gap-2">
-                      <AdminButton variant="secondary" size="sm" onClick={() => setShowMatrixGen(false)}>
-                        Hủy
-                      </AdminButton>
-                      <AdminButton
-                        variant="primary"
-                        size="sm"
-                        icon={<Sparkles className="w-3.5 h-3.5" />}
-                        onClick={handleGenerateMatrix}
-                      >
-                        Tạo {Math.max(1, matrixRAMs.length) * Math.max(1, matrixSSDs.length)} dòng
-                      </AdminButton>
-                    </div>
-                  </div>
+                  <VariantMatrixGeneratorPanel
+                    docPrice={doc.price}
+                    matrixRAMs={matrixRAMs}
+                    setMatrixRAMs={setMatrixRAMs}
+                    matrixSSDs={matrixSSDs}
+                    setMatrixSSDs={setMatrixSSDs}
+                    matrixGPU={matrixGPU}
+                    setMatrixGPU={setMatrixGPU}
+                    matrixBasePrice={matrixBasePrice}
+                    setMatrixBasePrice={setMatrixBasePrice}
+                    matrixStepPrice={matrixStepPrice}
+                    setMatrixStepPrice={setMatrixStepPrice}
+                    onClose={() => setShowMatrixGen(false)}
+                    onGenerate={handleGenerateMatrix}
+                  />
                 )}
 
                 {/* Compact Spreadsheet Table */}
@@ -1808,7 +1872,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                               size="sm"
                               icon={<Plus className="w-3.5 h-3.5" />}
                               onClick={() => {
-                                const newSku = `${doc.slug || 'SP'}-1`.toUpperCase();
+                                const existingSkus = new Set(doc.variants.map(v => (v.sku || '').toUpperCase()).filter(Boolean));
+                                const baseSku = `${slugifySkuPart(doc.slug || doc.name) || 'SP'}-1`.toUpperCase();
+                                const newSku = deduplicateSku(baseSku, existingSkus);
                                 updateDoc('variants', [
                                   {
                                     id: crypto.randomUUID(),
@@ -2768,177 +2834,23 @@ export default function ProductEditor({ id }: ProductEditorProps) {
 
       {/* TAB 6: SEO & HIỂN THỊ */}
       {activeTab === 'seo' && (
-        <AdminCard title="SEO">
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="product-seo-title" className="text-xs font-semibold text-slate-700">
-                  Tiêu đề SEO
-                </label>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {doc.seoTitle.length}/70
-                </span>
-              </div>
-              <input
-                type="text"
-                id="product-seo-title"
-                value={doc.seoTitle}
-                onChange={e => updateDoc('seoTitle', e.target.value)}
-                placeholder={`${doc.name || 'Tên sản phẩm'} | CitiLap`}
-                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="product-seo-description" className="text-xs font-semibold text-slate-700">
-                  Mô tả SEO
-                </label>
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {doc.seoDescription.length}/160
-                </span>
-              </div>
-              <textarea
-                rows={3}
-                id="product-seo-description"
-                value={doc.seoDescription}
-                onChange={e => updateDoc('seoDescription', e.target.value)}
-                placeholder="Tóm tắt ưu đãi, bảo hành, trả góp..."
-                className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-              />
-            </div>
-
-            {/* Google SERP Snippet Preview */}
-            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-0.5">
-              <div className="text-blue-700 text-sm font-medium truncate">
-                {doc.seoTitle || doc.name || 'Tiêu đề sản phẩm'}
-              </div>
-              <div className="text-emerald-700 text-xs truncate">
-                https://citilap.vn{productHref({ ...doc, slug: doc.slug || 'duong-dan-san-pham' })}
-              </div>
-              <div className="text-slate-600 text-xs line-clamp-2">
-                {doc.seoDescription || doc.description || 'Mô tả hiển thị trên Google...'}
-              </div>
-            </div>
-          </div>
-        </AdminCard>
+        <ProductSeoChecklistPanel
+          doc={doc}
+          updateDoc={updateDoc}
+        />
       )}
 
       {/* TAB 7: LỊCH SỬ PHIÊN BẢN & KHÔI PHỤC */}
-      {activeTab === 'history' && (
-        <AdminCard title="Lịch sử phiên bản">
-          {loadingRevisions ? (
-            <div className="py-12">
-              <AdminLoadingState message="Đang tải..." />
-            </div>
-          ) : revisions.length === 0 ? (
-            <div className="py-8 text-center text-slate-500 text-xs">
-              Chưa có lịch sử.
-            </div>
-          ) : (
-            <div className="overflow-x-auto -mx-4 sm:-mx-5">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/75 text-slate-500 font-semibold">
-                    <th className="py-2.5 px-4">Bản</th>
-                    <th className="py-2.5 px-4">Trạng thái</th>
-                    <th className="py-2.5 px-4">Thời gian</th>
-                    <th className="py-2.5 px-4">Người sửa</th>
-                    <th className="py-2.5 px-4">Tóm tắt</th>
-                    <th className="py-2.5 px-4 text-right"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {revisions.map(r => (
-                    <tr
-                      key={r.revision}
-                      className={`hover:bg-slate-50/50 transition ${
-                        r.isCurrent ? 'bg-blue-50/20 font-medium' : ''
-                      }`}
-                    >
-                      <td className="py-2.5 px-4 font-mono font-bold">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span>#{r.revision}</span>
-                          {r.isCurrent && (
-                            <span className="text-[10px] px-1.5 py-0.2 bg-blue-600 text-white rounded font-normal">
-                              Hiện tại
-                            </span>
-                          )}
-                          {r.isPublished && (
-                            <span className="text-[10px] px-1.5 py-0.2 bg-emerald-600 text-white rounded font-normal">
-                              Web
-                            </span>
-                          )}
-                        </span>
-                      </td>
-
-                      <td className="py-2.5 px-4">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
-                            r.action === 'publish'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : r.action === 'unpublish'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-slate-100 text-slate-700 border border-slate-200'
-                          }`}
-                        >
-                          {r.action === 'publish'
-                            ? 'Xuất bản'
-                            : r.action === 'unpublish'
-                            ? 'Ẩn'
-                            : r.action === 'restore'
-                            ? 'Khôi phục'
-                            : 'Lưu nháp'}
-                        </span>
-                      </td>
-
-                      <td className="py-2.5 px-4 text-slate-600 whitespace-nowrap">
-                        {new Date(r.createdAt).toLocaleString('vi-VN')}
-                      </td>
-
-                      <td className="py-2.5 px-4 text-slate-700">
-                        <span className="font-mono text-slate-600">{r.actorName || 'admin'}</span>
-                      </td>
-
-                      <td className="py-2.5 px-4 text-slate-600 max-w-xs truncate">
-                        {r.summary}
-                      </td>
-
-                      <td className="py-2.5 px-4 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              try {
-                                const snap = await mediaRequest<SnapshotDetail>(
-                                  `/api/admin/products/${id}/revisions/${r.revision}`
-                                );
-                                setSelectedRevisionSnapshot(snap);
-                              } catch (e) {
-                                alert((e as Error).message);
-                              }
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                          >
-                            Chi tiết
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRestoreConfirmRev(r)}
-                            disabled={saving || restoring}
-                            className="text-xs text-amber-700 hover:text-amber-900 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 cursor-pointer disabled:opacity-50"
-                          >
-                            Khôi phục
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </AdminCard>
+      {activeTab === 'history' && id && (
+        <ProductRevisionHistoryTab
+          id={id}
+          revisions={revisions}
+          loadingRevisions={loadingRevisions}
+          saving={saving}
+          restoring={restoring}
+          onSelectSnapshot={setSelectedRevisionSnapshot}
+          onConfirmRestore={setRestoreConfirmRev}
+        />
       )}
 
       {activeTab === 'extras' && <AdminCard title="Quà tặng, Mua kèm & FAQ"><ProductStorefrontFields document={doc} onChange={updateDoc} productId={id} /></AdminCard>}
@@ -3012,6 +2924,32 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                   <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none">đ</span>
                 </div>
                 <span className="text-xs text-slate-500 mt-1 block">{money(doc.price)}</span>
+                {(() => {
+                  const activeVariants = doc.variants.filter(
+                    v => (!v.availability || ['AVAILABLE', 'PREORDER'].includes(v.availability)) && v.price > 0
+                  );
+                  if (activeVariants.length === 0) return null;
+                  const lowestVariant = activeVariants.reduce(
+                    (min, cur) => (cur.price < min.price ? cur : min),
+                    activeVariants[0]
+                  );
+                  if (lowestVariant.price === doc.price) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        updateDoc('price', lowestVariant.price);
+                        if (lowestVariant.originalPrice != null && lowestVariant.originalPrice > lowestVariant.price) {
+                          updateDoc('originalPrice', lowestVariant.originalPrice);
+                        }
+                        toast.info(`Đã đồng bộ giá theo cấu hình thấp nhất (${money(lowestVariant.price)})`);
+                      }}
+                      className="mt-1.5 w-full text-left px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[11px] font-semibold text-amber-800 transition cursor-pointer"
+                    >
+                      Đồng bộ theo giá biến thể thấp nhất ({money(lowestVariant.price)})
+                    </button>
+                  );
+                })()}
               </div>
 
               <div>
@@ -3095,7 +3033,69 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         <SchedulePanel entityType="product" entityId={id} revision={revision} dirty={isDirty || saving}/>
       </aside>
       </div>
-      {isDirty && id && <DraftRecovery draft={doc} endpoint={'/api/admin/products/' + id}/>}
+      <DraftRecovery
+        draft={doc}
+        endpoint={id ? '/api/admin/products/' + id : undefined}
+        storageKey={draftStorageKey}
+        currentRevision={revision}
+        serverRevision={serverRevision}
+        dirty={isDirty}
+        validateDraft={candidate => {
+          if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+            return { ok: false, error: 'Bản nháp sản phẩm không đúng định dạng đối tượng.' };
+          }
+          const rec = candidate as Record<string, unknown>;
+          if (
+            typeof rec.name !== 'string' ||
+            typeof rec.slug !== 'string' ||
+            typeof rec.categoryId !== 'string'
+          ) {
+            return { ok: false, error: 'Thiếu trường thông tin cơ bản của sản phẩm.' };
+          }
+          const direct = productDocumentSchema.safeParse(candidate);
+          if (direct.success) {
+            return { ok: true, data: direct.data };
+          }
+          // Allow restoring in-progress new drafts where required string fields are still empty
+          const withPlaceholders = productDocumentSchema.safeParse({
+            ...rec,
+            name: rec.name.trim() || 'draft',
+            slug: rec.slug.trim() || 'draft',
+            categoryId: rec.categoryId.trim() || 'draft',
+          });
+          if (withPlaceholders.success) {
+            return {
+              ok: true,
+              data: {
+                ...withPlaceholders.data,
+                name: rec.name,
+                slug: rec.slug,
+                categoryId: rec.categoryId,
+              },
+            };
+          }
+          return {
+            ok: false,
+            error: direct.error.issues[0]?.message || 'Cấu trúc dữ liệu sản phẩm không hợp lệ.',
+          };
+        }}
+        onRestoreLocal={(restored, meta) => {
+          const validDoc = restored as ProductDocument;
+          markDirty();
+          setDoc(validDoc);
+          latestDoc.current = validDoc;
+          setRevision(meta.baseRevision);
+          if (meta.isStale) {
+            setStatusMessage({
+              type: 'warning',
+              text: `Đã khôi phục bản nháp từ phiên bản cũ (r${meta.baseRevision}, máy chủ hiện tại r${serverRevision}). Lưu trực tiếp sẽ kiểm tra xung đột phiên bản để không ghi đè nhầm dữ liệu mới.`,
+            });
+            toast.warning('Đã khôi phục bản nháp (phiên bản gốc cũ hơn máy chủ).');
+          } else {
+            toast.success('Đã khôi phục bản nháp tạm từ trình duyệt.');
+          }
+        }}
+      />
 
       {/* MEDIA PICKER MODAL */}
       {pickerOpen && (
@@ -3125,99 +3125,93 @@ export default function ProductEditor({ id }: ProductEditorProps) {
       )}
 
       {/* VARIANT IMAGE PICKER MODAL */}
-      {variantImagePickerId && (() => {
-        const targetVariant = doc.variants.find(v => v.id === variantImagePickerId);
-        const currentAssignedAssetId =
-          doc.media.find(m => m.variantId === variantImagePickerId)?.assetId ||
-          (targetVariant?.image && doc.media.some(m => m.assetId === targetVariant.image) ? targetVariant.image : '');
-        return (
-          <MediaDialog
-            title={`Gắn ảnh riêng cho cấu hình: ${targetVariant?.name || targetVariant?.sku || 'Biến thể'}`}
-            onClose={() => setVariantImagePickerId(null)}
-          >
-            <div className="space-y-4">
-              {doc.media.length > 0 && (
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-slate-800">
-                      1. Chọn nhanh từ các ảnh đã có của sản phẩm này ({doc.media.length} ảnh)
-                    </span>
-                    {currentAssignedAssetId && (
+      {variantImagePickerId && (
+        <MediaDialog
+          title={`Gắn ảnh riêng cho cấu hình: ${targetVariantForPicker?.name || targetVariantForPicker?.sku || 'Biến thể'}`}
+          onClose={() => setVariantImagePickerId(null)}
+        >
+          <div className="space-y-4">
+            {doc.media.length > 0 && (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-800">
+                    1. Chọn nhanh từ các ảnh đã có của sản phẩm này ({doc.media.length} ảnh)
+                  </span>
+                  {currentAssignedVariantAssetId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleAssignVariantImage(variantImagePickerId, null);
+                        setVariantImagePickerId(null);
+                      }}
+                      className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                    >
+                      ✕ Gỡ ảnh riêng (dùng ảnh chung)
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
+                  {doc.media.map((m, idx) => {
+                    const isSelected = currentAssignedVariantAssetId === m.assetId;
+                    return (
                       <button
+                        key={m.assetId}
                         type="button"
                         onClick={() => {
-                          handleAssignVariantImage(variantImagePickerId, null);
+                          handleAssignVariantImage(variantImagePickerId, m.assetId, m.alt);
                           setVariantImagePickerId(null);
                         }}
-                        className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                        className={`group relative rounded-lg overflow-hidden border-2 transition cursor-pointer text-left bg-white ${
+                          isSelected
+                            ? 'border-blue-600 ring-2 ring-blue-500/30'
+                            : 'border-slate-200 hover:border-blue-400'
+                        }`}
                       >
-                        ✕ Gỡ ảnh riêng (dùng ảnh chung)
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-2.5">
-                    {doc.media.map((m, idx) => {
-                      const isSelected = currentAssignedAssetId === m.assetId;
-                      return (
-                        <button
-                          key={m.assetId}
-                          type="button"
-                          onClick={() => {
-                            handleAssignVariantImage(variantImagePickerId, m.assetId, m.alt);
-                            setVariantImagePickerId(null);
-                          }}
-                          className={`group relative rounded-lg overflow-hidden border-2 transition cursor-pointer text-left bg-white ${
-                            isSelected
-                              ? 'border-blue-600 ring-2 ring-blue-500/30'
-                              : 'border-slate-200 hover:border-blue-400'
-                          }`}
-                        >
-                          <div className="aspect-square w-full bg-slate-100 relative overflow-hidden">
-                            <StudioAsset key={m.assetId} id={m.assetId} />
-                            <span className="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-white">
-                              {idx === 0 ? 'Bìa' : `#${idx + 1}`}
+                        <div className="aspect-square w-full bg-slate-100 relative overflow-hidden">
+                          <StudioAsset key={m.assetId} id={m.assetId} />
+                          <span className="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-white">
+                            {idx === 0 ? 'Bìa' : `#${idx + 1}`}
+                          </span>
+                          {isSelected && (
+                            <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white">
+                              Đang chọn
                             </span>
-                            {isSelected && (
-                              <span className="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white">
-                                Đang chọn
-                              </span>
-                            )}
-                          </div>
-                          <div className="p-1.5 text-[11px] text-slate-700 truncate font-medium">
-                            {m.alt || `Ảnh #${idx + 1}`}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <span className="block text-xs font-bold text-slate-800">
-                  {doc.media.length > 0
-                    ? '2. Hoặc tải lên / chọn ảnh mới từ Thư viện Media'
-                    : 'Tải lên hoặc chọn ảnh từ Thư viện Media'}
-                </span>
-                <MediaUpload defaultFolder="variants" onUploaded={() => setMediaRefresh(n => n + 1)} />
-                <MediaBrowser
-                  refresh={mediaRefresh}
-                  picker
-                  allowVideo={false}
-                  onSelect={asset => {
-                    handleAssignVariantImage(
-                      variantImagePickerId,
-                      asset.id,
-                      asset.alt || asset.name || `${doc.name} - ${targetVariant?.name || ''}`
+                          )}
+                        </div>
+                        <div className="p-1.5 text-[11px] text-slate-700 truncate font-medium">
+                          {m.alt || `Ảnh #${idx + 1}`}
+                        </div>
+                      </button>
                     );
-                    setVariantImagePickerId(null);
-                  }}
-                />
+                  })}
+                </div>
               </div>
+            )}
+
+            <div className="space-y-2">
+              <span className="block text-xs font-bold text-slate-800">
+                {doc.media.length > 0
+                  ? '2. Hoặc tải lên / chọn ảnh mới từ Thư viện Media'
+                  : 'Tải lên hoặc chọn ảnh từ Thư viện Media'}
+              </span>
+              <MediaUpload defaultFolder="variants" onUploaded={() => setMediaRefresh(n => n + 1)} />
+              <MediaBrowser
+                refresh={mediaRefresh}
+                picker
+                allowVideo={false}
+                onSelect={asset => {
+                  handleAssignVariantImage(
+                    variantImagePickerId,
+                    asset.id,
+                    asset.alt || asset.name || `${doc.name} - ${targetVariantForPicker?.name || ''}`
+                  );
+                  setVariantImagePickerId(null);
+                }}
+              />
             </div>
-          </MediaDialog>
-        );
-      })()}
+          </div>
+        </MediaDialog>
+      )}
 
       {/* CONTENT MEDIA PICKER DIALOG */}
       {contentMediaPickerOpen && (
@@ -3247,402 +3241,41 @@ export default function ProductEditor({ id }: ProductEditorProps) {
         </MediaDialog>
       )}
 
-      {/* INSPECT REVISION MODAL */}
-      {selectedRevisionSnapshot && (
-        <MediaDialog
-          title={`Chi tiết phiên bản #${selectedRevisionSnapshot.revision}`}
-          onClose={() => setSelectedRevisionSnapshot(null)}
-        >
-          <div className="p-4 space-y-4 max-w-2xl mx-auto">
-            <div className="grid grid-cols-2 gap-3 text-xs p-3 bg-slate-50 rounded-lg">
-              <div>
-                <span className="text-slate-500 block">Tên sản phẩm:</span>
-                <span className="font-bold text-slate-800">{selectedRevisionSnapshot.document?.name}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Giá niêm yết:</span>
-                <span className="font-bold text-blue-600">
-                  {money(selectedRevisionSnapshot.document?.price || 0)}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Tình trạng máy:</span>
-                <span className="text-slate-800">{selectedRevisionSnapshot.document?.condition || 'NEW'}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Số biến thể cấu hình:</span>
-                <span className="text-slate-800">
-                  {selectedRevisionSnapshot.document?.variants?.length || 0} biến thể
-                </span>
-              </div>
-            </div>
+      <ProductRevisionModals
+        id={id}
+        revision={revision}
+        historyOpen={historyOpen}
+        setHistoryOpen={setHistoryOpen}
+        revisions={revisions}
+        loadingRevisions={loadingRevisions}
+        saving={saving}
+        restoring={restoring}
+        selectedRevisionSnapshot={selectedRevisionSnapshot}
+        setSelectedRevisionSnapshot={setSelectedRevisionSnapshot}
+        restoreConfirmRev={restoreConfirmRev}
+        setRestoreConfirmRev={setRestoreConfirmRev}
+        onRestore={handleRestore}
+      />
 
-            <div>
-              <span className="text-xs font-bold text-slate-700 block mb-1">Mô tả ngắn:</span>
-              <p className="text-xs text-slate-600 p-2 bg-white border rounded">
-                {selectedRevisionSnapshot.document?.description || '(Trống)'}
-              </p>
-            </div>
-
-            <div className="flex justify-between items-center pt-3 border-t">
-              <AdminButton variant="secondary" onClick={() => setSelectedRevisionSnapshot(null)}>
-                Đóng
-              </AdminButton>
-              <AdminButton
-                variant="primary"
-                onClick={() => {
-                  setRestoreConfirmRev({
-                    revision: selectedRevisionSnapshot.revision,
-                    action: selectedRevisionSnapshot.action,
-                    createdAt: selectedRevisionSnapshot.createdAt,
-                    actorName: 'admin',
-                    summary: '',
-                    isCurrent: false,
-                    isPublished: false,
-                    isLegacy: false,
-                  });
-                  setSelectedRevisionSnapshot(null);
-                }}
-              >
-                Khôi phục bản này
-              </AdminButton>
-            </div>
-          </div>
-        </MediaDialog>
-      )}
-
-      {/* RESTORE CONFIRMATION MODAL */}
-      {restoreConfirmRev && (
-        <MediaDialog
-          title={`Xác nhận khôi phục phiên bản #${restoreConfirmRev.revision}`}
-          onClose={() => setRestoreConfirmRev(null)}
-        >
-          <div className="p-4 space-y-4 max-w-md mx-auto">
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-2">
-              <div className="flex items-center gap-2 font-bold text-amber-900">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>Lưu ý quan trọng</span>
-              </div>
-              <p>
-                Khôi phục sẽ lấy toàn bộ dữ liệu của phiên bản <strong>#{restoreConfirmRev.revision}</strong> và tạo một <strong>bản nháp mới</strong> trong Product Studio.
-              </p>
-              <p className="font-semibold text-slate-800">
-                Website công khai sẽ KHÔNG thay đổi cho đến khi bạn chủ động bấm nút &quot;Xuất bản website&quot;.
-              </p>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <AdminButton
-                variant="secondary"
-                onClick={() => setRestoreConfirmRev(null)}
-                disabled={restoring}
-              >
-                Hủy bỏ
-              </AdminButton>
-              <AdminButton
-                variant="primary"
-                onClick={() => void handleRestore(restoreConfirmRev.revision)}
-                loading={restoring}
-              >
-                Đồng ý khôi phục thành nháp
-              </AdminButton>
-            </div>
-          </div>
-        </MediaDialog>
-      )}
-
-      {/* PREVIEW MODAL */}
       {previewOpen && (
-        <MediaDialog title="Xem trước trang sản phẩm (Bản nháp)" onClose={() => setPreviewOpen(false)}>
-          <div className="p-4 space-y-6 max-w-4xl mx-auto">
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>Đây là tóm tắt nội dung đang biên tập, chưa tính chương trình ưu đãi trên website.</span>
-            </div>
-            {id && <Link href={`/admin/products/${id}/preview`} target="_blank" rel="noopener noreferrer" className="inline-flex text-sm font-semibold text-blue-700 underline">Mở bố cục Storefront với bản nháp đã lưu ↗</Link>}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">Hình ảnh sản phẩm</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  {doc.media.map(m => (
-                    <div key={m.assetId} className="aspect-square bg-slate-100 rounded-lg overflow-hidden border">
-                      <StudioAsset id={m.assetId} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h2 className="text-xl font-bold text-slate-900">{doc.name || 'Tên sản phẩm'}</h2>
-                <div className="text-2xl font-bold text-blue-600">{money(doc.price)}</div>
-                {doc.originalPrice != null && (
-                  <div className="text-sm text-slate-400 line-through">{money(doc.originalPrice)}</div>
-                )}
-                <div className="text-xs font-medium px-2 py-1 bg-slate-100 rounded inline-block text-slate-700">
-                  Trạng thái: {availabilityLabels[doc.availability]}
-                </div>
-                <p className="text-sm text-slate-600">{doc.description}</p>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">Thông số kỹ thuật</h3>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {doc.specs.map(s => (
-                  <div key={s.key} className="p-2 bg-slate-50 rounded flex justify-between">
-                    <span className="font-semibold text-slate-600">{s.key}:</span>
-                    <span className="text-slate-800">{s.value || '--'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {doc.variants.length > 0 && (
-              <div>
-                <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">Các cấu hình</h3>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {doc.variants.map(v => (
-                    <div key={v.id} className="p-2 border border-slate-200 rounded-lg">
-                      <div className="font-bold text-slate-800">{v.name || v.sku}</div>
-                      <div className="text-blue-600 font-semibold">{money(v.price)}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </MediaDialog>
+        <ProductPreviewModal
+          id={id}
+          doc={doc}
+          onClose={() => setPreviewOpen(false)}
+        />
       )}
 
-      {/* RELATED PRODUCTS PICKER MODAL */}
       {relatedPickerOpen && (
-        <MediaDialog
-          title="Chọn sản phẩm liên quan / Đề xuất mua kèm"
+        <RelatedProductsPickerModal
+          doc={doc}
+          updateDoc={updateDoc}
+          relatedSearch={relatedSearch}
+          setRelatedSearch={setRelatedSearch}
+          loadingRelated={loadingRelated}
+          relatedCandidates={relatedCandidates}
+          fetchRelatedCandidates={fetchRelatedCandidates}
           onClose={() => setRelatedPickerOpen(false)}
-        >
-          <div className="p-4 space-y-4 max-w-2xl mx-auto">
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={relatedSearch}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setRelatedSearch(val);
-                    void fetchRelatedCandidates(val);
-                  }}
-                  placeholder="Tìm sản phẩm theo tên hoặc SKU..."
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                />
-              </div>
-            </div>
-
-            <div className="max-h-96 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-lg bg-white">
-              {loadingRelated ? (
-                <div className="p-8 text-center text-xs text-slate-500">Đang tìm sản phẩm...</div>
-              ) : relatedCandidates.length === 0 ? (
-                <div className="p-8 text-center text-xs text-slate-500">Không tìm thấy sản phẩm phù hợp.</div>
-              ) : (
-                relatedCandidates.map(candidate => {
-                  const isSelected = (doc.relatedProductIds || []).includes(candidate.id);
-                  const isMax = (doc.relatedProductIds || []).length >= 10;
-                  return (
-                    <div
-                      key={candidate.id}
-                      className="p-3 flex items-center justify-between hover:bg-slate-50 transition"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {candidate.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={candidate.image}
-                            alt=""
-                            className="w-10 h-10 rounded object-cover border border-slate-200 shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-slate-400 text-xs">
-                            SP
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-slate-900 truncate">
-                            {candidate.name}
-                          </div>
-                          <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                            {candidate.sku && <span>SKU: {candidate.sku}</span>}
-                            <span className="text-blue-600 font-medium">{money(candidate.price)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        {isSelected ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateDoc(
-                                'relatedProductIds',
-                                (doc.relatedProductIds || []).filter(item => item !== candidate.id)
-                              );
-                            }}
-                            className="text-xs px-2.5 py-1 rounded border border-rose-200 bg-rose-50 text-rose-600 font-medium hover:bg-rose-100 cursor-pointer"
-                          >
-                            Bỏ chọn
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={isMax}
-                            onClick={() => {
-                              if (isMax) return;
-                              updateDoc('relatedProductIds', [
-                                ...(doc.relatedProductIds || []),
-                                candidate.id,
-                              ]);
-                            }}
-                            className="text-xs px-2.5 py-1 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-40 cursor-pointer"
-                          >
-                            {isMax ? 'Đã tối đa 10' : 'Chọn'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="flex justify-between items-center text-xs text-slate-500 pt-2 border-t border-slate-100">
-              <span>Đã chọn: {(doc.relatedProductIds || []).length} / 10 sản phẩm</span>
-              <AdminButton variant="primary" size="sm" onClick={() => setRelatedPickerOpen(false)}>
-                Hoàn tất
-              </AdminButton>
-            </div>
-          </div>
-        </MediaDialog>
-      )}
-
-      {/* REVISION HISTORY MODAL */}
-      {historyOpen && (
-        <MediaDialog
-          title={`Lịch sử phiên bản sản phẩm (#${revision})`}
-          onClose={() => setHistoryOpen(false)}
-        >
-          <div className="p-2 space-y-3">
-            {loadingRevisions ? (
-              <div className="py-12">
-                <AdminLoadingState message="Đang tải lịch sử phiên bản..." />
-              </div>
-            ) : revisions.length === 0 ? (
-              <div className="py-8 text-center text-slate-500 text-xs">
-                Chưa có lịch sử phiên bản cho sản phẩm này.
-              </div>
-            ) : (
-              <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-semibold">
-                      <th className="py-2.5 px-3">Bản</th>
-                      <th className="py-2.5 px-3">Hành động</th>
-                      <th className="py-2.5 px-3">Thời gian</th>
-                      <th className="py-2.5 px-3">Người thực hiện</th>
-                      <th className="py-2.5 px-3">Ghi chú</th>
-                      <th className="py-2.5 px-3 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {revisions.map(r => (
-                      <tr
-                        key={r.revision}
-                        className={`hover:bg-slate-50 transition ${
-                          r.isCurrent ? 'bg-blue-50/30 font-medium' : ''
-                        }`}
-                      >
-                        <td className="py-2.5 px-3 font-mono font-bold">
-                          <span className="inline-flex items-center gap-1.5">
-                            <span>#{r.revision}</span>
-                            {r.isCurrent && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-blue-600 text-white rounded font-normal">
-                                Hiện tại
-                              </span>
-                            )}
-                            {r.isPublished && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-emerald-600 text-white rounded font-normal">
-                                Web
-                              </span>
-                            )}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
-                              r.action === 'publish'
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : r.action === 'unpublish'
-                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                : 'bg-slate-100 text-slate-700 border border-slate-200'
-                            }`}
-                          >
-                            {r.action === 'publish'
-                              ? 'Xuất bản'
-                              : r.action === 'unpublish'
-                              ? 'Ẩn khỏi web'
-                              : r.action === 'restore'
-                              ? 'Khôi phục'
-                              : 'Lưu nháp'}
-                          </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
-                          {new Date(r.createdAt).toLocaleString('vi-VN')}
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-700">
-                          <span className="font-medium text-slate-700">{r.actorName || 'Quản trị viên'}</span>
-                        </td>
-                        <td className="py-2.5 px-3 text-slate-600 max-w-xs truncate">
-                          {r.summary}
-                        </td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  const snap = await mediaRequest<SnapshotDetail>(
-                                    `/api/admin/products/${id}/revisions/${r.revision}`
-                                  );
-                                  setHistoryOpen(false);
-                                  setSelectedRevisionSnapshot(snap);
-                                } catch (e) {
-                                  alert((e as Error).message);
-                                }
-                              }}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
-                            >
-                              Chi tiết
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setHistoryOpen(false);
-                                setRestoreConfirmRev(r);
-                              }}
-                              disabled={saving || restoring}
-                              className="text-xs text-amber-700 hover:text-amber-900 font-medium px-2 py-1 rounded bg-amber-50 hover:bg-amber-100 border border-amber-200 cursor-pointer disabled:opacity-50"
-                            >
-                              Khôi phục
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </MediaDialog>
+        />
       )}
     </div>
   );

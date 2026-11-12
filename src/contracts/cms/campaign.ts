@@ -3,13 +3,42 @@ import { z } from "zod";
 export const campaignStatusSchema = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export type CampaignStatus = z.infer<typeof campaignStatusSchema>;
 
-export const campaignItemSchema = z.object({
-  id: z.string().optional(),
-  productId: z.string().min(1, "Mã sản phẩm không được để trống"),
-  variantId: z.string().nullable().optional(),
-  salePrice: z.number().int().positive("Giá sale phải là số nguyên dương"),
-  regularPrice: z.number().int().positive("Giá bán thường phải là số nguyên dương").nullable().optional(),
-});
+export const campaignItemSchema = z
+  .object({
+    id: z.string().optional(),
+    productId: z.string().min(1, "Mã sản phẩm không được để trống"),
+    variantId: z.string().nullable().optional(),
+    salePrice: z.number().int().positive("Giá sale phải là số nguyên dương"),
+    regularPrice: z.number().int().positive("Giá bán thường phải là số nguyên dương").nullable().optional(),
+    quantityLimit: z.number().int().positive("Giới hạn suất phải là số nguyên dương").nullable().optional(),
+    perCustomerLimit: z.number().int().positive("Giới hạn mỗi khách phải là số nguyên dương").nullable().optional(),
+    soldCount: z.number().int().min(0, "Số lượng đã bán không được âm").optional(),
+  })
+  .superRefine((it, ctx) => {
+    // ponytail: quota configuration stays blocked until atomic reservation/cancel is accepted.
+    for (const field of ['quantityLimit', 'perCustomerLimit'] as const) {
+      if (it[field] != null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Giới hạn suất chưa khả dụng. Vui lòng để trống.',
+          path: [field],
+        });
+      }
+    }
+    if (
+      it.quantityLimit !== null &&
+      it.quantityLimit !== undefined &&
+      it.perCustomerLimit !== null &&
+      it.perCustomerLimit !== undefined &&
+      it.perCustomerLimit > it.quantityLimit
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Giới hạn mỗi khách không được lớn hơn tổng giới hạn suất khuyến mại.",
+        path: ["perCustomerLimit"],
+      });
+    }
+  });
 export type CampaignItem = z.infer<typeof campaignItemSchema>;
 
 export const campaignDocumentSchema = z
@@ -48,14 +77,22 @@ export const campaignDocumentSchema = z
       });
     }
 
+    if (data.status === "PUBLISHED" && (!data.items || data.items.length < 1)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.",
+        path: ["items"],
+      });
+    }
+
     const seenTargets = new Set<string>();
     for (let i = 0; i < data.items.length; i++) {
       const it = data.items[i];
-      const key = `${it.productId}:${it.variantId || ''}`;
+      const key = `${it.productId}:${it.variantId || ""}`;
       if (seenTargets.has(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Mục khuyến mại trùng lặp: Sản phẩm ${it.productId}${it.variantId ? ` (Biến thể: ${it.variantId})` : ''} đã có trong danh sách.`,
+          message: `Mục khuyến mại trùng lặp: Sản phẩm ${it.productId}${it.variantId ? ` (Biến thể: ${it.variantId})` : ""} đã có trong danh sách.`,
           path: ["items", i],
         });
       }

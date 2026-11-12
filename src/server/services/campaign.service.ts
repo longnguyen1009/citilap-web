@@ -33,6 +33,19 @@ export class CampaignConflictError extends Error {
   status = 409;
 }
 
+export class CampaignArchivedError extends CampaignConflictError {
+  override code = 'CAMPAIGN_ARCHIVED_CONFLICT';
+
+  constructor(
+    message = 'Chiến dịch đã lưu trữ không thể chỉnh sửa hoặc xuất bản lại',
+    campaignId = '',
+    campaignName = ''
+  ) {
+    super(message, campaignId, campaignName);
+    this.name = 'CampaignArchivedError';
+  }
+}
+
 export class CampaignRevisionConflictError extends Error {
   code = 'CAMPAIGN_REVISION_CONFLICT';
   statusCode = 409;
@@ -70,6 +83,9 @@ export class CampaignValidationError extends Error {
 export interface ActiveCampaignItemData {
   salePrice: number;
   regularPrice: number | null;
+  quantityLimit?: number | null;
+  perCustomerLimit?: number | null;
+  soldCount?: number;
   campaignId: string;
   campaignName: string;
   startAt: string;
@@ -118,14 +134,26 @@ async function getDb(d1?: unknown): Promise<D1Database> {
   return (await mediaEnvironment()).DB;
 }
 
+function chunkArray<T>(items: T[], size = 80): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 /**
  * Validates that all target products and variants exist, are ACTIVE,
- * and that each variant strictly belongs to its designated product.
+ * that each variant strictly belongs to its designated product,
+ * and that item.salePrice is strictly less than the actual current selling price.
+ * Also normalizes item.regularPrice against the actual selling / original price.
  */
 export async function assertValidCampaignTargets(items: CampaignItem[], db: D1Database): Promise<void> {
   if (!items || items.length === 0) return;
 
   const seenTargets = new Set<string>();
+  const seenProductLevel = new Set<string>();
+  const seenVariantByProduct = new Set<string>();
 
   for (const item of items) {
     const key = `${item.productId}:${item.variantId || ''}`;
@@ -137,11 +165,103 @@ export async function assertValidCampaignTargets(items: CampaignItem[], db: D1Da
     }
     seenTargets.add(key);
 
-    // Validate product existence and active status
-    const product = await db
-      .prepare('SELECT id, status, deletedAt FROM Product WHERE id = ?')
-      .bind(item.productId)
-      .first<{ id: string; status: string; deletedAt: string | null }>();
+    if (item.variantId) {
+      if (seenProductLevel.has(item.productId)) {
+        throw new CampaignValidationError(
+          'items',
+          `Không thể vừa áp dụng khuyến mại toàn sản phẩm "${item.productId}" vừa áp dụng riêng cho biến thể "${item.variantId}" trong cùng một chiến dịch.`
+        );
+      }
+      seenVariantByProduct.add(item.productId);
+    } else {
+      if (seenVariantByProduct.has(item.productId)) {
+        throw new CampaignValidationError(
+          'items',
+          `Không thể vừa áp dụng khuyến mại toàn sản phẩm "${item.productId}" vừa áp dụng riêng cho biến thể trong cùng một chiến dịch.`
+        );
+      }
+      seenProductLevel.add(item.productId);
+    }
+  }
+
+  // Batched query for products and variants (eliminates N+1 sequential queries)
+  const uniqueProductIds = [...new Set(items.map((it) => it.productId).filter(Boolean))];
+  const uniqueVariantIds = [
+    ...new Set(items.map((it) => it.variantId).filter((v): v is string => Boolean(v && v.trim()))),
+  ];
+
+  const productMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      price: number;
+      originalPrice: number | null;
+      status: string;
+      deletedAt: string | null;
+    }
+  >();
+
+  for (const chunk of chunkArray(uniqueProductIds, 80)) {
+    const placeholders = chunk.map(() => '?').join(', ');
+    const { results } = await db
+      .prepare(
+        `SELECT id, name, price, originalPrice, status, deletedAt
+         FROM Product
+         WHERE id IN (${placeholders})`
+      )
+      .bind(...chunk)
+      .all<{
+        id: string;
+        name: string;
+        price: number;
+        originalPrice: number | null;
+        status: string;
+        deletedAt: string | null;
+      }>();
+    for (const row of results || []) {
+      productMap.set(row.id, row);
+    }
+  }
+
+  const variantMap = new Map<
+    string,
+    {
+      id: string;
+      productId: string;
+      name: string | null;
+      sku: string | null;
+      price: number;
+      originalPrice: number | null;
+      status: string;
+    }
+  >();
+
+  for (const chunk of chunkArray(uniqueVariantIds, 80)) {
+    const placeholders = chunk.map(() => '?').join(', ');
+    const { results } = await db
+      .prepare(
+        `SELECT id, productId, name, sku, price, originalPrice, status
+         FROM ProductVariant
+         WHERE id IN (${placeholders})`
+      )
+      .bind(...chunk)
+      .all<{
+        id: string;
+        productId: string;
+        name: string | null;
+        sku: string | null;
+        price: number;
+        originalPrice: number | null;
+        status: string;
+      }>();
+    for (const row of results || []) {
+      variantMap.set(row.id, row);
+    }
+  }
+
+  for (const item of items) {
+    const product = productMap.get(item.productId);
 
     if (!product || product.deletedAt !== null) {
       throw new CampaignValidationError(
@@ -157,12 +277,16 @@ export async function assertValidCampaignTargets(items: CampaignItem[], db: D1Da
       );
     }
 
+    let actualPrice = Number(product.price);
+    let actualOriginalPrice =
+      product.originalPrice !== null && product.originalPrice !== undefined
+        ? Number(product.originalPrice)
+        : null;
+    let targetDisplayName = product.name || item.productId;
+
     // Validate variant if provided
     if (item.variantId) {
-      const variant = await db
-        .prepare('SELECT id, productId, status FROM ProductVariant WHERE id = ?')
-        .bind(item.variantId)
-        .first<{ id: string; productId: string; status: string }>();
+      const variant = variantMap.get(item.variantId);
 
       if (!variant) {
         throw new CampaignValidationError(
@@ -184,13 +308,56 @@ export async function assertValidCampaignTargets(items: CampaignItem[], db: D1Da
           `Biến thể mục tiêu không ở trạng thái kinh doanh hoạt động: "${item.variantId}"`
         );
       }
+
+      actualPrice = Number(variant.price);
+      actualOriginalPrice =
+        variant.originalPrice !== null && variant.originalPrice !== undefined
+          ? Number(variant.originalPrice)
+          : null;
+      const variantLabel = variant.name || variant.sku || variant.id;
+      targetDisplayName = `${product.name || item.productId} (${variantLabel})`;
+    }
+
+    // Validate salePrice < actualPrice so flash sale never raises or equals current selling price
+    if (!Number.isFinite(actualPrice) || item.salePrice >= actualPrice) {
+      throw new CampaignValidationError(
+        'salePrice',
+        `Giá khuyến mại (${item.salePrice.toLocaleString('vi-VN')}₫) của "${targetDisplayName}" phải nhỏ hơn giá bán hiện tại (${actualPrice.toLocaleString('vi-VN')}₫).`,
+        'INVALID_SALE_PRICE'
+      );
+    }
+
+    // Cap/sync regularPrice to authoritative range [actualPrice, max(actualPrice, actualOriginalPrice)]
+    const maxAllowedRegular =
+      actualOriginalPrice !== null && Number.isFinite(actualOriginalPrice) && actualOriginalPrice > actualPrice
+        ? actualOriginalPrice
+        : actualPrice;
+
+    item.regularPrice =
+      item.regularPrice !== null && item.regularPrice !== undefined && item.regularPrice > 0
+        ? Math.max(actualPrice, Math.min(item.regularPrice, maxAllowedRegular))
+        : actualPrice;
+
+    // Validate quota limits if both are provided
+    if (
+      item.quantityLimit !== null &&
+      item.quantityLimit !== undefined &&
+      item.perCustomerLimit !== null &&
+      item.perCustomerLimit !== undefined &&
+      item.perCustomerLimit > item.quantityLimit
+    ) {
+      throw new CampaignValidationError(
+        'perCustomerLimit',
+        `Giới hạn mỗi khách (${item.perCustomerLimit}) của "${targetDisplayName}" không được vượt quá tổng giới hạn suất (${item.quantityLimit}).`
+      );
     }
   }
 }
 
 /**
  * Strict overlap invariant: Checks whether any other PUBLISHED campaign
- * overlaps on the half-open interval [startAt, endAt) for any targeted product/variant.
+ * overlaps on the half-open interval [startAt, endAt) for any targeted product/variant,
+ * including product-level vs variant-level conflict on the same productId.
  */
 export async function assertNoPublishedOverlap(
   campaignId: string | null,
@@ -199,16 +366,22 @@ export async function assertNoPublishedOverlap(
   items: CampaignItem[],
   db: D1Database
 ): Promise<void> {
+  if (!items || items.length === 0) return;
+
   const campStartMs = startAt.getTime();
   const campEndMs = endAt.getTime();
+  const startIso = startAt.toISOString();
+  const endIso = endAt.toISOString();
 
   let query = `
     SELECT c.id, c.name, c.startAt, c.endAt, i.productId, i.variantId
     FROM PromotionCampaign c
     JOIN PromotionCampaignItem i ON c.id = i.campaignId
     WHERE c.status = 'PUBLISHED'
+      AND c.endAt > ?
+      AND c.startAt < ?
   `;
-  const params: unknown[] = [];
+  const params: unknown[] = [startIso, endIso];
   if (campaignId) {
     query += ` AND c.id != ?`;
     params.push(campaignId);
@@ -234,9 +407,11 @@ export async function assertNoPublishedOverlap(
     if (!hasOverlap) continue;
 
     for (const item of items) {
+      const otherVar = other.variantId || null;
+      const itemVar = item.variantId || null;
       const match =
         other.productId === item.productId &&
-        (other.variantId || null) === (item.variantId || null);
+        (!otherVar || !itemVar || otherVar === itemVar);
 
       if (match) {
         throw new CampaignConflictError(
@@ -260,7 +435,16 @@ export async function listCampaigns(d1?: D1Database) {
     orderBy: { createdAt: 'desc' },
     include: {
       items: {
-        select: { id: true, productId: true, variantId: true, salePrice: true, regularPrice: true },
+        select: {
+          id: true,
+          productId: true,
+          variantId: true,
+          salePrice: true,
+          regularPrice: true,
+          quantityLimit: true,
+          perCustomerLimit: true,
+          soldCount: true,
+        },
       },
     },
   });
@@ -287,7 +471,18 @@ export async function getCampaignById(id: string, d1?: D1Database) {
     where: { id },
     include: {
       items: {
-        select: { id: true, productId: true, variantId: true, salePrice: true, regularPrice: true, product: { select: { name: true } }, variant: { select: { name: true } } },
+        select: {
+          id: true,
+          productId: true,
+          variantId: true,
+          salePrice: true,
+          regularPrice: true,
+          quantityLimit: true,
+          perCustomerLimit: true,
+          soldCount: true,
+          product: { select: { name: true, price: true, originalPrice: true } },
+          variant: { select: { name: true, sku: true, price: true, originalPrice: true } },
+        },
       },
     },
   });
@@ -309,7 +504,8 @@ export async function getCampaignById(id: string, d1?: D1Database) {
 
 /**
  * Saves a campaign with full validation, CAS revision guard, and atomic D1 batch mutations.
- * If status is 'PUBLISHED', it CANNOT bypass the overlap guard.
+ * If status is 'PUBLISHED', it CANNOT bypass the overlap guard or empty items check.
+ * If existing status is 'ARCHIVED', it CANNOT be edited or republished.
  */
 export async function saveCampaign(
   input: CampaignDocument & { expectedRevision?: number },
@@ -339,36 +535,28 @@ export async function saveCampaign(
     dbArg = explicitDb;
   }
 
-  const valid = campaignDocumentSchema.parse({
-    ...input,
-    ...(id ? { id } : {}),
-  });
   const db = await getDb(dbArg);
 
-  const startAt = new Date(valid.startAt);
-  const endAt = new Date(valid.endAt);
-  const now = new Date().toISOString();
-
-  // 1. Strict Target Validation (Product active, Variant belongs to Product)
-  await assertValidCampaignTargets(valid.items, db);
-
-  // 2. Strict Overlap Guard: CANNOT bypass overlap check even if saving directly as PUBLISHED
-  if (valid.status === 'PUBLISHED') {
-    await assertNoPublishedOverlap(valid.id || null, startAt, endAt, valid.items, db);
-  }
-
-  if (valid.id) {
-    // Check existing record & CAS revision
-    const existing = await db
+  // If updating an existing campaign, check existence, ARCHIVED state, and CAS revision first
+  let existingRecord: { id: string; revision: number; status: string } | null = null;
+  if (id) {
+    existingRecord = await db
       .prepare('SELECT id, revision, status FROM PromotionCampaign WHERE id = ?')
-      .bind(valid.id)
+      .bind(id)
       .first<{ id: string; revision: number; status: string }>();
 
-    if (!existing) {
+    if (!existingRecord) {
       throw new Error('CAMPAIGN_NOT_FOUND');
     }
 
-    // P2 Invariant: expectedRevision is MANDATORY for updates. Reject missing, fractional, or negative values.
+    if (existingRecord.status === 'ARCHIVED') {
+      throw new CampaignArchivedError(
+        'Chiến dịch đã lưu trữ không thể chỉnh sửa hoặc xuất bản lại',
+        existingRecord.id,
+        input.name || ''
+      );
+    }
+
     const rawRev = expectedRevision ?? input.expectedRevision;
     if (rawRev === undefined || rawRev === null) {
       throw new CampaignValidationError(
@@ -385,16 +573,58 @@ export async function saveCampaign(
       );
     }
 
-    const checkRev = rawRev;
-    if (existing.revision !== checkRev) {
+    if (existingRecord.revision !== rawRev) {
       throw new CampaignRevisionConflictError(
-        `Xung đột phiên bản (CAS conflict): Chiến dịch đã được sửa đổi bởi người khác (Hiện tại: rev ${existing.revision}, Yêu cầu: rev ${checkRev}). Vui lòng tải lại và thử lại.`,
-        existing.revision,
-        checkRev
+        `Xung đột phiên bản (CAS conflict): Chiến dịch đã được sửa đổi bởi người khác (Hiện tại: rev ${existingRecord.revision}, Yêu cầu: rev ${rawRev}). Vui lòng tải lại và thử lại.`,
+        existingRecord.revision,
+        rawRev
       );
     }
+  }
 
-    const nextRevision = existing.revision + 1;
+  const valid = campaignDocumentSchema.parse({
+    ...input,
+    ...(id ? { id } : {}),
+  });
+
+  if (valid.status === 'PUBLISHED' && (!valid.items || valid.items.length < 1)) {
+    throw new CampaignValidationError(
+      'items',
+      'Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.',
+      'EMPTY_PUBLISHED_CAMPAIGN'
+    );
+  }
+
+  const startAt = new Date(valid.startAt);
+  const endAt = new Date(valid.endAt);
+  const now = new Date().toISOString();
+
+  // 1. Strict Target & Price Validation (Product active, Variant belongs to Product, salePrice < actualPrice)
+  await assertValidCampaignTargets(valid.items, db);
+
+  // 2. Strict Overlap Guard: CANNOT bypass overlap check even if saving directly as PUBLISHED
+  if (valid.status === 'PUBLISHED') {
+    await assertNoPublishedOverlap(valid.id || null, startAt, endAt, valid.items, db);
+  }
+
+  if (valid.id && existingRecord) {
+    const checkRev = (expectedRevision ?? input.expectedRevision)!;
+    const nextRevision = existingRecord.revision + 1;
+
+    // Fetch existing items to preserve soldCount for the same (productId, variantId)
+    const { results: existingItems } = await db
+      .prepare('SELECT id, productId, variantId, soldCount FROM PromotionCampaignItem WHERE campaignId = ?')
+      .bind(valid.id)
+      .all<{ id: string; productId: string; variantId: string | null; soldCount: number }>();
+
+    const existingSoldMap = new Map<string, { id: string; soldCount: number }>();
+    for (const oldItem of existingItems || []) {
+      const key = `${oldItem.productId}:${oldItem.variantId || ''}`;
+      existingSoldMap.set(key, {
+        id: oldItem.id,
+        soldCount: typeof oldItem.soldCount === 'number' && oldItem.soldCount >= 0 ? oldItem.soldCount : 0,
+      });
+    }
 
     // Use D1 atomic batch with strict CAS & monotonic revision:
     // Update matches WHERE id = ? so the DB trigger campaign_revision_guard fires if revision doesn't match OLD.revision + 1.
@@ -427,12 +657,16 @@ export async function saveCampaign(
       .bind(valid.id, valid.id, checkRev);
 
     const insertItemStmts = valid.items.map((it) => {
-      const itemId = it.id || 'citem_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      const targetKey = `${it.productId}:${it.variantId || ''}`;
+      const prev = existingSoldMap.get(targetKey);
+      const itemId = it.id || prev?.id || 'citem_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      const preservedSoldCount = prev?.soldCount ?? 0;
+
       return db
         .prepare(
           `INSERT INTO PromotionCampaignItem 
-           (id, campaignId, productId, variantId, salePrice, regularPrice, createdAt, updatedAt)
-           SELECT ?, ?, ?, ?, ?, ?, ?, ?
+           (id, campaignId, productId, variantId, salePrice, regularPrice, quantityLimit, perCustomerLimit, soldCount, createdAt, updatedAt)
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
            WHERE EXISTS (SELECT 1 FROM PromotionCampaign WHERE id = ? AND revision = ?)`
         )
         .bind(
@@ -442,6 +676,9 @@ export async function saveCampaign(
           it.variantId || null,
           it.salePrice,
           it.regularPrice || null,
+          it.quantityLimit ?? null,
+          it.perCustomerLimit ?? null,
+          preservedSoldCount,
           now,
           now,
           valid.id,
@@ -450,12 +687,17 @@ export async function saveCampaign(
     });
 
     try {
-      const batchResults = await db.batch([deleteOldItemsStmt, updateCampStmt, ...insertItemStmts, ...adminAuditStatements(db, 'campaign.save', valid.id, 'Campaign mutation')]);
+      const batchResults = await db.batch([
+        deleteOldItemsStmt,
+        updateCampStmt,
+        ...insertItemStmts,
+        ...adminAuditStatements(db, 'campaign.save', valid.id, 'Campaign mutation'),
+      ]);
       const updateMeta = batchResults[1]?.meta as { changes?: number } | undefined;
       if (updateMeta?.changes === 0) {
         throw new CampaignRevisionConflictError(
           'Cập nhật thất bại do xung đột revision đồng thời.',
-          existing.revision,
+          existingRecord.revision,
           checkRev
         );
       }
@@ -464,7 +706,7 @@ export async function saveCampaign(
       if (errMsg.includes('CAMPAIGN_REVISION_CONFLICT')) {
         throw new CampaignRevisionConflictError(
           'Cập nhật thất bại do xung đột revision đồng thời.',
-          existing.revision,
+          existingRecord.revision,
           checkRev
         );
       }
@@ -502,11 +744,12 @@ export async function saveCampaign(
 
     const insertItemStmts = valid.items.map((it) => {
       const itemId = it.id || 'citem_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+      const soldCount = 0;
       return db
         .prepare(
           `INSERT INTO PromotionCampaignItem 
-           (id, campaignId, productId, variantId, salePrice, regularPrice, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+           (id, campaignId, productId, variantId, salePrice, regularPrice, quantityLimit, perCustomerLimit, soldCount, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           itemId,
@@ -515,13 +758,20 @@ export async function saveCampaign(
           it.variantId || null,
           it.salePrice,
           it.regularPrice || null,
+          it.quantityLimit ?? null,
+          it.perCustomerLimit ?? null,
+          soldCount,
           now,
           now
         );
     });
 
     try {
-      await db.batch([insertCampStmt, ...insertItemStmts, ...adminAuditStatements(db, 'campaign.create', campaignId, 'Campaign created')]);
+      await db.batch([
+        insertCampStmt,
+        ...insertItemStmts,
+        ...adminAuditStatements(db, 'campaign.create', campaignId, 'Campaign created'),
+      ]);
     } catch (err: unknown) {
       const errMsg = (err as Error)?.message || String(err);
       if (errMsg.includes('CAMPAIGN_OVERLAP_CONFLICT')) {
@@ -540,7 +790,7 @@ export async function saveCampaign(
 /**
  * Publishes a campaign.
  * STRICT INVARIANT: Blocks overlapping published campaigns on the same product/variant,
- * validates targets, and executes CAS revision check.
+ * validates targets, requires >= 1 item, rejects ARCHIVED campaigns, and executes CAS revision check.
  */
 export async function publishCampaign(
   campaignId: string,
@@ -573,6 +823,14 @@ export async function publishCampaign(
     throw new Error('CAMPAIGN_NOT_FOUND');
   }
 
+  if (campaign.status === 'ARCHIVED') {
+    throw new CampaignArchivedError(
+      'Chiến dịch đã lưu trữ không thể chỉnh sửa hoặc xuất bản lại',
+      campaign.id,
+      campaign.name
+    );
+  }
+
   if (expectedRevision === undefined || expectedRevision === null) {
     throw new CampaignValidationError(
       'expectedRevision là bắt buộc khi xuất bản chiến dịch.',
@@ -598,7 +856,9 @@ export async function publishCampaign(
 
   // Fetch campaign items
   const { results: items } = await db
-    .prepare('SELECT id, productId, variantId, salePrice, regularPrice FROM PromotionCampaignItem WHERE campaignId = ?')
+    .prepare(
+      'SELECT id, productId, variantId, salePrice, regularPrice, quantityLimit, perCustomerLimit, soldCount FROM PromotionCampaignItem WHERE campaignId = ?'
+    )
     .bind(campaignId)
     .all<CampaignItem>();
 
@@ -608,9 +868,20 @@ export async function publishCampaign(
     variantId: it.variantId || null,
     salePrice: it.salePrice,
     regularPrice: it.regularPrice || null,
+    quantityLimit: it.quantityLimit ?? null,
+    perCustomerLimit: it.perCustomerLimit ?? null,
+    soldCount: it.soldCount ?? 0,
   }));
 
-  // 1. Validate targets
+  if (campItems.length < 1) {
+    throw new CampaignValidationError(
+      'items',
+      'Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.',
+      'EMPTY_PUBLISHED_CAMPAIGN'
+    );
+  }
+
+  // 1. Validate targets & actual prices
   await assertValidCampaignTargets(campItems, db);
 
   // 2. Temporal overlap check
@@ -630,9 +901,11 @@ export async function publishCampaign(
          SET status = 'PUBLISHED', revision = ?, updatedAt = ?
          WHERE id = ?`
       )
-      .bind(nextRevision, now, campaignId)
-      ;
-    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.publish', campaignId, 'Campaign publish', null, 'order', { changed: true })]);
+      .bind(nextRevision, now, campaignId);
+    const [res] = await db.batch([
+      statement,
+      ...adminAuditStatements(db, 'campaign.publish', campaignId, 'Campaign publish', null, 'order', { changed: true }),
+    ]);
 
     const meta = res?.meta as { changes?: number } | undefined;
     if (meta?.changes === 0) {
@@ -720,9 +993,11 @@ export async function archiveCampaign(
          SET status = 'ARCHIVED', revision = ?, updatedAt = ?
          WHERE id = ?`
       )
-      .bind(nextRevision, now, campaignId)
-      ;
-    const [res] = await db.batch([statement, ...adminAuditStatements(db, 'campaign.archive', campaignId, 'Campaign archive', null, 'order', { changed: true })]);
+      .bind(nextRevision, now, campaignId);
+    const [res] = await db.batch([
+      statement,
+      ...adminAuditStatements(db, 'campaign.archive', campaignId, 'Campaign archive', null, 'order', { changed: true }),
+    ]);
 
     const meta = res?.meta as { changes?: number } | undefined;
     if (meta?.changes === 0) {
@@ -749,8 +1024,9 @@ export async function archiveCampaign(
 
 /**
  * Resolves all active published campaigns for a given timestamp.
- * Returns a lookup map keying `productId` or `${productId}:${variantId}` -> salePrice & regularPrice.
+ * Returns a lookup map keying `productId` or `${productId}:${variantId}` -> salePrice, regularPrice & quota metadata.
  * Invariant: Every item carries its campaign startAt/endAt so the calculator can verify item validity.
+ * Performance: Uses a single batched query instead of N+1 queries per campaign.
  */
 export async function resolveActiveCampaigns(
   at: Date = new Date(),
@@ -790,27 +1066,49 @@ export async function resolveActiveCampaigns(
   const primary = activeCampaigns[0];
   const itemsMap = new Map<string, ActiveCampaignItemData>();
 
-  for (const camp of activeCampaigns) {
-    const { results: items } = await db
-      .prepare(
-        `SELECT productId, variantId, salePrice, regularPrice
-         FROM PromotionCampaignItem
-         WHERE campaignId = ?`
-      )
-      .bind(camp.id)
-      .all<{
-        productId: string;
-        variantId: string | null;
-        salePrice: number;
-        regularPrice: number | null;
-      }>();
+  const campaignIds = activeCampaigns.map((c) => c.id);
+  type CampaignItemRow = {
+    campaignId: string;
+    productId: string;
+    variantId: string | null;
+    salePrice: number;
+    regularPrice: number | null;
+    quantityLimit: number | null;
+    perCustomerLimit: number | null;
+    soldCount: number;
+  };
 
-    for (const it of items || []) {
+  const itemsByCampaignId = new Map<string, CampaignItemRow[]>();
+
+  for (const chunk of chunkArray(campaignIds, 80)) {
+    const placeholders = chunk.map(() => '?').join(', ');
+    const { results: chunkItems } = await db
+      .prepare(
+        `SELECT campaignId, productId, variantId, salePrice, regularPrice, quantityLimit, perCustomerLimit, soldCount
+         FROM PromotionCampaignItem
+         WHERE campaignId IN (${placeholders})`
+      )
+      .bind(...chunk)
+      .all<CampaignItemRow>();
+
+    for (const it of chunkItems || []) {
+      const list = itemsByCampaignId.get(it.campaignId);
+      if (list) list.push(it);
+      else itemsByCampaignId.set(it.campaignId, [it]);
+    }
+  }
+
+  for (const camp of activeCampaigns) {
+    const items = itemsByCampaignId.get(camp.id) || [];
+    for (const it of items) {
       const key = it.variantId ? `${it.productId}:${it.variantId}` : it.productId;
       if (!itemsMap.has(key)) {
         itemsMap.set(key, {
           salePrice: it.salePrice,
           regularPrice: it.regularPrice,
+          quantityLimit: it.quantityLimit ?? null,
+          perCustomerLimit: it.perCustomerLimit ?? null,
+          soldCount: typeof it.soldCount === 'number' ? it.soldCount : 0,
           campaignId: camp.id,
           campaignName: camp.name,
           startAt: camp.startAt,

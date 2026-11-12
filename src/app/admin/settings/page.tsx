@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import Link from 'next/link';
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Save,
   Store,
@@ -13,84 +12,46 @@ import {
   RefreshCw,
   RotateCcw,
   AlertCircle,
-  Image as ImageIcon,
-  Share2,
-  Scale,
-  Star,
-  QrCode,
-  Video,
-  Plus,
-  Trash2,
-  Gift,
-  ShoppingBag,
 } from "lucide-react";
-import { VIETQR_BANKS, findVietQrBank } from "@/lib/vietqr";
-import { PageHeader, InlineAlert, AdminCard } from "@/components/admin/ui";
+import { PageHeader, InlineAlert, AdminCard, useConfirm, useToast } from "@/components/admin/ui";
 import type { AdminSettingsDocument as StorefrontSettings } from "@/contracts/cms/settings";
-import {
-  DEFAULT_ADMIN_SETTINGS as DEFAULT_SETTINGS,
-  DEFAULT_GIFT_BUNDLES,
-  DEFAULT_ACCESSORY_BUNDLES,
-} from "@/contracts/cms/settings";
+import { DEFAULT_ADMIN_SETTINGS as DEFAULT_SETTINGS } from "@/contracts/cms/settings";
+import type { TabId } from "@/components/admin/settings/settings-helpers";
+import { StoreSettingsTab } from "@/components/admin/settings/StoreSettingsTab";
+import { FlashSaleSettingsTab } from "@/components/admin/settings/FlashSaleSettingsTab";
+import { BannersVideosSettingsTab } from "@/components/admin/settings/BannersVideosSettingsTab";
+import { FeaturesTestimonialsSettingsTab } from "@/components/admin/settings/FeaturesTestimonialsSettingsTab";
+import { ShippingPaymentSettingsTab } from "@/components/admin/settings/ShippingPaymentSettingsTab";
+import { ProductPageSettingsTab } from "@/components/admin/settings/ProductPageSettingsTab";
 
 const STORAGE_KEY = "citilap_admin_settings_v2_draft";
 
-type TabId = "store" | "flashsale" | "banners" | "features" | "shipping" | "product";
-
-const formatDots = (n: number | null | undefined): string => {
-  if (n === null || n === undefined || Number.isNaN(n)) return "";
-  return new Intl.NumberFormat("vi-VN").format(n);
-};
-
-const parseDots = (raw: string): number => {
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) return 0;
-  return Math.min(2000000000, parseInt(digits, 10) || 0);
-};
-
-const inputCls =
-  "w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-500 outline-none";
-const labelCls = "block text-[11px] font-semibold text-slate-600 mb-1";
-
-function toDatetimeLocalGmt7(isoStr?: string): string {
-  if (!isoStr) return "";
-  try {
-    const d = new Date(isoStr);
-    if (isNaN(d.getTime())) return "";
-    const gmt7 = new Date(d.getTime() + 7 * 3600 * 1000);
-    return gmt7.toISOString().slice(0, 16);
-  } catch {
-    return "";
-  }
-}
-
-function fromDatetimeLocalGmt7(localStr: string): string {
-  if (!localStr) return "";
-  try {
-    const [datePart, timePart] = localStr.split("T");
-    const [y, m, d] = datePart.split("-").map(Number);
-    const [h, min] = timePart.split(":").map(Number);
-    return new Date(Date.UTC(y, m - 1, d, h - 7, min, 0)).toISOString();
-  } catch {
-    return localStr;
-  }
-}
-
 export default function SettingsPage() {
+  const confirm = useConfirm();
+  const toast = useToast();
+
   const [activeTab, setActiveTab] = useState<TabId>("store");
   const [settings, setSettings] = useState<StorefrontSettings>(DEFAULT_SETTINGS);
   const [revision, setRevision] = useState<number>(0);
   const [loading, setLoading] = useState(true);
+  const [reloading, setReloading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [localDraftStatus, setLocalDraftStatus] = useState<string | null>(null);
+  const [localDraftError, setLocalDraftError] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [quickVideoUrl, setQuickVideoUrl] = useState("");
   const [fetchingVideos, setFetchingVideos] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState<Array<{ id: string; name: string; sku: string; price: number }>>([]);
   const [bundleProductSearch, setBundleProductSearch] = useState<Record<string, string>>({});
+
+  const settingsRef = useRef<StorefrontSettings>(DEFAULT_SETTINGS);
+  const editGenerationRef = useRef<number>(0);
+  const requestLockRef = useRef<"load" | "reload" | "save" | null>(null);
+  const fetchingVideosRef = useRef<boolean>(false);
+  const lastBackupRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -114,7 +75,7 @@ export default function SettingsPage() {
       .catch(() => {});
   }, [activeTab, catalogProducts.length]);
 
-  const loadSettingsData = useCallback(async (isMounted?: () => boolean) => {
+  const loadSettingsData = useCallback(async (isMounted?: () => boolean): Promise<boolean> => {
     try {
       const res = await fetch("/api/admin/settings", {
         credentials: "same-origin",
@@ -133,15 +94,22 @@ export default function SettingsPage() {
       }
 
       if (!isMounted || isMounted()) {
-        setSettings({ ...DEFAULT_SETTINGS, ...json.data.document });
+        const nextSettings = { ...DEFAULT_SETTINGS, ...json.data.document };
+        settingsRef.current = nextSettings;
+        editGenerationRef.current += 1;
+        setSettings(nextSettings);
         setRevision(json.data.revision ?? 0);
+        setLoadError(null);
         setIsDirty(false);
+        return true;
       }
+      return false;
     } catch (err) {
       if (!isMounted || isMounted()) {
         const errMsg = err instanceof Error ? err.message : "Mất kết nối tới máy chủ.";
         setLoadError(errMsg);
       }
+      return false;
     } finally {
       if (!isMounted || isMounted()) {
         setLoading(false);
@@ -149,27 +117,48 @@ export default function SettingsPage() {
     }
   }, []);
 
-  const fetchSettings = useCallback(async () => {
+  const fetchSettings = useCallback(async (): Promise<boolean> => {
+    if (requestLockRef.current !== null) return false;
+    requestLockRef.current = "load";
     setLoading(true);
     setLoadError(null);
     setConflict(false);
     setMessage(null);
-    await loadSettingsData();
+    try {
+      return await loadSettingsData();
+    } finally {
+      if (requestLockRef.current === "load") {
+        requestLockRef.current = null;
+      }
+    }
   }, [loadSettingsData]);
 
   useEffect(() => {
     let active = true;
+    requestLockRef.current = "load";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loadSettingsData() calls setState after async fetch, safe pattern
-    void loadSettingsData(() => active);
+    void loadSettingsData(() => active).finally(() => {
+      if (active && requestLockRef.current === "load") {
+        requestLockRef.current = null;
+      }
+    });
     return () => {
       active = false;
+      requestLockRef.current = null;
     };
   }, [loadSettingsData]);
 
-  const update = <K extends keyof StorefrontSettings>(key: K, value: StorefrontSettings[K]) => {
+  const update = useCallback(<K extends keyof StorefrontSettings>(key: K, value: StorefrontSettings[K]) => {
+    editGenerationRef.current += 1;
+    const next = { ...settingsRef.current, [key]: value };
+    settingsRef.current = next;
     setIsDirty(true);
-    setSettings((current) => ({ ...current, [key]: value }));
-  };
+    setSettings((current) => {
+      const merged = { ...current, [key]: value };
+      settingsRef.current = merged;
+      return merged;
+    });
+  }, []);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -183,7 +172,8 @@ export default function SettingsPage() {
 
   const handleAddVideoByUrl = async () => {
     const raw = quickVideoUrl.trim();
-    if (!raw || fetchingVideos) return;
+    if (!raw || fetchingVideosRef.current || fetchingVideos) return;
+    fetchingVideosRef.current = true;
     setFetchingVideos(true);
     setMessage(null);
     try {
@@ -199,7 +189,7 @@ export default function SettingsPage() {
         if (!res.ok || !json.success || !Array.isArray(json.data)) {
           throw new Error(json.error || "Không thể lấy thông tin danh sách video.");
         }
-        const current = settings.reviewVideos || [];
+        const current = settingsRef.current.reviewVideos || [];
         const mergedMap = new Map<string, (typeof current)[number]>();
         for (const item of [...json.data, ...current]) {
           if (item?.url && !mergedMap.has(item.url)) {
@@ -209,6 +199,7 @@ export default function SettingsPage() {
         update("reviewVideos", Array.from(mergedMap.values()).slice(0, 12));
         setQuickVideoUrl("");
         setMessage({ type: "success", text: `Đã thêm thành công ${json.data.length} video mới.` });
+        toast.success(`Đã thêm thành công ${json.data.length} video mới.`);
         return;
       }
 
@@ -219,24 +210,30 @@ export default function SettingsPage() {
       if (!res.ok || !json.success || !json.data) {
         throw new Error(json.error || "Không thể lấy thông tin video từ URL này.");
       }
-      const current = settings.reviewVideos || [];
+      const current = settingsRef.current.reviewVideos || [];
       if (current.length >= 12) {
         setMessage({ type: "warning", text: "Danh sách tối đa 12 video. Vui lòng xóa bớt trước khi thêm mới." });
+        toast.warning("Danh sách tối đa 12 video. Vui lòng xóa bớt trước khi thêm mới.");
         return;
       }
       update("reviewVideos", [json.data, ...current.filter((v) => v.url !== json.data.url)].slice(0, 12));
       setQuickVideoUrl("");
       setMessage({ type: "success", text: `Đã thêm video: ${json.data.title}` });
+      toast.success(`Đã thêm video: ${json.data.title}`);
     } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Lỗi khi thêm video." });
+      const errMsg = err instanceof Error ? err.message : "Lỗi khi thêm video.";
+      setMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     } finally {
+      fetchingVideosRef.current = false;
       setFetchingVideos(false);
     }
   };
 
   const handleFetchChannelVideos = async (channelUrl: string) => {
     const raw = channelUrl.trim();
-    if (!raw || fetchingVideos) return;
+    if (!raw || fetchingVideosRef.current || fetchingVideos) return;
+    fetchingVideosRef.current = true;
     setFetchingVideos(true);
     setMessage(null);
     try {
@@ -247,7 +244,7 @@ export default function SettingsPage() {
       if (!res.ok || !json.success || !Array.isArray(json.data)) {
         throw new Error(json.error || "Không thể lấy danh sách video từ kênh.");
       }
-      const existing = settings.reviewVideos || [];
+      const existing = settingsRef.current.reviewVideos || [];
       const mergedMap = new Map<string, (typeof existing)[number]>();
       for (const item of [...json.data, ...existing]) {
         if (item?.url && !mergedMap.has(item.url)) {
@@ -255,33 +252,66 @@ export default function SettingsPage() {
         }
       }
       update("reviewVideos", Array.from(mergedMap.values()).slice(0, 12));
+      const msg = json.message || `Đã cập nhật ${json.data.length} video mới nhất từ kênh.`;
       setMessage({
         type: "success",
-        text: json.message || `Đã cập nhật ${json.data.length} video mới nhất từ kênh.`,
+        text: msg,
       });
+      toast.success(msg);
     } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Lỗi khi tải video từ kênh." });
+      const errMsg = err instanceof Error ? err.message : "Lỗi khi tải video từ kênh.";
+      setMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
     } finally {
+      fetchingVideosRef.current = false;
       setFetchingVideos(false);
+    }
+  };
+
+  const persistErrorBackup = (errMsg: string) => {
+    setIsDirty(true);
+    try {
+      const latestSerialized = JSON.stringify(settingsRef.current);
+      localStorage.setItem(STORAGE_KEY, latestSerialized);
+      lastBackupRef.current = latestSerialized;
+      setLocalDraftError(false);
+      setLocalDraftStatus("Bản chưa đồng bộ với máy chủ (đã lưu tạm trên trình duyệt).");
+      setMessage({ type: "error", text: errMsg });
+      toast.error(errMsg);
+    } catch {
+      const storageErrText = "Không thể sao lưu tạm trên trình duyệt.";
+      const combinedMsg = `${errMsg} ${storageErrText}`;
+      setLocalDraftError(true);
+      setLocalDraftStatus(storageErrText);
+      setMessage({ type: "error", text: combinedMsg });
+      toast.error(combinedMsg);
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (saving || loading || loadError) return;
+    if (requestLockRef.current !== null || saving || loading || reloading || loadError) return;
 
-    if (settings.flashSaleEnabled && settings.flashSaleStartAt && settings.flashSaleEndAt) {
-      const start = new Date(settings.flashSaleStartAt).getTime();
-      const end = new Date(settings.flashSaleEndAt).getTime();
+    const currentSettings = settingsRef.current;
+    if (currentSettings.flashSaleEnabled && currentSettings.flashSaleStartAt && currentSettings.flashSaleEndAt) {
+      const start = new Date(currentSettings.flashSaleStartAt).getTime();
+      const end = new Date(currentSettings.flashSaleEndAt).getTime();
       if (!Number.isNaN(start) && !Number.isNaN(end) && start >= end) {
+        const errMsg = "Thời điểm bắt đầu Flash Sale phải trước thời điểm kết thúc.";
         setMessage({
           type: "error",
-          text: "Thời điểm bắt đầu Flash Sale phải trước thời điểm kết thúc.",
+          text: errMsg,
         });
+        toast.error(errMsg);
         return;
       }
     }
 
+    const submittedSnapshot: StorefrontSettings = structuredClone(currentSettings);
+    const submittedSerialized = JSON.stringify(submittedSnapshot);
+    const submittedGeneration = editGenerationRef.current;
+
+    requestLockRef.current = "save";
     setSaving(true);
     setMessage(null);
     setConflict(false);
@@ -295,35 +325,29 @@ export default function SettingsPage() {
         credentials: "same-origin",
         body: JSON.stringify({
           expectedRevision: revision,
-          document: settings,
+          document: submittedSnapshot,
         }),
       });
 
       if (res.status === 409) {
         const json = await res.json().catch(() => ({}));
         setConflict(true);
-        setMessage({
-          type: "error",
-          text:
-            json.error ||
-            "Xung đột phiên bản (409): Cài đặt đã được người khác chỉnh sửa. Giữ nguyên nội dung bạn đang sửa.",
-        });
+        const errMsg =
+          json.error ||
+          "Xung đột phiên bản (409): Cài đặt đã được người khác chỉnh sửa. Giữ nguyên nội dung bạn đang sửa.";
+        persistErrorBackup(errMsg);
         return;
       }
 
       if (res.status === 401) {
-        setMessage({
-          type: "error",
-          text: "Phiên đăng nhập đã hết hạn (401). Vui lòng đăng nhập lại ở tab khác rồi thử Lưu lại.",
-        });
+        const errMsg = "Phiên đăng nhập đã hết hạn (401). Vui lòng đăng nhập lại ở tab khác rồi thử Lưu lại.";
+        persistErrorBackup(errMsg);
         return;
       }
 
       if (res.status === 403) {
-        setMessage({
-          type: "error",
-          text: "Lỗi kiểm tra bảo mật CSRF (403).",
-        });
+        const errMsg = "Lỗi kiểm tra bảo mật CSRF (403).";
+        persistErrorBackup(errMsg);
         return;
       }
 
@@ -338,30 +362,43 @@ export default function SettingsPage() {
       }
 
       setRevision(json.data.revision);
-      setSettings({ ...DEFAULT_SETTINGS, ...json.data.document });
-      setIsDirty(false);
-      setLocalDraftStatus(null);
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-      } catch {
-        // ignore
+      const hasNewerEdit =
+        editGenerationRef.current !== submittedGeneration ||
+        JSON.stringify(settingsRef.current) !== submittedSerialized;
+
+      if (!hasNewerEdit) {
+        const savedSettings = { ...DEFAULT_SETTINGS, ...json.data.document };
+        settingsRef.current = savedSettings;
+        setSettings(savedSettings);
+        setIsDirty(false);
+        setLocalDraftError(false);
+        setLocalDraftStatus(null);
+        try {
+          const existingBackup = localStorage.getItem(STORAGE_KEY);
+          if (
+            existingBackup === null ||
+            existingBackup === submittedSerialized ||
+            existingBackup === JSON.stringify(savedSettings) ||
+            existingBackup === lastBackupRef.current
+          ) {
+            localStorage.removeItem(STORAGE_KEY);
+            lastBackupRef.current = null;
+          }
+        } catch {
+          // ignore
+        }
       }
 
       setMessage({
         type: "success",
         text: "Đã lưu cấu hình thành công.",
       });
+      toast.success("Đã lưu cấu hình cửa hàng thành công.");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Mất kết nối mạng khi lưu.";
-      setMessage({ type: "error", text: msg });
-
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-        setLocalDraftStatus("Bản chưa đồng bộ với máy chủ (đã lưu tạm trên trình duyệt).");
-      } catch {
-        // ignore
-      }
+      persistErrorBackup(msg);
     } finally {
+      requestLockRef.current = null;
       setSaving(false);
     }
   };
@@ -401,14 +438,33 @@ export default function SettingsPage() {
     { id: "flashsale", label: "Flash Sale dự phòng", icon: Flame, description: "Cấu hình hiển thị dự phòng khi không có chiến dịch riêng. Quản lý lịch chạy và giá khuyến mãi tại Flash Sale." },
   ];
 
-  const handleReloadLatest = () => {
-    if (
-      typeof window !== "undefined" &&
-      window.confirm(
-        "Tải phiên bản mới từ máy chủ sẽ ghi đè các nội dung bạn đang chỉnh sửa chưa lưu. Tiếp tục?"
-      )
-    ) {
-      void fetchSettings();
+  const handleReloadLatest = async () => {
+    if (requestLockRef.current !== null || saving || loading || reloading) return;
+    requestLockRef.current = "reload";
+    setReloading(true);
+    try {
+      const storeName = settingsRef.current.storeName || "CitiLap";
+      const ok = await confirm({
+        title: `Tải lại cấu hình "${storeName}" (từ #v${revision})?`,
+        message: `Tải phiên bản mới nhất của cấu hình "${storeName}" từ máy chủ sẽ ghi đè các thay đổi chưa lưu của bản #v${revision}. Bạn có chắc chắn muốn tiếp tục?`,
+        confirmLabel: "Tải bản mới",
+        cancelLabel: "Giữ bản đang sửa",
+        variant: "warning",
+      });
+      if (!ok) {
+        return;
+      }
+      setLoading(true);
+      setLoadError(null);
+      setConflict(false);
+      setMessage(null);
+      const loaded = await loadSettingsData();
+      if (loaded) {
+        toast.info("Đã tải lại phiên bản cấu hình mới nhất từ máy chủ.");
+      }
+    } finally {
+      requestLockRef.current = null;
+      setReloading(false);
     }
   };
 
@@ -431,8 +487,9 @@ export default function SettingsPage() {
             {conflict && (
               <button
                 type="button"
-                onClick={handleReloadLatest}
-                className="bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold py-1.5 px-3 rounded-lg border border-amber-300 transition flex items-center gap-1.5 cursor-pointer text-xs"
+                onClick={() => void handleReloadLatest()}
+                disabled={saving || loading || reloading}
+                className="bg-amber-100 hover:bg-amber-200 disabled:opacity-60 text-amber-900 font-semibold py-1.5 px-3 rounded-lg border border-amber-300 transition flex items-center gap-1.5 cursor-pointer text-xs"
               >
                 <RotateCcw className="w-3.5 h-3.5 text-amber-700" /> Tải bản mới
               </button>
@@ -440,7 +497,7 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || loading || Boolean(loadError)}
+              disabled={saving || loading || reloading || Boolean(loadError)}
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-1.5 px-4 rounded-lg shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0 text-xs"
             >
               {saving ? (
@@ -458,7 +515,7 @@ export default function SettingsPage() {
       />
 
       {localDraftStatus && (
-        <InlineAlert variant="warning">{localDraftStatus}</InlineAlert>
+        <InlineAlert variant={localDraftError ? "error" : "warning"}>{localDraftStatus}</InlineAlert>
       )}
 
       {message && (
@@ -483,7 +540,11 @@ export default function SettingsPage() {
 
       <AdminCard bodyClassName="p-0 overflow-hidden">
         {/* Top Tab Bar inside Card */}
-        <div role="group" aria-label="Nhóm cài đặt" className="admin-settings-tabs flex flex-wrap items-center gap-1 px-4 py-2 border-b border-slate-200 bg-slate-50/70">
+        <div
+          role="group"
+          aria-label="Nhóm cài đặt"
+          className="admin-settings-tabs flex flex-wrap items-center gap-1 px-4 py-2 border-b border-slate-200 bg-slate-50/70"
+        >
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -508,1397 +569,50 @@ export default function SettingsPage() {
 
         {/* Form Content */}
         <form onSubmit={handleSave} className="p-5 space-y-5 text-xs">
-          <p className="text-slate-600 leading-relaxed">{tabs.find(tab => tab.id === activeTab)?.description}</p>
-          {/* TAB 1: CỬA HÀNG & HOTLINE */}
-          {activeTab === "store" && (
-            <div className="space-y-5">
-              <h2 className="text-xs font-bold text-slate-800">Thông tin cửa hàng & Liên hệ</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                <div>
-                  <label className={labelCls}>Tên thương hiệu</label>
-                  <input
-                    type="text"
-                    value={settings.storeName}
-                    onChange={(e) => update("storeName", e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
+          <p className="text-slate-600 leading-relaxed">
+            {tabs.find((tab) => tab.id === activeTab)?.description}
+          </p>
 
-                <div>
-                  <label className={labelCls}>Email hỗ trợ</label>
-                  <input
-                    type="email"
-                    value={settings.storeEmail}
-                    onChange={(e) => update("storeEmail", e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelCls}>Giờ làm việc</label>
-                  <input
-                    type="text"
-                    value={settings.openingHours}
-                    onChange={(e) => update("openingHours", e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelCls}>Hotline chính (Hà Nội)</label>
-                  <input
-                    type="text"
-                    value={settings.storePhone}
-                    onChange={(e) => update("storePhone", e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelCls}>Hotline Bắc Ninh</label>
-                  <input
-                    type="text"
-                    value={settings.storePhoneBacNinh}
-                    onChange={(e) => update("storePhoneBacNinh", e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelCls}>Link Zalo</label>
-                  <input
-                    type="text"
-                    value={settings.zaloUrl}
-                    onChange={(e) => update("zaloUrl", e.target.value)}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelCls}>Link Messenger (m.me/...)</label>
-                  <input
-                    type="text"
-                    value={settings.messengerUrl}
-                    onChange={(e) => update("messengerUrl", e.target.value)}
-                    placeholder="https://m.me/citilapvn"
-                    className={inputCls}
-                  />
-                </div>
-
-                <label className="md:col-span-2 flex items-center gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer self-end">
-                  <input
-                    type="checkbox"
-                    checked={settings.floatingContactEnabled}
-                    onChange={(e) => update("floatingContactEnabled", e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <div>
-                    <div className="font-bold text-slate-800 text-xs">
-                      Hiện cụm nút liên hệ nổi (Zalo, Messenger, Yêu cầu gọi lại, Hotline)
-                    </div>
-                    <div className="text-[11px] text-slate-500">
-                      Hiển thị ở góc phải màn hình trên Storefront để khách hàng nhắn tin hoặc yêu cầu gọi lại ngay
-                    </div>
-                  </div>
-                </label>
-
-                <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className={labelCls}>Showroom Hà Nội</label>
-                    <input
-                      type="text"
-                      value={settings.addressHanoi}
-                      onChange={(e) => update("addressHanoi", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Showroom Bắc Ninh</label>
-                    <input
-                      type="text"
-                      value={settings.addressBacNinh}
-                      onChange={(e) => update("addressBacNinh", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-200 pt-4 space-y-3.5">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <ImageIcon className="w-3.5 h-3.5 text-blue-600" /> Nhận diện thương hiệu
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  <div>
-                    <label className={labelCls}>URL Logo</label>
-                    <input
-                      type="text"
-                      value={settings.logoUrl}
-                      onChange={(e) => update("logoUrl", e.target.value)}
-                      placeholder="/brand/citilap-logo.svg"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>URL Favicon</label>
-                    <input
-                      type="text"
-                      value={settings.faviconUrl}
-                      onChange={(e) => update("faviconUrl", e.target.value)}
-                      placeholder="/favicon.ico"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Khẩu hiệu (Motto)</label>
-                    <input
-                      type="text"
-                      value={settings.motto}
-                      onChange={(e) => update("motto", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Bản quyền Footer</label>
-                    <input
-                      type="text"
-                      value={settings.copyrightText}
-                      onChange={(e) => update("copyrightText", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-200 pt-4 space-y-3.5">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Scale className="w-3.5 h-3.5 text-blue-600" /> Thông tin pháp lý (hiển thị ở chân trang)
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  <div>
-                    <label className={labelCls}>Tên hộ kinh doanh / doanh nghiệp</label>
-                    <input
-                      type="text"
-                      value={settings.legalBusinessName}
-                      onChange={(e) => update("legalBusinessName", e.target.value)}
-                      placeholder="HỘ KINH DOANH CITI LAP"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Mã số đăng ký hộ kinh doanh / MST</label>
-                    <input
-                      type="text"
-                      value={settings.businessRegistrationNumber}
-                      onChange={(e) => update("businessRegistrationNumber", e.target.value)}
-                      placeholder="01D8053589"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Chủ hộ / Người đại diện (tùy chọn)</label>
-                    <input
-                      type="text"
-                      value={settings.legalRepresentative}
-                      onChange={(e) => update("legalRepresentative", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Nơi cấp (tùy chọn)</label>
-                    <input
-                      type="text"
-                      value={settings.businessRegistrationIssuer}
-                      onChange={(e) => update("businessRegistrationIssuer", e.target.value)}
-                      placeholder="UBND phường ..."
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Ngày cấp (tùy chọn)</label>
-                    <input
-                      type="text"
-                      value={settings.businessRegistrationDate}
-                      onChange={(e) => update("businessRegistrationDate", e.target.value)}
-                      placeholder="dd/mm/yyyy"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Địa chỉ đăng ký kinh doanh (tùy chọn)</label>
-                    <input
-                      type="text"
-                      value={settings.legalAddress}
-                      onChange={(e) => update("legalAddress", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-[auto_1fr_1fr] gap-3.5 items-end p-3.5 rounded-xl border border-slate-200 bg-slate-50/50">
-                  <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer pb-1.5">
-                    <input
-                      type="checkbox"
-                      checked={settings.moitBadgeEnabled}
-                      onChange={(e) => update("moitBadgeEnabled", e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    Hiện logo &quot;Đã thông báo Bộ Công Thương&quot;
-                  </label>
-                  <div>
-                    <label className={labelCls}>Link xác thực (online.gov.vn), tạm để # nếu chưa có</label>
-                    <input
-                      type="text"
-                      value={settings.moitBadgeUrl}
-                      onChange={(e) => update("moitBadgeUrl", e.target.value)}
-                      placeholder="http://online.gov.vn/Home/WebDetails/..."
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Ảnh logo</label>
-                    <input
-                      type="text"
-                      value={settings.moitBadgeImage}
-                      onChange={(e) => update("moitBadgeImage", e.target.value)}
-                      placeholder="https://bizweb.dktcdn.net/thumb/medium/100/372/934/themes/892516/assets/logo_bct.png"
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: FLASH SALE & GIỜ VÀNG */}
-          {activeTab === "flashsale" && (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 flex flex-col sm:flex-row items-start justify-between gap-3 text-xs text-blue-950">
-                <div className="flex items-start gap-2.5">
-                  <Flame className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="font-bold text-sm text-slate-900">Quản lý Flash Sale &amp; Giờ Vàng</p>
-                    <p className="text-slate-600 leading-relaxed">
-                      CitiLap quản lý các đợt Flash Sale chi tiết theo từng máy, biến thể và hẹn giờ tại mục{" "}
-                      <Link href="/admin/campaigns" className="font-bold text-blue-700 hover:underline">
-                        Quản lý Chiến dịch (/admin/campaigns)
-                      </Link>
-                      . Hệ thống tự động kiểm tra chống trùng giờ và cập nhật theo thời gian thực ngoài Storefront.
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      Cấu hình bên dưới dành cho Banner ngang hiển thị đầu trang chủ và chế độ Flash Sale toàn trang dự phòng.
-                    </p>
-                  </div>
-                </div>
-                <Link
-                  href="/admin/campaigns"
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shrink-0 shadow-2xs transition"
-                >
-                  Mở Quản lý Chiến dịch →
-                </Link>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-3">
-                <h2 className="font-bold text-slate-900 text-xs">Banner HOT SALE ngang trên Storefront</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <label className={labelCls}>
-                    Ảnh banner ngang trên PC (1600×160)
-                    <input
-                      value={settings.hotSaleBannerImage}
-                      onChange={e => update('hotSaleBannerImage', e.target.value)}
-                      placeholder="/api/library/... hoặc https://..."
-                      className={`mt-1 font-normal ${inputCls}`}
-                    />
-                  </label>
-                  <label className={labelCls}>
-                    Ảnh banner riêng trên Smartphone SP (Tùy chọn)
-                    <input
-                      value={settings.hotSaleMobileBannerImage || ''}
-                      onChange={e => update('hotSaleMobileBannerImage', e.target.value)}
-                      placeholder="Để trống nếu dùng chung ảnh PC"
-                      className={`mt-1 font-normal ${inputCls}`}
-                    />
-                  </label>
-                  <label className={labelCls}>
-                    Liên kết banner khi khách bấm vào
-                    <input
-                      value={settings.hotSaleBannerLink}
-                      onChange={e => update('hotSaleBannerLink', e.target.value)}
-                      placeholder="/admin/campaigns hoặc /laptop"
-                      className={`mt-1 font-normal ${inputCls}`}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              <div className="space-y-3.5">
-                <label className="flex items-center gap-2.5 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition">
-                  <input
-                    type="checkbox"
-                    checked={settings.flashSaleEnabled}
-                    onChange={(e) => update("flashSaleEnabled", e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                  />
-                  <div>
-                    <div className="font-bold text-slate-900 text-xs">Bật chương trình Flash Sale dự phòng toàn trang</div>
-                    <div className="text-[11px] text-slate-500">Áp dụng cho sản phẩm gắn cờ isFlashSale khi không có chiến dịch nâng cao nào hoạt động.</div>
-                  </div>
-                </label>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  <div>
-                    <label className={labelCls}>Tiêu đề chương trình</label>
-                    <input
-                      type="text"
-                      value={settings.flashSaleTitle}
-                      onChange={(e) => update("flashSaleTitle", e.target.value)}
-                      placeholder="Giá Sốc Giờ Vàng"
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Thời gian bắt đầu (GMT+7)</label>
-                    <input
-                      type="datetime-local"
-                      value={toDatetimeLocalGmt7(settings.flashSaleStartAt)}
-                      onChange={(e) => update("flashSaleStartAt", fromDatetimeLocalGmt7(e.target.value))}
-                      className={`${inputCls} font-mono`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Thời gian kết thúc (GMT+7)</label>
-                    <input
-                      type="datetime-local"
-                      value={toDatetimeLocalGmt7(settings.flashSaleEndAt)}
-                      onChange={(e) => update("flashSaleEndAt", fromDatetimeLocalGmt7(e.target.value))}
-                      className={`${inputCls} font-mono`}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: BANNERS & TRANG CHỦ */}
+          {activeTab === "store" && <StoreSettingsTab settings={settings} update={update} />}
+          {activeTab === "flashsale" && <FlashSaleSettingsTab settings={settings} update={update} />}
           {activeTab === "banners" && (
-            <div className="space-y-5">
-              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-950">
-                <div>
-                  <p className="font-bold text-slate-900">Lưu ý: Bố cục Trang chủ hiện được quản lý trực tiếp trong Trình dựng trang</p>
-                  <p className="text-slate-600 mt-0.5">
-                    Các thông số Hero Banner bên dưới đóng vai trò dữ liệu mặc định/dự phòng. Để thay đổi các khối Slider, Banner, Video Review và Lưới sản phẩm đang hiển thị ngoài Trang chủ, hãy mở Trình dựng trang chủ.
-                  </p>
-                </div>
-                <Link
-                  href="/admin/builder/home"
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shrink-0 shadow-2xs transition"
-                >
-                  Mở Bố cục Trang chủ →
-                </Link>
-              </div>
-              <div className="space-y-3">
-                <h2 className="text-xs font-bold text-slate-800">Hero Banner chính (Dự phòng)</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  <div>
-                    <label className={labelCls}>Badge nhãn nhỏ</label>
-                    <input
-                      type="text"
-                      value={settings.heroBadge}
-                      onChange={(e) => update("heroBadge", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Tiêu đề chính</label>
-                    <input
-                      type="text"
-                      value={settings.heroTitle}
-                      onChange={(e) => update("heroTitle", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Từ khóa Highlight</label>
-                    <input
-                      type="text"
-                      value={settings.heroHighlight}
-                      onChange={(e) => update("heroHighlight", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div className="md:col-span-3">
-                    <label className={labelCls}>Slogan phụ</label>
-                    <input
-                      type="text"
-                      value={settings.heroSlogan}
-                      onChange={(e) => update("heroSlogan", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Ảnh nền Hero trên PC (URL)</label>
-                    <input
-                      type="text"
-                      value={settings.heroBgImage}
-                      onChange={(e) => update("heroBgImage", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Ảnh nền Hero riêng trên Smartphone SP (URL)</label>
-                    <input
-                      type="text"
-                      value={settings.heroMobileBgImage || ""}
-                      onChange={(e) => update("heroMobileBgImage", e.target.value)}
-                      placeholder="/brand/citilap-hero-mobile.webp"
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Nút CTA - Tên</label>
-                    <input
-                      type="text"
-                      value={settings.heroCtaPrimaryText}
-                      onChange={(e) => update("heroCtaPrimaryText", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Nút CTA - Liên kết</label>
-                    <input
-                      type="text"
-                      value={settings.heroCtaPrimaryLink}
-                      onChange={(e) => update("heroCtaPrimaryLink", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-200 pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5 bg-slate-50/50">
-                  <h3 className="font-bold text-xs text-slate-800">Banner phụ 1 (Trái)</h3>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className={labelCls}>Tiêu đề</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner1Title}
-                        onChange={(e) => update("subBanner1Title", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Phụ đề</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner1Subtitle}
-                        onChange={(e) => update("subBanner1Subtitle", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Link đích</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner1Link}
-                        onChange={(e) => update("subBanner1Link", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Link ảnh</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner1Image}
-                        onChange={(e) => update("subBanner1Image", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5 bg-slate-50/50">
-                  <h3 className="font-bold text-xs text-slate-800">Banner phụ 2 (Phải)</h3>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className={labelCls}>Tiêu đề</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner2Title}
-                        onChange={(e) => update("subBanner2Title", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Phụ đề</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner2Subtitle}
-                        onChange={(e) => update("subBanner2Subtitle", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Link đích</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner2Link}
-                        onChange={(e) => update("subBanner2Link", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Link ảnh</label>
-                      <input
-                        type="text"
-                        value={settings.subBanner2Image}
-                        onChange={(e) => update("subBanner2Image", e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="border-t border-slate-200 pt-4 space-y-3.5">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Share2 className="w-3.5 h-3.5 text-blue-600" /> Mạng xã hội &amp; Kênh Video
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  <div>
-                    <label className={labelCls}>Facebook</label>
-                    <input
-                      type="text"
-                      value={settings.facebookUrl}
-                      onChange={(e) => update("facebookUrl", e.target.value)}
-                      placeholder="https://www.facebook.com/citilap"
-                      className={inputCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Kênh TikTok (@citilapvn)</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={settings.tiktokUrl}
-                        onChange={(e) => update("tiktokUrl", e.target.value)}
-                        placeholder="https://www.tiktok.com/@citilapvn"
-                        className={inputCls}
-                      />
-                      <button
-                        type="button"
-                        disabled={fetchingVideos || !settings.tiktokUrl}
-                        onClick={() => void handleFetchChannelVideos(settings.tiktokUrl)}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
-                        title="Nạp video mẫu từ kênh TikTok"
-                      >
-                        Lấy video
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Kênh YouTube (tạm dùng ThinkView hoặc kênh riêng)</label>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        value={settings.youtubeUrl}
-                        onChange={(e) => update("youtubeUrl", e.target.value)}
-                        placeholder="https://www.youtube.com/@thinkview/videos"
-                        className={inputCls}
-                      />
-                      <button
-                        type="button"
-                        disabled={fetchingVideos || !settings.youtubeUrl}
-                        onClick={() => void handleFetchChannelVideos(settings.youtubeUrl)}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold text-[11px] cursor-pointer"
-                        title="Lấy các video mới nhất từ kênh YouTube"
-                      >
-                        Lấy mới nhất
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Quản lý danh sách Video Review YouTube & TikTok */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                        <Video className="w-3.5 h-3.5 text-rose-600" /> Danh sách Video Review (YouTube &amp; TikTok)
-                      </h4>
-                      <p className="text-[11px] text-slate-500">
-                        Hiển thị trên Trang chủ và cột bên trang Tin tức. Bạn có thể dán trực tiếp link video YouTube hoặc TikTok để tự động lấy tiêu đề &amp; ảnh thu nhỏ, hoặc tự nhập từng ô.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={(settings.reviewVideos || []).length >= 12}
-                      onClick={() =>
-                        update("reviewVideos", [
-                          ...(settings.reviewVideos || []),
-                          {
-                            title: "Video đánh giá Laptop CitiLap",
-                            url: "https://www.youtube.com/watch?v=KsQTEyLOC6M",
-                            thumbnail: "https://i.ytimg.com/vi/KsQTEyLOC6M/hqdefault.jpg",
-                            platform: "youtube",
-                          },
-                        ])
-                      }
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-40 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Thêm dòng trống
-                    </button>
-                  </div>
-
-                  {/* Quick URL input box */}
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={quickVideoUrl}
-                      onChange={(e) => setQuickVideoUrl(e.target.value)}
-                      placeholder="Dán URL video YouTube (https://www.youtube.com/watch?v=...) hoặc TikTok (https://www.tiktok.com/@citilapvn/video/...)"
-                      className={inputCls}
-                    />
-                    <button
-                      type="button"
-                      disabled={!quickVideoUrl.trim() || fetchingVideos}
-                      onClick={() => void handleAddVideoByUrl()}
-                      className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold text-xs cursor-pointer"
-                    >
-                      {fetchingVideos ? (
-                        <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Đang lấy...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-3.5 h-3.5" /> Lấy thông tin &amp; Thêm
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Editable video list */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(settings.reviewVideos || []).map((video, idx) => {
-                      const patchVideo = (patch: Partial<typeof video>) => {
-                        const next = (settings.reviewVideos || []).map((v, i) =>
-                          i === idx ? { ...v, ...patch } : v
-                        );
-                        update("reviewVideos", next);
-                      };
-                      return (
-                        <div
-                          key={`${video.url}-${idx}`}
-                          className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                video.url.includes("tiktok.com") || video.platform === "tiktok"
-                                  ? "bg-slate-900 text-white"
-                                  : "bg-rose-600 text-white"
-                              }`}
-                            >
-                              {video.url.includes("tiktok.com") || video.platform === "tiktok"
-                                ? "TikTok"
-                                : "YouTube"}{" "}
-                              #{idx + 1}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                update(
-                                  "reviewVideos",
-                                  (settings.reviewVideos || []).filter((_, i) => i !== idx)
-                                )
-                              }
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:underline cursor-pointer"
-                            >
-                              <Trash2 className="w-3 h-3" /> Xóa
-                            </button>
-                          </div>
-                          <div>
-                            <label className={labelCls}>Tiêu đề video</label>
-                            <input
-                              type="text"
-                              value={video.title}
-                              onChange={(e) => patchVideo({ title: e.target.value })}
-                              placeholder="Nhập tiêu đề hiển thị..."
-                              className={inputCls}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>URL Video (YouTube hoặc TikTok)</label>
-                            <input
-                              type="text"
-                              value={video.url}
-                              onChange={(e) =>
-                                patchVideo({
-                                  url: e.target.value,
-                                  platform: e.target.value.includes("tiktok.com") ? "tiktok" : "youtube",
-                                })
-                              }
-                              placeholder="https://www.youtube.com/watch?v=... hoặc https://www.tiktok.com/@citilapvn/video/..."
-                              className={inputCls}
-                            />
-                          </div>
-                          <div>
-                            <label className={labelCls}>URL Ảnh Thumbnail</label>
-                            <input
-                              type="text"
-                              value={video.thumbnail || ""}
-                              onChange={(e) => patchVideo({ thumbnail: e.target.value })}
-                              placeholder="https://i.ytimg.com/vi/.../hqdefault.jpg hoặc /brand/store-photo-01.webp"
-                              className={inputCls}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-            </div>
+            <BannersVideosSettingsTab
+              settings={settings}
+              update={update}
+              quickVideoUrl={quickVideoUrl}
+              setQuickVideoUrl={setQuickVideoUrl}
+              fetchingVideos={fetchingVideos}
+              handleAddVideoByUrl={handleAddVideoByUrl}
+              handleFetchChannelVideos={handleFetchChannelVideos}
+            />
           )}
-
-          {/* TAB 4: CAM KẾT DỊCH VỤ */}
           {activeTab === "features" && (
-            <div className="space-y-3.5">
-              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-blue-950">
-                <div>
-                  <p className="font-bold text-slate-900">Đồng bộ với khối Giới thiệu &amp; Cam kết trên Trang chủ</p>
-                  <p className="text-slate-600 mt-0.5">
-                    Các cam kết và đánh giá khách hàng bên dưới là cấu hình chuẩn toàn hệ thống. Nếu Trang chủ đang dùng khối tùy chỉnh riêng, bạn có thể sửa trực tiếp tại Bố cục Trang chủ.
-                  </p>
-                </div>
-                <Link
-                  href="/admin/builder/home"
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shrink-0 shadow-2xs transition"
-                >
-                  Mở Bố cục Trang chủ →
-                </Link>
-              </div>
-              <h2 className="text-xs font-bold text-slate-800">Cam kết dịch vụ trang chủ (4 mục)</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-              {([1, 2, 3, 4] as const).map((num) => {
-                const titleKey = `feature${num}Title` as const;
-                const descKey = `feature${num}Desc` as const;
-                return (
-                  <div key={num} className="p-3.5 border border-slate-200 rounded-xl space-y-2.5 bg-slate-50/50">
-                    <div className="font-bold text-xs text-slate-800">Cam kết #{num}</div>
-                    <div>
-                      <label className={labelCls}>Tiêu đề</label>
-                      <input
-                        type="text"
-                        value={settings[titleKey]}
-                        onChange={(e) => update(titleKey, e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Mô tả ngắn</label>
-                      <input
-                        type="text"
-                        value={settings[descKey]}
-                        onChange={(e) => update(descKey, e.target.value)}
-                        className={inputCls}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-              </div>
-
-              <section className="border-t border-slate-200 pt-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <Star className="w-3.5 h-3.5 text-amber-500" /> Đánh giá khách hàng trang chủ (tối đa 6)
-                    </h3>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Chỉ nhập đánh giá thật của khách. Mục này bị ẩn trên trang chủ khi danh sách trống.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={(settings.testimonials || []).length >= 6}
-                    className="text-xs font-semibold text-blue-600 hover:underline disabled:opacity-40 cursor-pointer"
-                    onClick={() => update("testimonials", [...(settings.testimonials || []), { name: "", role: "", product: "", text: "", rating: 5 }])}
-                  >
-                    + Thêm đánh giá
-                  </button>
-                </div>
-                <div>
-                  <label className={labelCls}>Link xem tất cả đánh giá (Google Maps / Facebook, tùy chọn)</label>
-                  <input
-                    type="text"
-                    value={settings.testimonialsSourceUrl}
-                    onChange={(e) => update("testimonialsSourceUrl", e.target.value)}
-                    placeholder="https://maps.app.goo.gl/..."
-                    className={inputCls}
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {(settings.testimonials || []).map((item, index) => {
-                    const patch = (value: Partial<typeof item>) =>
-                      update("testimonials", settings.testimonials.map((t, i) => (i === index ? { ...t, ...value } : t)));
-                    return (
-                      <div key={index} className="rounded-xl border border-slate-200 p-3 space-y-2 bg-slate-50/50">
-                        <div className="grid grid-cols-2 gap-2">
-                          <label className="block text-[11px] font-semibold text-slate-600">
-                            Tên khách *
-                            <input value={item.name} maxLength={80} onChange={(e) => patch({ name: e.target.value })} className={`mt-1 font-normal ${inputCls}`} />
-                          </label>
-                          <label className="block text-[11px] font-semibold text-slate-600">
-                            Nghề nghiệp / Khu vực
-                            <input value={item.role} maxLength={120} onChange={(e) => patch({ role: e.target.value })} className={`mt-1 font-normal ${inputCls}`} />
-                          </label>
-                          <label className="block text-[11px] font-semibold text-slate-600">
-                            Sản phẩm đã mua
-                            <input value={item.product} maxLength={160} onChange={(e) => patch({ product: e.target.value })} className={`mt-1 font-normal ${inputCls}`} />
-                          </label>
-                          <label className="block text-[11px] font-semibold text-slate-600">
-                            Số sao
-                            <select value={item.rating} onChange={(e) => patch({ rating: Number(e.target.value) })} className={`mt-1 font-normal ${inputCls}`}>
-                              {[5, 4, 3, 2, 1].map((n) => <option key={n} value={n}>{n} sao</option>)}
-                            </select>
-                          </label>
-                        </div>
-                        <label className="block text-[11px] font-semibold text-slate-600">
-                          Nội dung *
-                          <textarea value={item.text} maxLength={800} rows={3} onChange={(e) => patch({ text: e.target.value })} className={`mt-1 font-normal ${inputCls}`} />
-                        </label>
-                        <div className="flex justify-end">
-                          <button
-                            type="button"
-                            className="text-xs text-rose-600 hover:underline cursor-pointer"
-                            onClick={() => update("testimonials", settings.testimonials.filter((_, i) => i !== index))}
-                          >
-                            Xóa đánh giá
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            </div>
+            <FeaturesTestimonialsSettingsTab settings={settings} update={update} />
           )}
-
-          {/* TAB 5: VẬN CHUYỂN & THANH TOÁN */}
           {activeTab === "shipping" && (
-            <div className="space-y-4">
-              <h2 className="text-xs font-bold text-slate-800">Phí vận chuyển & Phương thức thanh toán</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                <div>
-                  <label className={labelCls}>Phí giao hàng mặc định (VNĐ)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formatDots(settings.shippingFee)}
-                    onChange={(e) => update("shippingFee", parseDots(e.target.value))}
-                    className={`${inputCls} tabular-nums font-semibold`}
-                  />
-                </div>
-
-                <div>
-                  <label className={labelCls}>Miễn phí giao hàng từ mức (VNĐ, 0 = tắt)</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formatDots(settings.freeShippingThreshold)}
-                    onChange={(e) => update("freeShippingThreshold", parseDots(e.target.value))}
-                    className={`${inputCls} tabular-nums font-semibold`}
-                  />
-                </div>
-
-                <label className="flex items-center justify-between p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition">
-                  <div>
-                    <div className="font-bold text-slate-900 text-xs">Thanh toán khi nhận hàng (COD)</div>
-                    <div className="text-[11px] text-slate-500">Trả tiền mặt khi kiểm tra máy</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings.codEnabled}
-                    onChange={(e) => update("codEnabled", e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition">
-                  <div>
-                    <div className="font-bold text-slate-900 text-xs">Chuyển khoản ngân hàng</div>
-                    <div className="text-[11px] text-slate-500">Hiển thị thông tin tài khoản tại Checkout</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={settings.bankTransferEnabled}
-                    onChange={(e) => update("bankTransferEnabled", e.target.checked)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </label>
-
-                <div className="md:col-span-2 rounded-xl border border-blue-200 bg-blue-50/50 p-3.5 space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div>
-                      <h3 className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
-                        <QrCode className="w-3.5 h-3.5 text-blue-600" /> Cấu hình mã QR chuyển khoản tự động (VietQR Napas 247)
-                      </h3>
-                      <p className="text-[11px] text-slate-600 mt-0.5">
-                        Khi điền Ngân hàng + Số tài khoản, trang Checkout và trang Đặt hàng thành công sẽ tự sinh mã QR kèm sẵn số tiền và nội dung đơn hàng.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={!settings.bankBin.trim() || !settings.bankAccountNumber.trim()}
-                      onClick={() => {
-                        const bank = findVietQrBank(settings.bankBin);
-                        const bankLabel = bank ? `${bank.shortName} (${bank.code})` : settings.bankBin;
-                        const summary = [
-                          `Ngân hàng: ${bankLabel}`,
-                          `Số tài khoản: ${settings.bankAccountNumber.trim()}`,
-                          settings.bankAccountName.trim() ? `Chủ tài khoản: ${settings.bankAccountName.trim()}` : null,
-                          "Nội dung chuyển khoản: Mã đơn hàng + Số điện thoại đặt hàng",
-                        ]
-                          .filter(Boolean)
-                          .join("\n");
-                        update("bankAccountInfo", summary);
-                      }}
-                      className="text-xs font-semibold text-blue-700 bg-white hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg transition disabled:opacity-40 cursor-pointer shrink-0"
-                    >
-                      Điền nhanh vào ô hướng dẫn bên dưới
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className={labelCls}>Ngân hàng thụ hưởng</label>
-                      <select
-                        value={settings.bankBin}
-                        onChange={(e) => update("bankBin", e.target.value)}
-                        className={inputCls}
-                      >
-                        <option value="">-- Chọn ngân hàng (hoặc tắt QR) --</option>
-                        {VIETQR_BANKS.map((bank) => (
-                          <option key={bank.code} value={bank.code}>
-                            {bank.shortName} ({bank.code}) - {bank.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className={labelCls}>Số tài khoản</label>
-                      <input
-                        type="text"
-                        value={settings.bankAccountNumber}
-                        onChange={(e) => update("bankAccountNumber", e.target.value)}
-                        placeholder="Ví dụ: 1903..."
-                        className={`${inputCls} font-mono`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelCls}>Tên chủ tài khoản (in hoa không dấu)</label>
-                      <input
-                        type="text"
-                        value={settings.bankAccountName}
-                        onChange={(e) => update("bankAccountName", e.target.value)}
-                        placeholder="HO KINH DOANH CITI LAP"
-                        className={`${inputCls} uppercase`}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className={labelCls}>Thông tin tài khoản ngân hàng (hiển thị dạng văn bản & dùng để bật phương thức chuyển khoản)</label>
-                  <textarea
-                    value={settings.bankAccountInfo}
-                    onChange={(e) => update("bankAccountInfo", e.target.value)}
-                    rows={3}
-                    placeholder="Ngân hàng: ... - STK: ... - Chủ TK: ..."
-                    className={inputCls}
-                  />
-                </div>
-              </div>
-            </div>
+            <ShippingPaymentSettingsTab settings={settings} update={update} />
           )}
-
-          {/* TAB 6: TRANG SẢN PHẨM */}
-          {activeTab === 'product' && (
-            <div className="space-y-6">
-              {/* CÁC GÓI QUÀ TẶNG MẶC ĐỊNH */}
-              <section className="space-y-3 bg-rose-50/40 p-4 rounded-xl border border-rose-200/80">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <h2 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <Gift className="w-4 h-4 text-rose-600" />
-                      Các gói Quà tặng mặc định (Chọn nhanh khi sửa sản phẩm)
-                    </h2>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Thiết lập sẵn các gói quà theo dòng máy (VD: Laptop Văn phòng, Laptop Gaming, MacBook...). Khi sửa sản phẩm, Admin chỉ cần bấm 1 nút để áp dụng gói quà tương ứng.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => update('giftBundles', DEFAULT_GIFT_BUNDLES)}
-                      className="text-[11px] font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-pointer"
-                    >
-                      Khôi phục mẫu mặc định
-                    </button>
-                    <button
-                      type="button"
-                      disabled={(settings.giftBundles || []).length >= 12}
-                      onClick={() =>
-                        update('giftBundles', [
-                          ...(settings.giftBundles || []),
-                          {
-                            id: `gift-${Date.now()}`,
-                            name: `Gói quà tặng mới #${(settings.giftBundles || []).length + 1}`,
-                            gifts: ['Balo chống sốc CitiLap cao cấp', 'Chuột không dây chính hãng'],
-                          },
-                        ])
-                      }
-                      className="inline-flex items-center gap-1 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-40 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Thêm gói quà
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  {(settings.giftBundles || []).map((bundle, bIdx) => {
-                    const patchBundle = (patch: Partial<typeof bundle>) => {
-                      update(
-                        'giftBundles',
-                        (settings.giftBundles || []).map((item, i) => (i === bIdx ? { ...item, ...patch } : item))
-                      );
-                    };
-                    return (
-                      <div key={bundle.id || bIdx} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-2xs flex flex-col justify-between">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
-                              Gói #{bIdx + 1} ({bundle.gifts.length} món)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                update(
-                                  'giftBundles',
-                                  (settings.giftBundles || []).filter((_, i) => i !== bIdx)
-                                )
-                              }
-                              className="text-[11px] text-rose-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Trash2 className="w-3 h-3" /> Xóa gói
-                            </button>
-                          </div>
-
-                          <div>
-                            <label className={labelCls}>Tên gói quà tặng</label>
-                            <input
-                              type="text"
-                              value={bundle.name}
-                              onChange={e => patchBundle({ name: e.target.value })}
-                              placeholder="VD: Gói quà Laptop Văn phòng"
-                              className={`${inputCls} font-semibold`}
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                              <label className="text-[11px] font-semibold text-slate-600">Danh sách món quà</label>
-                              <button
-                                type="button"
-                                disabled={bundle.gifts.length >= 10}
-                                onClick={() => patchBundle({ gifts: [...bundle.gifts, ''] })}
-                                className="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer"
-                              >
-                                + Thêm món
-                              </button>
-                            </div>
-                            {bundle.gifts.map((giftItem, gIdx) => (
-                              <div key={gIdx} className="flex items-center gap-1">
-                                <input
-                                  type="text"
-                                  value={giftItem}
-                                  onChange={e => {
-                                    const nextItems = [...bundle.gifts];
-                                    nextItems[gIdx] = e.target.value;
-                                    patchBundle({ gifts: nextItems });
-                                  }}
-                                  placeholder={`Quà tặng #${gIdx + 1}...`}
-                                  className="flex-1 border border-slate-200 rounded px-2 py-1 text-xs"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    patchBundle({
-                                      gifts: bundle.gifts.filter((_, i) => i !== gIdx),
-                                    })
-                                  }
-                                  className="text-slate-400 hover:text-rose-600 px-1 cursor-pointer"
-                                  title="Xóa món quà"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* CÁC GÓI MUA KÈM / PHỤ KIỆN MẶC ĐỊNH */}
-              <section className="space-y-3 bg-blue-50/40 p-4 rounded-xl border border-blue-200/80">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <h2 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <ShoppingBag className="w-4 h-4 text-blue-600" />
-                      Các gói Mua kèm / Phụ kiện mặc định
-                    </h2>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Tạo sẵn các nhóm sản phẩm phụ kiện mua kèm (Chuột, Phím, Hub, Màn hình...) để chọn nhanh 1 chạm khi biên tập sản phẩm.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => update('accessoryBundles', DEFAULT_ACCESSORY_BUNDLES)}
-                      className="text-[11px] font-medium text-slate-600 hover:text-slate-900 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg cursor-pointer"
-                    >
-                      Khôi phục mẫu mặc định
-                    </button>
-                    <button
-                      type="button"
-                      disabled={(settings.accessoryBundles || []).length >= 12}
-                      onClick={() =>
-                        update('accessoryBundles', [
-                          ...(settings.accessoryBundles || []),
-                          {
-                            id: `acc-${Date.now()}`,
-                            name: `Gói phụ kiện mua kèm #${(settings.accessoryBundles || []).length + 1}`,
-                            productIds: [],
-                          },
-                        ])
-                      }
-                      className="inline-flex items-center gap-1 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-40 cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" /> Thêm gói mua kèm
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-                  {(settings.accessoryBundles || []).map((bundle, bIdx) => {
-                    const patchBundle = (patch: Partial<typeof bundle>) => {
-                      update(
-                        'accessoryBundles',
-                        (settings.accessoryBundles || []).map((item, i) => (i === bIdx ? { ...item, ...patch } : item))
-                      );
-                    };
-                    const q = (bundleProductSearch[bundle.id] || '').trim().toLowerCase();
-                    const candidates = catalogProducts
-                      .filter(p => !bundle.productIds.includes(p.id))
-                      .filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku || '').toLowerCase().includes(q))
-                      .slice(0, 6);
-
-                    return (
-                      <div key={bundle.id || bIdx} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-2xs flex flex-col justify-between">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                              Gói #{bIdx + 1} ({bundle.productIds.length}/8 SP)
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                update(
-                                  'accessoryBundles',
-                                  (settings.accessoryBundles || []).filter((_, i) => i !== bIdx)
-                                )
-                              }
-                              className="text-[11px] text-rose-600 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <Trash2 className="w-3 h-3" /> Xóa gói
-                            </button>
-                          </div>
-
-                          <div>
-                            <label className={labelCls}>Tên gói mua kèm</label>
-                            <input
-                              type="text"
-                              value={bundle.name}
-                              onChange={e => patchBundle({ name: e.target.value })}
-                              placeholder="VD: Gói Phụ kiện Gaming"
-                              className={`${inputCls} font-semibold`}
-                            />
-                          </div>
-
-                          {/* Selected products in this bundle */}
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-semibold text-slate-600 block">
-                              Sản phẩm trong gói ({bundle.productIds.length})
-                            </label>
-                            {bundle.productIds.length === 0 ? (
-                              <p className="text-[11px] text-slate-400 italic py-1">Chưa chọn sản phẩm nào. Tìm &amp; bấm thêm bên dưới.</p>
-                            ) : (
-                              <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
-                                {bundle.productIds.map(pid => {
-                                  const prod = catalogProducts.find(item => item.id === pid);
-                                  return (
-                                    <div key={pid} className="flex items-center justify-between gap-1.5 bg-slate-50 border border-slate-200 rounded px-2 py-1 text-[11px]">
-                                      <span className="truncate font-medium text-slate-700">{prod ? prod.name : pid}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => patchBundle({ productIds: bundle.productIds.filter(id => id !== pid) })}
-                                        className="text-rose-500 hover:text-rose-700 font-bold shrink-0 cursor-pointer"
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Quick product search to add to bundle */}
-                          {bundle.productIds.length < 8 && (
-                            <div className="pt-1 border-t border-slate-100 space-y-1">
-                              <input
-                                type="text"
-                                value={bundleProductSearch[bundle.id] || ''}
-                                onChange={e => setBundleProductSearch(prev => ({ ...prev, [bundle.id]: e.target.value }))}
-                                placeholder="Tìm sản phẩm thêm vào gói..."
-                                className="w-full border border-slate-200 rounded px-2 py-1 text-[11px]"
-                              />
-                              <div className="max-h-28 overflow-y-auto divide-y divide-slate-100 border border-slate-100 rounded bg-slate-50/50">
-                                {candidates.map(c => (
-                                  <div key={c.id} className="flex items-center justify-between gap-1.5 px-2 py-1 text-[11px]">
-                                    <span className="truncate text-slate-700" title={c.name}>{c.name}</span>
-                                    <button
-                                      type="button"
-                                      onClick={() => patchBundle({ productIds: [...bundle.productIds, c.id] })}
-                                      className="text-blue-600 hover:underline font-semibold shrink-0 cursor-pointer"
-                                    >
-                                      + Thêm
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {(['productTrustItems', 'productShippingItems'] as const).map(key => (
-                  <section key={key} className="space-y-2 bg-slate-50/60 p-3.5 rounded-xl border border-slate-200">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-xs font-bold text-slate-800">
-                        {key === 'productTrustItems' ? 'Đặc quyền an tâm' : 'Chính sách vận chuyển & cam kết'}
-                      </h2>
-                      <button
-                        type="button"
-                        disabled={(settings[key] || []).length >= 8}
-                        className="text-xs font-semibold text-blue-600 hover:underline disabled:opacity-40 cursor-pointer"
-                        onClick={() => update(key, [...(settings[key] || []), ''])}
-                      >
-                        + Thêm dòng
-                      </button>
-                    </div>
-                    {(settings[key] || []).map((value, index) => (
-                      <div key={index} className="flex gap-1.5 items-center">
-                        <input
-                          aria-label={(key === 'productTrustItems' ? 'Đặc quyền ' : 'Cam kết ') + (index + 1)}
-                          value={value}
-                          maxLength={key === 'productTrustItems' ? 300 : 500}
-                          onChange={e => update(key, settings[key].map((item, i) => i === index ? e.target.value : item))}
-                          className={inputCls}
-                        />
-                        <button
-                          type="button"
-                          className="text-xs text-rose-600 hover:bg-rose-50 px-2 py-1 rounded cursor-pointer"
-                          onClick={() => update(key, settings[key].filter((_, i) => i !== index))}
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    ))}
-                  </section>
-                ))}
-              </div>
-
-              <section className="space-y-2.5 border-t border-slate-200 pt-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-slate-800">Banner ưu đãi cạnh thông số (tối đa 2)</h3>
-                  <button
-                    type="button"
-                    disabled={(settings.productBanners || []).length >= 2}
-                    className="text-xs font-semibold text-blue-600 hover:underline disabled:opacity-40 cursor-pointer"
-                    onClick={() => update('productBanners', [...(settings.productBanners || []), { title: '', description: '', href: '/lien-he' }])}
-                  >
-                    + Thêm banner
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {(settings.productBanners || []).map((banner, index) => (
-                    <div key={index} className="rounded-xl border border-slate-200 p-3 space-y-2 bg-slate-50/50">
-                      {(['title', 'description', 'href'] as const).map(field => (
-                        <label key={field} className="block text-[11px] font-semibold text-slate-600">
-                          {field === 'title' ? 'Tiêu đề' : field === 'description' ? 'Nội dung' : 'Liên kết'}
-                          <input
-                            value={banner[field]}
-                            maxLength={field === 'title' ? 120 : field === 'description' ? 500 : 1000}
-                            onChange={e => update('productBanners', settings.productBanners.map((item, i) => i === index ? { ...item, [field]: e.target.value } : item))}
-                            className={`mt-1 font-normal ${inputCls}`}
-                          />
-                        </label>
-                      ))}
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          className="text-xs text-rose-600 hover:underline cursor-pointer"
-                          onClick={() => update('productBanners', settings.productBanners.filter((_, i) => i !== index))}
-                        >
-                          Xóa banner
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
+          {activeTab === "product" && (
+            <ProductPageSettingsTab
+              settings={settings}
+              update={update}
+              catalogProducts={catalogProducts}
+              bundleProductSearch={bundleProductSearch}
+              setBundleProductSearch={setBundleProductSearch}
+            />
           )}
 
           <div className="admin-settings-save pt-3 border-t border-slate-200 flex items-center justify-between gap-3">
             <span role="status" className={isDirty ? "text-amber-800" : "text-slate-500"}>
-              {saving ? "Đang lưu cấu hình…" : isDirty ? "Có thay đổi chưa lưu · Lưu áp dụng tất cả mục" : "Không có thay đổi chưa lưu"}
+              {saving
+                ? "Đang lưu cấu hình…"
+                : isDirty
+                ? "Có thay đổi chưa lưu · Lưu áp dụng tất cả mục"
+                : "Không có thay đổi chưa lưu"}
             </span>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || loading || reloading || Boolean(loadError)}
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-2 px-5 rounded-lg shadow-2xs transition flex items-center gap-1.5 cursor-pointer text-xs"
             >
               {saving ? (

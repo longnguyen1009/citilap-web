@@ -57,6 +57,11 @@ export default function MediaEditor({
   const [showEmbed, setShowEmbed] = useState(false);
   const [copiedKey, setCopiedKey] = useState<'url' | 'embed' | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const folderTouchedRef = useRef(false);
+  const activeAssetIdRef = useRef(asset.id);
+  const mountedRef = useRef(true);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyGenRef = useRef(0);
 
   const dirty =
     name !== current.name ||
@@ -65,33 +70,66 @@ export default function MediaEditor({
     folder !== (current.folder || 'general');
 
   useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      copyGenRef.current += 1;
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const targetAssetId = asset.id;
+    activeAssetIdRef.current = targetAssetId;
+    folderTouchedRef.current = false;
+    let active = true;
     const c = new AbortController();
-    mediaRequest<{ asset: MediaAssetDto; usages: MediaUsageDto[] }>(`/api/admin/media/${asset.id}`, {
+    const isCurrent = () =>
+      active && mountedRef.current && !c.signal.aborted && activeAssetIdRef.current === targetAssetId;
+
+    mediaRequest<{ asset: MediaAssetDto; usages: MediaUsageDto[] }>(`/api/admin/media/${targetAssetId}`, {
       signal: c.signal,
     })
       .then((data) => {
-        setUsages(data.usages);
-        if (data.asset?.folder) {
-          setCurrent((prev) => ({ ...prev, folder: data.asset.folder }));
-          setFolder(data.asset.folder);
+        if (!isCurrent()) return;
+        setUsages(Array.isArray(data.usages) ? data.usages : []);
+        if (data.asset) {
+          const nextFolder = data.asset.folder || 'general';
+          setCurrent((prev) => (prev.id === targetAssetId ? { ...prev, folder: nextFolder } : prev));
+          if (!folderTouchedRef.current) {
+            setFolder(nextFolder);
+          }
         }
       })
       .catch((e) => {
-        if (!c.signal.aborted) setError(e.message);
+        if (isCurrent()) setError(e instanceof Error ? e.message : 'Không thể tải chi tiết tệp.');
       });
-    mediaRequest<{ status: string; bytes: number | null }>(`/api/admin/media/${asset.id}/optimize`, {
+    mediaRequest<{ status: string; bytes: number | null }>(`/api/admin/media/${targetAssetId}/optimize`, {
       signal: c.signal,
     })
-      .then(setOptimization)
+      .then((res) => {
+        if (isCurrent()) setOptimization(res);
+      })
       .catch((e) => {
-        if (!c.signal.aborted) setError(e.message);
+        if (isCurrent()) setError(e instanceof Error ? e.message : 'Không thể kiểm tra tối ưu ảnh.');
       });
     mediaRequest<{ folders: MediaFolderDto[] }>('/api/admin/media/folders', { signal: c.signal })
       .then((res) => {
-        if (!c.signal.aborted && res.folders?.length) setFolders(res.folders);
+        if (isCurrent() && res.folders?.length) setFolders(res.folders);
       })
       .catch(() => undefined);
-    return () => c.abort();
+    return () => {
+      active = false;
+      c.abort();
+      copyGenRef.current += 1;
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+        copyTimerRef.current = null;
+      }
+    };
   }, [asset.id]);
 
   useEffect(() => {
@@ -104,6 +142,7 @@ export default function MediaEditor({
   }, [dirty]);
 
   async function save(state = current.state) {
+    const targetAssetId = current.id;
     const payload = { name, alt, caption, folder, revision: current.revision, state };
     if (!mediaEditSchema.safeParse(payload).success) {
       setError('Tên tệp bắt buộc (tối đa 180 ký tự), mô tả ảnh tối đa 300 và chú thích tối đa 1000 ký tự.');
@@ -114,11 +153,13 @@ export default function MediaEditor({
     setError('');
     setNotice('');
     try {
-      const data = await mediaRequest<{ asset: MediaAssetDto }>(`/api/admin/media/${current.id}`, {
+      const data = await mediaRequest<{ asset: MediaAssetDto }>(`/api/admin/media/${targetAssetId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (!mountedRef.current || activeAssetIdRef.current !== targetAssetId) return;
+      folderTouchedRef.current = false;
       setCurrent(data.asset);
       setName(data.asset.name);
       setAlt(data.asset.alt);
@@ -127,33 +168,64 @@ export default function MediaEditor({
       setNotice('Đã lưu thay đổi.');
       onSaved();
     } catch (e) {
+      if (!mountedRef.current || activeAssetIdRef.current !== targetAssetId) return;
       setError(e instanceof Error ? e.message : 'Không thể lưu.');
     } finally {
-      setBusy(false);
+      if (mountedRef.current && activeAssetIdRef.current === targetAssetId) {
+        setBusy(false);
+      }
     }
   }
 
   async function copyText(value: string, key: 'url' | 'embed') {
+    const targetAssetId = current.id;
+    const gen = ++copyGenRef.current;
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+    setCopiedKey(null);
     try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+        throw new Error('Clipboard API unavailable');
+      }
       await navigator.clipboard.writeText(value);
+      if (!mountedRef.current || activeAssetIdRef.current !== targetAssetId || gen !== copyGenRef.current) return;
+      setError('');
       setCopiedKey(key);
-      setTimeout(() => setCopiedKey((prev) => (prev === key ? null : prev)), 2000);
+      copyTimerRef.current = setTimeout(() => {
+        if (mountedRef.current && activeAssetIdRef.current === targetAssetId && copyGenRef.current === gen) {
+          setCopiedKey(null);
+          copyTimerRef.current = null;
+        }
+      }, 2000);
     } catch {
-      // Clipboard API unavailable
+      if (!mountedRef.current || activeAssetIdRef.current !== targetAssetId || gen !== copyGenRef.current) return;
+      setCopiedKey(null);
+      setError('Không thể sao chép vào bộ nhớ tạm. Vui lòng thử lại.');
     }
   }
 
   async function optimize() {
+    const targetAssetId = current.id;
     setBusy(true);
     setError('');
     try {
-      setOptimization(await mediaRequest(`/api/admin/media/${asset.id}/optimize`, { method: 'POST' }));
+      const res = await mediaRequest<{ status: string; bytes: number | null }>(
+        `/api/admin/media/${targetAssetId}/optimize`,
+        { method: 'POST' },
+      );
+      if (!mountedRef.current || activeAssetIdRef.current !== targetAssetId) return;
+      setOptimization(res);
       setNotice('Đã tạo ảnh thu nhỏ. Ảnh gốc được giữ nguyên.');
       onSaved();
     } catch (e) {
+      if (!mountedRef.current || activeAssetIdRef.current !== targetAssetId) return;
       setError(e instanceof Error ? e.message : 'Không thể tối ưu ảnh.');
     } finally {
-      setBusy(false);
+      if (mountedRef.current && activeAssetIdRef.current === targetAssetId) {
+        setBusy(false);
+      }
     }
   }
 
@@ -291,7 +363,14 @@ export default function MediaEditor({
           >
             <label className="media-field">
               Thư mục lưu trữ
-              <select value={folder} onChange={(e) => setFolder(e.target.value)} disabled={busy}>
+              <select
+                value={folder}
+                onChange={(e) => {
+                  folderTouchedRef.current = true;
+                  setFolder(e.target.value);
+                }}
+                disabled={busy}
+              >
                 {folders.map((f) => (
                   <option key={f.slug} value={f.slug}>
                     📁 {f.name}

@@ -29,11 +29,17 @@ export type AggregatePromotionCampaignItem = {
 export type PromotionCampaignItemAvgAggregateOutputType = {
   salePrice: number | null
   regularPrice: number | null
+  quantityLimit: number | null
+  perCustomerLimit: number | null
+  soldCount: number | null
 }
 
 export type PromotionCampaignItemSumAggregateOutputType = {
   salePrice: number | null
   regularPrice: number | null
+  quantityLimit: number | null
+  perCustomerLimit: number | null
+  soldCount: number | null
 }
 
 export type PromotionCampaignItemMinAggregateOutputType = {
@@ -43,6 +49,9 @@ export type PromotionCampaignItemMinAggregateOutputType = {
   variantId: string | null
   salePrice: number | null
   regularPrice: number | null
+  quantityLimit: number | null
+  perCustomerLimit: number | null
+  soldCount: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -54,6 +63,9 @@ export type PromotionCampaignItemMaxAggregateOutputType = {
   variantId: string | null
   salePrice: number | null
   regularPrice: number | null
+  quantityLimit: number | null
+  perCustomerLimit: number | null
+  soldCount: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -65,6 +77,9 @@ export type PromotionCampaignItemCountAggregateOutputType = {
   variantId: number
   salePrice: number
   regularPrice: number
+  quantityLimit: number
+  perCustomerLimit: number
+  soldCount: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -74,11 +89,17 @@ export type PromotionCampaignItemCountAggregateOutputType = {
 export type PromotionCampaignItemAvgAggregateInputType = {
   salePrice?: true
   regularPrice?: true
+  quantityLimit?: true
+  perCustomerLimit?: true
+  soldCount?: true
 }
 
 export type PromotionCampaignItemSumAggregateInputType = {
   salePrice?: true
   regularPrice?: true
+  quantityLimit?: true
+  perCustomerLimit?: true
+  soldCount?: true
 }
 
 export type PromotionCampaignItemMinAggregateInputType = {
@@ -88,6 +109,9 @@ export type PromotionCampaignItemMinAggregateInputType = {
   variantId?: true
   salePrice?: true
   regularPrice?: true
+  quantityLimit?: true
+  perCustomerLimit?: true
+  soldCount?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -99,6 +123,9 @@ export type PromotionCampaignItemMaxAggregateInputType = {
   variantId?: true
   salePrice?: true
   regularPrice?: true
+  quantityLimit?: true
+  perCustomerLimit?: true
+  soldCount?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -110,6 +137,9 @@ export type PromotionCampaignItemCountAggregateInputType = {
   variantId?: true
   salePrice?: true
   regularPrice?: true
+  quantityLimit?: true
+  perCustomerLimit?: true
+  soldCount?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -208,6 +238,9 @@ export type PromotionCampaignItemGroupByOutputType = {
   variantId: string | null
   salePrice: number
   regularPrice: number | null
+  quantityLimit: number | null
+  perCustomerLimit: number | null
+  soldCount: number
   createdAt: Date
   updatedAt: Date
   _count: PromotionCampaignItemCountAggregateOutputType | null
@@ -242,6 +275,9 @@ export type PromotionCampaignItemWhereInput = {
   variantId?: Prisma.StringNullableFilter<"PromotionCampaignItem"> | string | null
   salePrice?: Prisma.IntFilter<"PromotionCampaignItem"> | number
   regularPrice?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  quantityLimit?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  perCustomerLimit?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  soldCount?: Prisma.IntFilter<"PromotionCampaignItem"> | number
   createdAt?: Prisma.DateTimeFilter<"PromotionCampaignItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PromotionCampaignItem"> | Date | string
   campaign?: Prisma.XOR<Prisma.PromotionCampaignScalarRelationFilter, Prisma.PromotionCampaignWhereInput>
@@ -256,6 +292,9 @@ export type PromotionCampaignItemOrderByWithRelationInput = {
   variantId?: Prisma.SortOrderInput | Prisma.SortOrder
   salePrice?: Prisma.SortOrder
   regularPrice?: Prisma.SortOrderInput | Prisma.SortOrder
+  quantityLimit?: Prisma.SortOrderInput | Prisma.SortOrder
+  perCustomerLimit?: Prisma.SortOrderInput | Prisma.SortOrder
+  soldCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   campaign?: Prisma.PromotionCampaignOrderByWithRelationInput
@@ -273,6 +312,9 @@ export type PromotionCampaignItemWhereUniqueInput = Prisma.AtLeast<{
   variantId?: Prisma.StringNullableFilter<"PromotionCampaignItem"> | string | null
   salePrice?: Prisma.IntFilter<"PromotionCampaignItem"> | number
   regularPrice?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  quantityLimit?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  perCustomerLimit?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  soldCount?: Prisma.IntFilter<"PromotionCampaignItem"> | number
   createdAt?: Prisma.DateTimeFilter<"PromotionCampaignItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PromotionCampaignItem"> | Date | string
   campaign?: Prisma.XOR<Prisma.PromotionCampaignScalarRelationFilter, Prisma.PromotionCampaignWhereInput>
@@ -287,6 +329,9 @@ export type PromotionCampaignItemOrderByWithAggregationInput = {
   variantId?: Prisma.SortOrderInput | Prisma.SortOrder
   salePrice?: Prisma.SortOrder
   regularPrice?: Prisma.SortOrderInput | Prisma.SortOrder
+  quantityLimit?: Prisma.SortOrderInput | Prisma.SortOrder
+  perCustomerLimit?: Prisma.SortOrderInput | Prisma.SortOrder
+  soldCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.PromotionCampaignItemCountOrderByAggregateInput
@@ -306,6 +351,9 @@ export type PromotionCampaignItemScalarWhereWithAggregatesInput = {
   variantId?: Prisma.StringNullableWithAggregatesFilter<"PromotionCampaignItem"> | string | null
   salePrice?: Prisma.IntWithAggregatesFilter<"PromotionCampaignItem"> | number
   regularPrice?: Prisma.IntNullableWithAggregatesFilter<"PromotionCampaignItem"> | number | null
+  quantityLimit?: Prisma.IntNullableWithAggregatesFilter<"PromotionCampaignItem"> | number | null
+  perCustomerLimit?: Prisma.IntNullableWithAggregatesFilter<"PromotionCampaignItem"> | number | null
+  soldCount?: Prisma.IntWithAggregatesFilter<"PromotionCampaignItem"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PromotionCampaignItem"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"PromotionCampaignItem"> | Date | string
 }
@@ -314,6 +362,9 @@ export type PromotionCampaignItemCreateInput = {
   id?: string
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   campaign: Prisma.PromotionCampaignCreateNestedOneWithoutItemsInput
@@ -328,6 +379,9 @@ export type PromotionCampaignItemUncheckedCreateInput = {
   variantId?: string | null
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -336,6 +390,9 @@ export type PromotionCampaignItemUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   campaign?: Prisma.PromotionCampaignUpdateOneRequiredWithoutItemsNestedInput
@@ -350,6 +407,9 @@ export type PromotionCampaignItemUncheckedUpdateInput = {
   variantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -361,6 +421,9 @@ export type PromotionCampaignItemCreateManyInput = {
   variantId?: string | null
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -369,6 +432,9 @@ export type PromotionCampaignItemUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -380,6 +446,9 @@ export type PromotionCampaignItemUncheckedUpdateManyInput = {
   variantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -401,6 +470,9 @@ export type PromotionCampaignItemCountOrderByAggregateInput = {
   variantId?: Prisma.SortOrder
   salePrice?: Prisma.SortOrder
   regularPrice?: Prisma.SortOrder
+  quantityLimit?: Prisma.SortOrder
+  perCustomerLimit?: Prisma.SortOrder
+  soldCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -408,6 +480,9 @@ export type PromotionCampaignItemCountOrderByAggregateInput = {
 export type PromotionCampaignItemAvgOrderByAggregateInput = {
   salePrice?: Prisma.SortOrder
   regularPrice?: Prisma.SortOrder
+  quantityLimit?: Prisma.SortOrder
+  perCustomerLimit?: Prisma.SortOrder
+  soldCount?: Prisma.SortOrder
 }
 
 export type PromotionCampaignItemMaxOrderByAggregateInput = {
@@ -417,6 +492,9 @@ export type PromotionCampaignItemMaxOrderByAggregateInput = {
   variantId?: Prisma.SortOrder
   salePrice?: Prisma.SortOrder
   regularPrice?: Prisma.SortOrder
+  quantityLimit?: Prisma.SortOrder
+  perCustomerLimit?: Prisma.SortOrder
+  soldCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -428,6 +506,9 @@ export type PromotionCampaignItemMinOrderByAggregateInput = {
   variantId?: Prisma.SortOrder
   salePrice?: Prisma.SortOrder
   regularPrice?: Prisma.SortOrder
+  quantityLimit?: Prisma.SortOrder
+  perCustomerLimit?: Prisma.SortOrder
+  soldCount?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -435,6 +516,9 @@ export type PromotionCampaignItemMinOrderByAggregateInput = {
 export type PromotionCampaignItemSumOrderByAggregateInput = {
   salePrice?: Prisma.SortOrder
   regularPrice?: Prisma.SortOrder
+  quantityLimit?: Prisma.SortOrder
+  perCustomerLimit?: Prisma.SortOrder
+  soldCount?: Prisma.SortOrder
 }
 
 export type PromotionCampaignItemCreateNestedManyWithoutProductInput = {
@@ -567,6 +651,9 @@ export type PromotionCampaignItemCreateWithoutProductInput = {
   id?: string
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   campaign: Prisma.PromotionCampaignCreateNestedOneWithoutItemsInput
@@ -579,6 +666,9 @@ export type PromotionCampaignItemUncheckedCreateWithoutProductInput = {
   variantId?: string | null
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -618,6 +708,9 @@ export type PromotionCampaignItemScalarWhereInput = {
   variantId?: Prisma.StringNullableFilter<"PromotionCampaignItem"> | string | null
   salePrice?: Prisma.IntFilter<"PromotionCampaignItem"> | number
   regularPrice?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  quantityLimit?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  perCustomerLimit?: Prisma.IntNullableFilter<"PromotionCampaignItem"> | number | null
+  soldCount?: Prisma.IntFilter<"PromotionCampaignItem"> | number
   createdAt?: Prisma.DateTimeFilter<"PromotionCampaignItem"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PromotionCampaignItem"> | Date | string
 }
@@ -626,6 +719,9 @@ export type PromotionCampaignItemCreateWithoutVariantInput = {
   id?: string
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   campaign: Prisma.PromotionCampaignCreateNestedOneWithoutItemsInput
@@ -638,6 +734,9 @@ export type PromotionCampaignItemUncheckedCreateWithoutVariantInput = {
   productId: string
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -671,6 +770,9 @@ export type PromotionCampaignItemCreateWithoutCampaignInput = {
   id?: string
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   product: Prisma.ProductCreateNestedOneWithoutCampaignItemsInput
@@ -683,6 +785,9 @@ export type PromotionCampaignItemUncheckedCreateWithoutCampaignInput = {
   variantId?: string | null
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -718,6 +823,9 @@ export type PromotionCampaignItemCreateManyProductInput = {
   variantId?: string | null
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -726,6 +834,9 @@ export type PromotionCampaignItemUpdateWithoutProductInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   campaign?: Prisma.PromotionCampaignUpdateOneRequiredWithoutItemsNestedInput
@@ -738,6 +849,9 @@ export type PromotionCampaignItemUncheckedUpdateWithoutProductInput = {
   variantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -748,6 +862,9 @@ export type PromotionCampaignItemUncheckedUpdateManyWithoutProductInput = {
   variantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -758,6 +875,9 @@ export type PromotionCampaignItemCreateManyVariantInput = {
   productId: string
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -766,6 +886,9 @@ export type PromotionCampaignItemUpdateWithoutVariantInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   campaign?: Prisma.PromotionCampaignUpdateOneRequiredWithoutItemsNestedInput
@@ -778,6 +901,9 @@ export type PromotionCampaignItemUncheckedUpdateWithoutVariantInput = {
   productId?: Prisma.StringFieldUpdateOperationsInput | string
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -788,6 +914,9 @@ export type PromotionCampaignItemUncheckedUpdateManyWithoutVariantInput = {
   productId?: Prisma.StringFieldUpdateOperationsInput | string
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -798,6 +927,9 @@ export type PromotionCampaignItemCreateManyCampaignInput = {
   variantId?: string | null
   salePrice: number
   regularPrice?: number | null
+  quantityLimit?: number | null
+  perCustomerLimit?: number | null
+  soldCount?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -806,6 +938,9 @@ export type PromotionCampaignItemUpdateWithoutCampaignInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   product?: Prisma.ProductUpdateOneRequiredWithoutCampaignItemsNestedInput
@@ -818,6 +953,9 @@ export type PromotionCampaignItemUncheckedUpdateWithoutCampaignInput = {
   variantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -828,6 +966,9 @@ export type PromotionCampaignItemUncheckedUpdateManyWithoutCampaignInput = {
   variantId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   salePrice?: Prisma.IntFieldUpdateOperationsInput | number
   regularPrice?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  quantityLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  perCustomerLimit?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  soldCount?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -841,6 +982,9 @@ export type PromotionCampaignItemSelect<ExtArgs extends runtime.Types.Extensions
   variantId?: boolean
   salePrice?: boolean
   regularPrice?: boolean
+  quantityLimit?: boolean
+  perCustomerLimit?: boolean
+  soldCount?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   campaign?: boolean | Prisma.PromotionCampaignDefaultArgs<ExtArgs>
@@ -855,6 +999,9 @@ export type PromotionCampaignItemSelectCreateManyAndReturn<ExtArgs extends runti
   variantId?: boolean
   salePrice?: boolean
   regularPrice?: boolean
+  quantityLimit?: boolean
+  perCustomerLimit?: boolean
+  soldCount?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   campaign?: boolean | Prisma.PromotionCampaignDefaultArgs<ExtArgs>
@@ -869,6 +1016,9 @@ export type PromotionCampaignItemSelectUpdateManyAndReturn<ExtArgs extends runti
   variantId?: boolean
   salePrice?: boolean
   regularPrice?: boolean
+  quantityLimit?: boolean
+  perCustomerLimit?: boolean
+  soldCount?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   campaign?: boolean | Prisma.PromotionCampaignDefaultArgs<ExtArgs>
@@ -883,11 +1033,14 @@ export type PromotionCampaignItemSelectScalar = {
   variantId?: boolean
   salePrice?: boolean
   regularPrice?: boolean
+  quantityLimit?: boolean
+  perCustomerLimit?: boolean
+  soldCount?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PromotionCampaignItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "campaignId" | "productId" | "variantId" | "salePrice" | "regularPrice" | "createdAt" | "updatedAt", ExtArgs["result"]["promotionCampaignItem"]>
+export type PromotionCampaignItemOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "campaignId" | "productId" | "variantId" | "salePrice" | "regularPrice" | "quantityLimit" | "perCustomerLimit" | "soldCount" | "createdAt" | "updatedAt", ExtArgs["result"]["promotionCampaignItem"]>
 export type PromotionCampaignItemInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   campaign?: boolean | Prisma.PromotionCampaignDefaultArgs<ExtArgs>
   product?: boolean | Prisma.ProductDefaultArgs<ExtArgs>
@@ -918,6 +1071,9 @@ export type $PromotionCampaignItemPayload<ExtArgs extends runtime.Types.Extensio
     variantId: string | null
     salePrice: number
     regularPrice: number | null
+    quantityLimit: number | null
+    perCustomerLimit: number | null
+    soldCount: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["promotionCampaignItem"]>
@@ -1352,6 +1508,9 @@ export interface PromotionCampaignItemFieldRefs {
   readonly variantId: Prisma.FieldRef<"PromotionCampaignItem", 'String'>
   readonly salePrice: Prisma.FieldRef<"PromotionCampaignItem", 'Int'>
   readonly regularPrice: Prisma.FieldRef<"PromotionCampaignItem", 'Int'>
+  readonly quantityLimit: Prisma.FieldRef<"PromotionCampaignItem", 'Int'>
+  readonly perCustomerLimit: Prisma.FieldRef<"PromotionCampaignItem", 'Int'>
+  readonly soldCount: Prisma.FieldRef<"PromotionCampaignItem", 'Int'>
   readonly createdAt: Prisma.FieldRef<"PromotionCampaignItem", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"PromotionCampaignItem", 'DateTime'>
 }

@@ -21,6 +21,7 @@ import {
   InlineAlert,
   AdminLoadingState,
   AdminErrorState,
+  useConfirm,
 } from '@/components/admin/ui';
 import { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import type { PostCategoryDocument } from '@/contracts/cms/post';
@@ -31,12 +32,15 @@ interface CategoryItem extends PostCategoryDocument {
 }
 
 export default function PostCategoriesPage() {
+  const confirm = useConfirm();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deletingIdRef = useRef<string | null>(null);
 
   // Form modal
   const [formOpen, setFormOpen] = useState(false);
@@ -121,6 +125,7 @@ export default function PostCategoriesPage() {
   };
 
   const handleOpenEdit = (item: CategoryItem) => {
+    if (deletingIdRef.current === item.id) return;
     setEditingId(item.id);
     setEditingRev(item.revision);
     setFormDoc({
@@ -148,6 +153,7 @@ export default function PostCategoriesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     setFormError(null);
     setSuccess(null);
@@ -176,8 +182,22 @@ export default function PostCategoriesPage() {
   };
 
   const handleDelete = async (item: CategoryItem) => {
-    const confirmed = window.confirm(`Bạn có chắc muốn xóa chuyên mục "${item.name}"?`);
-    if (!confirmed) return;
+    if (deletingIdRef.current) return;
+    deletingIdRef.current = item.id;
+    setDeletingId(item.id);
+
+    const confirmed = await confirm({
+      title: 'Xóa chuyên mục bài viết',
+      message: `Bạn có chắc muốn xóa chuyên mục "${item.name}"?`,
+      confirmLabel: 'Xóa chuyên mục',
+      cancelLabel: 'Hủy',
+      variant: 'destructive',
+    });
+    if (!confirmed) {
+      deletingIdRef.current = null;
+      setDeletingId(null);
+      return;
+    }
 
     setError(null);
     setSuccess(null);
@@ -188,7 +208,11 @@ export default function PostCategoriesPage() {
       setSuccess(`Đã xóa chuyên mục "${item.name}".`);
       fetchCategories();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Không thể xóa chuyên mục.');
+      const msg = err instanceof Error ? err.message : 'Không thể xóa chuyên mục.';
+      setError(msg);
+    } finally {
+      deletingIdRef.current = null;
+      setDeletingId(null);
     }
   };
 
@@ -227,7 +251,7 @@ export default function PostCategoriesPage() {
           {success}
         </InlineAlert>
       )}
-      {error && (
+      {error && (loading || categories.length > 0) && (
         <InlineAlert variant="error" onClose={() => setError(null)}>
           {error}
         </InlineAlert>
@@ -313,7 +337,9 @@ export default function PostCategoriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredCategories.map((c) => (
+                {filteredCategories.map((c) => {
+                  const isDeleting = deletingId === c.id;
+                  return (
                   <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-2.5 px-4 font-semibold text-slate-800">
                       {c.name}
@@ -338,8 +364,9 @@ export default function PostCategoriesPage() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
+                          disabled={isDeleting}
                           onClick={() => handleOpenEdit(c)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Chỉnh sửa"
                         >
                           <Edit size={13} />
@@ -347,8 +374,10 @@ export default function PostCategoriesPage() {
                         </button>
                         <button
                           type="button"
+                          disabled={isDeleting}
+                          aria-busy={isDeleting}
                           onClick={() => handleDelete(c)}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Xóa"
                         >
                           <Trash2 size={14} />
@@ -356,7 +385,8 @@ export default function PostCategoriesPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -384,8 +414,9 @@ export default function PostCategoriesPage() {
               </h3>
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => setFormOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer disabled:opacity-50"
                 aria-label="Đóng hộp thoại"
               >
                 ✕
@@ -394,7 +425,9 @@ export default function PostCategoriesPage() {
 
             <div className="p-4 space-y-3.5 text-xs">
               {formError && (
-                <InlineAlert variant="error">{formError}</InlineAlert>
+                <InlineAlert variant="error" onClose={() => setFormError(null)}>
+                  {formError}
+                </InlineAlert>
               )}
 
               <div>
@@ -468,6 +501,7 @@ export default function PostCategoriesPage() {
                 type="button"
                 size="sm"
                 variant="secondary"
+                disabled={submitting}
                 onClick={() => setFormOpen(false)}
               >
                 Hủy

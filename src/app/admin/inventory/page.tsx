@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Store,
   Plus,
@@ -10,6 +11,7 @@ import {
   RotateCcw,
   ExternalLink,
   CheckCircle2,
+  AlertTriangle,
   MapPin,
 } from "lucide-react";
 import {
@@ -19,6 +21,9 @@ import {
   AdminLoadingState,
   AdminErrorState,
   InlineAlert,
+  DataTable,
+  type DataTableColumn,
+  useToast,
 } from "@/components/admin/ui";
 
 interface WarehouseItem {
@@ -86,7 +91,15 @@ interface VariantOption {
 }
 
 const serialStatusLabels: Record<string, string> = {
-  AVAILABLE: "Sẵn sàng", RESERVED: "Đang giữ", SOLD: "Đã bán", QC_HOLD: "Chờ QC", REPAIR: "Đang sửa",
+  AVAILABLE: "Sẵn sàng",
+  RESERVED: "Đang giữ",
+  SOLD: "Đã bán",
+  QC_HOLD: "Chờ QC",
+  REPAIR: "Đang sửa",
+  DAMAGED: "Hư hỏng",
+  ALLOCATED: "Đã phân bổ",
+  RETURNING: "Đang trả",
+  RETURNED: "Đã trả",
 };
 
 const serialConditionLabels: Record<string, string> = {
@@ -95,7 +108,17 @@ const serialConditionLabels: Record<string, string> = {
   USED: "Đã qua sử dụng",
 };
 
-export default function AdminInventoryPage() {
+function InventoryContent() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const toast = useToast();
+
+  const initialTab = searchParams.get("tab") === "balances" ? "balances" : "serials";
+  const initialWarehouse = searchParams.get("warehouseId") || "ALL";
+  const initialStatus = searchParams.get("status") || "ALL";
+  const initialQ = searchParams.get("q") || "";
+  const initialLowStockOnly = searchParams.get("lowStock") === "1";
+
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const [serialUnits, setSerialUnits] = useState<SerialUnitItem[]>([]);
   const [balances, setBalances] = useState<BalanceItem[]>([]);
@@ -105,15 +128,23 @@ export default function AdminInventoryPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"serials" | "balances">("serials");
-  const [warehouseFilter, setWarehouseFilter] = useState("ALL");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"serials" | "balances">(initialTab);
+  const [warehouseFilter, setWarehouseFilter] = useState(initialWarehouse);
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [searchQuery, setSearchQuery] = useState(initialQ);
+  const [lowStockOnly, setLowStockOnly] = useState(initialLowStockOnly);
   const [productFilterText, setProductFilterText] = useState("");
+
+  // Pagination state for both DataTables
+  const [serialPage, setSerialPage] = useState(1);
+  const [serialPageSize, setSerialPageSize] = useState(20);
+  const [balancePage, setBalancePage] = useState(1);
+  const [balancePageSize, setBalancePageSize] = useState(20);
 
   // New Serial Modal / Form
   const [showAddForm, setShowAddForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [updatingSerial, setUpdatingSerial] = useState(false);
   const [newSerial, setNewSerial] = useState({
     productId: "",
     variantId: "",
@@ -122,10 +153,28 @@ export default function AdminInventoryPage() {
     publicCode: "",
     condition: "LIKE_NEW",
     warrantyMonths: 12,
-    batteryHealth: 98,
-    appearance: "Đẹp 99% Like New, nguyên bản 100%, không cấn móp",
+    batteryHealth: "",
+    appearance: "",
     notes: "",
   });
+
+  // Sync URL query params
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams();
+    if (activeTab === "balances") params.set("tab", "balances");
+    if (warehouseFilter !== "ALL") params.set("warehouseId", warehouseFilter);
+    if (statusFilter !== "ALL") params.set("status", statusFilter);
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (lowStockOnly) params.set("lowStock", "1");
+
+    const qs = params.toString();
+    const targetUrl = qs ? `${pathname}?${qs}` : pathname;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (targetUrl !== currentUrl) {
+      window.history.replaceState(null, "", targetUrl);
+    }
+  }, [activeTab, warehouseFilter, statusFilter, searchQuery, lowStockOnly, pathname]);
 
   const loadInventory = useCallback(async () => {
     setLoading(true);
@@ -150,7 +199,8 @@ export default function AdminInventoryPage() {
       setVariants(json.data.variants || []);
       if (!newSerial.productId && json.data.products?.[0]?.id) {
         const firstProdId = json.data.products[0].id;
-        const firstVarId = (json.data.variants || []).find((v: VariantOption) => v.productId === firstProdId)?.id || "";
+        const firstVarId =
+          (json.data.variants || []).find((v: VariantOption) => v.productId === firstProdId)?.id || "";
         setNewSerial((prev) => ({
           ...prev,
           productId: firstProdId,
@@ -185,27 +235,30 @@ export default function AdminInventoryPage() {
         body: JSON.stringify({
           action: "CREATE_SERIAL",
           ...newSerial,
+          batteryHealth: newSerial.batteryHealth === '' ? null : Number(newSerial.batteryHealth),
         }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
         throw new Error(json.error || "Không thể thêm Serial mới.");
       }
-      setFeedback({
-        type: "success",
-        text: `Đã nhập kho mã máy ${newSerial.serialNumber.toUpperCase()} thành công.`,
-      });
+      const msg = `Đã nhập kho mã máy ${newSerial.serialNumber.toUpperCase()} thành công.`;
+      setFeedback({ type: "success", text: msg });
+      toast.success(msg);
       setShowAddForm(false);
       setNewSerial((prev) => ({ ...prev, serialNumber: "", publicCode: "", notes: "" }));
       void loadInventory();
     } catch (err) {
-      setFeedback({ type: "error", text: (err as Error).message });
+      const msg = (err as Error).message;
+      setFeedback({ type: "error", text: msg });
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleStatusChange = async (serialId: string, nextStatus: string) => {
+  const handleStatusChange = useCallback(async (serialId: string, nextStatus: string, expectedUpdatedAt: string) => {
+    setUpdatingSerial(true);
     try {
       const res = await fetch("/api/admin/inventory", {
         method: "POST",
@@ -214,22 +267,351 @@ export default function AdminInventoryPage() {
           action: "UPDATE_SERIAL_STATUS",
           id: serialId,
           status: nextStatus,
+          expectedUpdatedAt,
         }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
         throw new Error(json.error || "Không thể đổi trạng thái.");
       }
-      setFeedback({ type: "success", text: `Đã cập nhật trạng thái Serial sang "${serialStatusLabels[nextStatus] || nextStatus}".` });
+      const msg = `Đã cập nhật trạng thái Serial sang "${serialStatusLabels[nextStatus] || nextStatus}".`;
+      setFeedback({ type: "success", text: msg });
+      toast.success(msg);
       void loadInventory();
     } catch (err) {
-      setFeedback({ type: "error", text: (err as Error).message });
+      const msg = (err as Error).message;
+      setFeedback({ type: "error", text: msg });
+      toast.error(msg);
+    } finally {
+      setUpdatingSerial(false);
     }
-  };
+  }, [loadInventory, toast]);
 
-  const filteredBalances = balances.filter(b =>
-    (warehouseFilter === "ALL" || b.warehouseId === warehouseFilter) &&
-    (!searchQuery.trim() || [b.productName, b.variantSku, b.variantName].some(value => value?.toLocaleLowerCase("vi").includes(searchQuery.trim().toLocaleLowerCase("vi"))))
+  const filteredBalances = useMemo(() => {
+    return balances.filter((b) => {
+      if (warehouseFilter !== "ALL" && b.warehouseId !== warehouseFilter) return false;
+      if (
+        searchQuery.trim() &&
+        ![b.productName, b.variantSku, b.variantName].some((value) =>
+          value?.toLocaleLowerCase("vi").includes(searchQuery.trim().toLocaleLowerCase("vi"))
+        )
+      ) {
+        return false;
+      }
+      const available = Math.max(0, b.onHand - b.reserved);
+      if (lowStockOnly && available > 2) return false;
+      return true;
+    });
+  }, [balances, warehouseFilter, searchQuery, lowStockOnly]);
+
+  const lowStockCount = useMemo(
+    () =>
+      balances.filter((b) => {
+        if (warehouseFilter !== "ALL" && b.warehouseId !== warehouseFilter) return false;
+        return Math.max(0, b.onHand - b.reserved) <= 2;
+      }).length,
+    [balances, warehouseFilter]
+  );
+
+  // Paginated slices
+  const serialTotalPages = Math.max(1, Math.ceil(serialUnits.length / serialPageSize));
+  const safeSerialPage = Math.min(serialPage, serialTotalPages);
+  const pagedSerialUnits = useMemo(
+    () => serialUnits.slice((safeSerialPage - 1) * serialPageSize, safeSerialPage * serialPageSize),
+    [serialUnits, safeSerialPage, serialPageSize]
+  );
+
+  const balanceTotalPages = Math.max(1, Math.ceil(filteredBalances.length / balancePageSize));
+  const safeBalancePage = Math.min(balancePage, balanceTotalPages);
+  const pagedBalances = useMemo(
+    () => filteredBalances.slice((safeBalancePage - 1) * balancePageSize, safeBalancePage * balancePageSize),
+    [filteredBalances, safeBalancePage, balancePageSize]
+  );
+
+  const serialColumns = useMemo<DataTableColumn<SerialUnitItem>[]>(
+    () => [
+      {
+        key: "serialNumber",
+        header: "Serial / Service Tag",
+        headerText: "Serial / Service Tag",
+        sortable: true,
+        sortType: "text",
+        sortValue: (u) => u.serialNumber,
+        isRowHeader: true,
+        className: "font-mono font-bold text-slate-900 whitespace-nowrap",
+        render: (u) => u.serialNumber,
+      },
+      {
+        key: "productName",
+        header: "Sản phẩm",
+        headerText: "Sản phẩm",
+        sortable: true,
+        sortType: "text",
+        sortValue: (u) => u.productName,
+        render: (u) => (
+          <div>
+            <Link
+              href={`/admin/products/${u.productId}`}
+              className="font-semibold text-blue-600 hover:underline"
+            >
+              {u.productName}
+            </Link>
+            <div className="text-[11px] text-slate-400">
+              {u.productBrand || "CitiLap"} · BH {u.warrantyMonths || 12} tháng (1 đổi 1 7 ngày)
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "warehouseName",
+        header: "Showroom / Kho",
+        headerText: "Showroom / Kho",
+        sortable: true,
+        sortType: "text",
+        sortValue: (u) => u.warehouseName,
+        className: "whitespace-nowrap",
+        render: (u) => (
+          <div>
+            <span className="font-medium text-slate-800">{u.warehouseName}</span>
+            <div className="text-[10px] font-mono text-slate-400">{u.warehouseCode}</div>
+          </div>
+        ),
+      },
+      {
+        key: "publicCode",
+        header: "Mã Kiểm định (Public Code)",
+        headerText: "Mã Kiểm định",
+        sortable: true,
+        sortType: "text",
+        sortValue: (u) => u.publicCode || "",
+        className: "whitespace-nowrap",
+        render: (u) =>
+          u.publicCode ? (
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold text-[11px]">
+                <ShieldCheck className="w-3 h-3" />
+                {u.publicCode}
+              </span>
+              <Link
+                href={`/order-tracking?code=${encodeURIComponent(u.publicCode)}`}
+                target="_blank"
+                className="text-slate-400 hover:text-blue-600"
+                title="Xem chứng thư kiểm định ngoài Storefront"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          ) : (
+            <span className="text-slate-400 italic">Chưa cấp mã</span>
+          ),
+      },
+      {
+        key: "condition",
+        header: "Tình trạng & Pin",
+        headerText: "Tình trạng & Pin",
+        sortable: true,
+        sortType: "number",
+        sortValue: (u) => u.batteryHealth ?? 0,
+        className: "whitespace-nowrap",
+        render: (u) => (
+          <div>
+            <div className="font-medium text-slate-700">
+              {serialConditionLabels[u.condition] || u.condition}
+            </div>
+            {u.batteryHealth !== null && u.batteryHealth !== undefined && (
+              <div className="text-[11px] text-slate-500">
+                Pin: <strong>{u.batteryHealth}%</strong>
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        header: "Trạng thái",
+        headerText: "Trạng thái",
+        align: "center",
+        sortable: true,
+        sortType: "text",
+        sortValue: (u) => serialStatusLabels[u.status] || u.status,
+        className: "whitespace-nowrap",
+        render: (u) => (
+          <StatusBadge
+            status={u.status}
+            customLabel={serialStatusLabels[u.status]}
+            className="whitespace-nowrap"
+          />
+        ),
+      },
+      {
+        key: "actions",
+        header: "Thao tác",
+        headerText: "Thao tác",
+        align: "right",
+        className: "whitespace-nowrap",
+        render: (u) => (
+          <div className="inline-flex items-center gap-1.5">
+            <Link
+              href={`/admin/products/${u.productId}`}
+              className="px-2 py-1 border border-slate-200 rounded bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[11px] font-semibold transition whitespace-nowrap"
+              title="Mở trình biên tập sản phẩm để sửa chi tiết Hồ sơ kiểm định (QC)"
+            >
+              Sửa QC
+            </Link>
+            <select
+              aria-label={`Đổi trạng thái serial ${u.serialNumber}`}
+              value={u.status}
+              onChange={(e) => void handleStatusChange(u.id, e.target.value, u.updatedAt)}
+              disabled={updatingSerial || !['AVAILABLE', 'QC_HOLD', 'REPAIR', 'DAMAGED', 'RETURNED'].includes(u.status)}
+              className="px-2 py-1 border border-slate-200 rounded bg-white text-xs font-medium cursor-pointer"
+            >
+              <option value="AVAILABLE">Sẵn sàng</option>
+              {!['AVAILABLE', 'QC_HOLD', 'REPAIR', 'DAMAGED'].includes(u.status) && <option value={u.status}>{serialStatusLabels[u.status] || u.status}</option>}
+              <option value="QC_HOLD">Chờ QC</option>
+              <option value="REPAIR">Bảo hành / Sửa</option>
+              <option value="DAMAGED">Hư hỏng</option>
+            </select>
+          </div>
+        ),
+      },
+    ],
+    [handleStatusChange, updatingSerial]
+  );
+
+  const balanceColumns = useMemo<DataTableColumn<BalanceItem>[]>(
+    () => [
+      {
+        key: "productName",
+        header: "Sản phẩm",
+        headerText: "Sản phẩm",
+        sortable: true,
+        sortType: "text",
+        sortValue: (b) => b.productName,
+        isRowHeader: true,
+        render: (b) => {
+          const available = Math.max(0, b.onHand - b.reserved);
+          return (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href={`/admin/products/${b.productId}`}
+                className="font-semibold text-blue-600 hover:underline"
+              >
+                {b.productName}
+              </Link>
+              {available === 0 ? (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                  <AlertTriangle className="size-2.5" />
+                  Hết hàng
+                </span>
+              ) : available <= 2 ? (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  <AlertTriangle className="size-2.5" />
+                  Sắp hết
+                </span>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        key: "variantSku",
+        header: "SKU / Phiên bản",
+        headerText: "SKU / Phiên bản",
+        sortable: true,
+        sortType: "text",
+        sortValue: (b) => b.variantSku || "DEFAULT",
+        className: "font-mono text-slate-600 whitespace-nowrap",
+        render: (b) => `${b.variantSku || "DEFAULT"}${b.variantName ? ` · ${b.variantName}` : ""}`,
+      },
+      {
+        key: "warehouseName",
+        header: "Showroom / Kho",
+        headerText: "Showroom / Kho",
+        sortable: true,
+        sortType: "text",
+        sortValue: (b) => b.warehouseName,
+        className: "whitespace-nowrap",
+        render: (b) => b.warehouseName,
+      },
+      {
+        key: "onHand",
+        header: "Tồn thực tế (On Hand)",
+        headerText: "Tồn thực tế",
+        align: "right",
+        sortable: true,
+        sortType: "number",
+        sortValue: (b) => b.onHand,
+        className: "font-bold tabular-nums whitespace-nowrap",
+        render: (b) => b.onHand,
+      },
+      {
+        key: "reserved",
+        header: "Đang giữ (Reserved)",
+        headerText: "Đang giữ",
+        align: "right",
+        sortable: true,
+        sortType: "number",
+        sortValue: (b) => b.reserved,
+        className: "text-amber-700 tabular-nums whitespace-nowrap",
+        render: (b) => b.reserved,
+      },
+      {
+        key: "available",
+        header: "Khả dụng",
+        headerText: "Khả dụng",
+        align: "right",
+        sortable: true,
+        sortType: "number",
+        sortValue: (b) => Math.max(0, b.onHand - b.reserved),
+        className: "whitespace-nowrap",
+        render: (b) => {
+          const available = Math.max(0, b.onHand - b.reserved);
+          return (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold tabular-nums ${
+                available > 2
+                  ? "bg-emerald-50 text-emerald-700"
+                  : available > 0
+                  ? "bg-amber-100 text-amber-800 border border-amber-200"
+                  : "bg-rose-100 text-rose-700 border border-rose-200"
+              }`}
+            >
+              {available > 2 && <CheckCircle2 className="w-3 h-3" />}
+              {available <= 2 && <AlertTriangle className="w-3 h-3" />}
+              {available}
+            </span>
+          );
+        },
+      },
+      {
+        key: "actions",
+        header: "Thao tác",
+        headerText: "Thao tác",
+        align: "right",
+        className: "whitespace-nowrap",
+        render: (b) => (
+          <button
+            type="button"
+            onClick={() => {
+              setNewSerial((prev) => ({
+                ...prev,
+                productId: b.productId,
+                variantId: b.variantId || "",
+                warehouseId: b.warehouseId,
+              }));
+              setShowAddForm(true);
+              setActiveTab("serials");
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-[11px] transition cursor-pointer"
+            title="Nhập Serial mới cho sản phẩm này"
+          >
+            <Plus className="w-3 h-3" />
+            <span>Nhập Serial</span>
+          </button>
+        ),
+      },
+    ],
+    []
   );
 
   if (loading && warehouses.length === 0) {
@@ -299,11 +681,17 @@ export default function AdminInventoryPage() {
             </button>
           }
         >
-          <form id="inventory-intake" onSubmit={handleCreateSerial} className="admin-inventory-form grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
+          <form
+            id="inventory-intake"
+            onSubmit={handleCreateSerial}
+            className="admin-inventory-form grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs"
+          >
             <h3 className="md:col-span-3 font-semibold text-slate-800">1. Máy & kho nhận</h3>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <label htmlFor="intake-product" className="block font-bold text-slate-700">Sản phẩm *</label>
+                <label htmlFor="intake-product" className="block font-bold text-slate-700">
+                  Sản phẩm *
+                </label>
                 <input
                   type="search"
                   aria-label="Lọc sản phẩm nhập kho"
@@ -344,12 +732,15 @@ export default function AdminInventoryPage() {
               </select>
               {variants.some((v) => v.productId === newSerial.productId) && (
                 <div>
-                  <label htmlFor="intake-variant" className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                  <label
+                    htmlFor="intake-variant"
+                    className="block text-[11px] font-semibold text-slate-600 mb-0.5"
+                  >
                     Cấu hình / Phiên bản (SKU)
                   </label>
                   <select
                     id="intake-variant"
-                value={newSerial.variantId}
+                    value={newSerial.variantId}
                     onChange={(e) => setNewSerial({ ...newSerial, variantId: e.target.value })}
                     className="w-full p-1.5 border border-slate-200 rounded-lg bg-slate-50 text-[11px]"
                   >
@@ -365,7 +756,9 @@ export default function AdminInventoryPage() {
               )}
             </div>
             <div>
-              <label htmlFor="intake-warehouse" className="block font-bold text-slate-700 mb-1">Showroom / Kho lưu trữ *</label>
+              <label htmlFor="intake-warehouse" className="block font-bold text-slate-700 mb-1">
+                Showroom / Kho lưu trữ *
+              </label>
               <select
                 id="intake-warehouse"
                 value={newSerial.warehouseId}
@@ -383,7 +776,9 @@ export default function AdminInventoryPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="intake-serial" className="block font-bold text-slate-700 mb-1">Số Serial / Service Tag *</label>
+              <label htmlFor="intake-serial" className="block font-bold text-slate-700 mb-1">
+                Số Serial / Service Tag *
+              </label>
               <input
                 type="text"
                 placeholder="VD: PF4X9L21"
@@ -394,7 +789,9 @@ export default function AdminInventoryPage() {
                 required
               />
             </div>
-            <h3 className="md:col-span-3 border-t border-slate-200 pt-3 font-semibold text-slate-800">2. Kiểm định & bảo hành</h3>
+            <h3 className="md:col-span-3 border-t border-slate-200 pt-3 font-semibold text-slate-800">
+              2. Kiểm định & bảo hành
+            </h3>
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label htmlFor="intake-code" className="font-bold text-slate-700">
@@ -406,12 +803,12 @@ export default function AdminInventoryPage() {
                     const selProd = products.find((p) => p.id === newSerial.productId);
                     const prefix = selProd?.slug
                       ? selProd.slug
-                          .replace(/^laptop-/, '')
-                          .split('-')
+                          .replace(/^laptop-/, "")
+                          .split("-")
                           .slice(0, 3)
                           .map((w) => w.slice(0, 3).toUpperCase())
-                          .join('')
-                      : 'CTL';
+                          .join("")
+                      : "CTL";
                     const serialTail = (
                       newSerial.serialNumber.trim() || Math.random().toString(36).slice(2, 6)
                     )
@@ -438,11 +835,13 @@ export default function AdminInventoryPage() {
               />
             </div>
             <div>
-              <label htmlFor="intake-condition" className="block font-bold text-slate-700 mb-1">Tình trạng &amp; Bảo hành (tháng)</label>
+              <label htmlFor="intake-condition" className="block font-bold text-slate-700 mb-1">
+                Tình trạng &amp; Bảo hành (tháng)
+              </label>
               <div className="flex gap-2">
                 <select
                   id="intake-condition"
-                value={newSerial.condition}
+                  value={newSerial.condition}
                   onChange={(e) => setNewSerial({ ...newSerial, condition: e.target.value })}
                   className="flex-1 p-2 border border-slate-300 rounded-lg bg-white"
                 >
@@ -456,25 +855,33 @@ export default function AdminInventoryPage() {
                   max={36}
                   aria-label="Bảo hành (tháng)"
                   value={newSerial.warrantyMonths}
-                  onChange={(e) => setNewSerial({ ...newSerial, warrantyMonths: Number(e.target.value) || 12 })}
+                  onChange={(e) =>
+                    setNewSerial({ ...newSerial, warrantyMonths: Number(e.target.value) || 12 })
+                  }
                   className="w-20 p-2 border border-slate-300 rounded-lg text-center"
                 />
               </div>
             </div>
             <div>
-              <label htmlFor="intake-battery" className="block font-bold text-slate-700 mb-1">Dung lượng Pin % (0 - 100)</label>
+              <label htmlFor="intake-battery" className="block font-bold text-slate-700 mb-1">
+                Dung lượng Pin % (0 - 100)
+              </label>
               <input
                 type="number"
                 min={0}
                 max={100}
                 id="intake-battery"
                 value={newSerial.batteryHealth}
-                onChange={(e) => setNewSerial({ ...newSerial, batteryHealth: Number(e.target.value) || 95 })}
+                onChange={(e) =>
+                  setNewSerial({ ...newSerial, batteryHealth: e.target.value })
+                }
                 className="w-full p-2 border border-slate-300 rounded-lg"
               />
             </div>
             <div className="md:col-span-2">
-              <label htmlFor="intake-appearance" className="block font-bold text-slate-700 mb-1">Ngoại hình &amp; Ghi chú kiểm định</label>
+              <label htmlFor="intake-appearance" className="block font-bold text-slate-700 mb-1">
+                Ngoại hình &amp; Ghi chú kiểm định
+              </label>
               <input
                 type="text"
                 id="intake-appearance"
@@ -489,7 +896,11 @@ export default function AdminInventoryPage() {
                 disabled={submitting}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition cursor-pointer disabled:opacity-50"
               >
-                {submitting ? "Đang lưu..." : newSerial.publicCode.trim() ? "Nhập máy & Công khai kiểm định" : "Nhập máy vào kho"}
+                {submitting
+                  ? "Đang lưu..."
+                  : newSerial.publicCode.trim()
+                  ? "Nhập máy & Công khai kiểm định"
+                  : "Nhập máy vào kho"}
               </button>
             </div>
           </form>
@@ -502,7 +913,10 @@ export default function AdminInventoryPage() {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setActiveTab("serials")}
+              onClick={() => {
+                setActiveTab("serials");
+                setSerialPage(1);
+              }}
               aria-pressed={activeTab === "serials"}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "serials"
@@ -514,7 +928,10 @@ export default function AdminInventoryPage() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("balances")}
+              onClick={() => {
+                setActiveTab("balances");
+                setBalancePage(1);
+              }}
               aria-pressed={activeTab === "balances"}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
                 activeTab === "balances"
@@ -526,7 +943,7 @@ export default function AdminInventoryPage() {
             </button>
           </div>
 
-          {activeTab === "serials" && (
+          {activeTab === "serials" ? (
             <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
               {[
                 { key: "ALL", label: "Tất cả" },
@@ -538,7 +955,10 @@ export default function AdminInventoryPage() {
                 <button
                   key={s.key}
                   type="button"
-                  onClick={() => setStatusFilter(s.key)}
+                  onClick={() => {
+                    setStatusFilter(s.key);
+                    setSerialPage(1);
+                  }}
                   aria-pressed={statusFilter === s.key}
                   className={`px-2 py-1 rounded text-[11px] font-semibold transition cursor-pointer ${
                     statusFilter === s.key
@@ -550,6 +970,27 @@ export default function AdminInventoryPage() {
                 </button>
               ))}
             </div>
+          ) : (
+            <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+              <button
+                type="button"
+                aria-pressed={lowStockOnly}
+                onClick={() => {
+                  setLowStockOnly((prev) => !prev);
+                  setBalancePage(1);
+                }}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition cursor-pointer ${
+                  lowStockOnly
+                    ? "bg-amber-600 text-white border-amber-600"
+                    : lowStockCount > 0
+                    ? "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                    : "bg-slate-50 text-slate-600 border-slate-200"
+                }`}
+              >
+                <AlertTriangle className="size-3" />
+                <span>Sắp hết / Hết hàng ≤ 2 ({lowStockCount})</span>
+              </button>
+            </div>
           )}
         </div>
 
@@ -558,17 +999,29 @@ export default function AdminInventoryPage() {
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="search"
-              placeholder={activeTab === "serials" ? "Tìm Serial, mã kiểm định, tên máy..." : "Tìm tên sản phẩm, SKU..."}
+              placeholder={
+                activeTab === "serials"
+                  ? "Tìm Serial, mã kiểm định, tên máy..."
+                  : "Tìm tên sản phẩm, SKU..."
+              }
               aria-label={activeTab === "serials" ? "Tìm máy theo Serial" : "Tìm tồn kho theo SKU"}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setSerialPage(1);
+                setBalancePage(1);
+              }}
               className="pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs w-56 bg-white"
             />
           </div>
           <select
             aria-label="Lọc kho"
             value={warehouseFilter}
-            onChange={(e) => setWarehouseFilter(e.target.value)}
+            onChange={(e) => {
+              setWarehouseFilter(e.target.value);
+              setSerialPage(1);
+              setBalancePage(1);
+            }}
             className="px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white text-xs cursor-pointer"
           >
             <option value="ALL">Tất cả kho</option>
@@ -583,221 +1036,123 @@ export default function AdminInventoryPage() {
 
       {/* Tab Content */}
       {activeTab === "serials" ? (
-        <AdminCard title="Danh sách máy & Kiểm định" subtitle="Hiển thị tối đa 100 máy khớp bộ lọc." bodyClassName="p-0 overflow-x-auto">
-          {serialUnits.length === 0 ? (
-            <div className="p-10 text-center text-xs text-slate-500">
-              Không có Serial nào khớp bộ lọc.
-            </div>
-          ) : (
-            <table className="admin-table w-full text-left border-collapse text-xs">
-              <thead>
-                <tr>
-                  <th>Serial / Service Tag</th>
-                  <th>Sản phẩm</th>
-                  <th>Showroom / Kho</th>
-                  <th>Mã Kiểm định (Public Code)</th>
-                  <th>Tình trạng &amp; Pin</th>
-                  <th className="text-center">Trạng thái</th>
-                  <th className="text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {serialUnits.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/70 transition">
-                    <td className="font-mono font-bold text-slate-900">{u.serialNumber}</td>
-                    <td>
-                      <Link
-                        href={`/admin/products/${u.productId}`}
-                        className="font-semibold text-blue-600 hover:underline"
-                      >
-                        {u.productName}
-                      </Link>
-                      <div className="text-[11px] text-slate-400">
-                        {u.productBrand || "CitiLap"} · BH {u.warrantyMonths || 12} tháng (1 đổi 1 7 ngày)
-                      </div>
-                    </td>
-                    <td>
-                      <span className="font-medium text-slate-800">{u.warehouseName}</span>
-                      <div className="text-[10px] font-mono text-slate-400">{u.warehouseCode}</div>
-                    </td>
-                    <td>
-                      {u.publicCode ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono font-bold text-[11px]">
-                            <ShieldCheck className="w-3 h-3" />
-                            {u.publicCode}
-                          </span>
-                          <Link
-                            href={`/order-tracking?code=${encodeURIComponent(u.publicCode)}`}
-                            target="_blank"
-                            className="text-slate-400 hover:text-blue-600"
-                            title="Xem chứng thư kiểm định ngoài Storefront"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </Link>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400 italic">Chưa cấp mã</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="font-medium text-slate-700">{serialConditionLabels[u.condition] || u.condition}</div>
-                      {u.batteryHealth !== null && u.batteryHealth !== undefined && (
-                        <div className="text-[11px] text-slate-500">
-                          Pin: <strong>{u.batteryHealth}%</strong>
-                        </div>
-                      )}
-                    </td>
-                    <td className="text-center">
-                      <StatusBadge status={u.status} customLabel={serialStatusLabels[u.status]} className="whitespace-nowrap" />
-                    </td>
-                    <td className="text-right">
-                      <div className="inline-flex items-center gap-1.5">
-                        <Link
-                          href={`/admin/products/${u.productId}`}
-                          className="px-2 py-1 border border-slate-200 rounded bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 text-[11px] font-semibold transition whitespace-nowrap"
-                          title="Mở trình biên tập sản phẩm để sửa chi tiết Hồ sơ kiểm định (QC)"
-                        >
-                          Sửa QC
-                        </Link>
-                        <select
-                          aria-label={`Đổi trạng thái serial ${u.serialNumber}`}
-                          value={u.status}
-                          onChange={(e) => void handleStatusChange(u.id, e.target.value)}
-                          className="px-2 py-1 border border-slate-200 rounded bg-white text-xs font-medium cursor-pointer"
-                        >
-                          <option value="AVAILABLE">Sẵn sàng</option>
-                          <option value="RESERVED">Đang giữ</option>
-                          <option value="SOLD">Đã bán</option>
-                          <option value="QC_HOLD">Chờ QC</option>
-                          <option value="REPAIR">Bảo hành / Sửa</option>
-                        </select>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <AdminCard
+          title="Danh sách máy & Kiểm định"
+          subtitle="Theo dõi từng chiếc máy theo số Serial và trạng thái kiểm định."
+          bodyClassName="p-0 overflow-hidden"
+        >
+          <DataTable
+            caption="Danh sách máy theo Serial"
+            columns={serialColumns}
+            data={pagedSerialUnits}
+            rowKey={(u) => u.id}
+            loading={loading}
+            loadingMessage="Đang tải danh sách Serial..."
+            emptyTitle="Không có Serial nào khớp bộ lọc"
+            emptyDescription="Thử thay đổi từ khóa tìm kiếm, kho hoặc trạng thái Serial."
+            pagination={{
+              page: safeSerialPage,
+              pageSize: serialPageSize,
+              totalItems: serialUnits.length,
+              totalPages: serialTotalPages,
+              pageSizeOptions: [10, 20, 50, 100],
+              onPageChange: (p) => setSerialPage(p),
+              onPageSizeChange: (size) => {
+                setSerialPageSize(size);
+                setSerialPage(1);
+              },
+            }}
+          />
         </AdminCard>
       ) : (
-        <AdminCard title="Tồn kho theo SKU & Showroom" subtitle="Khả dụng = Tồn thực tế − Đang giữ. Lọc trên tối đa 100 dòng đã tải." bodyClassName="p-0 overflow-x-auto">
-          {filteredBalances.length === 0 ? (
-            <div className="p-10 text-center text-xs text-slate-500">Không có dòng tồn kho khớp bộ lọc.</div>
-          ) : (
-            <table className="admin-table w-full text-left border-collapse text-xs">
-              <thead>
-                <tr>
-                  <th>Sản phẩm</th>
-                  <th>SKU / Phiên bản</th>
-                  <th>Showroom / Kho</th>
-                  <th className="text-right">Tồn thực tế (On Hand)</th>
-                  <th className="text-right">Đang giữ (Reserved)</th>
-                  <th className="text-right">Khả dụng</th>
-                  <th className="text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredBalances.map((b) => {
-                  const available = Math.max(0, b.onHand - b.reserved);
-                  return (
-                    <tr key={b.id} className="hover:bg-slate-50/70 transition">
-                      <td>
-                        <Link
-                          href={`/admin/products/${b.productId}`}
-                          className="font-semibold text-blue-600 hover:underline"
-                        >
-                          {b.productName}
-                        </Link>
-                      </td>
-                      <td className="font-mono text-slate-600">
-                        {b.variantSku || "DEFAULT"} {b.variantName ? `· ${b.variantName}` : ""}
-                      </td>
-                      <td>{b.warehouseName}</td>
-                      <td className="text-right font-bold tabular-nums">{b.onHand}</td>
-                      <td className="text-right text-amber-700 tabular-nums">{b.reserved}</td>
-                      <td className="text-right">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-bold tabular-nums ${
-                            available > 0
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-rose-50 text-rose-700"
-                          }`}
-                        >
-                          {available > 0 && <CheckCircle2 className="w-3 h-3" />}
-                          {available}
-                        </span>
-                      </td>
-                      <td className="text-right whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setNewSerial((prev) => ({
-                              ...prev,
-                              productId: b.productId,
-                              variantId: b.variantId || "",
-                              warehouseId: b.warehouseId,
-                            }));
-                            setShowAddForm(true);
-                            setActiveTab("serials");
-                          }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold text-[11px] transition cursor-pointer"
-                          title="Nhập Serial mới cho sản phẩm này"
-                        >
-                          <Plus className="w-3 h-3" />
-                          <span>Nhập Serial</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+        <AdminCard
+          title="Tồn kho theo SKU & Showroom"
+          subtitle="Khả dụng = Tồn thực tế − Đang giữ. Các mặt hàng tồn khả dụng ≤ 2 được tô nổi bật."
+          bodyClassName="p-0 overflow-hidden"
+        >
+          <DataTable
+            caption="Bảng tồn kho theo SKU và Showroom"
+            columns={balanceColumns}
+            data={pagedBalances}
+            rowKey={(b) => b.id}
+            loading={loading}
+            loadingMessage="Đang tải tồn kho SKU..."
+            emptyTitle="Không có dòng tồn kho khớp bộ lọc"
+            emptyDescription="Thử tắt lọc tồn kho thấp hoặc đổi từ khóa tìm kiếm."
+            rowClassName={(b) => {
+              const available = Math.max(0, b.onHand - b.reserved);
+              if (available === 0) return "bg-rose-50/40";
+              if (available <= 2) return "bg-amber-50/35";
+              return "";
+            }}
+            pagination={{
+              page: safeBalancePage,
+              pageSize: balancePageSize,
+              totalItems: filteredBalances.length,
+              totalPages: balanceTotalPages,
+              pageSizeOptions: [10, 20, 50, 100],
+              onPageChange: (p) => setBalancePage(p),
+              onPageSizeChange: (size) => {
+                setBalancePageSize(size);
+                setBalancePage(1);
+              },
+            }}
+          />
         </AdminCard>
       )}
+
       <details className="rounded-lg border border-slate-200 bg-white">
-        <summary className="px-4 py-3 font-semibold text-slate-700">Thông tin kho & Showroom ({warehouses.length})</summary>
+        <summary className="px-4 py-3 font-semibold text-slate-700 cursor-pointer">
+          Thông tin kho & Showroom ({warehouses.length})
+        </summary>
         <div className="p-4 pt-0">
-      {/* Showroom / Warehouse Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {warehouses.map((w) => (
-          <div
-            key={w.id}
-            className={`bg-white rounded-xl border p-4 shadow-2xs flex flex-col justify-between gap-3 ${
-              w.status === "ACTIVE" ? "border-slate-200" : "border-slate-200 opacity-65 bg-slate-50"
-            }`}
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
-                  <Store className="w-4 h-4" />
+          {/* Showroom / Warehouse Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            {warehouses.map((w) => (
+              <div
+                key={w.id}
+                className={`bg-white rounded-xl border p-4 shadow-2xs flex flex-col justify-between gap-3 ${
+                  w.status === "ACTIVE" ? "border-slate-200" : "border-slate-200 opacity-65 bg-slate-50"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                      <Store className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900">{w.name}</div>
+                      <div className="text-[11px] font-mono text-slate-400">Mã kho: {w.code}</div>
+                    </div>
+                  </div>
+                  <StatusBadge status={w.status} />
                 </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900">{w.name}</div>
-                  <div className="text-[11px] font-mono text-slate-400">Mã kho: {w.code}</div>
+                <div className="text-xs text-slate-600 flex items-start gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                  <span>{w.address || "Chưa cập nhật địa chỉ"}</span>
+                </div>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500">
+                    Serial sẵn sàng: <strong className="text-emerald-700">{w.availableSerials}</strong> /{" "}
+                    {w.totalSerials}
+                  </span>
+                  <span className="text-slate-500">
+                    Tồn kho SL: <strong className="text-slate-900">{w.totalOnHand}</strong>
+                  </span>
                 </div>
               </div>
-              <StatusBadge status={w.status} />
-            </div>
-            <div className="text-xs text-slate-600 flex items-start gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-              <span>{w.address || "Chưa cập nhật địa chỉ"}</span>
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-              <span className="text-slate-500">
-                Serial sẵn sàng: <strong className="text-emerald-700">{w.availableSerials}</strong> / {w.totalSerials}
-              </span>
-              <span className="text-slate-500">
-                Tồn kho SL: <strong className="text-slate-900">{w.totalOnHand}</strong>
-              </span>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
-
         </div>
       </details>
     </div>
+  );
+}
+
+export default function AdminInventoryPage() {
+  return (
+    <Suspense fallback={<AdminLoadingState message="Đang tải dữ liệu kho hàng..." />}>
+      <InventoryContent />
+    </Suspense>
   );
 }
