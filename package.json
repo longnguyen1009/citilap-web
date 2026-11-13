@@ -15,6 +15,8 @@
     "db:generate": "prisma generate && node scripts/post-prisma-generate.mjs",
     "db:migrate:local": "wrangler d1 migrations apply citilap-db-dev --local",
     "db:migrate:remote": "wrangler d1 migrations apply citilap-db-dev --remote",
+    "db:migrate:staging": "wrangler d1 migrations apply DB --env staging --remote",
+    "db:migrate:prod": "wrangler d1 migrations apply DB --env production --remote",
     "db:query:local": "wrangler d1 execute citilap-db-dev --local",
     "db:seed:local": "wrangler d1 execute citilap-db-dev --local --file=scripts/seed-development.sql",
     "db:seed:demo": "node scripts/seed-storefront-demo.mjs --local",

@@ -26,6 +26,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import PageHeader from '@/components/admin/ui/PageHeader';
+import { useConfirm, useToast } from '@/components/admin/ui';
 import MediaBrowser, { mediaRequest } from '@/components/admin/media/MediaBrowser';
 import MediaDialog from '@/components/admin/media/MediaDialog';
 import MediaUpload from '@/components/admin/media/MediaUpload';
@@ -88,6 +89,8 @@ export interface TreeCategoryItem extends CategoryItem {
 }
 
 export default function CategoriesStudio() {
+  const confirm = useConfirm();
+  const toast = useToast();
   const [detail, setDetail] = useState<NavigationDetail | null>(null);
   const [doc, setDoc] = useState<NavigationDocument | null>(null);
   const [baseline, setBaseline] = useState('');
@@ -543,31 +546,39 @@ export default function CategoriesStudio() {
   };
 
   // Delete Category
-  const handleDeleteCategory = (cat: CategoryItem) => {
+  const handleDeleteCategory = async (cat: CategoryItem) => {
     if (!doc) return;
     const isSeedOrReferenced = detail?.categoryIds.includes(cat.id);
 
     if (isSeedOrReferenced) {
-      alert(
-        `Danh mục "${cat.name}" đang được liên kết với dữ liệu sản phẩm trong hệ thống. Bạn không thể xóa vĩnh viễn, nhưng có thể chuyển trạng thái sang [Ẩn] để không hiển thị ra website.`
-      );
+      const msg = `Danh mục "${cat.name}" đang được liên kết với dữ liệu sản phẩm trong hệ thống. Bạn không thể xóa vĩnh viễn, nhưng có thể chuyển trạng thái sang [Ẩn] để không hiển thị ra website.`;
+      toast.warning(msg);
+      setNotification({ type: 'info', message: msg });
       return;
     }
 
     const hasChildren = categories.some(c => c.parentId === cat.id);
     if (hasChildren) {
-      alert(
-        `Danh mục "${cat.name}" đang có các danh mục con trực thuộc. Vui lòng di chuyển hoặc xóa các danh mục con trước khi xóa danh mục này.`
-      );
+      const msg = `Danh mục "${cat.name}" đang có các danh mục con trực thuộc. Vui lòng di chuyển hoặc xóa các danh mục con trước khi xóa danh mục này.`;
+      toast.warning(msg);
+      setNotification({ type: 'error', message: msg });
       return;
     }
 
-    if (window.confirm(`Bạn có chắc chắn muốn xóa danh mục "${cat.name}"?`)) {
+    const ok = await confirm({
+      title: 'Xóa danh mục sản phẩm',
+      message: `Bạn có chắc chắn muốn xóa danh mục "${cat.name}"?`,
+      confirmLabel: 'Xóa danh mục',
+      cancelLabel: 'Hủy',
+      variant: 'destructive',
+    });
+    if (ok) {
       setDoc({
         ...doc,
         categories: categories.filter(c => c.id !== cat.id),
       });
       if (editingId === cat.id) cancelEdit();
+      toast.success(`Đã xóa danh mục "${cat.name}".`);
       setNotification({
         type: 'success',
         message: `Đã xóa danh mục "${cat.name}".`,
@@ -615,7 +626,7 @@ export default function CategoriesStudio() {
     });
   };
 
-  const handleApplyBulkAction = () => {
+  const handleApplyBulkAction = async () => {
     if (!doc || !bulkAction || selectedIds.size === 0) return;
 
     if (bulkAction === 'show') {
@@ -639,26 +650,33 @@ export default function CategoriesStudio() {
       const cannotDeleteCount = selectedIds.size - canDelete.length;
 
       if (canDelete.length === 0) {
-        alert(
-          'Tất cả danh mục đã chọn đều đang được liên kết với sản phẩm và không thể xóa vĩnh viễn. Bạn có thể chọn hành động "Ẩn" thay thế.'
-        );
+        const msg = 'Tất cả danh mục đã chọn đều đang được liên kết với sản phẩm và không thể xóa vĩnh viễn. Bạn có thể chọn hành động "Ẩn" thay thế.';
+        toast.warning(msg);
+        setNotification({ type: 'info', message: msg });
+        setBulkAction('');
         return;
       }
 
-      if (
-        window.confirm(
-          `Bạn có chắc chắn muốn xóa ${canDelete.length} danh mục?` +
-            (cannotDeleteCount > 0
-              ? ` (${cannotDeleteCount} danh mục có sản phẩm liên kết sẽ được giữ lại)`
-              : '')
-        )
-      ) {
+      const targetNames = canDelete.map(c => `"${c.name}"`).slice(0, 3).join(', ') + (canDelete.length > 3 ? ` và ${canDelete.length - 3} danh mục khác` : '');
+      const ok = await confirm({
+        title: 'Xóa danh mục hàng loạt',
+        message:
+          `Bạn có chắc chắn muốn xóa ${canDelete.length} danh mục (${targetNames})?` +
+          (cannotDeleteCount > 0
+            ? ` (${cannotDeleteCount} danh mục có sản phẩm liên kết sẽ được giữ lại)`
+            : ''),
+        confirmLabel: 'Xóa danh mục',
+        cancelLabel: 'Hủy',
+        variant: 'destructive',
+      });
+      if (ok) {
         const canDeleteIds = new Set(canDelete.map(c => c.id));
         setDoc({
           ...doc,
           categories: categories.filter(c => !canDeleteIds.has(c.id)),
         });
         setSelectedIds(new Set());
+        toast.success(`Đã xóa ${canDelete.length} danh mục thành công.`);
         setNotification({
           type: 'success',
           message: `Đã xóa ${canDelete.length} danh mục thành công.`,

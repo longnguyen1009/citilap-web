@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import {
   Search,
@@ -14,14 +14,15 @@ import {
   AlertTriangle,
   Package,
   MessageSquare,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import {
   PageHeader,
   AdminCard,
   AdminButton,
   InlineAlert,
+  DataTable,
+  type DataTableColumn,
+  useToast,
 } from "@/components/admin/ui";
 
 type Customer = {
@@ -89,9 +90,58 @@ const SOURCE_TABS = [
 
 const PAGE_LIMIT = 25;
 
+function downloadCustomersCsv(rows: Customer[], filename: string) {
+  const headers = [
+    "Mã KH",
+    "Họ tên",
+    "Số điện thoại",
+    "Email",
+    "Nguồn",
+    "Hạng thành viên",
+    "Số đơn",
+    "Tổng chi tiêu (VND)",
+    "Đơn gần nhất",
+    "Ngày tham gia",
+  ];
+  const escapeCsv = (val: unknown) => {
+    const str = String(val ?? "");
+    if (/[",\n\r]/.test(str)) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+  const lines = rows.map((c) =>
+    [
+      c.id,
+      c.name || "Khách hàng",
+      c.phone || "",
+      c.email || "",
+      c.sourceLabel,
+      c.tier,
+      c.totalOrders,
+      c.nonCancelledTotal ?? c.totalSpend ?? 0,
+      c.lastOrder ? new Date(c.lastOrder).toLocaleDateString("vi-VN") : "",
+      c.createdAt ? new Date(c.createdAt).toLocaleDateString("vi-VN") : "",
+    ]
+      .map(escapeCsv)
+      .join(",")
+  );
+  const csvContent = "\uFEFF" + [headers.map(escapeCsv).join(","), ...lines].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function CustomersContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const toast = useToast();
 
   const initialSearch = searchParams.get("search") || "";
   const initialTier = searchParams.get("tier") || "";
@@ -105,6 +155,7 @@ function CustomersContent() {
   const [tierFilter, setTierFilter] = useState(initialTier);
   const [sourceFilter, setSourceFilter] = useState(initialSource);
   const [page, setPage] = useState(initialPage);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [total, setTotal] = useState(0);
@@ -179,6 +230,7 @@ function CustomersContent() {
       if (response.ok && result?.success && Array.isArray(result.data)) {
         const rows: Customer[] = result.data;
         setCustomers(rows);
+        setSelectedKeys([]);
         const pag = result.pagination;
         const resolvedTotal = Number(pag?.total ?? rows.length);
         const resolvedTotalPages = Math.max(1, Number(pag?.totalPages ?? 1));
@@ -283,17 +335,178 @@ function CustomersContent() {
     window.open(`/api/admin/customers/export?${query.toString()}`, "_blank");
   };
 
-  const rangeStart = total === 0 || customers.length === 0 ? 0 : (page - 1) * PAGE_LIMIT + 1;
-  const rangeEnd =
-    total === 0 || customers.length === 0
-      ? 0
-      : Math.min(total, (page - 1) * PAGE_LIMIT + customers.length);
+  const phoneFreq = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of customers) {
+      const p = (c.phone || "").trim();
+      if (p) map.set(p, (map.get(p) || 0) + 1);
+    }
+    return map;
+  }, [customers]);
 
-  const phoneFreq = new Map<string, number>();
-  for (const c of customers) {
-    const p = (c.phone || "").trim();
-    if (p) phoneFreq.set(p, (phoneFreq.get(p) || 0) + 1);
-  }
+  const columns = useMemo<DataTableColumn<Customer>[]>(
+    () => [
+      {
+        key: "customer",
+        header: "Khách hàng",
+        headerText: "Khách hàng",
+        sortable: true,
+        sortType: "text",
+        sortValue: (c) => c.name || c.email || c.phone || "",
+        isRowHeader: true,
+        className: "whitespace-nowrap",
+        render: (customer) => {
+          const phoneCount = customer.phone ? phoneFreq.get(customer.phone.trim()) || 0 : 0;
+          return (
+            <div className="flex items-center gap-2.5">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
+                  customer.source === "REGISTERED"
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-purple-100 text-purple-700"
+                }`}
+              >
+                {(customer.name || customer.email || "K").charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                  <span>{customer.name || "Khách hàng"}</span>
+                  {phoneCount > 1 && customer.phone && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm(customer.phone || "");
+                        setPage(1);
+                      }}
+                      title="Bấm để lọc toàn bộ hồ sơ/đơn hàng có cùng số điện thoại này"
+                      className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold hover:bg-amber-200 transition cursor-pointer"
+                    >
+                      Trùng SĐT ({phoneCount})
+                    </button>
+                  )}
+                </div>
+                <div className="text-[11px] text-slate-500 flex items-center gap-2 font-mono font-normal">
+                  {customer.phone && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-2.5 h-2.5 text-slate-400" />
+                      {customer.phone}
+                    </span>
+                  )}
+                  {customer.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="w-2.5 h-2.5 text-slate-400" />
+                      {customer.email}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: "tier",
+        header: "Hạng thành viên",
+        headerText: "Hạng thành viên",
+        sortable: true,
+        sortType: "text",
+        sortValue: (c) => c.tier || c.sourceLabel,
+        className: "whitespace-nowrap",
+        render: (customer) => (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                customer.source === "REGISTERED"
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "bg-purple-50 text-purple-700 border border-purple-200"
+              }`}
+            >
+              {customer.sourceLabel}
+            </span>
+            {customer.tier && customer.tier !== customer.sourceLabel && (
+              <span
+                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                  tierBadge[customer.tier] || "bg-slate-100 text-slate-600 border-slate-200"
+                }`}
+              >
+                Hạng {customer.tier}
+              </span>
+            )}
+            {customer.orderNumber && (
+              <span className="text-[10px] text-slate-500 font-mono">
+                #{customer.orderNumber}
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "totalOrders",
+        header: "Số đơn",
+        headerText: "Số đơn",
+        align: "center",
+        sortable: true,
+        sortType: "number",
+        sortValue: (c) => c.totalOrders,
+        className: "whitespace-nowrap font-bold text-slate-900 tabular-nums",
+        render: (customer) => customer.totalOrders,
+      },
+      {
+        key: "totalSpend",
+        header: "Tổng chi tiêu",
+        headerText: "Tổng chi tiêu",
+        align: "right",
+        sortable: true,
+        sortType: "number",
+        sortValue: (c) => c.nonCancelledTotal ?? c.totalSpend ?? 0,
+        className: "whitespace-nowrap font-bold text-blue-700 tabular-nums",
+        render: (customer) =>
+          `${(customer.nonCancelledTotal ?? customer.totalSpend ?? 0).toLocaleString("vi-VN")}đ`,
+      },
+      {
+        key: "createdAt",
+        header: "Ngày tham gia",
+        headerText: "Ngày tham gia",
+        align: "right",
+        sortable: true,
+        sortType: "date",
+        sortValue: (c) => c.createdAt || c.lastOrder,
+        className: "whitespace-nowrap tabular-nums",
+        render: (customer) => (
+          <div className="text-right">
+            <div className="text-slate-700 font-medium">
+              {customer.createdAt
+                ? new Date(customer.createdAt).toLocaleDateString("vi-VN")
+                : "—"}
+            </div>
+            {customer.lastOrder && (
+              <div className="text-[10px] text-slate-400">
+                Đơn cuối: {new Date(customer.lastOrder).toLocaleDateString("vi-VN")}
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        key: "actions",
+        header: "Thao tác",
+        headerText: "Thao tác",
+        align: "right",
+        className: "whitespace-nowrap",
+        render: (customer) => (
+          <button
+            type="button"
+            onClick={() => void loadCustomerDetail(customer.id)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-200 transition cursor-pointer"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            <span>Xem</span>
+          </button>
+        ),
+      },
+    ],
+    [loadCustomerDetail, phoneFreq]
+  );
 
   return (
     <div className="max-w-7xl mx-auto pb-12 space-y-3">
@@ -439,201 +652,60 @@ function CustomersContent() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="table-wrapper overflow-x-auto" tabIndex={0} role="region" aria-label="Danh sách khách hàng">
-          <table className="admin-table w-full text-left border-collapse text-xs">
-            <thead className="bg-slate-50/90 text-slate-500 font-bold uppercase text-[11px] border-b border-slate-200">
-              <tr>
-                <th className="py-2.5 px-4">Khách hàng</th>
-                <th className="py-2.5 px-4">Phân loại &amp; Hạng</th>
-                <th className="py-2.5 px-4 text-center">Đơn</th>
-                <th className="py-2.5 px-4 text-right">Tổng chi</th>
-                <th className="py-2.5 px-4 text-right">Đơn cuối</th>
-                <th className="py-2.5 px-4 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-1.5 text-blue-600" />
-                    <span>Đang tải khách hàng...</span>
-                  </td>
-                </tr>
-              ) : loadError ? (
-                <tr>
-                  <td colSpan={6} className="py-10 text-center">
-                    <div className="max-w-md mx-auto space-y-2.5">
-                      <p className="text-xs font-semibold text-red-700">{loadError}</p>
-                      <button
-                        type="button"
-                        onClick={() => void fetchCustomers()}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Thử lại</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ) : customers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
-                    Không có khách hàng phù hợp.
-                  </td>
-                </tr>
-              ) : (
-                customers.map((customer) => {
-                  const phoneCount = customer.phone ? phoneFreq.get(customer.phone.trim()) || 0 : 0;
-                  return (
-                  <tr key={customer.id} className="hover:bg-slate-50/70 transition">
-                    <td className="py-2.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] shrink-0 ${
-                            customer.source === "REGISTERED"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-purple-100 text-purple-700"
-                          }`}
-                        >
-                          {(customer.name || customer.email || "K").charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
-                            <span>{customer.name || "Khách hàng"}</span>
-                            {phoneCount > 1 && customer.phone && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSearchTerm(customer.phone || "");
-                                  setPage(1);
-                                }}
-                                title="Bấm để lọc toàn bộ hồ sơ/đơn hàng có cùng số điện thoại này"
-                                className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold hover:bg-amber-200 transition cursor-pointer"
-                              >
-                                Trùng SĐT ({phoneCount})
-                              </button>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-slate-500 flex items-center gap-2 font-mono">
-                            {customer.phone && (
-                              <span className="flex items-center gap-1">
-                                <Phone className="w-2.5 h-2.5 text-slate-400" />
-                                {customer.phone}
-                              </span>
-                            )}
-                            {customer.email && (
-                              <span className="flex items-center gap-1">
-                                <Mail className="w-2.5 h-2.5 text-slate-400" />
-                                {customer.email}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="py-2.5 px-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
-                            customer.source === "REGISTERED"
-                              ? "bg-blue-50 text-blue-700 border border-blue-200"
-                              : "bg-purple-50 text-purple-700 border border-purple-200"
-                          }`}
-                        >
-                          {customer.sourceLabel}
-                        </span>
-                        {customer.tier && customer.tier !== customer.sourceLabel && (
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
-                              tierBadge[customer.tier] || "bg-slate-100 text-slate-600 border-slate-200"
-                            }`}
-                          >
-                            Hạng {customer.tier}
-                          </span>
-                        )}
-                        {customer.orderNumber && (
-                          <span className="text-[10px] text-slate-500 font-mono">
-                            #{customer.orderNumber}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-
-                    <td className="py-2.5 px-4 whitespace-nowrap text-center font-bold text-slate-900 tabular-nums">
-                      {customer.totalOrders}
-                    </td>
-
-                    <td className="py-2.5 px-4 whitespace-nowrap text-right font-bold text-blue-700 tabular-nums">
-                      {(customer.nonCancelledTotal ?? customer.totalSpend ?? 0).toLocaleString("vi-VN")}đ
-                    </td>
-
-                    <td className="py-2.5 px-4 whitespace-nowrap text-right text-slate-500 tabular-nums">
-                      {customer.lastOrder
-                        ? new Date(customer.lastOrder).toLocaleDateString("vi-VN")
-                        : "—"}
-                    </td>
-
-                    <td className="py-2.5 px-4 whitespace-nowrap text-right">
-                      <button
-                        type="button"
-                        onClick={() => void loadCustomerDetail(customer.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded border border-blue-200 transition cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        <span>Xem</span>
-                      </button>
-                    </td>
-                  </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Footer with Server Pagination */}
-        <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50/60 text-xs text-slate-600 flex flex-wrap justify-between items-center gap-3">
-          <div className="tabular-nums">
-            Hiển thị{" "}
-            <span className="font-bold text-slate-900">
-              {rangeStart === 0 ? 0 : `${rangeStart}–${rangeEnd}`}
-            </span>{" "}
-            / <span className="font-bold text-slate-900">{total}</span> khách hàng
-            <span className="hidden sm:inline text-slate-400 ml-2">
-              • Khách vãng lai ghi nhận độc lập theo từng đơn
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-slate-500 font-medium tabular-nums">
-              Trang {page} / {totalPages}
-            </span>
-            <div className="flex items-center gap-1">
+        {/* DataTable */}
+        {loadError && customers.length === 0 ? (
+          <div className="py-10 text-center">
+            <div className="max-w-md mx-auto space-y-2.5">
+              <p className="text-xs font-semibold text-red-700">{loadError}</p>
               <button
                 type="button"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                aria-label="Trang trước"
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none text-slate-700 font-semibold cursor-pointer"
+                onClick={() => void fetchCustomers()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Trước</span>
-              </button>
-              <button
-                type="button"
-                disabled={page >= totalPages || loading}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                aria-label="Trang sau"
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:pointer-events-none text-slate-700 font-semibold cursor-pointer"
-              >
-                <span>Sau</span>
-                <ChevronRight className="w-3.5 h-3.5" />
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Thử lại</span>
               </button>
             </div>
           </div>
-        </div>
+        ) : (
+          <DataTable
+            caption="Danh sách khách hàng"
+            columns={columns}
+            data={customers}
+            rowKey={(c) => c.id}
+            loading={loading}
+            loadingMessage="Đang tải khách hàng..."
+            emptyTitle="Không có khách hàng phù hợp"
+            emptyDescription="Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc hạng thành viên."
+            selectable
+            selectedKeys={selectedKeys}
+            onSelectionChange={setSelectedKeys}
+            bulkActions={(keys) => (
+              <AdminButton
+                type="button"
+                variant="secondary"
+                size="sm"
+                icon={<Download className="w-3.5 h-3.5" />}
+                onClick={() => {
+                  const selectedRows = customers.filter((c) => keys.includes(c.id));
+                  downloadCustomersCsv(
+                    selectedRows,
+                    `khach-hang-da-chon-${new Date().toISOString().slice(0, 10)}.csv`
+                  );
+                  toast.success(`Đã xuất CSV ${selectedRows.length} khách hàng đã chọn.`);
+                }}
+              >
+                Xuất CSV ({keys.length})
+              </AdminButton>
+            )}
+            pagination={{
+              page,
+              totalItems: total,
+              totalPages,
+              onPageChange: (nextPage) => setPage(nextPage),
+            }}
+          />
+        )}
       </AdminCard>
 
       {/* 4. Customer Detail Modal */}
