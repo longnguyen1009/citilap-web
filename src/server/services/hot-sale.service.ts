@@ -2,6 +2,8 @@ import { prisma } from '@/lib/prisma';
 import { mapD1ProductToHomepageProduct, getFlashSaleProducts, type ProductDbRow, type HomepageProduct } from './catalog.service';
 import { getStorefrontPricingContext, isFlashSaleActive, type PriceEvaluationContext } from './pricing.service';
 
+const ACTIVE_AVAILABILITIES = new Set(['AVAILABLE', 'PREORDER', 'IN_STOCK', 'ACTIVE']);
+
 export async function getHotSaleCampaigns(context?: PriceEvaluationContext, at = new Date()) {
   const pricing = context ?? await getStorefrontPricingContext(undefined, at);
   const campaigns = await prisma.promotionCampaign.findMany({
@@ -24,8 +26,16 @@ export async function getHotSaleCampaigns(context?: PriceEvaluationContext, at =
       const row = byId.get(item.productId);
       if (!row) return [];
       const published = row.studio?.published ? JSON.parse(row.studio.published) : null;
-      if (published && !['AVAILABLE', 'PREORDER'].includes(published.availability)) return [];
-      if (item.variantId && published && !published.variants?.some((v: { id: string; availability?: string }) => v.id === item.variantId && (!v.availability || ['AVAILABLE', 'PREORDER'].includes(v.availability)))) return [];
+      const pubAvail = typeof published?.availability === 'string' ? published.availability.toUpperCase() : '';
+      if (published && pubAvail && !ACTIVE_AVAILABILITIES.has(pubAvail)) return [];
+      if (
+        item.variantId &&
+        published &&
+        !published.variants?.some((v: { id: string; availability?: string }) => {
+          const vAvail = typeof v.availability === 'string' ? v.availability.toUpperCase() : '';
+          return v.id === item.variantId && (!vAvail || ACTIVE_AVAILABILITIES.has(vAvail));
+        })
+      ) return [];
       const variants = item.variantId ? row.variants.filter(v => v.id === item.variantId) : row.variants;
       if (item.variantId && !variants.length) return [];
       const product = mapD1ProductToHomepageProduct({ ...row, variants } as unknown as ProductDbRow, undefined, pricing, at);

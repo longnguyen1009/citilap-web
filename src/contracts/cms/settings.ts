@@ -225,6 +225,7 @@ export const adminSettingsDocumentSchema = z.object({
   flashSaleTitle: safeText(120),
   flashSaleStartAt: safeText(64).default(""), // Chuỗi ISO UTC cố định hoặc rỗng
   flashSaleEndAt: safeText(64), // Chuỗi ISO UTC cố định hoặc rỗng
+  flashSalePreShowHours: z.coerce.number().min(0).max(168).default(2),
 
   // Hero & Banners
   heroBadge: safeText(100),
@@ -343,6 +344,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   flashSaleTitle: "Giá Sốc Giờ Vàng",
   flashSaleStartAt: "",
   flashSaleEndAt: "2026-12-31T23:59:59Z",
+  flashSalePreShowHours: 2,
 
   heroBadge: "CitiLap Gaming Zone",
   heroTitle: "CHỌN LAPTOP",
@@ -435,6 +437,7 @@ export const publicStorefrontSettingsSchema = z.object({
   flashSaleTitle: z.string(),
   flashSaleStartAt: z.string().default(""),
   flashSaleEndAt: z.string(),
+  flashSalePreShowHours: z.number().min(0).max(168).default(2),
 
   heroBadge: z.string(),
   heroTitle: z.string(),

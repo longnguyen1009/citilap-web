@@ -29,12 +29,22 @@ import {
   type CampaignData,
   type CampaignItemForm,
   type BannerSettingsState,
+  type DailySlotForm,
   type FilterTab,
+  type ScheduleMode,
   formatGmt7,
-  isoToDatetimeLocalGmt7,
-  datetimeLocalGmt7ToIso,
   calculateBulkDiscountedPrice,
 } from '@/components/admin/campaigns/types';
+import {
+  DEFAULT_FLASH_SALE_PRE_SHOW_HOURS,
+  addDaysToVnDate,
+  diffVnDaysInclusive,
+  isoToVnDateDisplay,
+  isoToVnTimeDisplay,
+  parseVnDateInput,
+  parseVnTimeInput,
+  vnDateTimeToIso,
+} from '@/lib/flash-sale-schedule';
 
 export default function AdminCampaignsPage() {
   const confirm = useConfirm();
@@ -61,9 +71,16 @@ export default function AdminCampaignsPage() {
   const [formDescription, setFormDescription] = useState('');
   const [formEnabled, setFormEnabled] = useState(true);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [formStartLocal, setFormStartLocal] = useState('');
-  const [formEndLocal, setFormEndLocal] = useState('');
-  const [durationHours, setDurationHours] = useState('');
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('continuous');
+  const [startDateStr, setStartDateStr] = useState('');
+  const [startTimeStr, setStartTimeStr] = useState('10:00');
+  const [endDateStr, setEndDateStr] = useState('');
+  const [endTimeStr, setEndTimeStr] = useState('12:00');
+  const [durationDaysStr, setDurationDaysStr] = useState('1');
+  const [dailySlots, setDailySlots] = useState<DailySlotForm[]>([
+    { startTime: '10:00', endTime: '12:00' },
+    { startTime: '12:00', endTime: '14:00' },
+  ]);
   const [formItems, setFormItems] = useState<CampaignItemForm[]>([]);
   const [formRevision, setFormRevision] = useState<number>(0);
   const [saving, setSaving] = useState(false);
@@ -84,6 +101,10 @@ export default function AdminCampaignsPage() {
           flashSaleTitle: doc.flashSaleTitle || 'Giá Sốc Giờ Vàng',
           flashSaleStartAt: doc.flashSaleStartAt || '',
           flashSaleEndAt: doc.flashSaleEndAt || '',
+          flashSalePreShowHours:
+            typeof doc.flashSalePreShowHours === 'number'
+              ? doc.flashSalePreShowHours
+              : DEFAULT_FLASH_SALE_PRE_SHOW_HOURS,
         });
       }
     } catch {
@@ -203,16 +224,30 @@ export default function AdminCampaignsPage() {
     });
   }, [campaigns, searchQuery, filterTab, nowMs]);
 
+  const applyRangeFromIso = (startIso: string, endIso: string) => {
+    const sDate = isoToVnDateDisplay(startIso);
+    const eDate = isoToVnDateDisplay(endIso);
+    setStartDateStr(sDate);
+    setStartTimeStr(isoToVnTimeDisplay(startIso) || '10:00');
+    setEndDateStr(eDate);
+    setEndTimeStr(isoToVnTimeDisplay(endIso) || '12:00');
+    const span = diffVnDaysInclusive(sDate, eDate);
+    setDurationDaysStr(span ? String(span) : '1');
+  };
+
   const openNewEditor = () => {
     setFormEnabled(true);
-    setDurationHours('');
+    setScheduleMode('continuous');
     setEditingCampaign(null);
     setFormName('');
     setFormDescription('');
     const now = new Date();
     const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    setFormStartLocal(isoToDatetimeLocalGmt7(now.toISOString()));
-    setFormEndLocal(isoToDatetimeLocalGmt7(twoHoursLater.toISOString()));
+    applyRangeFromIso(now.toISOString(), twoHoursLater.toISOString());
+    setDailySlots([
+      { startTime: '10:00', endTime: '12:00' },
+      { startTime: '12:00', endTime: '14:00' },
+    ]);
     setFormItems([]);
     setFormRevision(0);
     setFormError(null);
@@ -221,12 +256,11 @@ export default function AdminCampaignsPage() {
 
   const openEditEditor = async (c: CampaignData) => {
     setFormEnabled(c.status === 'PUBLISHED' && new Date(c.endAt).getTime() > Date.now());
-    setDurationHours('');
+    setScheduleMode('continuous');
     setEditingCampaign(c);
     setFormName(c.name);
     setFormDescription(c.description || '');
-    setFormStartLocal(isoToDatetimeLocalGmt7(c.startAt));
-    setFormEndLocal(isoToDatetimeLocalGmt7(c.endAt));
+    applyRangeFromIso(c.startAt, c.endAt);
     setFormRevision(c.revision);
     setFormError(null);
 
@@ -290,14 +324,15 @@ export default function AdminCampaignsPage() {
     );
     const now = new Date();
     const twoHoursLater = new Date(now.getTime() + 2 * 3600000);
-    setFormStartLocal(isoToDatetimeLocalGmt7(now.toISOString()));
-    setFormEndLocal(isoToDatetimeLocalGmt7(twoHoursLater.toISOString()));
+    setScheduleMode('continuous');
+    applyRangeFromIso(now.toISOString(), twoHoursLater.toISOString());
     toast.info(`Đã tạo bản nháp nhân bản từ "${campaign.name}". Hãy kiểm tra khung giờ và bấm Lưu.`);
   };
 
   const addTimeSlot = async (campaign: CampaignData) => {
     if (!(await openEditEditor(campaign))) return;
     setEditingCampaign(null);
+    setScheduleMode('continuous');
     setFormRevision(0);
     setFormEnabled(true);
     setFormItems((items) =>
@@ -307,9 +342,9 @@ export default function AdminCampaignsPage() {
         soldCount: 0,
       }))
     );
-    setFormStartLocal(isoToDatetimeLocalGmt7(campaign.endAt));
-    setFormEndLocal(
-      isoToDatetimeLocalGmt7(new Date(Date.parse(campaign.endAt) + 2 * 3600000).toISOString())
+    applyRangeFromIso(
+      campaign.endAt,
+      new Date(Date.parse(campaign.endAt) + 2 * 3600000).toISOString()
     );
   };
 
@@ -364,29 +399,78 @@ export default function AdminCampaignsPage() {
       if (!formName.trim()) {
         throw new Error('Vui lòng nhập tên chiến dịch');
       }
-      if (!formStartLocal || !formEndLocal) {
-        throw new Error('Vui lòng nhập thời gian bắt đầu và kết thúc');
-      }
-      if (
-        durationHours &&
-        (!Number.isFinite(Number(durationHours)) ||
-          Number(durationHours) < 0.25 ||
-          Number(durationHours) > 8760)
-      ) {
-        throw new Error('Thời lượng phải từ 0,25 đến 8760 giờ.');
+
+      const effectiveMode: ScheduleMode = editingCampaign ? 'continuous' : scheduleMode;
+      const startDate = parseVnDateInput(startDateStr);
+      const endDate = parseVnDateInput(endDateStr);
+      if (!startDate || !endDate) {
+        throw new Error('Vui lòng nhập Từ ngày và Đến ngày hợp lệ theo dạng DD/MM/YYYY (VD: 15/11/2026).');
       }
 
-      const startUtc = datetimeLocalGmt7ToIso(formStartLocal);
-      const endUtc = datetimeLocalGmt7ToIso(formEndLocal);
+      let windows: Array<{ startAt: string; endAt: string }> = [];
 
-      if (new Date(startUtc).getTime() >= new Date(endUtc).getTime()) {
-        throw new Error('Thời điểm bắt đầu phải trước thời điểm kết thúc.');
+      if (effectiveMode === 'continuous') {
+        const startT = parseVnTimeInput(startTimeStr);
+        const endT = parseVnTimeInput(endTimeStr);
+        if (!startT || !endT) {
+          throw new Error('Vui lòng nhập giờ 24h hợp lệ (VD: 10:00, 14:00).');
+        }
+        const startUtc = vnDateTimeToIso(startDate.display, startT.display);
+        const endUtc = vnDateTimeToIso(endDate.display, endT.display);
+        if (!startUtc || !endUtc || new Date(startUtc).getTime() >= new Date(endUtc).getTime()) {
+          throw new Error('Thời điểm bắt đầu phải trước thời điểm kết thúc.');
+        }
+        windows = [{ startAt: startUtc, endAt: endUtc }];
+      } else {
+        const dayCount = diffVnDaysInclusive(startDate.display, endDate.display);
+        if (!dayCount || dayCount > 60) {
+          throw new Error('Khoảng ngày chạy khung giờ phải từ 1 đến 60 ngày.');
+        }
+        if (dailySlots.length === 0) {
+          throw new Error('Vui lòng chọn ít nhất 1 khung giờ mỗi ngày.');
+        }
+        const normalizedSlots = dailySlots.map((slot, idx) => {
+          const st = parseVnTimeInput(slot.startTime);
+          const et = parseVnTimeInput(slot.endTime);
+          if (!st || !et) {
+            throw new Error(`Khung giờ ${idx + 1}: Nhập giờ 24h hợp lệ (VD: 10:00 - 12:00).`);
+          }
+          const stMin = st.hour * 60 + st.minute;
+          const etMin = et.hour * 60 + et.minute;
+          if (stMin >= etMin) {
+            throw new Error(`Khung giờ ${idx + 1} (${st.display} → ${et.display}): Giờ kết thúc phải sau giờ bắt đầu.`);
+          }
+          return { st, et, stMin, etMin };
+        }).sort((a, b) => a.stMin - b.stMin);
+
+        for (let i = 1; i < normalizedSlots.length; i++) {
+          if (normalizedSlots[i].stMin < normalizedSlots[i - 1].etMin) {
+            throw new Error(
+              `Khung giờ bị trùng nhau trong cùng ngày: ${normalizedSlots[i - 1].st.display}–${normalizedSlots[i - 1].et.display} và ${normalizedSlots[i].st.display}–${normalizedSlots[i].et.display}.`
+            );
+          }
+        }
+
+        const expanded: Array<{ startAt: string; endAt: string }> = [];
+        for (let offset = 0; offset < dayCount; offset++) {
+          const dayVal = addDaysToVnDate(startDate.display, offset);
+          if (!dayVal) continue;
+          for (const slot of normalizedSlots) {
+            const startAt = vnDateTimeToIso(dayVal.display, slot.st.display);
+            const endAt = vnDateTimeToIso(dayVal.display, slot.et.display);
+            if (!enabled || new Date(endAt).getTime() > Date.now()) {
+              expanded.push({ startAt, endAt });
+            }
+          }
+        }
+        if (!expanded.length) {
+          throw new Error('Tất cả khung giờ đã chọn đều đã kết thúc so với hiện tại.');
+        }
+        windows = expanded;
       }
 
-      const targetStatus =
-        enabled && new Date(endUtc).getTime() > Date.now() ? 'PUBLISHED' : 'DRAFT';
-
-      if (targetStatus === 'PUBLISHED' && formItems.length < 1) {
+      const willPublishAny = enabled && windows.some((w) => new Date(w.endAt).getTime() > Date.now());
+      if (willPublishAny && formItems.length < 1) {
         throw new Error('Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.');
       }
 
@@ -451,48 +535,57 @@ export default function AdminCampaignsPage() {
         };
       });
 
-      const payload = {
-        name: formName.trim(),
-        description: formDescription.trim() || null,
-        status: targetStatus,
-        startAt: startUtc,
-        endAt: endUtc,
-        items: parsedItems,
-        revision: formRevision,
-        expectedRevision: formRevision,
-      };
+      let savedCount = 0;
+      for (const win of windows) {
+        const targetStatus =
+          enabled && new Date(win.endAt).getTime() > Date.now() ? 'PUBLISHED' : 'DRAFT';
+        const payload = {
+          name: formName.trim(),
+          description: formDescription.trim() || null,
+          status: targetStatus,
+          startAt: win.startAt,
+          endAt: win.endAt,
+          items: editingCampaign ? parsedItems : parsedItems.map((it) => ({ ...it, id: undefined, soldCount: 0 })),
+          revision: editingCampaign ? formRevision : 0,
+          expectedRevision: editingCampaign ? formRevision : 0,
+        };
 
-      const url = editingCampaign
-        ? `/api/admin/campaigns/${editingCampaign.id}`
-        : `/api/admin/campaigns`;
-      const method = editingCampaign ? 'PUT' : 'POST';
+        const url = editingCampaign
+          ? `/api/admin/campaigns/${editingCampaign.id}`
+          : `/api/admin/campaigns`;
+        const method = editingCampaign ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      const json = (await res.json()) as {
-        success: boolean;
-        error?: string;
-        code?: string;
-        conflictingCampaignName?: string;
-      };
+        const json = (await res.json()) as {
+          success: boolean;
+          error?: string;
+          code?: string;
+          conflictingCampaignName?: string;
+        };
 
-      if (!res.ok || !json.success) {
-        if (json.code === 'CAMPAIGN_OVERLAP_CONFLICT') {
-          throw new Error(`Xung đột khung giờ: ${json.error}`);
+        if (!res.ok || !json.success) {
+          const partialNote = savedCount > 0 ? ` (Đã tạo trước ${savedCount}/${windows.length} khung giờ)` : '';
+          if (json.code === 'CAMPAIGN_OVERLAP_CONFLICT') {
+            throw new Error(`Xung đột khung giờ: ${json.error}${partialNote}`);
+          }
+          if (json.code === 'CAMPAIGN_REVISION_CONFLICT') {
+            throw new Error(`Xung đột phiên bản (CAS): ${json.error}`);
+          }
+          throw new Error(`${json.error || 'Lỗi khi lưu chiến dịch.'}${partialNote}`);
         }
-        if (json.code === 'CAMPAIGN_REVISION_CONFLICT') {
-          throw new Error(`Xung đột phiên bản (CAS): ${json.error}`);
-        }
-        throw new Error(json.error || 'Lỗi khi lưu chiến dịch.');
+        savedCount++;
       }
 
       const msg = editingCampaign
         ? `Đã cập nhật chiến dịch "${formName}" thành công.`
-        : `Đã tạo chiến dịch "${formName}" thành công.`;
+        : windows.length > 1
+          ? `Đã tạo ${savedCount} khung giờ cho chiến dịch "${formName}" thành công.`
+          : `Đã tạo chiến dịch "${formName}" thành công.`;
       setSuccessMsg(msg);
       toast.success(msg);
       setIsEditorOpen(false);
@@ -880,9 +973,13 @@ export default function AdminCampaignsPage() {
         formName={formName}
         formDescription={formDescription}
         formEnabled={formEnabled}
-        formStartLocal={formStartLocal}
-        formEndLocal={formEndLocal}
-        durationHours={durationHours}
+        scheduleMode={scheduleMode}
+        startDateStr={startDateStr}
+        startTimeStr={startTimeStr}
+        endDateStr={endDateStr}
+        endTimeStr={endTimeStr}
+        durationDaysStr={durationDaysStr}
+        dailySlots={dailySlots}
         formItems={formItems}
         formRevision={formRevision}
         saving={saving}
@@ -891,9 +988,13 @@ export default function AdminCampaignsPage() {
         onChangeName={setFormName}
         onChangeDescription={setFormDescription}
         onChangeEnabled={setFormEnabled}
-        onChangeStartLocal={setFormStartLocal}
-        onChangeEndLocal={setFormEndLocal}
-        onChangeDurationHours={setDurationHours}
+        onChangeScheduleMode={setScheduleMode}
+        onChangeStartDateStr={setStartDateStr}
+        onChangeStartTimeStr={setStartTimeStr}
+        onChangeEndDateStr={setEndDateStr}
+        onChangeEndTimeStr={setEndTimeStr}
+        onChangeDurationDaysStr={setDurationDaysStr}
+        onChangeDailySlots={setDailySlots}
         onAddEmptyItem={handleAddItem}
         onPickerAddItems={(items) =>
           setFormItems((prev) => [

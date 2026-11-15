@@ -7,6 +7,7 @@ import { mediaEnvironment } from '@/server/media-http';
 import { MediaError } from '@/server/services/media-library.service';
 import { publicNavigation, publicCollection } from '@/server/services/navigation.service';
 import { publicStudio } from '@/server/services/product-studio.service';
+import { DEFAULT_FLASH_SALE_PRE_SHOW_HOURS, getNextHotSaleBoundaryMs } from '@/lib/flash-sale-schedule';
 
 export type ProductPublicationClassification =
   | { kind: 'NOT_FOUND' }
@@ -238,11 +239,23 @@ export const getCachedCatalogState = cache(async (now = Date.now()) => {
   return { ...cached, serverTime: now };
 });
 
-export const getCachedHotSaleCampaigns = cache(async () => {
-  return cachedJson('public-hot-sale-campaigns', PUBLIC_CMS_TTL_SECONDS, async () => {
+export const getCachedHotSaleCampaigns = cache(async (now = Date.now()) => {
+  const settings = await getStorefrontSettings().catch(() => null);
+  const preShowHours = settings?.flashSalePreShowHours ?? DEFAULT_FLASH_SALE_PRE_SHOW_HOURS;
+  const cached = await cachedJson('public-hot-sale-campaigns-v2', PUBLIC_CMS_TTL_SECONDS, async () => {
+    const fetchNow = Date.now();
     const { getHotSaleCampaigns } = await import('@/server/services/hot-sale.service');
-    return getHotSaleCampaigns();
+    const campaigns = await getHotSaleCampaigns(undefined, new Date(fetchNow));
+    return {
+      campaigns,
+      nextBoundary: getNextHotSaleBoundaryMs(campaigns, fetchNow, preShowHours),
+    };
   });
+  if (cached.nextBoundary !== null && cached.nextBoundary <= now) {
+    const { getHotSaleCampaigns } = await import('@/server/services/hot-sale.service');
+    return getHotSaleCampaigns(undefined, new Date(now));
+  }
+  return cached.campaigns;
 });
 
 export const getCachedHomepageCatalog = cache(async () => {

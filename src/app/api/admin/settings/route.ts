@@ -2,6 +2,7 @@ import { withAdminContext } from '@/server/admin-request-context';
 import { NextResponse } from "next/server";
 import { requireAdmin, requireAdminMutation } from "@/lib/auth";
 import { mediaEnvironment } from "@/server/media-http";
+import { revalidateFlashSaleStorefront } from "@/server/cache/revalidate-flash-sale";
 import {
   getAdminSettings,
   saveAdminSettings,
@@ -61,6 +62,7 @@ async function POSTHandler(request: Request) {
 
     const env = await mediaEnvironment();
     const result = await saveAdminSettings(env.DB, body, "admin");
+    await revalidateFlashSaleStorefront();
 
     return NextResponse.json({
       success: true,

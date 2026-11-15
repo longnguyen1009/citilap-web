@@ -10,6 +10,7 @@ import {
   CampaignValidationError,
 } from '@/server/services/campaign.service';
 import { campaignDocumentSchema } from '@/contracts/cms/campaign';
+import { revalidateFlashSaleStorefront } from '@/server/cache/revalidate-flash-sale';
 import { ZodError } from 'zod';
 
 export const runtime = 'edge';
@@ -50,6 +51,7 @@ async function POSTHandler(request: Request) {
 
     const env = await mediaEnvironment();
     const created = await saveCampaign(campaignDocumentSchema.parse(body), env.DB);
+    await revalidateFlashSaleStorefront();
 
     return NextResponse.json(
       {

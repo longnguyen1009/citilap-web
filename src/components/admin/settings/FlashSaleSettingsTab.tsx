@@ -6,10 +6,9 @@ import { Flame } from "lucide-react";
 import {
   inputCls,
   labelCls,
-  toDatetimeLocalGmt7,
-  fromDatetimeLocalGmt7,
   type SettingsTabProps,
 } from "./settings-helpers";
+import { VnIsoPairField } from "../campaigns/VnScheduleFields";
 
 export function FlashSaleSettingsTab({ settings, update }: SettingsTabProps) {
   return (
@@ -88,7 +87,7 @@ export function FlashSaleSettingsTab({ settings, update }: SettingsTabProps) {
           </div>
         </label>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3.5 items-start">
           <div>
             <label className={labelCls}>Tiêu đề chương trình</label>
             <input
@@ -100,24 +99,36 @@ export function FlashSaleSettingsTab({ settings, update }: SettingsTabProps) {
             />
           </div>
 
-          <div>
-            <label className={labelCls}>Thời gian bắt đầu (GMT+7)</label>
-            <input
-              type="datetime-local"
-              value={toDatetimeLocalGmt7(settings.flashSaleStartAt)}
-              onChange={(e) => update("flashSaleStartAt", fromDatetimeLocalGmt7(e.target.value))}
-              className={`${inputCls} font-mono`}
-            />
-          </div>
+          <VnIsoPairField
+            title="Thời gian bắt đầu (GMT+7)"
+            isoValue={settings.flashSaleStartAt}
+            defaultTime="00:00"
+            onChangeIso={(nextIso) => update("flashSaleStartAt", nextIso)}
+          />
+
+          <VnIsoPairField
+            title="Thời gian kết thúc (GMT+7)"
+            isoValue={settings.flashSaleEndAt}
+            defaultTime="23:59"
+            onChangeIso={(nextIso) => update("flashSaleEndAt", nextIso)}
+          />
 
           <div>
-            <label className={labelCls}>Thời gian kết thúc (GMT+7)</label>
+            <label className={labelCls}>Hiện trước giờ sale (giờ)</label>
             <input
-              type="datetime-local"
-              value={toDatetimeLocalGmt7(settings.flashSaleEndAt)}
-              onChange={(e) => update("flashSaleEndAt", fromDatetimeLocalGmt7(e.target.value))}
+              type="number"
+              min={0}
+              max={168}
+              step={0.5}
+              value={settings.flashSalePreShowHours ?? 2}
+              onChange={(e) =>
+                update("flashSalePreShowHours", Math.max(0, Math.min(168, Number(e.target.value) || 0)))
+              }
               className={`${inputCls} font-mono`}
             />
+            <span className="mt-1 block text-[11px] text-slate-500">
+              VD: 2 giờ → Sale 12h–14h tự hiện lúc 10h, ẩn lúc 14h.
+            </span>
           </div>
         </div>
       </div>

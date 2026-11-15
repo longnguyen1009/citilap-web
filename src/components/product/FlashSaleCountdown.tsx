@@ -58,6 +58,7 @@ export default function FlashSaleCountdown({
   const expiredRef = useRef(false);
 
   useEffect(() => {
+    expiredRef.current = false;
     const tick = () => {
       const next = evaluateCountdown(startAt, endAt);
       setState(next);

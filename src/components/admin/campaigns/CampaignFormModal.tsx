@@ -1,15 +1,26 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Zap, X, AlertCircle, AlertTriangle, Archive, Copy } from 'lucide-react';
+import { useEffect, useId, useMemo } from 'react';
+import { Zap, X, AlertCircle, AlertTriangle, Archive, Copy, Plus, Trash2, Clock } from 'lucide-react';
 import { type CampaignPickerTarget } from '@/components/admin/products/CampaignProductPicker';
 import CampaignItemsTable from './CampaignItemsTable';
 import {
   type CampaignData,
   type CampaignItemForm,
-  isoToDatetimeLocalGmt7,
-  datetimeLocalGmt7ToIso,
+  type DailySlotForm,
+  type ScheduleMode,
 } from './types';
+import { VnDateField, VnTimeField } from './VnScheduleFields';
+import {
+  FLASH_SALE_TIME_SLOT_PRESETS,
+  addDaysToVnDate,
+  diffVnDaysInclusive,
+  formatVnDayKeyLabel,
+  formatVnTimeShort,
+  parseVnDateInput,
+  parseVnTimeInput,
+  vnDateTimeToIso,
+} from '@/lib/flash-sale-schedule';
 
 interface CampaignFormModalProps {
   open: boolean;
@@ -18,9 +29,13 @@ interface CampaignFormModalProps {
   formName: string;
   formDescription: string;
   formEnabled: boolean;
-  formStartLocal: string;
-  formEndLocal: string;
-  durationHours: string;
+  scheduleMode: ScheduleMode;
+  startDateStr: string;
+  startTimeStr: string;
+  endDateStr: string;
+  endTimeStr: string;
+  durationDaysStr: string;
+  dailySlots: DailySlotForm[];
   formItems: CampaignItemForm[];
   formRevision: number;
   saving: boolean;
@@ -29,9 +44,13 @@ interface CampaignFormModalProps {
   onChangeName: (v: string) => void;
   onChangeDescription: (v: string) => void;
   onChangeEnabled: (v: boolean) => void;
-  onChangeStartLocal: (v: string) => void;
-  onChangeEndLocal: (v: string) => void;
-  onChangeDurationHours: (v: string) => void;
+  onChangeScheduleMode: (v: ScheduleMode) => void;
+  onChangeStartDateStr: (v: string) => void;
+  onChangeStartTimeStr: (v: string) => void;
+  onChangeEndDateStr: (v: string) => void;
+  onChangeEndTimeStr: (v: string) => void;
+  onChangeDurationDaysStr: (v: string) => void;
+  onChangeDailySlots: (slots: DailySlotForm[]) => void;
   onAddEmptyItem: () => void;
   onPickerAddItems: (targets: CampaignPickerTarget[]) => void;
   onRemoveItem: (index: number) => void;
@@ -48,9 +67,13 @@ export default function CampaignFormModal({
   formName,
   formDescription,
   formEnabled,
-  formStartLocal,
-  formEndLocal,
-  durationHours,
+  scheduleMode,
+  startDateStr,
+  startTimeStr,
+  endDateStr,
+  endTimeStr,
+  durationDaysStr,
+  dailySlots,
   formItems,
   formRevision,
   saving,
@@ -59,9 +82,13 @@ export default function CampaignFormModal({
   onChangeName,
   onChangeDescription,
   onChangeEnabled,
-  onChangeStartLocal,
-  onChangeEndLocal,
-  onChangeDurationHours,
+  onChangeScheduleMode,
+  onChangeStartDateStr,
+  onChangeStartTimeStr,
+  onChangeEndDateStr,
+  onChangeEndTimeStr,
+  onChangeDurationDaysStr,
+  onChangeDailySlots,
   onAddEmptyItem,
   onPickerAddItems,
   onRemoveItem,
@@ -70,6 +97,10 @@ export default function CampaignFormModal({
   onSave,
   onCloneCampaign,
 }: CampaignFormModalProps) {
+  const nameInputId = useId();
+  const descInputId = useId();
+  const daysInputId = useId();
+
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -103,6 +134,60 @@ export default function CampaignFormModal({
     };
   }, [open, onClose]);
 
+  const effectiveMode: ScheduleMode = editingCampaign ? 'continuous' : scheduleMode;
+
+  const schedulePreview = useMemo(() => {
+    const startDate = parseVnDateInput(startDateStr, nowMs);
+    const endDate = parseVnDateInput(endDateStr, nowMs);
+    if (effectiveMode === 'continuous') {
+      const startT = parseVnTimeInput(startTimeStr);
+      const endT = parseVnTimeInput(endTimeStr);
+      if (!startDate || !endDate || !startT || !endT) {
+        return { valid: false, text: 'Nhập ngày (DD/MM/YYYY) và giờ 24h (HH:mm) hợp lệ theo giờ Việt Nam.' };
+      }
+      const startIso = vnDateTimeToIso(startDate.display, startT.display, nowMs);
+      const endIso = vnDateTimeToIso(endDate.display, endT.display, nowMs);
+      if (!startIso || !endIso || Date.parse(startIso) >= Date.parse(endIso)) {
+        return { valid: false, text: 'Thời điểm kết thúc phải sau thời điểm bắt đầu.' };
+      }
+      const spanDays = diffVnDaysInclusive(startDate.display, endDate.display);
+      return {
+        valid: true,
+        text: `Áp dụng: ${startDate.display} ${startT.display} → ${endDate.display} ${endT.display}${spanDays ? ` (${spanDays} ngày · Giờ VN)` : ''}`,
+      };
+    }
+
+    if (!startDate || !endDate) {
+      return { valid: false, text: 'Nhập Từ ngày và Đến ngày (DD/MM/YYYY) để xem lịch khung giờ.' };
+    }
+    const dayCount = diffVnDaysInclusive(startDate.display, endDate.display);
+    if (!dayCount || dayCount > 60) {
+      return { valid: false, text: 'Khoảng ngày phải từ 1 đến 60 ngày (Đến ngày ≥ Từ ngày).' };
+    }
+    const validSlots = dailySlots.filter((s) => {
+      const st = parseVnTimeInput(s.startTime);
+      const et = parseVnTimeInput(s.endTime);
+      if (!st || !et) return false;
+      return st.hour * 60 + st.minute < et.hour * 60 + et.minute;
+    });
+    if (!validSlots.length) {
+      return { valid: false, text: 'Chọn hoặc nhập ít nhất 1 khung giờ hợp lệ (VD: 10:00 → 12:00).' };
+    }
+    const dayLabels: string[] = [];
+    for (let i = 0; i < Math.min(dayCount, 5); i++) {
+      const d = addDaysToVnDate(startDate.display, i);
+      if (d) dayLabels.push(formatVnDayKeyLabel(d.dayKey));
+    }
+    const slotText = validSlots
+      .map((s) => `${formatVnTimeShort(s.startTime)}–${formatVnTimeShort(s.endTime)}`)
+      .join(', ');
+    const moreText = dayCount > 5 ? `, … (+${dayCount - 5} ngày)` : '';
+    return {
+      valid: true,
+      text: `Tạo ${dayCount * validSlots.length} khung giờ: ${dayLabels.join(', ')}${moreText} · Khung giờ: ${slotText} (Storefront hiện 2 ngày gần nhất)`,
+    };
+  }, [effectiveMode, startDateStr, startTimeStr, endDateStr, endTimeStr, dailySlots, nowMs]);
+
   if (!open) return null;
 
   const isArchived = editingCampaign?.status === 'ARCHIVED';
@@ -112,6 +197,79 @@ export default function CampaignFormModal({
       nowMs >= new Date(editingCampaign.startAt).getTime() &&
       nowMs < new Date(editingCampaign.endAt).getTime()
   );
+
+  const handleStartDateChange = (nextDate: string) => {
+    onChangeStartDateStr(nextDate);
+    const parsedStart = parseVnDateInput(nextDate, nowMs);
+    const days = Number(durationDaysStr);
+    if (parsedStart && Number.isInteger(days) && days >= 1 && days <= 365) {
+      const computedEnd = addDaysToVnDate(parsedStart.display, days - 1);
+      if (computedEnd) onChangeEndDateStr(computedEnd.display);
+      return;
+    }
+    const span = diffVnDaysInclusive(nextDate, endDateStr);
+    onChangeDurationDaysStr(span ? String(span) : '');
+  };
+
+  const handleEndDateChange = (nextDate: string) => {
+    onChangeEndDateStr(nextDate);
+    const span = diffVnDaysInclusive(startDateStr, nextDate);
+    onChangeDurationDaysStr(span ? String(span) : '');
+  };
+
+  const handleDurationDaysChange = (raw: string) => {
+    onChangeDurationDaysStr(raw);
+    const days = Number(raw);
+    if (!Number.isInteger(days) || days < 1 || days > 365) return;
+    const baseStart = parseVnDateInput(startDateStr, nowMs);
+    if (!baseStart) return;
+    const nextEnd = addDaysToVnDate(baseStart.display, days - 1);
+    if (nextEnd) onChangeEndDateStr(nextEnd.display);
+  };
+
+  const applyContinuousSpanDays = (days: number) => {
+    const baseStart = parseVnDateInput(startDateStr, nowMs) || parseVnDateInput(addDaysToVnDate(new Date().toISOString().slice(0, 10), 0)?.display || '');
+    if (!baseStart) return;
+    const nextEnd = addDaysToVnDate(baseStart.display, days - 1);
+    if (!nextEnd) return;
+    onChangeStartDateStr(baseStart.display);
+    onChangeEndDateStr(nextEnd.display);
+    onChangeDurationDaysStr(String(days));
+    onChangeStartTimeStr('00:00');
+    onChangeEndTimeStr('23:59');
+  };
+
+  const applyContinuousTimePreset = (startT: string, endT: string) => {
+    onChangeStartTimeStr(startT);
+    onChangeEndTimeStr(endT);
+    const baseStart = parseVnDateInput(startDateStr, nowMs);
+    if (baseStart) {
+      onChangeEndDateStr(baseStart.display);
+      onChangeDurationDaysStr('1');
+    }
+  };
+
+  const togglePresetSlot = (startTime: string, endTime: string) => {
+    const exists = dailySlots.some(
+      (s) =>
+        parseVnTimeInput(s.startTime)?.display === startTime &&
+        parseVnTimeInput(s.endTime)?.display === endTime
+    );
+    if (exists) {
+      if (dailySlots.length === 1) return;
+      onChangeDailySlots(
+        dailySlots.filter(
+          (s) =>
+            !(
+              parseVnTimeInput(s.startTime)?.display === startTime &&
+              parseVnTimeInput(s.endTime)?.display === endTime
+            )
+        )
+      );
+    } else {
+      onChangeDailySlots([...dailySlots, { startTime, endTime }]);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
@@ -132,7 +290,7 @@ export default function CampaignFormModal({
                 ? isArchived
                   ? `Xem chiến dịch đã lưu trữ: ${editingCampaign.name}`
                   : `Sửa chiến dịch: ${editingCampaign.name}`
-                : 'Tạo chiến dịch mới'}
+                : 'Tạo chiến dịch Flash Sale'}
             </h2>
             {editingCampaign && (
               <span className="text-[11px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-mono">
@@ -141,6 +299,7 @@ export default function CampaignFormModal({
             )}
           </div>
           <button
+            type="button"
             aria-label="Đóng trình sửa chiến dịch"
             onClick={onClose}
             className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
@@ -151,7 +310,6 @@ export default function CampaignFormModal({
 
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto space-y-4 flex-grow text-xs">
-          {/* Archived Read-only Banner */}
           {isArchived && editingCampaign && (
             <div className="p-3.5 bg-slate-100 border border-slate-300 rounded-xl text-slate-800 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5">
@@ -171,33 +329,33 @@ export default function CampaignFormModal({
             </div>
           )}
 
-          {/* Active Live Campaign Warning Banner */}
           {isCurrentlyActive && !isArchived && (
             <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 flex items-start gap-2.5">
               <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
               <div>
-                <strong className="font-bold">Cảnh báo — Chiến dịch đang diễn ra trực tiếp trên Storefront!</strong>
+                <strong className="font-bold">Chiến dịch đang hiển thị trên Storefront</strong>
                 <p className="mt-0.5 text-amber-800">
-                  Chiến dịch này đang áp dụng giá Flash Sale cho khách hàng ngay lúc này. Mọi thay đổi khi lưu sẽ lập tức cập nhật giá bán và giới hạn suất trên Storefront.
+                  Mọi thay đổi về thời gian và danh sách sản phẩm sẽ cập nhật trực tiếp ngoài trang chủ ngay sau khi lưu.
                 </p>
               </div>
             </div>
           )}
 
           {formError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2">
+            <div role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
               <span>{formError}</span>
             </div>
           )}
 
           {/* Basic Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
             <div className="sm:col-span-8">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor={nameInputId} className="block text-xs font-semibold text-slate-700 mb-1">
                 Tên chiến dịch <span className="text-rose-500">*</span>
               </label>
               <input
+                id={nameInputId}
                 type="text"
                 disabled={isArchived}
                 value={formName}
@@ -207,7 +365,7 @@ export default function CampaignFormModal({
               />
             </div>
 
-            <div className="sm:col-span-4 pt-5">
+            <div className="sm:col-span-4">
               <label
                 className={`flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-1.5 text-xs font-semibold text-blue-900 ${
                   isArchived ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
@@ -225,175 +383,277 @@ export default function CampaignFormModal({
             </div>
 
             <div className="sm:col-span-12">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor={descInputId} className="block text-xs font-semibold text-slate-700 mb-1">
                 Mô tả ngắn
               </label>
               <input
+                id={descInputId}
                 type="text"
                 disabled={isArchived}
                 value={formDescription}
                 onChange={(e) => onChangeDescription(e.target.value)}
-                placeholder="Ghi chú hoặc mô tả ngắn cho chương trình (tuỳ chọn)"
+                placeholder="Ghi chú ngắn (tuỳ chọn)"
                 className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
               />
             </div>
           </div>
 
-          {/* Quick Date/Time & Full Datetime-local */}
+          {/* Simplified Single Vietnam GMT+7 Schedule Setup */}
           <fieldset
             disabled={isArchived}
-            className="grid grid-cols-1 gap-2.5 rounded-xl border border-slate-200 p-3 sm:grid-cols-4 bg-slate-50/50 disabled:opacity-65"
+            className="rounded-xl border border-slate-200 p-3.5 bg-slate-50/60 space-y-3 disabled:opacity-65"
           >
-            <legend className="px-1.5 text-[11px] font-bold text-slate-700">
-              Chọn nhanh khung giờ trong ngày (GMT+7)
+            <legend className="inline-flex items-center gap-1.5 px-1.5 font-bold text-slate-800 text-xs">
+              <Clock className="w-3.5 h-3.5 text-blue-600" />
+              <span>Thiết lập thời gian (Giờ Việt Nam · 24h)</span>
             </legend>
-            <label className="text-[11px] font-semibold text-slate-600">
-              Ngày sale
-              <input
-                type="date"
-                value={formStartLocal.slice(0, 10)}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onChangeStartLocal(`${e.target.value}T${formStartLocal.slice(11) || '10:00'}`);
-                    onChangeEndLocal(`${e.target.value}T${formEndLocal.slice(11) || '12:00'}`);
-                    onChangeDurationHours('');
-                  }
-                }}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-              />
-            </label>
-            <label className="text-[11px] font-semibold text-slate-600">
-              Bắt đầu
-              <input
-                type="time"
-                value={formStartLocal.slice(11)}
-                onChange={(e) => {
-                  onChangeStartLocal(`${formStartLocal.slice(0, 10)}T${e.target.value}`);
-                  onChangeDurationHours('');
-                }}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-              />
-            </label>
-            <label className="text-[11px] font-semibold text-slate-600">
-              Kết thúc
-              <input
-                type="time"
-                value={formEndLocal.slice(11)}
-                onChange={(e) => {
-                  const datePart = formEndLocal.slice(0, 10) || formStartLocal.slice(0, 10);
-                  onChangeEndLocal(`${datePart}T${e.target.value}`);
-                  onChangeDurationHours('');
-                }}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs"
-              />
-            </label>
-            <div>
-              <label className="text-[11px] font-semibold text-slate-600 block">
-                Số giờ chạy
-              </label>
-              <input
-                type="number"
-                min="0.25"
-                max="8760"
-                step="0.25"
-                value={durationHours}
-                placeholder="VD: 2, 6, 24"
-                onChange={(e) => {
-                  const value = e.target.value;
-                  onChangeDurationHours(value);
-                  const hours = Number(value);
-                  if (formStartLocal && Number.isFinite(hours) && hours > 0 && hours <= 8760) {
-                    onChangeEndLocal(
-                      isoToDatetimeLocalGmt7(
-                        new Date(
-                          new Date(datetimeLocalGmt7ToIso(formStartLocal)).getTime() +
-                            hours * 3600000
-                        ).toISOString()
-                      )
-                    );
-                  }
-                }}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-normal"
-              />
-            </div>
-            <div className="sm:col-span-4 flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/70">
-              <span className="text-[11px] text-slate-500 font-semibold">Tăng nhanh kết thúc:</span>
-              {[
-                { label: '2 giờ', h: 2 },
-                { label: '4 giờ', h: 4 },
-                { label: '8 giờ', h: 8 },
-                { label: '24 giờ (1 ngày)', h: 24 },
-                { label: '3 ngày', h: 72 },
-                { label: '7 ngày', h: 168 },
-              ].map(({ label, h }) => (
-                <button
-                  key={h}
-                  type="button"
-                  onClick={() => {
-                    if (!formStartLocal) return;
-                    onChangeDurationHours(String(h));
-                    const endIso = new Date(
-                      new Date(datetimeLocalGmt7ToIso(formStartLocal)).getTime() + h * 3600000
-                    ).toISOString();
-                    onChangeEndLocal(isoToDatetimeLocalGmt7(endIso));
-                  }}
-                  className="px-2 py-0.5 rounded bg-white hover:bg-slate-200 border border-slate-300 text-[11px] font-medium text-slate-700 transition cursor-pointer"
-                >
-                  +{label}
-                </button>
-              ))}
+            {!editingCampaign && (
+              <div className="flex justify-end">
+                <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => onChangeScheduleMode('continuous')}
+                    className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                      effectiveMode === 'continuous'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Từ ngày → Đến ngày
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onChangeScheduleMode('daily_slots')}
+                    className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                      effectiveMode === 'daily_slots'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Theo khung giờ mỗi ngày
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {effectiveMode === 'continuous' ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 items-start">
+                  <VnDateField
+                    label="Từ ngày"
+                    required
+                    disabled={isArchived}
+                    value={startDateStr}
+                    onChange={handleStartDateChange}
+                    placeholder="15/11/2026"
+                  />
+                  <VnTimeField
+                    label="Giờ bắt đầu"
+                    required
+                    disabled={isArchived}
+                    value={startTimeStr}
+                    onChange={onChangeStartTimeStr}
+                    placeholder="10:00"
+                  />
+                  <div>
+                    <label htmlFor={daysInputId} className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Trong mấy ngày
+                    </label>
+                    <input
+                      id={daysInputId}
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={durationDaysStr}
+                      onChange={(e) => handleDurationDaysChange(e.target.value)}
+                      placeholder="VD: 2"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                    />
+                  </div>
+                  <VnDateField
+                    label="Đến ngày"
+                    required
+                    disabled={isArchived}
+                    value={endDateStr}
+                    onChange={handleEndDateChange}
+                    placeholder="16/11/2026"
+                  />
+                  <VnTimeField
+                    label="Giờ kết thúc"
+                    required
+                    disabled={isArchived}
+                    value={endTimeStr}
+                    onChange={onChangeEndTimeStr}
+                    placeholder="23:59"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="font-semibold text-slate-500 mr-0.5">Khung giờ nhanh:</span>
+                  {FLASH_SALE_TIME_SLOT_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => applyContinuousTimePreset(preset.startTime, preset.endTime)}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                  <span className="font-semibold text-slate-500 ml-1 mr-0.5">Số ngày:</span>
+                  {[1, 2, 3, 7].map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => applyContinuousSpanDays(days)}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                    >
+                      {days} ngày
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-start">
+                  <VnDateField
+                    label="Từ ngày"
+                    required
+                    disabled={isArchived}
+                    value={startDateStr}
+                    onChange={handleStartDateChange}
+                    placeholder="15/11/2026"
+                  />
+                  <div>
+                    <label htmlFor={daysInputId} className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Trong mấy ngày
+                    </label>
+                    <input
+                      id={daysInputId}
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={durationDaysStr}
+                      onChange={(e) => handleDurationDaysChange(e.target.value)}
+                      placeholder="VD: 2"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+                    />
+                  </div>
+                  <VnDateField
+                    label="Đến ngày"
+                    required
+                    disabled={isArchived}
+                    value={endDateStr}
+                    onChange={handleEndDateChange}
+                    placeholder="16/11/2026"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-semibold text-slate-700">
+                      Chọn khung giờ chạy mỗi ngày (24h · Giờ Việt Nam):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChangeDailySlots([...dailySlots, { startTime: '16:00', endTime: '18:00' }])
+                      }
+                      className="inline-flex items-center gap-1 rounded-md border border-blue-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-blue-700 hover:bg-blue-50 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Thêm khung giờ</span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {FLASH_SALE_TIME_SLOT_PRESETS.map((preset) => {
+                      const active = dailySlots.some(
+                        (s) =>
+                          parseVnTimeInput(s.startTime)?.display === preset.startTime &&
+                          parseVnTimeInput(s.endTime)?.display === preset.endTime
+                      );
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => togglePresetSlot(preset.startTime, preset.endTime)}
+                          className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition cursor-pointer ${
+                            active
+                              ? 'border-blue-600 bg-blue-600 text-white'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:text-blue-700'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {dailySlots.map((slot, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white p-1.5"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <VnTimeField
+                            ariaLabel={`Khung giờ ${idx + 1} bắt đầu`}
+                            value={slot.startTime}
+                            onChange={(val) =>
+                              onChangeDailySlots(
+                                dailySlots.map((item, i) =>
+                                  i === idx ? { ...item, startTime: val } : item
+                                )
+                              )
+                            }
+                            placeholder="10:00"
+                          />
+                        </div>
+                        <span className="text-slate-400 font-bold">→</span>
+                        <div className="flex-1 min-w-0">
+                          <VnTimeField
+                            ariaLabel={`Khung giờ ${idx + 1} kết thúc`}
+                            value={slot.endTime}
+                            onChange={(val) =>
+                              onChangeDailySlots(
+                                dailySlots.map((item, i) =>
+                                  i === idx ? { ...item, endTime: val } : item
+                                )
+                              )
+                            }
+                            placeholder="12:00"
+                          />
+                        </div>
+                        {dailySlots.length > 1 && (
+                          <button
+                            type="button"
+                            aria-label={`Xóa khung giờ ${idx + 1}`}
+                            onClick={() =>
+                              onChangeDailySlots(dailySlots.filter((_, i) => i !== idx))
+                            }
+                            className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div
+              className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium ${
+                schedulePreview.valid
+                  ? 'bg-blue-50 text-blue-900 border border-blue-200/80'
+                  : 'bg-amber-50 text-amber-900 border border-amber-200/80'
+              }`}
+            >
+              {schedulePreview.text}
             </div>
           </fieldset>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Thời điểm bắt đầu (GMT+7) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                disabled={isArchived}
-                value={formStartLocal}
-                onChange={(e) => {
-                  onChangeStartLocal(e.target.value);
-                  const hours = Number(durationHours);
-                  if (
-                    e.target.value &&
-                    durationHours &&
-                    Number.isFinite(hours) &&
-                    hours >= 0.25 &&
-                    hours <= 8760
-                  ) {
-                    onChangeEndLocal(
-                      isoToDatetimeLocalGmt7(
-                        new Date(
-                          new Date(datetimeLocalGmt7ToIso(e.target.value)).getTime() +
-                            hours * 3600000
-                        ).toISOString()
-                      )
-                    );
-                  }
-                }}
-                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono disabled:bg-slate-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Thời điểm kết thúc (GMT+7) <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="datetime-local"
-                disabled={isArchived}
-                value={formEndLocal}
-                onChange={(e) => {
-                  onChangeDurationHours('');
-                  onChangeEndLocal(e.target.value);
-                }}
-                className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-mono disabled:bg-slate-100"
-              />
-            </div>
-          </div>
 
           {/* Items Table */}
           <CampaignItemsTable

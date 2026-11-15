@@ -7,9 +7,8 @@ import {
   type CampaignData,
   type BannerSettingsState,
   formatGmt7,
-  isoToDatetimeLocalGmt7,
-  datetimeLocalGmt7ToIso,
 } from './types';
+import { VnIsoPairField } from './VnScheduleFields';
 
 interface CampaignStatsCardsProps {
   campaigns: CampaignData[];
@@ -147,33 +146,43 @@ export default function CampaignStatsCards({
                     className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-normal"
                   />
                 </label>
-                <label className="block font-semibold text-slate-600">
-                  Bắt đầu dự phòng (GMT+7)
+                <VnIsoPairField
+                  title="Bắt đầu dự phòng (GMT+7)"
+                  isoValue={bannerSettings.flashSaleStartAt}
+                  defaultTime="00:00"
+                  onChangeIso={(nextIso) =>
+                    onChangeBannerSettings({ ...bannerSettings, flashSaleStartAt: nextIso })
+                  }
+                />
+                <VnIsoPairField
+                  title="Kết thúc dự phòng (GMT+7)"
+                  isoValue={bannerSettings.flashSaleEndAt}
+                  defaultTime="23:59"
+                  onChangeIso={(nextIso) =>
+                    onChangeBannerSettings({ ...bannerSettings, flashSaleEndAt: nextIso })
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 border-t border-slate-200/70">
+                <label className="block font-semibold text-slate-700">
+                  Tự động hiện trên Homepage trước (giờ)
                   <input
-                    type="datetime-local"
-                    value={isoToDatetimeLocalGmt7(bannerSettings.flashSaleStartAt)}
+                    type="number"
+                    min={0}
+                    max={168}
+                    step={0.5}
+                    value={bannerSettings.flashSalePreShowHours}
                     onChange={(e) =>
                       onChangeBannerSettings({
                         ...bannerSettings,
-                        flashSaleStartAt: datetimeLocalGmt7ToIso(e.target.value),
+                        flashSalePreShowHours: Math.max(0, Math.min(168, Number(e.target.value) || 0)),
                       })
                     }
                     className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-mono font-normal"
                   />
-                </label>
-                <label className="block font-semibold text-slate-600">
-                  Kết thúc dự phòng (GMT+7)
-                  <input
-                    type="datetime-local"
-                    value={isoToDatetimeLocalGmt7(bannerSettings.flashSaleEndAt)}
-                    onChange={(e) =>
-                      onChangeBannerSettings({
-                        ...bannerSettings,
-                        flashSaleEndAt: datetimeLocalGmt7ToIso(e.target.value),
-                      })
-                    }
-                    className="mt-1 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white font-mono font-normal"
-                  />
+                  <span className="mt-0.5 block text-[10px] font-normal text-slate-500">
+                    VD: 2 giờ → Sale 12h–14h tự hiện lúc 10h và tự ẩn lúc 14h (0 = chỉ hiện trong lúc chạy).
+                  </span>
                 </label>
               </div>
             </div>

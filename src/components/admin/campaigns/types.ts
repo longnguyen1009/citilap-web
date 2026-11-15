@@ -44,6 +44,14 @@ export interface BannerSettingsState {
   flashSaleTitle: string;
   flashSaleStartAt: string;
   flashSaleEndAt: string;
+  flashSalePreShowHours: number;
+}
+
+export type ScheduleMode = 'continuous' | 'daily_slots';
+
+export interface DailySlotForm {
+  startTime: string;
+  endTime: string;
 }
 
 export type FilterTab = 'ALL' | 'ACTIVE' | 'UPCOMING' | 'INACTIVE';

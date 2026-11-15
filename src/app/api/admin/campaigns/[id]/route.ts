@@ -12,6 +12,7 @@ import {
   CampaignValidationError,
 } from '@/server/services/campaign.service';
 import { ZodError } from 'zod';
+import { revalidateFlashSaleStorefront } from '@/server/cache/revalidate-flash-sale';
 
 export const runtime = 'edge';
 
@@ -84,6 +85,7 @@ async function PUTHandler(request: Request, context: RouteContext) {
       { ...campaignDocumentSchema.parse({ ...body, id }), expectedRevision },
       env.DB
     );
+    await revalidateFlashSaleStorefront();
 
     return NextResponse.json({
       success: true,
@@ -197,6 +199,7 @@ async function DELETEHandler(request: Request, context: RouteContext) {
 
     const env = await mediaEnvironment();
     const archived = await archiveCampaign(id, expectedRevision, env.DB);
+    await revalidateFlashSaleStorefront();
 
     return NextResponse.json({
       success: true,

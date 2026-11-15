@@ -225,6 +225,7 @@ export function ProductCarousel({
   mobileLimit = null,
   eagerImages = false,
   cardVariant = 'default',
+  deduplicate = cardVariant !== 'flash',
 }: {
   products: ProductCardProduct[];
   label: string;
@@ -232,8 +233,9 @@ export function ProductCarousel({
   mobileLimit?: number | null;
   eagerImages?: boolean;
   cardVariant?: 'default' | 'flash';
+  deduplicate?: boolean;
 }) {
-  const products = deduplicateListingProducts(rawProducts);
+  const products = deduplicate ? deduplicateListingProducts(rawProducts) : rawProducts;
   const isFlash = cardVariant === 'flash';
   const container = useRef<HTMLDivElement>(null);
   const rail = useRef<HTMLDivElement>(null);
