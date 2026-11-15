@@ -134,7 +134,27 @@ export default function CampaignFormModal({
     };
   }, [open, onClose]);
 
-  const effectiveMode: ScheduleMode = editingCampaign ? 'continuous' : scheduleMode;
+  const effectiveMode: ScheduleMode = scheduleMode;
+
+  const continuousDailySuggestion = useMemo(() => {
+    if (effectiveMode !== 'continuous') return null;
+    const startDate = parseVnDateInput(startDateStr, nowMs);
+    const endDate = parseVnDateInput(endDateStr, nowMs);
+    const startT = parseVnTimeInput(startTimeStr);
+    const endT = parseVnTimeInput(endTimeStr);
+    if (!startDate || !endDate || !startT || !endT) return null;
+    if (startDate.dayKey === endDate.dayKey) return null;
+    const stMin = startT.hour * 60 + startT.minute;
+    const etMin = endT.hour * 60 + endT.minute;
+    if (stMin >= etMin) return null;
+    if (startT.display === '00:00' && endT.display === '23:59') return null;
+    return {
+      startTime: startT.display,
+      endTime: endT.display,
+      startDate: startDate.display,
+      endDate: endDate.display,
+    };
+  }, [effectiveMode, startDateStr, endDateStr, startTimeStr, endTimeStr, nowMs]);
 
   const schedulePreview = useMemo(() => {
     const startDate = parseVnDateInput(startDateStr, nowMs);
@@ -151,9 +171,12 @@ export default function CampaignFormModal({
         return { valid: false, text: 'Thời điểm kết thúc phải sau thời điểm bắt đầu.' };
       }
       const spanDays = diffVnDaysInclusive(startDate.display, endDate.display);
+      const isSingleDay = startDate.dayKey === endDate.dayKey;
       return {
         valid: true,
-        text: `Áp dụng: ${startDate.display} ${startT.display} → ${endDate.display} ${endT.display}${spanDays ? ` (${spanDays} ngày · Giờ VN)` : ''}`,
+        text: isSingleDay
+          ? `Áp dụng: ${startDate.display} từ ${startT.display} → ${endT.display} (Giờ VN)`
+          : `Áp dụng liên tục 24/24: ${startDate.display} ${startT.display} → ${endDate.display} ${endT.display} (${spanDays} ngày không ngắt · Giờ VN)`,
       };
     }
 
@@ -173,18 +196,33 @@ export default function CampaignFormModal({
     if (!validSlots.length) {
       return { valid: false, text: 'Chọn hoặc nhập ít nhất 1 khung giờ hợp lệ (VD: 10:00 → 12:00).' };
     }
-    const dayLabels: string[] = [];
-    for (let i = 0; i < Math.min(dayCount, 5); i++) {
+    let activeWindowCount = 0;
+    const futureDayLabels: string[] = [];
+    for (let i = 0; i < dayCount; i++) {
       const d = addDaysToVnDate(startDate.display, i);
-      if (d) dayLabels.push(formatVnDayKeyLabel(d.dayKey));
+      if (!d) continue;
+      let hasActiveSlotForDay = false;
+      for (const s of validSlots) {
+        const endIso = vnDateTimeToIso(d.display, parseVnTimeInput(s.endTime)!.display, nowMs);
+        if (dayCount === 1 || Date.parse(endIso) > nowMs) {
+          activeWindowCount++;
+          hasActiveSlotForDay = true;
+        }
+      }
+      if (hasActiveSlotForDay && futureDayLabels.length < 5) {
+        futureDayLabels.push(formatVnDayKeyLabel(d.dayKey));
+      }
     }
     const slotText = validSlots
       .map((s) => `${formatVnTimeShort(s.startTime)}–${formatVnTimeShort(s.endTime)}`)
       .join(', ');
-    const moreText = dayCount > 5 ? `, … (+${dayCount - 5} ngày)` : '';
+    if (activeWindowCount === 0) {
+      return { valid: false, text: 'Tất cả khung giờ trong khoảng ngày này đều đã qua.' };
+    }
+    const moreText = activeWindowCount / validSlots.length > 5 ? ', …' : '';
     return {
       valid: true,
-      text: `Tạo ${dayCount * validSlots.length} khung giờ: ${dayLabels.join(', ')}${moreText} · Khung giờ: ${slotText} (Storefront hiện 2 ngày gần nhất)`,
+      text: `Lên lịch ${activeWindowCount} khung giờ: ${futureDayLabels.join(', ')}${moreText} · Khung giờ mỗi ngày: ${slotText} (Storefront hiện 2 ngày gần nhất)`,
     };
   }, [effectiveMode, startDateStr, startTimeStr, endDateStr, endTimeStr, dailySlots, nowMs]);
 
@@ -227,16 +265,21 @@ export default function CampaignFormModal({
     if (nextEnd) onChangeEndDateStr(nextEnd.display);
   };
 
-  const applyContinuousSpanDays = (days: number) => {
-    const baseStart = parseVnDateInput(startDateStr, nowMs) || parseVnDateInput(addDaysToVnDate(new Date().toISOString().slice(0, 10), 0)?.display || '');
+  const applyDailySpanDays = (days: number) => {
+    const baseStart =
+      parseVnDateInput(startDateStr, nowMs) ||
+      parseVnDateInput(addDaysToVnDate(new Date().toISOString().slice(0, 10), 0)?.display || '');
     if (!baseStart) return;
     const nextEnd = addDaysToVnDate(baseStart.display, days - 1);
     if (!nextEnd) return;
     onChangeStartDateStr(baseStart.display);
     onChangeEndDateStr(nextEnd.display);
     onChangeDurationDaysStr(String(days));
-    onChangeStartTimeStr('00:00');
-    onChangeEndTimeStr('23:59');
+  };
+
+  const convertContinuousToDailySlot = (startTime: string, endTime: string) => {
+    onChangeDailySlots([{ startTime, endTime }]);
+    onChangeScheduleMode('daily_slots');
   };
 
   const applyContinuousTimePreset = (startT: string, endT: string) => {
@@ -407,34 +450,35 @@ export default function CampaignFormModal({
               <Clock className="w-3.5 h-3.5 text-blue-600" />
               <span>Thiết lập thời gian (Giờ Việt Nam · 24h)</span>
             </legend>
-            {!editingCampaign && (
-              <div className="flex justify-end">
-                <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => onChangeScheduleMode('continuous')}
-                    className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
-                      effectiveMode === 'continuous'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Từ ngày → Đến ngày
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onChangeScheduleMode('daily_slots')}
-                    className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
-                      effectiveMode === 'daily_slots'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Theo khung giờ mỗi ngày
-                  </button>
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-500">
+                Click trực tiếp vào từng ô (Ngày / Tháng / Năm / Giờ / Phút) để gõ sửa nhanh.
+              </span>
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => onChangeScheduleMode('daily_slots')}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                    effectiveMode === 'daily_slots'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Theo khung giờ mỗi ngày
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onChangeScheduleMode('continuous')}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition cursor-pointer ${
+                    effectiveMode === 'continuous'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Chạy liên tục 24/24
+                </button>
               </div>
-            )}
+            </div>
 
             {effectiveMode === 'continuous' ? (
               <>
@@ -500,18 +544,48 @@ export default function CampaignFormModal({
                       {preset.label}
                     </button>
                   ))}
-                  <span className="font-semibold text-slate-500 ml-1 mr-0.5">Số ngày:</span>
+                  <span className="font-semibold text-slate-500 ml-1 mr-0.5">Số ngày (00:00–23:59):</span>
                   {[1, 2, 3, 7].map((days) => (
                     <button
                       key={days}
                       type="button"
-                      onClick={() => applyContinuousSpanDays(days)}
+                      onClick={() => {
+                        applyDailySpanDays(days);
+                        onChangeStartTimeStr('00:00');
+                        onChangeEndTimeStr('23:59');
+                      }}
                       className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
                     >
                       {days} ngày
                     </button>
                   ))}
                 </div>
+                {continuousDailySuggestion && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                    <span>
+                      Đang chọn <strong>chạy liên tục 24/24</strong> từ {continuousDailySuggestion.startTime}{' '}
+                      {continuousDailySuggestion.startDate} → {continuousDailySuggestion.endTime}{' '}
+                      {continuousDailySuggestion.endDate}. Nếu bạn muốn mỗi ngày chỉ chạy trong khung giờ{' '}
+                      <strong>
+                        {continuousDailySuggestion.startTime}–{continuousDailySuggestion.endTime}
+                      </strong>{' '}
+                      (và đếm ngược &quot;Bắt đầu sau&quot; trước giờ mở sale):
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        convertContinuousToDailySlot(
+                          continuousDailySuggestion.startTime,
+                          continuousDailySuggestion.endTime
+                        )
+                      }
+                      className="shrink-0 rounded-md bg-amber-600 hover:bg-amber-700 px-2.5 py-1 font-bold text-white transition cursor-pointer"
+                    >
+                      Chuyển sang khung giờ {continuousDailySuggestion.startTime}–
+                      {continuousDailySuggestion.endTime} mỗi ngày
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -547,6 +621,20 @@ export default function CampaignFormModal({
                     onChange={handleEndDateChange}
                     placeholder="16/11/2026"
                   />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className="font-semibold text-slate-500 mr-0.5">Số ngày nhanh:</span>
+                  {[1, 2, 3, 7].map((days) => (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => applyDailySpanDays(days)}
+                      className="rounded-md border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition cursor-pointer"
+                    >
+                      {days} ngày
+                    </button>
+                  ))}
                 </div>
 
                 <div className="space-y-2">

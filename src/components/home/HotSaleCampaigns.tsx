@@ -28,6 +28,22 @@ function pickPreferredSlot(slots: Campaign[], nowMs: number): Campaign {
   );
 }
 
+/**
+ * Ensures HOTSALE renders 1 card per product (preferring the first discounted option)
+ * and caps the storefront carousel at `maxProducts` (default 10).
+ */
+function collapseCampaignProducts(products: ProductCardProduct[], maxProducts = 10): ProductCardProduct[] {
+  const byId = new Map<string, ProductCardProduct>();
+  for (const p of products) {
+    const existing = byId.get(p.id);
+    if (!existing || (!existing.isOnSale && p.isOnSale)) {
+      byId.set(p.id, p);
+    }
+  }
+  const unique = [...byId.values()];
+  return maxProducts > 0 ? unique.slice(0, maxProducts) : unique;
+}
+
 export default function HotSaleCampaigns({
   campaigns,
   bannerImage,
@@ -36,6 +52,7 @@ export default function HotSaleCampaigns({
   bannerAlt,
   preShowHours = DEFAULT_FLASH_SALE_PRE_SHOW_HOURS,
   autoHide = true,
+  maxProducts = 10,
   initialNowMs,
 }: {
   campaigns: Campaign[];
@@ -45,6 +62,7 @@ export default function HotSaleCampaigns({
   bannerAlt?: string;
   preShowHours?: number;
   autoHide?: boolean;
+  maxProducts?: number;
   initialNowMs?: number;
 }) {
   const [selected, setSelected] = useState('');
@@ -321,12 +339,13 @@ export default function HotSaleCampaigns({
               key={`${campaign.id}:${campaign.startAt}:${campaign.endAt}`}
               startAt={campaign.startAt}
               endAt={campaign.endAt}
+              initialNowMs={initialNowMs ?? nowMs}
               saleStyle
             />
           </div>
           <ProductCarousel
             key={campaign.id}
-            products={campaign.products}
+            products={collapseCampaignProducts(campaign.products, maxProducts)}
             label={campaign.name}
             oneAtATime
             cardVariant="flash"

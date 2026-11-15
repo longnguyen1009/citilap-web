@@ -237,7 +237,7 @@ export default function AdminCampaignsPage() {
 
   const openNewEditor = () => {
     setFormEnabled(true);
-    setScheduleMode('continuous');
+    setScheduleMode('daily_slots');
     setEditingCampaign(null);
     setFormName('');
     setFormDescription('');
@@ -261,6 +261,15 @@ export default function AdminCampaignsPage() {
     setFormName(c.name);
     setFormDescription(c.description || '');
     applyRangeFromIso(c.startAt, c.endAt);
+    const sTime = isoToVnTimeDisplay(c.startAt);
+    const eTime = isoToVnTimeDisplay(c.endAt);
+    const sParsed = parseVnTimeInput(sTime);
+    const eParsed = parseVnTimeInput(eTime);
+    if (sParsed && eParsed && sParsed.hour * 60 + sParsed.minute < eParsed.hour * 60 + eParsed.minute) {
+      setDailySlots([{ startTime: sParsed.display, endTime: eParsed.display }]);
+    } else {
+      setDailySlots([{ startTime: '10:00', endTime: '12:00' }]);
+    }
     setFormRevision(c.revision);
     setFormError(null);
 
@@ -400,7 +409,7 @@ export default function AdminCampaignsPage() {
         throw new Error('Vui lòng nhập tên chiến dịch');
       }
 
-      const effectiveMode: ScheduleMode = editingCampaign ? 'continuous' : scheduleMode;
+      const effectiveMode: ScheduleMode = scheduleMode;
       const startDate = parseVnDateInput(startDateStr);
       const endDate = parseVnDateInput(endDateStr);
       if (!startDate || !endDate) {
@@ -458,7 +467,7 @@ export default function AdminCampaignsPage() {
           for (const slot of normalizedSlots) {
             const startAt = vnDateTimeToIso(dayVal.display, slot.st.display);
             const endAt = vnDateTimeToIso(dayVal.display, slot.et.display);
-            if (!enabled || new Date(endAt).getTime() > Date.now()) {
+            if ((!enabled && dayCount === 1) || new Date(endAt).getTime() > Date.now()) {
               expanded.push({ startAt, endAt });
             }
           }
@@ -536,7 +545,9 @@ export default function AdminCampaignsPage() {
       });
 
       let savedCount = 0;
-      for (const win of windows) {
+      for (let idx = 0; idx < windows.length; idx++) {
+        const win = windows[idx];
+        const isUpdatingExisting = Boolean(editingCampaign && idx === 0);
         const targetStatus =
           enabled && new Date(win.endAt).getTime() > Date.now() ? 'PUBLISHED' : 'DRAFT';
         const payload = {
@@ -545,15 +556,18 @@ export default function AdminCampaignsPage() {
           status: targetStatus,
           startAt: win.startAt,
           endAt: win.endAt,
-          items: editingCampaign ? parsedItems : parsedItems.map((it) => ({ ...it, id: undefined, soldCount: 0 })),
-          revision: editingCampaign ? formRevision : 0,
-          expectedRevision: editingCampaign ? formRevision : 0,
+          items: isUpdatingExisting
+            ? parsedItems
+            : parsedItems.map((it) => ({ ...it, id: undefined, soldCount: 0 })),
+          revision: isUpdatingExisting ? formRevision : 0,
+          expectedRevision: isUpdatingExisting ? formRevision : 0,
         };
 
-        const url = editingCampaign
-          ? `/api/admin/campaigns/${editingCampaign.id}`
-          : `/api/admin/campaigns`;
-        const method = editingCampaign ? 'PUT' : 'POST';
+        const url =
+          isUpdatingExisting && editingCampaign
+            ? `/api/admin/campaigns/${editingCampaign.id}`
+            : `/api/admin/campaigns`;
+        const method = isUpdatingExisting ? 'PUT' : 'POST';
 
         const res = await fetch(url, {
           method,
@@ -581,11 +595,12 @@ export default function AdminCampaignsPage() {
         savedCount++;
       }
 
-      const msg = editingCampaign
-        ? `Đã cập nhật chiến dịch "${formName}" thành công.`
-        : windows.length > 1
-          ? `Đã tạo ${savedCount} khung giờ cho chiến dịch "${formName}" thành công.`
-          : `Đã tạo chiến dịch "${formName}" thành công.`;
+      const msg =
+        windows.length > 1
+          ? `Đã lưu ${savedCount} khung giờ cho chiến dịch "${formName}" thành công.`
+          : editingCampaign
+            ? `Đã cập nhật chiến dịch "${formName}" thành công.`
+            : `Đã tạo chiến dịch "${formName}" thành công.`;
       setSuccessMsg(msg);
       toast.success(msg);
       setIsEditorOpen(false);

@@ -9,6 +9,7 @@ export interface FlashSaleCountdownProps {
   className?: string;
   onExpire?: () => void;
   saleStyle?: boolean;
+  initialNowMs?: number;
 }
 
 type CountdownState =
@@ -48,6 +49,7 @@ export default function FlashSaleCountdown({
   className = "",
   onExpire,
   saleStyle = false,
+  initialNowMs,
 }: FlashSaleCountdownProps) {
   const mounted = useSyncExternalStore(
     emptySubscribe,
@@ -77,9 +79,14 @@ export default function FlashSaleCountdown({
   // Server render or unmounted fallback: render calm placeholder to avoid hydration mismatch
   if (!mounted) {
     if (saleStyle) {
+      const startMs = startAt ? new Date(startAt).getTime() : NaN;
+      const ssrUpcoming =
+        typeof initialNowMs === "number" && !Number.isNaN(startMs) && initialNowMs < startMs;
       return (
         <div className={`flex max-w-full flex-wrap items-center justify-center sm:justify-start gap-1.5 sm:gap-2 text-white ${className}`}>
-          <span className="text-xs font-bold uppercase sm:text-lg">Kết thúc trong:</span>
+          <span className="text-xs font-bold uppercase sm:text-lg">
+            {ssrUpcoming ? "Bắt đầu sau:" : "Kết thúc trong:"}
+          </span>
           <div className="flex items-center gap-1 text-sm font-black sm:gap-2 sm:text-2xl">
             {["--", "--", "--", "--"].map((val, idx) => (
               <span key={idx} className="contents">
