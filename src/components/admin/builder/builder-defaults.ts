@@ -61,6 +61,7 @@ export const SECTION_TYPE_META: Record<
   { label: string; icon: React.ElementType; desc: string }
 > = {
   banner: { label: 'Banner quảng cáo', icon: ImageIcon, desc: 'Banner đơn nổi bật với nút kêu gọi hành động' },
+  promo_banners: { label: '2 Banner Ảnh Động', icon: Sparkles, desc: 'Cặp 2 banner khuyến mãi chuyển động nổi bật' },
   slider: { label: 'Slider trình chiếu', icon: Sliders, desc: 'Băng chuyền hình ảnh chạy ngang' },
   product_grid: { label: 'Lưới sản phẩm', icon: Grid, desc: 'Danh sách sản phẩm chọn thủ công hoặc theo bộ lọc' },
   featured_categories: { label: 'Danh mục nổi bật', icon: FolderTree, desc: 'Các danh mục chính kèm icon' },
@@ -77,6 +78,9 @@ export function getSectionBlockSummary(sec: SectionItem, fallbackLabel: string):
   let blockSummary = fallbackLabel;
   if (sec.data.type === 'banner') {
     blockSummary = `Banner (${sec.data.layout || 'hero'})`;
+  } else if (sec.data.type === 'promo_banners') {
+    const count = (sec.data.banners || []).filter((b) => b.enabled !== false).length;
+    blockSummary = `2 Banner ảnh động • ${count} banner`;
   } else if (sec.data.type === 'intro') {
     const count = (sec.data.features || []).filter((f) => f.enabled !== false).length;
     blockSummary = `Cam kết dịch vụ • ${count} ô`;
@@ -138,6 +142,45 @@ export function createDefaultSection(type: SectionType): SectionItem {
           secondaryLink: '',
           secondaryButtonText: '',
           layout: 'hero',
+        },
+      };
+    case 'promo_banners':
+      return {
+        id,
+        type: 'promo_banners',
+        name: '2 Banner Ảnh Động',
+        enabled: true,
+        data: {
+          type: 'promo_banners',
+          title: 'Chương trình khuyến mãi nổi bật',
+          banners: [
+            {
+              id: `promo_${Date.now()}_1`,
+              badge: 'KHUYẾN MÃI HOT',
+              highlightBadge: '',
+              title: 'LAPTOP GAMING',
+              highlight: 'GIẢM NGAY 500K',
+              subtitle: '',
+              ctaText: 'Săn ngay',
+              href: '/category/laptop-gaming',
+              imageUrl: '/brand/banner-gaming-promo.webp',
+              theme: 'crimson',
+              enabled: true,
+            },
+            {
+              id: `promo_${Date.now()}_2`,
+              badge: 'CUỐI NĂM 2026',
+              highlightBadge: '',
+              title: 'ULTRABOOK MỎNG NHẸ',
+              highlight: 'CẤU HÌNH CAO · MỚI ĐẸP',
+              subtitle: '',
+              ctaText: 'Khám phá',
+              href: '/category/laptop-van-phong',
+              imageUrl: '/brand/banner-ultrabook-2026.webp',
+              theme: 'sapphire',
+              enabled: true,
+            },
+          ],
         },
       };
     case 'slider':

@@ -19,15 +19,18 @@ import ProductCard from '@/components/product/ProductCard';
 import { createElement, Fragment, type ReactNode } from 'react';
 import type { ResolvedSectionItem } from '@/server/services/site-builder.service';
 import CategoryGridSection from '@/components/home/CategoryGridSection';
+import CategoryProductBlock from '@/components/home/CategoryProductBlock';
 import BrandSection from '@/components/home/BrandSection';
 import {
   newsReviewsSectionDataSchema,
   ctaSectionDataSchema,
+  promoBannersSectionDataSchema,
   type ProductGridSectionData,
   type FeaturedCategoriesSectionData,
 } from '@/contracts/cms/site-builder';
 import type { SliderSectionData } from '@/components/home/SliderSection';
 import FeatureStrip from '@/components/home/FeatureStrip';
+import PromoDualBanners from '@/components/home/PromoDualBanners';
 import MediaSection from '@/components/home/MediaSectionView';
 import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
 import VideoReviews from '@/components/home/VideoReviews';
@@ -111,6 +114,18 @@ export default function BlockRenderer({
           case 'banner':
             blockNode = <BannerBlock key={section.id} data={section.data} />;
             break;
+
+          case 'promo_banners': {
+            const pData = promoBannersSectionDataSchema.parse(section.data);
+            blockNode = (
+              <PromoDualBanners
+                key={section.id}
+                banners={pData.banners}
+                ariaLabel={pData.title || 'Chương trình khuyến mãi nổi bật'}
+              />
+            );
+            break;
+          }
 
           case 'slider':
             blockNode = <SliderBlock key={section.id} data={section.data} />;
@@ -214,12 +229,14 @@ import SliderSection from '@/components/home/SliderSection';
 // 1. BANNER BLOCK
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function BannerBlock({ data }: { data: any }) {
-  const imageUrl = data.imageUrl || '/brand/marketing-banner.webp';
+  const imageUrl = data.imageUrl || '/brand/citilap-hero-v2.webp';
   const mobileImageUrl =
     data.mobileImageUrl?.trim() ||
-    (imageUrl === '/brand/citilap-hero.webp' || imageUrl === '/brand/marketing-banner.webp'
-      ? '/brand/citilap-hero-mobile.webp'
-      : '');
+    (imageUrl === '/brand/citilap-hero-v2.webp'
+      ? '/brand/citilap-hero-v2-mobile.webp'
+      : imageUrl === '/brand/citilap-hero.webp' || imageUrl === '/brand/marketing-banner.webp'
+        ? '/brand/citilap-hero-mobile.webp'
+        : '');
   const hasSeparateMobileImage = Boolean(mobileImageUrl && mobileImageUrl !== imageUrl);
   const layout = data.layout || 'hero';
   const mobileTitle = data.mobileTitle?.trim() || '';
@@ -357,15 +374,101 @@ function BannerBlock({ data }: { data: any }) {
     );
   }
 
-  return (
-    <section className="bg-[#0f172a] relative overflow-hidden" aria-label={data.title || 'Hero Banner'}>
-      <div className="w-full relative min-h-[188px] sm:min-h-[208px] md:h-[260px] lg:h-[340px]">
+  const hasOverlayContent = Boolean(
+    data.badge?.trim() ||
+      data.title?.trim() ||
+      mobileTitle ||
+      data.subtitle?.trim() ||
+      mobileSubtitle ||
+      (data.link && data.buttonText?.trim()) ||
+      (data.secondaryLink && data.secondaryButtonText?.trim())
+  );
+
+  if (!hasOverlayContent) {
+    const cleanHeroImages = (
+      <>
         {hasSeparateMobileImage && (
           <Image
             src={mobileImageUrl}
             alt={mobileTitle || data.title || 'Hero banner'}
             width={800}
-            height={540}
+            height={400}
+            className="md:hidden w-full h-auto block"
+            priority
+            fetchPriority="high"
+            unoptimized={mobileImageUrl.startsWith('/brand/')}
+            sizes="100vw"
+          />
+        )}
+        <Image
+          src={imageUrl}
+          alt={data.title || 'Hero banner'}
+          width={1920}
+          height={340}
+          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}w-full h-auto block`}
+          priority
+          fetchPriority="high"
+          unoptimized={imageUrl.startsWith('/brand/')}
+          sizes="100vw"
+        />
+      </>
+    );
+
+    return (
+      <section className="bg-[#110f14] relative overflow-hidden mb-5 sm:mb-6 md:mb-8 lg:mb-10" aria-label={data.title || 'Hero Banner'}>
+        <div className="w-full relative">
+          {data.link ? (
+            <Link
+              href={data.link}
+              aria-label={mobileTitle || data.title || 'Hero Banner'}
+              className="block w-full focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden"
+            >
+              {cleanHeroImages}
+            </Link>
+          ) : (
+            cleanHeroImages
+          )}
+        </div>
+
+        {/* Quick Need & Budget Pills right below Hero Banner */}
+        <div className="bg-slate-900/95 border-t border-white/10 py-2">
+          <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
+            <nav aria-label="Chọn nhanh theo nhu cầu và tầm giá" className="flex flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto overscroll-x-contain hide-scrollbar">
+              <span className="text-[11px] font-bold text-slate-400 shrink-0 mr-0.5 hidden sm:inline">Chọn nhanh:</span>
+              {[
+                { label: 'Laptop Văn phòng', href: '/laptop-van-phong' },
+                { label: 'Laptop Gaming', href: '/laptop-gaming' },
+                { label: 'Đồ họa · Kỹ thuật', href: '/laptop-workstation' },
+                { label: 'Mỏng nhẹ', href: '/search?tag=mong-nhe' },
+                { label: 'Dưới 15 triệu', href: '/search?pricePreset=under-15&maxPrice=15000000' },
+                { label: '15 – 20 triệu', href: '/search?pricePreset=15-20&minPrice=15000000&maxPrice=20000000' },
+                { label: '20 – 30 triệu', href: '/search?pricePreset=20-30&minPrice=20000000&maxPrice=30000000' },
+                { label: 'LikeNew 99%', href: '/search?category=laptop-likenew' },
+              ].map((chip) => (
+                <Link
+                  key={chip.href}
+                  href={chip.href}
+                  className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-semibold text-slate-100 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition whitespace-nowrap"
+                >
+                  {chip.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="bg-[#060f23] relative overflow-hidden mb-5 sm:mb-6 md:mb-8 lg:mb-10" aria-label={data.title || 'Hero Banner'}>
+      <div className="w-full relative min-h-[216px] sm:min-h-[236px] md:h-[300px] lg:h-[364px]">
+        {hasSeparateMobileImage && (
+          <Image
+            src={mobileImageUrl}
+            alt={mobileTitle || data.title || 'Hero banner'}
+            width={900}
+            height={560}
             className="md:hidden absolute inset-0 w-full h-full object-cover object-right"
             priority
             fetchPriority="high"
@@ -377,8 +480,8 @@ function BannerBlock({ data }: { data: any }) {
           src={imageUrl}
           alt={data.title || 'Hero banner'}
           width={1920}
-          height={600}
-          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}absolute inset-0 w-full h-full object-cover`}
+          height={680}
+          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}absolute inset-0 w-full h-full object-cover object-right`}
           priority
           fetchPriority="high"
           unoptimized={imageUrl.startsWith('/brand/')}
@@ -392,20 +495,21 @@ function BannerBlock({ data }: { data: any }) {
           />
         )}
         <div
-          className={`relative z-10 min-h-[188px] sm:min-h-[208px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent ${
+          className={`relative z-10 min-h-[216px] sm:min-h-[236px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#060f23]/92 via-[#091836]/80 to-[#091836]/55 md:via-[#091836]/66 md:to-transparent ${
             hideOverlayOnMobile ? 'hidden md:flex' : 'flex'
-          } items-center py-3 sm:py-4 md:py-0`}
+          } items-center py-4 sm:py-5 md:py-0`}
         >
           <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
-            <div className="max-w-xl lg:max-w-2xl text-white">
+            <div className="max-w-xl lg:max-w-[680px] text-white">
               {data.badge && (
-                <div className="inline-block border border-blue-500/50 rounded-md md:rounded-lg px-2.5 md:px-3.5 py-0.5 md:py-1 mb-1 sm:mb-1.5 md:mb-3 backdrop-blur-md bg-blue-900/40 shadow-lg max-w-full">
-                  <span className="text-blue-300 md:text-blue-400 font-black text-[10px] md:text-xs lg:text-sm tracking-wider md:tracking-widest uppercase line-clamp-1">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/35 bg-sky-500/15 px-3 py-1 mb-2 md:mb-3 backdrop-blur-md shadow-xs max-w-full">
+                  <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-amber-300 shrink-0" />
+                  <span className="text-sky-200 font-bold text-[10px] sm:text-[11px] md:text-xs tracking-wide uppercase line-clamp-1">
                     {data.badge}
                   </span>
                 </div>
               )}
-              <h1 className="text-lg sm:text-xl md:text-3xl lg:text-5xl font-black mb-1 md:mb-2 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-300 drop-shadow-sm leading-tight">
+              <h1 className="text-[22px] sm:text-[26px] md:text-[34px] lg:text-[40px] font-black mb-1.5 md:mb-2.5 tracking-tight text-white drop-shadow-xs leading-[1.15]">
                 {mobileTitle ? (
                   <>
                     <span className="md:hidden">{mobileTitle}</span>
@@ -416,7 +520,7 @@ function BannerBlock({ data }: { data: any }) {
                 )}
               </h1>
               {(data.subtitle || mobileSubtitle) && (
-                <p className="text-xs md:text-sm lg:text-base font-bold text-yellow-400 mb-2 md:mb-4 tracking-wide drop-shadow-md line-clamp-2">
+                <p className="text-xs sm:text-[13px] md:text-[15px] font-medium text-slate-200/95 mb-3 md:mb-5 max-w-lg leading-relaxed line-clamp-2">
                   {mobileSubtitle ? (
                     <>
                       <span className="md:hidden">{mobileSubtitle}</span>
@@ -427,23 +531,34 @@ function BannerBlock({ data }: { data: any }) {
                   )}
                 </p>
               )}
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 md:gap-3">
+              <div className="flex flex-wrap gap-2 sm:gap-2.5 md:gap-3">
                 {data.link && data.buttonText && (
                   <Link
                     href={data.link}
-                    className="min-h-11 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-2.5 sm:px-4 md:px-6 lg:px-7 rounded-full uppercase text-[11px] md:text-xs lg:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="min-h-11 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-4 sm:px-5 md:px-6 rounded-full text-xs md:text-sm shadow-lg shadow-blue-600/35 transition duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.buttonText}
+                    <ChevronRight aria-hidden="true" className="w-4 h-4 -mr-0.5" />
                   </Link>
                 )}
                 {data.secondaryLink && data.secondaryButtonText && (
                   <Link
                     href={data.secondaryLink}
-                    className="min-h-11 inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2 px-2.5 sm:px-4 md:px-6 lg:px-7 rounded-full uppercase text-[11px] md:text-xs lg:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                    className="min-h-11 inline-flex items-center justify-center gap-1.5 bg-amber-400/15 hover:bg-amber-400/25 active:scale-95 backdrop-blur-md border border-amber-300/45 text-amber-200 font-bold py-2 px-4 sm:px-5 md:px-6 rounded-full text-xs md:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {data.secondaryButtonText}
                   </Link>
                 )}
+              </div>
+              <div className="hidden sm:flex flex-wrap items-center gap-x-4 gap-y-1 mt-3.5 text-[11.5px] font-medium text-slate-300/90">
+                <span className="inline-flex items-center gap-1.5">
+                  <ShieldCheck aria-hidden="true" className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                  Máy tuyển chọn, test kỹ trước giao
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Headphones aria-hidden="true" className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  Tư vấn thật theo nhu cầu &amp; ngân sách
+                </span>
               </div>
             </div>
           </div>
@@ -648,6 +763,17 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
     return <CategoryGridSection />;
   }
 
+  if (data.layout !== 'board') {
+    return (
+      <CategoryProductBlock
+        categories={categories}
+        title={data.title}
+        subtitle={data.subtitle}
+        viewAllLink={data.viewAllLink}
+      />
+    );
+  }
+
   return (
     <section className="py-4 md:py-6" aria-label={data.title || 'Danh mục nổi bật'}>
       <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
@@ -673,28 +799,16 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
         )}
 
         <div
-          className={
-            data.layout === 'board'
-              ? 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2.5 rounded-xl border-2 border-slate-300 bg-white p-2 shadow-xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-hidden md:rounded-2xl md:p-0 md:gap-0 md:grid-cols-3 lg:grid-cols-6'
-              : 'grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2.5 rounded-xl border-2 border-slate-200 bg-white p-2 shadow-xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-visible md:border-0 md:bg-transparent md:p-0 md:shadow-none md:grid-cols-3 md:gap-3 lg:grid-cols-6 lg:gap-3.5'
-          }
+          className="grid grid-rows-2 grid-flow-col auto-cols-[calc((100%-24px)/4)] overflow-x-auto overscroll-x-contain snap-x snap-mandatory hide-scrollbar gap-2.5 rounded-xl border-2 border-slate-300 bg-white p-2 shadow-xs md:grid-rows-none md:grid-flow-row md:auto-cols-auto md:overflow-hidden md:rounded-2xl md:p-0 md:gap-0 md:grid-cols-3 lg:grid-cols-6"
         >
           {categories.map((c: { id: string; name: string; href: string; image: string | null }, index: number) => (
             <Link
               key={`${c.id}-${index}`}
               href={c.href}
-              className={
-                data.layout === 'board'
-                  ? 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1.5 rounded-xl border border-slate-200 bg-slate-50/70 text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:flex-row md:items-center md:justify-start md:gap-2.5 md:rounded-none md:border-0 md:border-b-2 md:border-r-2 md:border-slate-200 md:bg-gradient-to-b md:from-white md:to-slate-50/90 md:p-2.5 lg:p-3 md:text-left md:hover:from-blue-50/70 md:hover:to-blue-50/30 motion-reduce:transition-none'
-                  : 'group min-h-11 min-w-0 snap-start flex flex-col items-center justify-between p-1.5 rounded-xl border-2 border-slate-300/90 bg-gradient-to-b from-white via-slate-50/70 to-slate-100/80 text-center transition duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:rounded-2xl md:border-2 md:border-slate-300 md:bg-gradient-to-b md:from-white md:via-slate-50/60 md:to-blue-50/40 md:px-2.5 md:py-2.5 lg:px-3 lg:py-3 md:shadow-sm md:hover:-translate-y-1 md:hover:border-blue-500 md:hover:from-blue-50/50 md:hover:to-white md:hover:shadow-md motion-reduce:md:hover:translate-y-0 motion-reduce:transition-none'
-              }
+              className="group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1.5 rounded-xl border border-slate-200 bg-slate-50/70 text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:flex-row md:items-center md:justify-start md:gap-2.5 md:rounded-none md:border-0 md:border-b-2 md:border-r-2 md:border-slate-200 md:bg-gradient-to-b md:from-white md:to-slate-50/90 md:p-2.5 lg:p-3 md:text-left md:hover:from-blue-50/70 md:hover:to-blue-50/30 motion-reduce:transition-none"
             >
               <div
-                className={`relative flex shrink-0 items-center justify-center overflow-hidden transition duration-200 group-hover:scale-105 motion-reduce:group-hover:scale-100 ${
-                  data.layout === 'board'
-                    ? 'mb-1 h-14 w-16 md:mb-0 md:h-14 md:w-16 lg:h-16 lg:w-20'
-                    : 'mb-1 h-14 w-16 md:mb-2 md:h-20 md:w-28 lg:h-22 lg:w-32'
-                }`}
+                className="relative flex shrink-0 items-center justify-center overflow-hidden transition duration-200 group-hover:scale-105 motion-reduce:group-hover:scale-100 mb-1 h-14 w-16 md:mb-0 md:h-14 md:w-16 lg:h-16 lg:w-20"
               >
                 {c.image ? (() => {
                   const catImg = c.image.startsWith('/api/library/') && !c.image.includes('?') ? `${c.image}?size=thumb&v=2` : c.image;

@@ -314,7 +314,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
                   alt={settings.storeName || "CitiLap"}
                   decoding="async"
                   fetchPriority="high"
-                  className="h-auto w-[116px] min-[375px]:w-[132px] md:w-[132px] lg:w-[172px] xl:w-[210px] object-contain"
+                  className="h-auto w-[140px] min-[375px]:w-[160px] md:w-[132px] lg:w-[172px] xl:w-[210px] object-contain"
                 />
               ) : (
                 <>

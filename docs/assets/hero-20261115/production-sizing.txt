@@ -1,0 +1,6 @@
+Reference: https://citilap.vn/ fetched 2026-11-15
+Production desktop image: /brand/citilap-hero.webp = 1946 x 786
+Production mobile image: /brand/citilap-hero-mobile.webp = 800 x 540
+Generated with built-in image_gen, desktop and mobile separately. Export: WebP quality 97.
+Desktop prompt: Adapt sharp hero artwork to production 1946:786 ratio; preserve laptops, text and neon office scene, recompose vertically without stretching, high native detail.
+Mobile prompt: Recompose matching laptops into upper 65%, three Vietnamese benefit columns below, 800:540 ratio, sharp native detail.

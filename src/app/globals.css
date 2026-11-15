@@ -391,3 +391,141 @@ dialog::backdrop {
   overflow: hidden;
   overscroll-behavior: contain;
 }
+
+/* Promotional dual animated banners & category card hover sheen */
+@keyframes promoKenBurns {
+  0% {
+    transform: scale(1.01) translate3d(0, 0, 0);
+  }
+  100% {
+    transform: scale(1.08) translate3d(-1.5%, -1%, 0);
+  }
+}
+
+@keyframes promoSheenSweep {
+  0% {
+    transform: translate3d(-130%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.65;
+  }
+  45%,
+  100% {
+    transform: translate3d(260%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+@keyframes promoFloatOrb {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate3d(12px, -10px, 0) scale(1.16);
+    opacity: 0.8;
+  }
+}
+
+@keyframes promoBadgePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.045);
+  }
+}
+
+@keyframes promoSparkle {
+  0%,
+  100% {
+    transform: scale(0.75) rotate(0deg);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.2) rotate(15deg);
+    opacity: 0.95;
+  }
+}
+
+@keyframes promoCtaPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.05);
+    filter: brightness(1.18);
+  }
+}
+
+@keyframes promoCtaSheen {
+  0% {
+    transform: translate3d(-140%, 0, 0) skewX(-20deg);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.75;
+  }
+  55%,
+  100% {
+    transform: translate3d(260%, 0, 0) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .promo-banner-kenburns {
+    animation: promoKenBurns 11s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+
+  .promo-banner-sheen {
+    animation: promoSheenSweep 4.8s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  .promo-banner-sheen-delayed {
+    animation: promoSheenSweep 4.8s ease-in-out 2.2s infinite;
+    will-change: transform, opacity;
+  }
+
+  .promo-banner-orb {
+    animation: promoFloatOrb 5.5s ease-in-out infinite alternate;
+    will-change: transform, opacity;
+  }
+
+  .promo-banner-badge-pulse {
+    animation: promoBadgePulse 2.4s ease-in-out infinite;
+    will-change: transform;
+  }
+
+  .promo-banner-sparkle {
+    animation: promoSparkle 2.8s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+
+  .promo-cta-pulse {
+    animation: promoCtaPulse 1.7s ease-in-out infinite;
+    will-change: transform, filter;
+  }
+
+  .promo-cta-sheen {
+    animation: promoCtaSheen 2.4s ease-in-out infinite;
+    will-change: transform, opacity;
+  }
+}
+
+.promo-banners-paused .promo-banner-kenburns,
+.promo-banners-paused .promo-banner-sheen,
+.promo-banners-paused .promo-banner-sheen-delayed,
+.promo-banners-paused .promo-banner-orb,
+.promo-banners-paused .promo-banner-badge-pulse,
+.promo-banners-paused .promo-banner-sparkle,
+.promo-banners-paused .promo-cta-pulse,
+.promo-banners-paused .promo-cta-sheen {
+  animation-play-state: paused !important;
+}

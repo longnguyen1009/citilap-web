@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 import HeroSection from "@/components/home/HeroSection";
-import FeatureStrip from "@/components/home/FeatureStrip";
+import PromoDualBanners from "@/components/home/PromoDualBanners";
 import CategoryGridSection from "@/components/home/CategoryGridSection";
 import FlashSaleSection from "@/components/home/FlashSaleSection";
 import ProductSection from "@/components/home/ProductSection";
@@ -96,8 +96,8 @@ export default async function Home() {
       {/* 1. HERO SECTION & SUB-BANNERS */}
       <HeroSection settings={settings ?? undefined} />
 
-      {/* 2. FEATURE STRIP */}
-      <FeatureStrip settings={settings} />
+      {/* 2. PROMO DUAL ANIMATED BANNERS */}
+      <PromoDualBanners />
 
       {/* 3. KHÁM PHÁ HỆ SINH THÁI DANH MỤC & PHỤ KIỆN TECH */}
       <CategoryGridSection navigation={navigation} />

@@ -25,6 +25,7 @@ import { useCatalogOptions } from './BuilderPickers';
 import type { CategoryOption } from './builder-defaults';
 
 export type BannerData = Extract<SectionItem['data'], { type: 'banner' }>;
+export type PromoBannersData = Extract<SectionItem['data'], { type: 'promo_banners' }>;
 export type SliderData = Extract<SectionItem['data'], { type: 'slider' }>;
 export type ProductGridData = Extract<SectionItem['data'], { type: 'product_grid' }>;
 export type FeaturedCategoriesData = Extract<SectionItem['data'], { type: 'featured_categories' }>;
@@ -2557,6 +2558,199 @@ export function IntroForm({
                   placeholder="/chinh-sach-bao-hanh"
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
                 />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function PromoBannersForm({
+  data,
+  update,
+  onPickMedia,
+}: {
+  data: PromoBannersData;
+  update: (p: Partial<PromoBannersData>) => void;
+  onPickMedia: (bannerIdx: number) => void;
+}) {
+  const banners = data.banners || [];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="font-bold text-slate-700 block mb-1">Nhãn khối (ARIA Label)</label>
+        <input
+          type="text"
+          value={data.title || ''}
+          onChange={(e) => update({ title: e.target.value })}
+          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs"
+          placeholder="Chương trình khuyến mãi nổi bật"
+        />
+      </div>
+
+      <div className="space-y-3">
+        {banners.map((banner, idx) => (
+          <div key={banner.id || idx} className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <span className="font-bold text-xs text-slate-800">
+                Banner #{idx + 1}: {banner.title || 'Chưa đặt tiêu đề'}
+              </span>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={banner.enabled !== false}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], enabled: e.target.checked };
+                    update({ banners: next });
+                  }}
+                  className="rounded text-blue-600"
+                />
+                <span>Hiển thị</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Nhãn trên (Badge)</label>
+                <input
+                  type="text"
+                  value={banner.badge || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], badge: e.target.value };
+                    update({ banners: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Nhãn nhấn mạnh</label>
+                <input
+                  type="text"
+                  value={banner.highlightBadge || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], highlightBadge: e.target.value };
+                    update({ banners: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Tiêu đề chính</label>
+                <input
+                  type="text"
+                  value={banner.title || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], title: e.target.value };
+                    update({ banners: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Dòng nổi bật</label>
+                <input
+                  type="text"
+                  value={banner.highlight || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], highlight: e.target.value };
+                    update({ banners: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Mô tả ngắn</label>
+              <input
+                type="text"
+                value={banner.subtitle || ''}
+                onChange={(e) => {
+                  const next = [...banners];
+                  next[idx] = { ...next[idx], subtitle: e.target.value };
+                  update({ banners: next });
+                }}
+                className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Nút CTA</label>
+                <input
+                  type="text"
+                  value={banner.ctaText || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], ctaText: e.target.value };
+                    update({ banners: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Đường dẫn (Link)</label>
+                <input
+                  type="text"
+                  value={banner.href || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], href: e.target.value };
+                    update({ banners: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Tông màu</label>
+                <select
+                  value={banner.theme || 'crimson'}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = {
+                      ...next[idx],
+                      theme: e.target.value as 'crimson' | 'sapphire' | 'emerald' | 'amber',
+                    };
+                    update({ banners: next });
+                  }}
+                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+                >
+                  <option value="crimson">Đỏ Gaming (Crimson)</option>
+                  <option value="sapphire">Xanh Ultrabook (Sapphire)</option>
+                  <option value="emerald">Xanh lục (Emerald)</option>
+                  <option value="amber">Vàng cam (Amber)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Ảnh nền banner</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={banner.imageUrl || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], imageUrl: e.target.value };
+                    update({ banners: next });
+                  }}
+                  className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => onPickMedia(idx)}
+                  className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded text-xs font-semibold cursor-pointer"
+                >
+                  Chọn ảnh
+                </button>
               </div>
             </div>
           </div>

@@ -11,9 +11,11 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
   const heroBgImage = raw.heroBgImage?.trim() || DEFAULT_SETTINGS.heroBgImage;
   const heroMobileBgImage =
     raw.heroMobileBgImage?.trim() ||
-    (heroBgImage === "/brand/marketing-banner.webp" || heroBgImage === "/brand/citilap-hero.webp"
-      ? "/brand/citilap-hero-mobile.webp"
-      : "");
+    (heroBgImage === "/brand/citilap-hero-v2.webp"
+      ? "/brand/citilap-hero-v2-mobile.webp"
+      : heroBgImage === "/brand/marketing-banner.webp" || heroBgImage === "/brand/citilap-hero.webp"
+        ? "/brand/citilap-hero-mobile.webp"
+        : "");
   const hasSeparateMobileHero = Boolean(heroMobileBgImage && heroMobileBgImage !== heroBgImage);
   const settings = {
     ...raw,
@@ -27,8 +29,17 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
     subBanner2Link: raw.subBanner2Link?.trim() || DEFAULT_SETTINGS.subBanner2Link,
   };
 
+  const hasHeroOverlay = Boolean(
+    settings.heroBadge?.trim() ||
+      settings.heroTitle?.trim() ||
+      settings.heroHighlight?.trim() ||
+      settings.heroSlogan?.trim() ||
+      settings.heroCtaPrimaryText?.trim() ||
+      settings.heroCtaSecondaryText?.trim()
+  );
+
   return (
-    <section className="py-3 md:py-5 bg-slate-50/60 border-b border-slate-200/70" aria-label="Banner nổi bật và khuyến mãi">
+    <section className="py-3 md:py-5 mb-4 sm:mb-5 md:mb-7 lg:mb-9 bg-slate-50/60 border-b border-slate-200/70" aria-label="Banner nổi bật và khuyến mãi">
       <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2.5 sm:gap-3 lg:gap-4">
           {/* 1. MAIN HERO (Left 2fr on PC) */}
@@ -40,51 +51,59 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={settings.heroBgImage}
-                alt={`${settings.heroTitle} ${settings.heroHighlight}`}
+                alt={`${settings.heroTitle} ${settings.heroHighlight}`.trim() || "Hero Banner"}
                 width={1920}
                 height={600}
                 loading="eager"
                 fetchPriority="high"
                 decoding="async"
-                className="absolute inset-0 w-full h-full object-cover max-md:object-right"
+                className="absolute inset-0 w-full h-full object-cover object-center"
               />
             </picture>
-            <div className="relative z-10 min-h-[188px] sm:min-h-[208px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent flex items-center px-3 py-3 sm:p-5 md:p-7 lg:p-8">
-              <div className="max-w-lg lg:max-w-xl text-white min-w-0">
-                {settings.heroBadge && (
-                  <div className="inline-block border border-blue-500/50 rounded-md lg:rounded-lg px-2.5 py-0.5 md:py-1 mb-1 sm:mb-1.5 md:mb-3 backdrop-blur-md bg-blue-900/40 shadow-lg max-w-full">
-                    <span className="text-blue-400 font-black text-[10px] md:text-xs lg:text-sm tracking-wider uppercase line-clamp-1">
-                      {settings.heroBadge}
-                    </span>
+            {hasHeroOverlay && (
+              <div className="relative z-10 min-h-[188px] sm:min-h-[208px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#0b1221]/95 via-[#0b1221]/75 to-transparent flex items-center px-3 py-3 sm:p-5 md:p-7 lg:p-8">
+                <div className="max-w-lg lg:max-w-xl text-white min-w-0">
+                  {settings.heroBadge && (
+                    <div className="inline-block border border-blue-500/50 rounded-md lg:rounded-lg px-2.5 py-0.5 md:py-1 mb-1 sm:mb-1.5 md:mb-3 backdrop-blur-md bg-blue-900/40 shadow-lg max-w-full">
+                      <span className="text-blue-400 font-black text-[10px] md:text-xs lg:text-sm tracking-wider uppercase line-clamp-1">
+                        {settings.heroBadge}
+                      </span>
+                    </div>
+                  )}
+                  {(settings.heroTitle || settings.heroHighlight) && (
+                    <h1 className="text-lg sm:text-xl md:text-4xl lg:text-5xl font-black mb-1 md:mb-2.5 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-300 drop-shadow-sm leading-tight">
+                      {settings.heroTitle}{" "}
+                      <span className="text-blue-500">{settings.heroHighlight}</span>
+                    </h1>
+                  )}
+                  {settings.heroSlogan && (
+                    <p className="text-[11px] sm:text-xs md:text-base font-bold text-yellow-400 mb-2 md:mb-5 tracking-wide drop-shadow-md text-balance line-clamp-2">
+                      {settings.heroSlogan}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2 md:gap-3">
+                    {settings.heroCtaPrimaryText && (
+                      <Link
+                        href={settings.heroCtaPrimaryLink}
+                        prefetch={false}
+                        className="min-h-11 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-2.5 sm:px-5 lg:px-6 rounded-full uppercase text-[11px] md:text-xs lg:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                      >
+                        {settings.heroCtaPrimaryText}
+                      </Link>
+                    )}
+                    {settings.heroCtaSecondaryText && (
+                      <Link
+                        href={settings.heroCtaSecondaryLink}
+                        prefetch={false}
+                        className="min-h-11 inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2 px-2.5 sm:px-5 lg:px-6 rounded-full uppercase text-[11px] md:text-xs lg:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                      >
+                        {settings.heroCtaSecondaryText}
+                      </Link>
+                    )}
                   </div>
-                )}
-                <h1 className="text-lg sm:text-xl md:text-4xl lg:text-5xl font-black mb-1 md:mb-2.5 italic tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-gray-100 to-gray-300 drop-shadow-sm leading-tight">
-                  {settings.heroTitle}{" "}
-                  <span className="text-blue-500">{settings.heroHighlight}</span>
-                </h1>
-                {settings.heroSlogan && (
-                  <p className="text-[11px] sm:text-xs md:text-base font-bold text-yellow-400 mb-2 md:mb-5 tracking-wide drop-shadow-md text-balance line-clamp-2">
-                    {settings.heroSlogan}
-                  </p>
-                )}
-                <div className="flex flex-wrap gap-1.5 sm:gap-2 md:gap-3">
-                  <Link
-                    href={settings.heroCtaPrimaryLink}
-                    prefetch={false}
-                    className="min-h-11 inline-flex items-center justify-center bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-2.5 sm:px-5 lg:px-6 rounded-full uppercase text-[11px] md:text-xs lg:text-sm shadow-[0_0_15px_rgba(37,99,235,0.5)] transition duration-200 transform hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
-                  >
-                    {settings.heroCtaPrimaryText}
-                  </Link>
-                  <Link
-                    href={settings.heroCtaSecondaryLink}
-                    prefetch={false}
-                    className="min-h-11 inline-flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-md border border-white/20 text-white font-bold py-2 px-2.5 sm:px-5 lg:px-6 rounded-full uppercase text-[11px] md:text-xs lg:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
-                  >
-                    {settings.heroCtaSecondaryText}
-                  </Link>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* 2. SUB-BANNERS (2-col beneath on SP/Tablet, 2 equal stacked rows on PC Bento) */}
