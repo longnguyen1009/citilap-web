@@ -22,9 +22,14 @@ import {
   Search,
   Copy,
   Eye,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import CampaignStatsCards from '@/components/admin/campaigns/CampaignStatsCards';
 import CampaignFormModal from '@/components/admin/campaigns/CampaignFormModal';
+import { restoreCampaignOptions } from '@/components/admin/campaigns/campaign-form';
+import { buildCampaignWindows, getCampaignPhase } from '@/lib/campaign-schedule';
+import { campaignOrderRank } from '@/lib/campaign-order';
 import {
   type CampaignData,
   type CampaignItemForm,
@@ -37,7 +42,6 @@ import {
 } from '@/components/admin/campaigns/types';
 import {
   DEFAULT_FLASH_SALE_PRE_SHOW_HOURS,
-  addDaysToVnDate,
   diffVnDaysInclusive,
   isoToVnDateDisplay,
   isoToVnTimeDisplay,
@@ -57,6 +61,8 @@ export default function AdminCampaignsPage() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [filterTab, setFilterTab] = useState<FilterTab>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCampaignName, setSelectedCampaignName] = useState<string | null>(null);
+  const campaignKey = (name: string) => name.trim().toLocaleLowerCase('vi-VN');
 
   // Storefront Flash Sale / Hot Sale Banner fallback settings
   const [bannerSettingsOpen, setBannerSettingsOpen] = useState(false);
@@ -64,6 +70,33 @@ export default function AdminCampaignsPage() {
   const [settingsRevision, setSettingsRevision] = useState<number>(0);
   const [fullSettingsDoc, setFullSettingsDoc] = useState<Record<string, unknown> | null>(null);
   const [savingBannerSettings, setSavingBannerSettings] = useState(false);
+  const campaignOrder = (fullSettingsDoc?.hotSaleCampaignOrder as string[] | undefined) ?? [];
+  const campaignGroups = [...new Map(campaigns.map(c => [campaignKey(c.name), c.name])).values()]
+    .sort((a, b) => campaignOrderRank(a, campaignOrder) - campaignOrderRank(b, campaignOrder));
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  const moveCampaign = async (index: number, direction: number) => {
+    if (!fullSettingsDoc || savingOrder || savingBannerSettings) return;
+    const order = [...campaignGroups];
+    const target = index + direction;
+    if (target < 0 || target >= order.length) return;
+    [order[index], order[target]] = [order[target], order[index]];
+    setSavingOrder(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expectedRevision: settingsRevision, document: { ...fullSettingsDoc, hotSaleCampaignOrder: order } }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Không lưu được thứ tự chiến dịch.');
+      setFullSettingsDoc(json.data.document);
+      setSettingsRevision(json.data.revision);
+      toast.success('Đã lưu thứ tự chiến dịch trên homepage.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Không lưu được thứ tự.');
+      void loadBannerSettings();
+    } finally { setSavingOrder(false); }
+  };
 
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<CampaignData | null>(null);
@@ -175,15 +208,15 @@ export default function AdminCampaignsPage() {
     const timer = setTimeout(() => {
       setNowMs(Date.now());
       void fetchCampaigns();
+      void loadBannerSettings();
     }, 0);
     return () => clearTimeout(timer);
-  }, [fetchCampaigns]);
+  }, [fetchCampaigns, loadBannerSettings]);
 
   useEffect(() => {
-    if (isEditorOpen) return;
     const clock = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(clock);
-  }, [isEditorOpen]);
+  }, []);
 
   const closeEditor = useCallback(() => setIsEditorOpen(false), []);
 
@@ -192,10 +225,9 @@ export default function AdminCampaignsPage() {
     let upcoming = 0;
     let inactive = 0;
     for (const c of campaigns) {
-      const startMs = new Date(c.startAt).getTime();
-      const endMs = new Date(c.endAt).getTime();
-      if (c.status === 'PUBLISHED' && nowMs >= startMs && nowMs < endMs) active++;
-      else if (c.status === 'PUBLISHED' && nowMs < startMs) upcoming++;
+      const phase = getCampaignPhase(c, nowMs);
+      if (phase === 'active') active++;
+      else if (phase === 'upcoming') upcoming++;
       else inactive++;
     }
     return {
@@ -208,6 +240,7 @@ export default function AdminCampaignsPage() {
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
+      if (selectedCampaignName !== null && campaignKey(c.name) !== campaignKey(selectedCampaignName)) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         if (
@@ -217,16 +250,15 @@ export default function AdminCampaignsPage() {
           return false;
         }
       }
-      const startMs = new Date(c.startAt).getTime();
-      const endMs = new Date(c.endAt).getTime();
-      const isActive = c.status === 'PUBLISHED' && nowMs >= startMs && nowMs < endMs;
-      const isUpcoming = c.status === 'PUBLISHED' && nowMs < startMs;
+      const phase = getCampaignPhase(c, nowMs);
+      const isActive = phase === 'active';
+      const isUpcoming = phase === 'upcoming';
       if (filterTab === 'ACTIVE') return isActive;
       if (filterTab === 'UPCOMING') return isUpcoming;
       if (filterTab === 'INACTIVE') return !isActive && !isUpcoming;
       return true;
     });
-  }, [campaigns, searchQuery, filterTab, nowMs]);
+  }, [campaigns, searchQuery, filterTab, nowMs, selectedCampaignName]);
 
   const applyRangeFromIso = (startIso: string, endIso: string) => {
     const sDate = isoToVnDateDisplay(startIso);
@@ -239,19 +271,17 @@ export default function AdminCampaignsPage() {
     setDurationDaysStr(span ? String(span) : '1');
   };
 
-  const openNewEditor = () => {
+  const openNewEditor = (name = '') => {
     setFormEnabled(true);
-    setScheduleMode('daily_slots');
+    setScheduleMode('continuous');
     setEditingCampaign(null);
-    setFormName('');
+    setFormName(name);
     setFormDescription('');
     const now = new Date();
     const twoHoursLater = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     applyRangeFromIso(now.toISOString(), twoHoursLater.toISOString());
-    setDailySlots([
-      { startTime: '10:00', endTime: '12:00' },
-      { startTime: '12:00', endTime: '14:00' },
-    ]);
+    setDailySlots([{ startTime: '10:00', endTime: '12:00' }]);
+    if (name) setScheduleMode('daily_slots');
     setFormItems([]);
     setFormRevision(0);
     setFormError(null);
@@ -281,32 +311,14 @@ export default function AdminCampaignsPage() {
       const res = await fetch(`/api/admin/campaigns/${c.id}`);
       const json = (await res.json()) as { success: boolean; data?: CampaignData };
       if (res.ok && json.data?.items) {
-        setEditingCampaign((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: json.data!.status,
-                revision: json.data!.revision,
-              }
-            : json.data!
-        );
-        setFormItems(
-          json.data.items.map((it) => ({
-            displayName: [it.product?.name, it.variant?.name].filter(Boolean).join(' · '),
-            id: it.id,
-            productId: it.productId,
-            variantId: it.variantId || '',
-            salePrice: it.salePrice,
-            regularPrice:
-              it.regularPrice ??
-              it.variant?.price ??
-              it.product?.price ??
-              '',
-            quantityLimit: it.quantityLimit ?? '',
-            perCustomerLimit: it.perCustomerLimit ?? '',
-            soldCount: it.soldCount ?? 0,
-          }))
-        );
+        setFormItems(restoreCampaignOptions(json.data.items));
+        setEditingCampaign(json.data);
+        setFormName(json.data.name);
+        setFormDescription(json.data.description || '');
+        setFormEnabled(json.data.status === 'PUBLISHED' && Date.parse(json.data.endAt) > Date.now());
+        applyRangeFromIso(json.data.startAt, json.data.endAt);
+        setScheduleMode(json.data.schedule ? 'daily_slots' : 'continuous');
+        if (json.data.schedule) setDailySlots(json.data.schedule.slots);
         setFormRevision(json.data.revision);
       } else {
         throw new Error('Không tải được sản phẩm chiến dịch. Thử lại để tránh mất danh sách.');
@@ -378,11 +390,11 @@ export default function AdminCampaignsPage() {
 
   const handleRemoveItem = useCallback((index: number) => {
     setFormItems((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  }, [setFormItems]);
 
   const handleRemoveProduct = useCallback((productId: string) => {
     setFormItems((prev) => prev.filter((it) => it.productId !== productId));
-  }, []);
+  }, [setFormItems]);
 
   const handleItemChange = useCallback(
     (index: number, field: keyof CampaignItemForm, value: string) => {
@@ -390,7 +402,7 @@ export default function AdminCampaignsPage() {
         prev.map((it, i) => (i === index ? { ...it, [field]: value } : it))
       );
     },
-    []
+    [setFormItems]
   );
 
   const applyBulkDiscountPct = (pct: number) => {
@@ -442,51 +454,9 @@ export default function AdminCampaignsPage() {
         }
         windows = [{ startAt: startUtc, endAt: endUtc }];
       } else {
-        const dayCount = diffVnDaysInclusive(startDate.display, endDate.display);
-        if (!dayCount || dayCount > 60) {
-          throw new Error('Khoảng ngày chạy khung giờ phải từ 1 đến 60 ngày.');
-        }
-        if (dailySlots.length === 0) {
-          throw new Error('Vui lòng chọn ít nhất 1 khung giờ mỗi ngày.');
-        }
-        const normalizedSlots = dailySlots.map((slot, idx) => {
-          const st = parseVnTimeInput(slot.startTime);
-          const et = parseVnTimeInput(slot.endTime);
-          if (!st || !et) {
-            throw new Error(`Khung giờ ${idx + 1}: Nhập giờ 24h hợp lệ (VD: 10:00 - 12:00).`);
-          }
-          const stMin = st.hour * 60 + st.minute;
-          const etMin = et.hour * 60 + et.minute;
-          if (stMin >= etMin) {
-            throw new Error(`Khung giờ ${idx + 1} (${st.display} → ${et.display}): Giờ kết thúc phải sau giờ bắt đầu.`);
-          }
-          return { st, et, stMin, etMin };
-        }).sort((a, b) => a.stMin - b.stMin);
+        windows = buildCampaignWindows({ mode: 'daily_slots', startDate: startDate.dayKey,
+          endDate: endDate.dayKey, slots: dailySlots });
 
-        for (let i = 1; i < normalizedSlots.length; i++) {
-          if (normalizedSlots[i].stMin < normalizedSlots[i - 1].etMin) {
-            throw new Error(
-              `Khung giờ bị trùng nhau trong cùng ngày: ${normalizedSlots[i - 1].st.display}–${normalizedSlots[i - 1].et.display} và ${normalizedSlots[i].st.display}–${normalizedSlots[i].et.display}.`
-            );
-          }
-        }
-
-        const expanded: Array<{ startAt: string; endAt: string }> = [];
-        for (let offset = 0; offset < dayCount; offset++) {
-          const dayVal = addDaysToVnDate(startDate.display, offset);
-          if (!dayVal) continue;
-          for (const slot of normalizedSlots) {
-            const startAt = vnDateTimeToIso(dayVal.display, slot.st.display);
-            const endAt = vnDateTimeToIso(dayVal.display, slot.et.display);
-            if ((!enabled && dayCount === 1) || new Date(endAt).getTime() > Date.now()) {
-              expanded.push({ startAt, endAt });
-            }
-          }
-        }
-        if (!expanded.length) {
-          throw new Error('Tất cả khung giờ đã chọn đều đã kết thúc so với hiện tại.');
-        }
-        windows = expanded;
       }
 
       const productsWithValidDiscount = new Set(
@@ -575,65 +545,62 @@ export default function AdminCampaignsPage() {
         throw new Error('Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.');
       }
 
-      let savedCount = 0;
-      for (let idx = 0; idx < windows.length; idx++) {
-        const win = windows[idx];
-        const isUpdatingExisting = Boolean(editingCampaign && idx === 0);
-        const targetStatus =
-          enabled && new Date(win.endAt).getTime() > Date.now() ? 'PUBLISHED' : 'DRAFT';
-        const payload = {
-          name: formName.trim(),
-          description: formDescription.trim() || null,
-          status: targetStatus,
-          startAt: win.startAt,
-          endAt: win.endAt,
-          items: isUpdatingExisting
-            ? parsedItems
-            : parsedItems.map((it) => ({ ...it, id: undefined, soldCount: 0 })),
-          revision: isUpdatingExisting ? formRevision : 0,
-          expectedRevision: isUpdatingExisting ? formRevision : 0,
-        };
+      const win = { startAt: windows[0].startAt, endAt: windows.at(-1)!.endAt };
+      const isUpdatingExisting = Boolean(editingCampaign);
+      const targetStatus =
+        enabled && new Date(win.endAt).getTime() > Date.now() ? 'PUBLISHED' : 'DRAFT';
+      const payload = {
+        name: formName.trim(),
+        description: formDescription.trim() || null,
+        status: targetStatus,
+        startAt: win.startAt,
+        endAt: win.endAt,
+        schedule: effectiveMode === 'daily_slots' ? { mode: 'daily_slots', startDate: startDate.dayKey, endDate: endDate.dayKey, slots: dailySlots } : null,
+        items: isUpdatingExisting
+          ? parsedItems
+          : parsedItems.map((it) => ({ ...it, id: undefined, soldCount: 0 })),
+        revision: isUpdatingExisting ? formRevision : 0,
+        expectedRevision: isUpdatingExisting ? formRevision : 0,
+      };
 
-        const url =
-          isUpdatingExisting && editingCampaign
-            ? `/api/admin/campaigns/${editingCampaign.id}`
-            : `/api/admin/campaigns`;
-        const method = isUpdatingExisting ? 'PUT' : 'POST';
+      const url =
+        isUpdatingExisting && editingCampaign
+          ? `/api/admin/campaigns/${editingCampaign.id}`
+          : `/api/admin/campaigns`;
+      const method = isUpdatingExisting ? 'PUT' : 'POST';
 
-        const res = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
-        const json = (await res.json()) as {
-          success: boolean;
-          error?: string;
-          code?: string;
-          conflictingCampaignName?: string;
-        };
+      const json = (await res.json()) as {
+        success: boolean;
+        error?: string;
+        code?: string;
+        conflictingCampaignName?: string;
+      };
 
-        if (!res.ok || !json.success) {
-          const partialNote = savedCount > 0 ? ` (Đã tạo trước ${savedCount}/${windows.length} khung giờ)` : '';
-          if (json.code === 'CAMPAIGN_OVERLAP_CONFLICT') {
-            throw new Error(`Xung đột khung giờ: ${json.error}${partialNote}`);
-          }
-          if (json.code === 'CAMPAIGN_REVISION_CONFLICT') {
-            throw new Error(`Xung đột phiên bản (CAS): ${json.error}`);
-          }
-          throw new Error(`${json.error || 'Lỗi khi lưu chiến dịch.'}${partialNote}`);
+      if (!res.ok || !json.success) {
+        if (json.code === 'CAMPAIGN_OVERLAP_CONFLICT') {
+          throw new Error(`Xung đột khung giờ: ${json.error}`);
         }
-        savedCount++;
+        if (json.code === 'CAMPAIGN_REVISION_CONFLICT') {
+          throw new Error(`Xung đột phiên bản (CAS): ${json.error}`);
+        }
+        throw new Error(`${json.error || 'Lỗi khi lưu chiến dịch.'}`);
       }
 
       const msg =
         windows.length > 1
-          ? `Đã lưu ${savedCount} khung giờ cho chiến dịch "${formName}" thành công.`
+          ? `Đã lưu ${windows.length} khung giờ cho chiến dịch "${formName}" thành công.`
           : editingCampaign
             ? `Đã cập nhật chiến dịch "${formName}" thành công.`
             : `Đã tạo chiến dịch "${formName}" thành công.`;
       setSuccessMsg(msg);
       toast.success(msg);
+      setSelectedCampaignName(formName.trim());
       setIsEditorOpen(false);
       void fetchCampaigns();
     } catch (e) {
@@ -720,7 +687,7 @@ export default function AdminCampaignsPage() {
         title="Flash Sale & Chiến dịch"
         badge={
           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">
-            {campaigns.length}
+            {campaignGroups.length}
           </span>
         }
         actions={
@@ -743,12 +710,17 @@ export default function AdminCampaignsPage() {
               aria-label="Làm mới"
               icon={<RefreshCw className={loading ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'} />}
             />
-            <AdminButton size="sm" onClick={openNewEditor} icon={<Plus className="w-4 h-4" />}>
-              Tạo chiến dịch
+            <AdminButton size="sm" onClick={() => openNewEditor(selectedCampaignName || '')} icon={<Plus className="w-4 h-4" />}>
+              {selectedCampaignName ? 'Thêm flashsale chi tiết' : 'Tạo chiến dịch'}
             </AdminButton>
           </div>
         }
       />
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-xs text-blue-950">
+        <p>Homepage tự hiện trước giờ bắt đầu {bannerSettings?.flashSalePreShowHours ?? DEFAULT_FLASH_SALE_PRE_SHOW_HOURS} giờ, áp dụng giá sale đúng giờ và tự ẩn khi kết thúc. Chỉ hiện sản phẩm đang mở bán có giá sale hợp lệ.</p>
+        <span className="shrink-0 font-semibold tabular-nums">Giờ Việt Nam (UTC+7): {nowMs ? formatGmt7(new Date(nowMs).toISOString()) : '—'}</span>
+      </div>
 
       {/* Alerts */}
       {successMsg && (
@@ -793,7 +765,34 @@ export default function AdminCampaignsPage() {
         onSaveBannerSettings={() => void handleSaveBannerSettings()}
       />
 
-      {/* Unified Single-Card Workspace */}
+      <AdminCard>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">Danh sách chiến dịch</h2>
+          {selectedCampaignName && <AdminButton variant="secondary" size="sm" onClick={() => setSelectedCampaignName(null)}>Tất cả chiến dịch</AdminButton>}
+        </div>
+        <p className="mb-3 text-xs text-slate-500">Di chuyển lên / xuống để đổi thứ tự trên homepage. Thay đổi được lưu ngay.</p>
+        <div className="space-y-2">
+          {campaignGroups.map((name, index) => {
+            const details = campaigns.filter(c => campaignKey(c.name) === campaignKey(name));
+            const active = selectedCampaignName !== null && campaignKey(selectedCampaignName) === campaignKey(name);
+            return <div key={campaignKey(name)} className="flex items-center gap-2">
+              <span className="w-6 text-center text-sm text-slate-400 tabular-nums">{index + 1}</span>
+              <button type="button" aria-pressed={active}
+              onClick={() => { setSelectedCampaignName(name); setFilterTab('ALL'); }}
+              className={`flex-1 text-left rounded-xl border p-4 cursor-pointer ${active ? 'border-blue-600 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+              <span className="block font-bold text-slate-900">{name}</span>
+              <span className="block mt-1 text-xs text-slate-500">{details.length} flashsale chi tiết · {details.filter(c => getCampaignPhase(c, nowMs) === 'active').length} đang chạy</span>
+              </button>
+              <AdminButton variant="secondary" size="sm" aria-label={`Di chuyển ${name} lên`} disabled={index === 0 || savingOrder || savingBannerSettings || !fullSettingsDoc} onClick={() => void moveCampaign(index, -1)} icon={<ArrowUp className="h-4 w-4" />} />
+              <AdminButton variant="secondary" size="sm" aria-label={`Di chuyển ${name} xuống`} disabled={index === campaignGroups.length - 1 || savingOrder || savingBannerSettings || !fullSettingsDoc} onClick={() => void moveCampaign(index, 1)} icon={<ArrowDown className="h-4 w-4" />} />
+            </div>;
+          })}
+          {!loading && !campaignGroups.length && <p className="text-sm text-slate-500">Chưa có chiến dịch. Tạo chiến dịch cùng lịch chi tiết đầu tiên.</p>}
+        </div>
+      </AdminCard>
+
+      {selectedCampaignName !== null && <>
+      <h2 className="font-semibold">Flashsale chi tiết: {selectedCampaignName}</h2>
       <AdminCard bodyClassName="p-0 overflow-hidden">
         {/* Top Bar: Tabs + Search */}
         <div className="px-4 py-2.5 border-b border-slate-200 bg-slate-50/60 flex flex-wrap items-center justify-between gap-3">
@@ -865,7 +864,7 @@ export default function AdminCampaignsPage() {
             <table className="admin-table w-full text-left text-xs text-slate-600">
               <thead className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase">
                 <tr>
-                  <th className="py-2.5 px-4">Chiến dịch</th>
+                  <th className="py-2.5 px-4">Flashsale chi tiết</th>
                   <th className="py-2.5 px-4">Trạng thái</th>
                   <th className="py-2.5 px-4">Khung giờ (GMT+7)</th>
                   <th className="py-2.5 px-4">Homepage</th>
@@ -875,10 +874,9 @@ export default function AdminCampaignsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredCampaigns.map((c) => {
-                  const startMs = new Date(c.startAt).getTime();
                   const endMs = new Date(c.endAt).getTime();
                   const isCurrentlyActive =
-                    c.status === 'PUBLISHED' && nowMs >= startMs && nowMs < endMs;
+                    getCampaignPhase(c, nowMs) === 'active';
                   const isArchived = c.status === 'ARCHIVED';
 
                   return (
@@ -899,7 +897,7 @@ export default function AdminCampaignsPage() {
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                               Đang diễn ra
                             </span>
-                          ) : nowMs < startMs ? (
+                          ) : getCampaignPhase(c, nowMs) === 'upcoming' ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-800">
                               <Clock className="w-3 h-3" />
                               Sắp diễn ra
@@ -922,6 +920,9 @@ export default function AdminCampaignsPage() {
                       <td className="py-2.5 px-4 text-xs font-mono tabular-nums whitespace-nowrap">
                         <div>{formatGmt7(c.startAt)}</div>
                         <div className="text-slate-400 text-[11px]">→ {formatGmt7(c.endAt)}</div>
+                        {c.schedule && <div className="mt-1 text-[11px] font-sans font-semibold text-blue-700">
+                          Mỗi ngày: {c.schedule.slots.map(s => `${s.startTime}–${s.endTime}`).join(', ')}
+                        </div>}
                       </td>
                       <td className="py-2.5 px-4 whitespace-nowrap">
                         <button
@@ -1012,7 +1013,10 @@ export default function AdminCampaignsPage() {
         )}
       </AdminCard>
 
+      </>}
+
       <CampaignFormModal
+        campaignNames={campaignGroups}
         open={isEditorOpen}
         editingCampaign={editingCampaign}
         nowMs={nowMs}

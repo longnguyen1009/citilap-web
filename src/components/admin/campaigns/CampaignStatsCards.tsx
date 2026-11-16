@@ -9,6 +9,7 @@ import {
   formatGmt7,
 } from './types';
 import { VnIsoPairField } from './VnScheduleFields';
+import { buildCampaignWindows, getCampaignPhase } from '@/lib/campaign-schedule';
 
 interface CampaignStatsCardsProps {
   campaigns: CampaignData[];
@@ -40,10 +41,11 @@ export default function CampaignStatsCards({
 }: CampaignStatsCardsProps) {
   const activeCampaign = campaigns.find(
     (c) =>
-      c.status === 'PUBLISHED' &&
-      nowMs >= new Date(c.startAt).getTime() &&
-      nowMs < new Date(c.endAt).getTime()
+      getCampaignPhase(c, nowMs) === 'active'
   );
+  const activeWindow = activeCampaign?.schedule
+    ? buildCampaignWindows(activeCampaign.schedule).find(w => Date.parse(w.startAt) <= nowMs && nowMs < Date.parse(w.endAt))
+    : activeCampaign;
 
   return (
     <div className="space-y-3">
@@ -215,7 +217,7 @@ export default function CampaignStatsCards({
               <strong>Đang chạy Flash Sale trên Storefront:</strong> &quot;{activeCampaign.name}&quot; (
               {activeCampaign.itemCount} sản phẩm).
               <span className="ml-1.5 text-emerald-700">
-                Kết thúc lúc {formatGmt7(activeCampaign.endAt)}
+                Phiên này kết thúc lúc {formatGmt7(activeWindow?.endAt || activeCampaign.endAt)}
               </span>
             </div>
           </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef } from 'react';
+import { getCampaignPhase } from '@/lib/campaign-schedule';
 import { Zap, X, AlertCircle, AlertTriangle, Archive, Copy, Plus, Trash2, Clock } from 'lucide-react';
 import { type CampaignPickerTarget } from '@/components/admin/products/CampaignProductPicker';
 import CampaignItemsTable from './CampaignItemsTable';
@@ -14,6 +15,7 @@ import { VnDateField, VnTimeField } from './VnScheduleFields';
 import {
   FLASH_SALE_TIME_SLOT_PRESETS,
   addDaysToVnDate,
+  getVnTodayParts,
   diffVnDaysInclusive,
   formatVnDayKeyLabel,
   formatVnTimeShort,
@@ -23,6 +25,7 @@ import {
 } from '@/lib/flash-sale-schedule';
 
 interface CampaignFormModalProps {
+  campaignNames: string[];
   open: boolean;
   editingCampaign: CampaignData | null;
   nowMs: number;
@@ -62,6 +65,7 @@ interface CampaignFormModalProps {
 }
 
 export default function CampaignFormModal({
+  campaignNames,
   open,
   editingCampaign,
   nowMs,
@@ -183,7 +187,7 @@ export default function CampaignFormModal({
         valid: true,
         text: isSingleDay
           ? `Áp dụng: ${startDate.display} từ ${startT.display} → ${endT.display} (Giờ VN)`
-          : `Áp dụng liên tục 24/24: ${startDate.display} ${startT.display} → ${endDate.display} ${endT.display} (${spanDays} ngày không ngắt · Giờ VN)`,
+          : `Áp dụng liên tục: ${startDate.display} ${startT.display} → ${endDate.display} ${endT.display} (${spanDays} ngày không ngắt · Giờ VN)`,
       };
     }
 
@@ -229,7 +233,7 @@ export default function CampaignFormModal({
     const moreText = activeWindowCount / validSlots.length > 5 ? ', …' : '';
     return {
       valid: true,
-      text: `Lên lịch ${activeWindowCount} khung giờ: ${futureDayLabels.join(', ')}${moreText} · Khung giờ mỗi ngày: ${slotText} (Storefront hiện 2 ngày gần nhất)`,
+      text: `Một chiến dịch · ${activeWindowCount} phiên: ${futureDayLabels.join(', ')}${moreText} · Mỗi ngày: ${slotText} (Storefront hiện 2 ngày gần nhất)`,
     };
   }, [effectiveMode, startDateStr, startTimeStr, endDateStr, endTimeStr, dailySlots, nowMs]);
 
@@ -238,9 +242,7 @@ export default function CampaignFormModal({
   const isArchived = editingCampaign?.status === 'ARCHIVED';
   const isCurrentlyActive = Boolean(
     editingCampaign &&
-      editingCampaign.status === 'PUBLISHED' &&
-      nowMs >= new Date(editingCampaign.startAt).getTime() &&
-      nowMs < new Date(editingCampaign.endAt).getTime()
+      getCampaignPhase(editingCampaign, nowMs) === 'active'
   );
 
   const handleStartDateChange = (nextDate: string) => {
@@ -275,7 +277,7 @@ export default function CampaignFormModal({
   const applyDailySpanDays = (days: number) => {
     const baseStart =
       parseVnDateInput(startDateStr, nowMs) ||
-      parseVnDateInput(addDaysToVnDate(new Date().toISOString().slice(0, 10), 0)?.display || '');
+      parseVnDateInput(getVnTodayParts(nowMs).dayKey);
     if (!baseStart) return;
     const nextEnd = addDaysToVnDate(baseStart.display, days - 1);
     if (!nextEnd) return;
@@ -406,6 +408,7 @@ export default function CampaignFormModal({
               </label>
               <input
                 id={nameInputId}
+                list={`${nameInputId}-campaigns`}
                 type="text"
                 disabled={isArchived}
                 value={formName}
@@ -428,13 +431,15 @@ export default function CampaignFormModal({
                   onChange={(e) => onChangeEnabled(e.target.checked)}
                   className="h-4 w-4 rounded text-blue-600"
                 />
-                <span>Bật trên homepage</span>
+                <span>Kích hoạt theo lịch</span>
               </label>
             </div>
 
+            <datalist id={`${nameInputId}-campaigns`}>{campaignNames.map(name => <option key={name} value={name} />)}</datalist>
+            <p className="sm:col-span-12 text-xs text-slate-500">Chọn tên chiến dịch có sẵn hoặc nhập tên mới. Tạo flashsale chi tiết riêng cho mỗi khung giờ cần danh sách sản phẩm khác nhau.</p>
             <div className="sm:col-span-12">
               <label htmlFor={descInputId} className="block text-xs font-semibold text-slate-700 mb-1">
-                Mô tả ngắn
+                Tên / ghi chú flashsale chi tiết
               </label>
               <input
                 id={descInputId}
@@ -459,7 +464,7 @@ export default function CampaignFormModal({
             </legend>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-[11px] text-slate-500">
-                Click trực tiếp vào từng ô (Ngày / Tháng / Năm / Giờ / Phút) để gõ sửa nhanh.
+                Chọn ngày trên lịch, nhập giờ 24h. Tất cả dùng giờ Việt Nam (UTC+7).
               </span>
               <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-[11px]">
                 <button
@@ -482,14 +487,14 @@ export default function CampaignFormModal({
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  Chạy liên tục 24/24
+                  Chạy một khoảng thời gian
                 </button>
               </div>
             </div>
 
             {effectiveMode === 'continuous' ? (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 items-start">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 items-start">
                   <VnDateField
                     label="Từ ngày"
                     required
@@ -506,21 +511,6 @@ export default function CampaignFormModal({
                     onChange={onChangeStartTimeStr}
                     placeholder="10:00"
                   />
-                  <div>
-                    <label htmlFor={daysInputId} className="block text-[11px] font-semibold text-slate-700 mb-1">
-                      Trong mấy ngày
-                    </label>
-                    <input
-                      id={daysInputId}
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={durationDaysStr}
-                      onChange={(e) => handleDurationDaysChange(e.target.value)}
-                      placeholder="VD: 2"
-                      className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-mono focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
-                    />
-                  </div>
                   <VnDateField
                     label="Đến ngày"
                     required
@@ -570,7 +560,7 @@ export default function CampaignFormModal({
                 {continuousDailySuggestion && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
                     <span>
-                      Đang chọn <strong>chạy liên tục 24/24</strong> từ {continuousDailySuggestion.startTime}{' '}
+                      Đang chọn <strong>chạy liên tục</strong> từ {continuousDailySuggestion.startTime}{' '}
                       {continuousDailySuggestion.startDate} → {continuousDailySuggestion.endTime}{' '}
                       {continuousDailySuggestion.endDate}. Nếu bạn muốn mỗi ngày chỉ chạy trong khung giờ{' '}
                       <strong>

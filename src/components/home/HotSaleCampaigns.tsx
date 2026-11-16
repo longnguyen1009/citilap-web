@@ -2,6 +2,7 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Flame } from 'lucide-react';
+import { campaignOrderRank } from '@/lib/campaign-order';
 import FlashSaleCountdown from '@/components/product/FlashSaleCountdown';
 import { type ProductCardProduct } from '@/components/product/ProductCard';
 import { ProductCarousel } from './ProductTabs';
@@ -46,6 +47,7 @@ function collapseCampaignProducts(products: ProductCardProduct[], maxProducts = 
 
 export default function HotSaleCampaigns({
   campaigns,
+  campaignOrder = [],
   bannerImage,
   mobileBannerImage,
   bannerLink,
@@ -56,6 +58,7 @@ export default function HotSaleCampaigns({
   initialNowMs,
 }: {
   campaigns: Campaign[];
+  campaignOrder?: string[];
   bannerImage?: string;
   mobileBannerImage?: string;
   bannerLink?: string;
@@ -89,7 +92,8 @@ export default function HotSaleCampaigns({
 
   const { groups, visibleCampaigns } = useMemo(() => {
     const activeOnly = campaigns.filter((c) => Date.parse(c.endAt) > nowMs);
-    const hasExplicit = activeOnly.some((c) => c.id !== 'site-flash-sale');
+    const hasExplicit = activeOnly.some((c) => c.id !== 'site-flash-sale' &&
+      (!autoHide || isCampaignSlotInAutoShowWindow(c.startAt, c.endAt, nowMs, preShowHours)));
     const clean = hasExplicit ? activeOnly.filter((c) => c.id !== 'site-flash-sale') : activeOnly;
 
     const map = new Map<string, Campaign[]>();
@@ -112,6 +116,8 @@ export default function HotSaleCampaigns({
         )
       )
       .sort((a, b) => {
+        const priority = campaignOrderRank(a.key, campaignOrder) - campaignOrderRank(b.key, campaignOrder);
+        if (priority) return priority;
         const aRunning = a.slots.some((s) => Date.parse(s.startAt) <= nowMs && Date.parse(s.endAt) > nowMs);
         const bRunning = b.slots.some((s) => Date.parse(s.startAt) <= nowMs && Date.parse(s.endAt) > nowMs);
         if (aRunning !== bRunning) return aRunning ? -1 : 1;
@@ -122,7 +128,7 @@ export default function HotSaleCampaigns({
       groups: grouped,
       visibleCampaigns: grouped.flatMap((g) => g.slots),
     };
-  }, [campaigns, nowMs, preShowHours, autoHide]);
+  }, [campaigns, nowMs, preShowHours, autoHide, campaignOrder]);
 
   if (!groups.length || !visibleCampaigns.length) return null;
 
@@ -184,7 +190,7 @@ export default function HotSaleCampaigns({
     const startD = dateLabel(slot.startAt);
     const endD = dateLabel(slot.endAt);
     return startD === endD
-      ? `${startH}–${endH} ${startD}`
+      ? `${startH}–${endH}`
       : `${startH} ${startD} – ${endH} ${endD}`;
   };
 
@@ -292,7 +298,7 @@ export default function HotSaleCampaigns({
               </span>
             </h2>
           )}
-          {days.length > 1 && (
+          {days.length > 0 && (
             <div
               role="group"
               aria-label="Ngày sale (GMT+7)"

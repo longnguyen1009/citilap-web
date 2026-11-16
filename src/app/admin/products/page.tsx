@@ -482,6 +482,7 @@ export default function UnifiedProductsPage() {
         key: "name",
         header: "Tên sản phẩm",
         headerText: "Tên sản phẩm",
+        headerClassName: "catalog-product-heading",
         sortable: true,
         sortType: "text",
         sortValue: (item) => item.name,

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { getCampaignWindows } from '@/lib/campaign-schedule';
 import { mapD1ProductToHomepageProduct, getFlashSaleProducts, type ProductDbRow, type HomepageProduct } from './catalog.service';
 import { getStorefrontPricingContext, isFlashSaleActive, type PriceEvaluationContext } from './pricing.service';
 
@@ -45,7 +46,6 @@ function hasConfiguredItemDiscount(
   item: { salePrice: number; regularPrice?: number | null; quantityLimit?: number | null; soldCount?: number | null },
   mapped: HomepageProduct
 ): boolean {
-  if (mapped.isOnSale) return true;
   if (item.quantityLimit != null && (item.soldCount ?? 0) >= item.quantityLimit) return false;
   const sellingPrice = mapped.rawPrice ?? mapped.price;
   const refRegular = item.regularPrice ?? mapped.rawOriginalPrice ?? sellingPrice;
@@ -66,8 +66,29 @@ export async function getHotSaleCampaigns(context?: PriceEvaluationContext, at =
   }) : [];
   const byId = new Map(rows.map(row => [row.id, row]));
 
-  const tabs: { id: string; name: string; startAt: string; endAt: string; products: HomepageProduct[] }[] = campaigns.map(campaign => {
+  const campaignSlots = campaigns.flatMap(c => getCampaignWindows(c)
+    .filter(w => Date.parse(w.endAt) > at.getTime())
+    .map(w => ({ ...c, sourceId: c.id, id: c.scheduleJson ? `${c.id}:${w.startAt}` : c.id,
+      startAt: new Date(w.startAt), endAt: new Date(w.endAt) })));
+  const tabs: { id: string; name: string; startAt: string; endAt: string; products: HomepageProduct[] }[] = campaignSlots.map(campaign => {
     const isRunning = campaign.startAt <= at;
+    // Preview this slot's configured prices without changing live checkout pricing.
+    const displayAt = isRunning ? at : campaign.startAt;
+    const displayPricing: PriceEvaluationContext = {
+      ...pricing,
+      flashSaleEnabled: false,
+      activeCampaign: {
+        campaignId: campaign.sourceId,
+        campaignName: campaign.name,
+        startAt: campaign.startAt.toISOString(),
+        endAt: campaign.endAt.toISOString(),
+        items: new Map(campaign.items.map(item => [
+          item.variantId ? `${item.productId}:${item.variantId}` : item.productId,
+          { ...item, campaignId: campaign.sourceId, campaignName: campaign.name,
+            startAt: campaign.startAt.toISOString(), endAt: campaign.endAt.toISOString() },
+        ])),
+      },
+    };
     // Collapse multi-variant options belonging to the same productId into 1 card,
     // picking the first option (in Studio variant order) that actually has a discount.
     const itemsByProduct = new Map<string, typeof campaign.items>();
@@ -103,7 +124,7 @@ export async function getHotSaleCampaigns(context?: PriceEvaluationContext, at =
           if (!isExplicitVariantPublishedAvailable(published, item.variantId)) continue;
           const variants = row.variants.filter(v => v.id === item.variantId);
           if (!variants.length) continue;
-          const mapped = mapD1ProductToHomepageProduct({ ...row, variants } as unknown as ProductDbRow, undefined, pricing, at);
+          const mapped = mapD1ProductToHomepageProduct({ ...row, variants } as unknown as ProductDbRow, undefined, displayPricing, displayAt);
           candidates.push({
             mapped,
             hasConfiguredDiscount: hasConfiguredItemDiscount(item, mapped),
@@ -115,17 +136,17 @@ export async function getHotSaleCampaigns(context?: PriceEvaluationContext, at =
 
           if (orderedVariants.length > 0) {
             const variantCandidates = orderedVariants
-              .map(v => mapD1ProductToHomepageProduct({ ...row, variants: [v] } as unknown as ProductDbRow, undefined, pricing, at))
+              .map(v => mapD1ProductToHomepageProduct({ ...row, variants: [v] } as unknown as ProductDbRow, undefined, displayPricing, displayAt))
               .filter(p => p.availability !== 'UNAVAILABLE');
-            const discountedVariant = variantCandidates.find(p => p.isOnSale) ?? variantCandidates[0];
+            const discountedVariant = variantCandidates.find(p => p.saleCampaignId === campaign.sourceId) ?? variantCandidates[0];
             if (discountedVariant) {
               candidates.push({
                 mapped: discountedVariant,
-                hasConfiguredDiscount: Boolean(discountedVariant.isOnSale),
+                hasConfiguredDiscount: hasConfiguredItemDiscount(item, discountedVariant),
               });
             }
           } else {
-            const mapped = mapD1ProductToHomepageProduct({ ...row, variants: [] } as unknown as ProductDbRow, undefined, pricing, at);
+            const mapped = mapD1ProductToHomepageProduct({ ...row, variants: [] } as unknown as ProductDbRow, undefined, displayPricing, displayAt);
             candidates.push({
               mapped,
               hasConfiguredDiscount: hasConfiguredItemDiscount(item, mapped),
@@ -137,7 +158,7 @@ export async function getHotSaleCampaigns(context?: PriceEvaluationContext, at =
       if (!candidates.length) continue;
 
       if (isRunning) {
-        const chosen = candidates.find(c => c.mapped.isOnSale);
+        const chosen = candidates.find(c => c.mapped.saleCampaignId === campaign.sourceId);
         if (chosen) products.push(chosen.mapped);
       } else {
         const chosen = candidates.find(c => c.hasConfiguredDiscount) ?? candidates[0];

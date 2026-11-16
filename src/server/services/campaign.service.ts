@@ -1,4 +1,5 @@
 import { adminAuditStatements } from '../admin-context';
+import { buildCampaignWindows, getCampaignWindows, readDailyCampaignSchedule, type CampaignWindow } from '@/lib/campaign-schedule';
 import type { D1Database } from '@cloudflare/workers-types';
 import { getPrismaClient, getD1Database } from '@/lib/prisma';
 import { mediaEnvironment } from '@/server/media-http';
@@ -364,18 +365,18 @@ export async function assertNoPublishedOverlap(
   startAt: Date,
   endAt: Date,
   items: CampaignItem[],
-  db: D1Database
+  db: D1Database,
+  windows: CampaignWindow[] = [{ startAt: startAt.toISOString(), endAt: endAt.toISOString() }]
 ): Promise<void> {
   if (!items || items.length === 0) return;
 
-  const campStartMs = startAt.getTime();
-  const campEndMs = endAt.getTime();
   const startIso = startAt.toISOString();
   const endIso = endAt.toISOString();
 
   let query = `
-    SELECT c.id, c.name, c.startAt, c.endAt, i.productId, i.variantId
+    SELECT c.id, c.name, w.startAt, w.endAt, i.productId, i.variantId
     FROM PromotionCampaign c
+    JOIN PromotionCampaignWindow w ON w.campaignId = c.id
     JOIN PromotionCampaignItem i ON c.id = i.campaignId
     WHERE c.status = 'PUBLISHED'
       AND c.endAt > ?
@@ -403,7 +404,7 @@ export async function assertNoPublishedOverlap(
     const otherEndMs = new Date(other.endAt).getTime();
 
     // Temporal overlap condition: startA < endB && endA > startB
-    const hasOverlap = campStartMs < otherEndMs && campEndMs > otherStartMs;
+    const hasOverlap = windows.some(w => Date.parse(w.startAt) < otherEndMs && Date.parse(w.endAt) > otherStartMs);
     if (!hasOverlap) continue;
 
     for (const item of items) {
@@ -457,6 +458,7 @@ export async function listCampaigns(d1?: D1Database) {
     revision: (c as { revision?: number }).revision ?? 0,
     startAt: c.startAt.toISOString(),
     endAt: c.endAt.toISOString(),
+    schedule: readDailyCampaignSchedule(c.scheduleJson),
     itemCount: c.items.length,
     items: c.items,
     createdAt: c.createdAt.toISOString(),
@@ -480,7 +482,9 @@ export async function getCampaignById(id: string, d1?: D1Database) {
           quantityLimit: true,
           perCustomerLimit: true,
           soldCount: true,
-          product: { select: { name: true, price: true, originalPrice: true } },
+          product: { select: { name: true, price: true, originalPrice: true,
+            variants: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, sku: true, price: true, originalPrice: true, status: true } },
+          } },
           variant: { select: { name: true, sku: true, price: true, originalPrice: true } },
         },
       },
@@ -496,6 +500,7 @@ export async function getCampaignById(id: string, d1?: D1Database) {
     revision: (c as { revision?: number }).revision ?? 0,
     startAt: c.startAt.toISOString(),
     endAt: c.endAt.toISOString(),
+    schedule: readDailyCampaignSchedule(c.scheduleJson),
     items: c.items,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
@@ -595,8 +600,10 @@ export async function saveCampaign(
     );
   }
 
-  const startAt = new Date(valid.startAt);
-  const endAt = new Date(valid.endAt);
+  const windows = valid.schedule ? buildCampaignWindows(valid.schedule) : [{ startAt: valid.startAt, endAt: valid.endAt }];
+  const startAt = new Date(windows[0].startAt);
+  const endAt = new Date(windows.at(-1)!.endAt);
+  const scheduleJson = valid.schedule ? JSON.stringify(windows) : null;
   const now = new Date().toISOString();
 
   // 1. Strict Target & Price Validation (Product active, Variant belongs to Product, salePrice < actualPrice)
@@ -604,7 +611,7 @@ export async function saveCampaign(
 
   // 2. Strict Overlap Guard: CANNOT bypass overlap check even if saving directly as PUBLISHED
   if (valid.status === 'PUBLISHED') {
-    await assertNoPublishedOverlap(valid.id || null, startAt, endAt, valid.items, db);
+    await assertNoPublishedOverlap(valid.id || null, startAt, endAt, valid.items, db, windows);
   }
 
   if (valid.id && existingRecord) {
@@ -632,7 +639,7 @@ export async function saveCampaign(
     const updateCampStmt = db
       .prepare(
         `UPDATE PromotionCampaign 
-         SET name = ?, description = ?, status = ?, revision = ?, startAt = ?, endAt = ?, updatedAt = ?
+         SET name = ?, description = ?, status = ?, revision = ?, startAt = ?, endAt = ?, scheduleJson = ?, updatedAt = ?
          WHERE id = ?`
       )
       .bind(
@@ -642,6 +649,7 @@ export async function saveCampaign(
         nextRevision,
         startAt.toISOString(),
         endAt.toISOString(),
+        scheduleJson,
         now,
         valid.id
       );
@@ -728,8 +736,8 @@ export async function saveCampaign(
     const insertCampStmt = db
       .prepare(
         `INSERT INTO PromotionCampaign 
-         (id, name, description, status, revision, startAt, endAt, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`
+         (id, name, description, status, revision, startAt, endAt, scheduleJson, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`
       )
       .bind(
         campaignId,
@@ -738,6 +746,7 @@ export async function saveCampaign(
         valid.status || 'DRAFT',
         startAt.toISOString(),
         endAt.toISOString(),
+        scheduleJson,
         now,
         now
       );
@@ -807,7 +816,7 @@ export async function publishCampaign(
   const db = await getDb(dbArg);
 
   const campaign = await db
-    .prepare('SELECT id, name, description, status, revision, startAt, endAt FROM PromotionCampaign WHERE id = ?')
+    .prepare('SELECT id, name, description, status, revision, startAt, endAt, scheduleJson FROM PromotionCampaign WHERE id = ?')
     .bind(campaignId)
     .first<{
       id: string;
@@ -817,6 +826,7 @@ export async function publishCampaign(
       revision: number;
       startAt: string;
       endAt: string;
+      scheduleJson: string | null;
     }>();
 
   if (!campaign) {
@@ -887,7 +897,7 @@ export async function publishCampaign(
   // 2. Temporal overlap check
   const startAt = new Date(campaign.startAt);
   const endAt = new Date(campaign.endAt);
-  await assertNoPublishedOverlap(campaignId, startAt, endAt, campItems, db);
+  await assertNoPublishedOverlap(campaignId, startAt, endAt, campItems, db, getCampaignWindows(campaign));
 
   // 3. Atomic CAS publish:
   // Using WHERE id = ? triggers campaign_revision_guard and campaign_published_overlap_guard_update at DB level!
@@ -1045,10 +1055,10 @@ export async function resolveActiveCampaigns(
   // Query campaigns that are published and active at timestamp [startAt, endAt)
   const { results: activeCampaigns } = await db
     .prepare(
-      `SELECT id, name, startAt, endAt, revision
-       FROM PromotionCampaign
-       WHERE status = 'PUBLISHED' AND startAt <= ? AND endAt > ?
-       ORDER BY startAt DESC`
+      `SELECT c.id, c.name, w.startAt, w.endAt, c.revision
+       FROM PromotionCampaign c JOIN PromotionCampaignWindow w ON w.campaignId=c.id
+       WHERE c.status = 'PUBLISHED' AND w.startAt <= ? AND w.endAt > ?
+       ORDER BY w.startAt DESC`
     )
     .bind(atIso, atIso)
     .all<{

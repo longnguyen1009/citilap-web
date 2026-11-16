@@ -219,6 +219,7 @@ export const adminSettingsDocumentSchema = z.object({
 
   // Flash sale
   hotSaleBannerImage: safeUrlOrPath.default(""),
+  hotSaleCampaignOrder: z.array(z.string().trim().min(1).max(120)).max(1000).default([]),
   hotSaleMobileBannerImage: safeUrlOrPath.default(""),
   hotSaleBannerLink: safeUrlOrPath.default("/hot-sale"),
   flashSaleEnabled: z.union([z.boolean(), z.number().transform((n) => n !== 0)]).default(false),
@@ -339,6 +340,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
 
   flashSaleEnabled: true,
   hotSaleBannerImage: "",
+  hotSaleCampaignOrder: [],
   hotSaleMobileBannerImage: "",
   hotSaleBannerLink: "/hot-sale",
   flashSaleTitle: "Giá Sốc Giờ Vàng",
@@ -396,6 +398,7 @@ export const publicStorefrontSettingsSchema = z.object({
   productShippingItems: z.array(z.string()).default([]),
   productBanners: z.array(productBannerSchema).default([]),
   hotSaleBannerImage: z.string().default(""),
+  hotSaleCampaignOrder: z.array(z.string()).default([]),
   hotSaleMobileBannerImage: z.string().default(""),
   hotSaleBannerLink: z.string().default("/hot-sale"),
   storeName: z.string(),

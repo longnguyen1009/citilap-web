@@ -1,3 +1,5 @@
+import type { DailyCampaignSchedule } from '@/lib/campaign-schedule';
+
 export interface CampaignItemForm {
   displayName?: string;
   id?: string;
@@ -19,7 +21,8 @@ export interface CampaignItemDetail {
   quantityLimit?: number | null;
   perCustomerLimit?: number | null;
   soldCount?: number;
-  product?: { name: string; price?: number; originalPrice?: number | null };
+  product?: { name: string; price?: number; originalPrice?: number | null;
+    variants?: Array<{ id: string; name: string; sku?: string; price: number; originalPrice?: number | null; status?: string }> };
   variant?: { name: string; sku?: string; price?: number; originalPrice?: number | null } | null;
 }
 
@@ -31,6 +34,7 @@ export interface CampaignData {
   revision: number;
   startAt: string;
   endAt: string;
+  schedule?: DailyCampaignSchedule | null;
   itemCount: number;
   items?: CampaignItemDetail[];
   createdAt: string;

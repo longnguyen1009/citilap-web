@@ -3,7 +3,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 export async function catalogState(db: D1Database, now = Date.now()) {
   const [version, boundaries] = await db.batch<{ revision?: number; startAt?: string; endAt?: string }>([
     db.prepare('SELECT revision FROM SearchCatalogRevision WHERE id=1'),
-    db.prepare(`SELECT startAt,endAt FROM PromotionCampaign WHERE status='PUBLISHED'
+    db.prepare(`SELECT w.startAt,w.endAt FROM PromotionCampaignWindow w JOIN PromotionCampaign c ON c.id=w.campaignId WHERE c.status='PUBLISHED'
       UNION ALL SELECT json_extract(document,'$.flashSaleStartAt'),json_extract(document,'$.flashSaleEndAt')
       FROM SiteSettings WHERE id='site' AND json_extract(document,'$.flashSaleEnabled')=1`),
   ]);

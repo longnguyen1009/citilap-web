@@ -744,6 +744,7 @@ export const PromotionCampaignScalarFieldEnum = {
   description: 'description',
   status: 'status',
   revision: 'revision',
+  scheduleJson: 'scheduleJson',
   startAt: 'startAt',
   endAt: 'endAt',
   createdAt: 'createdAt',

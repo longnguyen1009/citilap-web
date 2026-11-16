@@ -40,6 +40,7 @@ export type PromotionCampaignMinAggregateOutputType = {
   description: string | null
   status: string | null
   revision: number | null
+  scheduleJson: string | null
   startAt: Date | null
   endAt: Date | null
   createdAt: Date | null
@@ -52,6 +53,7 @@ export type PromotionCampaignMaxAggregateOutputType = {
   description: string | null
   status: string | null
   revision: number | null
+  scheduleJson: string | null
   startAt: Date | null
   endAt: Date | null
   createdAt: Date | null
@@ -64,6 +66,7 @@ export type PromotionCampaignCountAggregateOutputType = {
   description: number
   status: number
   revision: number
+  scheduleJson: number
   startAt: number
   endAt: number
   createdAt: number
@@ -86,6 +89,7 @@ export type PromotionCampaignMinAggregateInputType = {
   description?: true
   status?: true
   revision?: true
+  scheduleJson?: true
   startAt?: true
   endAt?: true
   createdAt?: true
@@ -98,6 +102,7 @@ export type PromotionCampaignMaxAggregateInputType = {
   description?: true
   status?: true
   revision?: true
+  scheduleJson?: true
   startAt?: true
   endAt?: true
   createdAt?: true
@@ -110,6 +115,7 @@ export type PromotionCampaignCountAggregateInputType = {
   description?: true
   status?: true
   revision?: true
+  scheduleJson?: true
   startAt?: true
   endAt?: true
   createdAt?: true
@@ -209,6 +215,7 @@ export type PromotionCampaignGroupByOutputType = {
   description: string | null
   status: string
   revision: number
+  scheduleJson: string | null
   startAt: Date
   endAt: Date
   createdAt: Date
@@ -244,6 +251,7 @@ export type PromotionCampaignWhereInput = {
   description?: Prisma.StringNullableFilter<"PromotionCampaign"> | string | null
   status?: Prisma.StringFilter<"PromotionCampaign"> | string
   revision?: Prisma.IntFilter<"PromotionCampaign"> | number
+  scheduleJson?: Prisma.StringNullableFilter<"PromotionCampaign"> | string | null
   startAt?: Prisma.DateTimeFilter<"PromotionCampaign"> | Date | string
   endAt?: Prisma.DateTimeFilter<"PromotionCampaign"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"PromotionCampaign"> | Date | string
@@ -257,6 +265,7 @@ export type PromotionCampaignOrderByWithRelationInput = {
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   revision?: Prisma.SortOrder
+  scheduleJson?: Prisma.SortOrderInput | Prisma.SortOrder
   startAt?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -273,6 +282,7 @@ export type PromotionCampaignWhereUniqueInput = Prisma.AtLeast<{
   description?: Prisma.StringNullableFilter<"PromotionCampaign"> | string | null
   status?: Prisma.StringFilter<"PromotionCampaign"> | string
   revision?: Prisma.IntFilter<"PromotionCampaign"> | number
+  scheduleJson?: Prisma.StringNullableFilter<"PromotionCampaign"> | string | null
   startAt?: Prisma.DateTimeFilter<"PromotionCampaign"> | Date | string
   endAt?: Prisma.DateTimeFilter<"PromotionCampaign"> | Date | string
   createdAt?: Prisma.DateTimeFilter<"PromotionCampaign"> | Date | string
@@ -286,6 +296,7 @@ export type PromotionCampaignOrderByWithAggregationInput = {
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   revision?: Prisma.SortOrder
+  scheduleJson?: Prisma.SortOrderInput | Prisma.SortOrder
   startAt?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -306,6 +317,7 @@ export type PromotionCampaignScalarWhereWithAggregatesInput = {
   description?: Prisma.StringNullableWithAggregatesFilter<"PromotionCampaign"> | string | null
   status?: Prisma.StringWithAggregatesFilter<"PromotionCampaign"> | string
   revision?: Prisma.IntWithAggregatesFilter<"PromotionCampaign"> | number
+  scheduleJson?: Prisma.StringNullableWithAggregatesFilter<"PromotionCampaign"> | string | null
   startAt?: Prisma.DateTimeWithAggregatesFilter<"PromotionCampaign"> | Date | string
   endAt?: Prisma.DateTimeWithAggregatesFilter<"PromotionCampaign"> | Date | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PromotionCampaign"> | Date | string
@@ -318,6 +330,7 @@ export type PromotionCampaignCreateInput = {
   description?: string | null
   status?: string
   revision?: number
+  scheduleJson?: string | null
   startAt: Date | string
   endAt: Date | string
   createdAt?: Date | string
@@ -331,6 +344,7 @@ export type PromotionCampaignUncheckedCreateInput = {
   description?: string | null
   status?: string
   revision?: number
+  scheduleJson?: string | null
   startAt: Date | string
   endAt: Date | string
   createdAt?: Date | string
@@ -344,6 +358,7 @@ export type PromotionCampaignUpdateInput = {
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
+  scheduleJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -357,6 +372,7 @@ export type PromotionCampaignUncheckedUpdateInput = {
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
+  scheduleJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -370,6 +386,7 @@ export type PromotionCampaignCreateManyInput = {
   description?: string | null
   status?: string
   revision?: number
+  scheduleJson?: string | null
   startAt: Date | string
   endAt: Date | string
   createdAt?: Date | string
@@ -382,6 +399,7 @@ export type PromotionCampaignUpdateManyMutationInput = {
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
+  scheduleJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -394,6 +412,7 @@ export type PromotionCampaignUncheckedUpdateManyInput = {
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
+  scheduleJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -406,6 +425,7 @@ export type PromotionCampaignCountOrderByAggregateInput = {
   description?: Prisma.SortOrder
   status?: Prisma.SortOrder
   revision?: Prisma.SortOrder
+  scheduleJson?: Prisma.SortOrder
   startAt?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -422,6 +442,7 @@ export type PromotionCampaignMaxOrderByAggregateInput = {
   description?: Prisma.SortOrder
   status?: Prisma.SortOrder
   revision?: Prisma.SortOrder
+  scheduleJson?: Prisma.SortOrder
   startAt?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -434,6 +455,7 @@ export type PromotionCampaignMinOrderByAggregateInput = {
   description?: Prisma.SortOrder
   status?: Prisma.SortOrder
   revision?: Prisma.SortOrder
+  scheduleJson?: Prisma.SortOrder
   startAt?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -469,6 +491,7 @@ export type PromotionCampaignCreateWithoutItemsInput = {
   description?: string | null
   status?: string
   revision?: number
+  scheduleJson?: string | null
   startAt: Date | string
   endAt: Date | string
   createdAt?: Date | string
@@ -481,6 +504,7 @@ export type PromotionCampaignUncheckedCreateWithoutItemsInput = {
   description?: string | null
   status?: string
   revision?: number
+  scheduleJson?: string | null
   startAt: Date | string
   endAt: Date | string
   createdAt?: Date | string
@@ -509,6 +533,7 @@ export type PromotionCampaignUpdateWithoutItemsInput = {
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
+  scheduleJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -521,6 +546,7 @@ export type PromotionCampaignUncheckedUpdateWithoutItemsInput = {
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   revision?: Prisma.IntFieldUpdateOperationsInput | number
+  scheduleJson?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   startAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -564,6 +590,7 @@ export type PromotionCampaignSelect<ExtArgs extends runtime.Types.Extensions.Int
   description?: boolean
   status?: boolean
   revision?: boolean
+  scheduleJson?: boolean
   startAt?: boolean
   endAt?: boolean
   createdAt?: boolean
@@ -578,6 +605,7 @@ export type PromotionCampaignSelectCreateManyAndReturn<ExtArgs extends runtime.T
   description?: boolean
   status?: boolean
   revision?: boolean
+  scheduleJson?: boolean
   startAt?: boolean
   endAt?: boolean
   createdAt?: boolean
@@ -590,6 +618,7 @@ export type PromotionCampaignSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   description?: boolean
   status?: boolean
   revision?: boolean
+  scheduleJson?: boolean
   startAt?: boolean
   endAt?: boolean
   createdAt?: boolean
@@ -602,13 +631,14 @@ export type PromotionCampaignSelectScalar = {
   description?: boolean
   status?: boolean
   revision?: boolean
+  scheduleJson?: boolean
   startAt?: boolean
   endAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PromotionCampaignOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "status" | "revision" | "startAt" | "endAt" | "createdAt" | "updatedAt", ExtArgs["result"]["promotionCampaign"]>
+export type PromotionCampaignOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "description" | "status" | "revision" | "scheduleJson" | "startAt" | "endAt" | "createdAt" | "updatedAt", ExtArgs["result"]["promotionCampaign"]>
 export type PromotionCampaignInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   items?: boolean | Prisma.PromotionCampaign$itemsArgs<ExtArgs>
   _count?: boolean | Prisma.PromotionCampaignCountOutputTypeDefaultArgs<ExtArgs>
@@ -627,6 +657,7 @@ export type $PromotionCampaignPayload<ExtArgs extends runtime.Types.Extensions.I
     description: string | null
     status: string
     revision: number
+    scheduleJson: string | null
     startAt: Date
     endAt: Date
     createdAt: Date
@@ -1060,6 +1091,7 @@ export interface PromotionCampaignFieldRefs {
   readonly description: Prisma.FieldRef<"PromotionCampaign", 'String'>
   readonly status: Prisma.FieldRef<"PromotionCampaign", 'String'>
   readonly revision: Prisma.FieldRef<"PromotionCampaign", 'Int'>
+  readonly scheduleJson: Prisma.FieldRef<"PromotionCampaign", 'String'>
   readonly startAt: Prisma.FieldRef<"PromotionCampaign", 'DateTime'>
   readonly endAt: Prisma.FieldRef<"PromotionCampaign", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"PromotionCampaign", 'DateTime'>

@@ -36,6 +36,7 @@ export interface HomepageProduct {
   discount?: string; // Formatted badge discount string e.g. "-14%"
   isFlashSale?: boolean;
   isOnSale?: boolean;
+  saleCampaignId?: string;
   stock: number; // Transitional aggregate inventory
   warranty?: string;
   primaryImage: string | null;
@@ -853,6 +854,7 @@ export function mapD1ProductToHomepageProduct(
     discount: resolved.discountPercent ? `-${resolved.discountPercent}%` : undefined,
     isFlashSale: Boolean(row.isFlashSale),
     isOnSale: resolved.isOnSale,
+    saleCampaignId: resolved.campaign?.id,
     stock: typeof chosenVariant?.stock === "number" ? chosenVariant.stock : (typeof published?.stock === "number" ? published.stock : (typeof row.stock === "number" ? row.stock : 0)),
     warranty: formatShortWarrantyBadge(
       published?.warrantyType,

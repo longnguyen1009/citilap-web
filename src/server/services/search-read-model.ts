@@ -30,7 +30,7 @@ export async function readSearchPage(db: D1Database, options: SearchFilterOption
   for (let attempt = 0; attempt < 2; attempt++) {
     const version = await db.prepare('SELECT revision FROM SearchCatalogRevision WHERE id=1').first<{ revision: number }>();
     if (!version) throw new Error('Search catalog revision missing');
-    const boundaries = await db.prepare(`SELECT startAt,endAt FROM PromotionCampaign WHERE status='PUBLISHED'
+    const boundaries = await db.prepare(`SELECT w.startAt,w.endAt FROM PromotionCampaignWindow w JOIN PromotionCampaign c ON c.id=w.campaignId WHERE c.status='PUBLISHED'
       UNION ALL SELECT json_extract(document,'$.flashSaleStartAt'),json_extract(document,'$.flashSaleEndAt') FROM SiteSettings WHERE id='site'`)
       .all<{ startAt: string | null; endAt: string | null }>();
     const next = boundaries.results.flatMap(row => [row.startAt, row.endAt]).filter((v): v is string => !!v)

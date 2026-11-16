@@ -11,7 +11,6 @@ import type { PriceEvaluationContext } from '@/server/services/pricing.service';
 import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
 import {
   DEFAULT_FLASH_SALE_PRE_SHOW_HOURS,
-  isCampaignSlotInAutoShowWindow,
 } from '@/lib/flash-sale-schedule';
 
 async function resolveFallbackProductTabs() {
@@ -78,24 +77,9 @@ export default async function FlashSaleSection({
   const nowMs = evaluatedAt.getTime();
   const preShowHours =
     resolvedSettings?.flashSalePreShowHours ?? DEFAULT_FLASH_SALE_PRE_SHOW_HOURS;
-  const hasExplicitCampaign = campaigns.some((c) => c.id !== 'site-flash-sale');
-  const effectiveCampaigns = (
-    hasExplicitCampaign ? campaigns.filter((c) => c.id !== 'site-flash-sale') : campaigns
-  ).filter((c) => Date.parse(c.endAt) > nowMs);
-
-  // On Homepage (!showEmpty), auto-show only campaign groups with at least one slot
-  // currently active or within `preShowHours` before start, and auto-hide once ended.
-  const visibleGroups = new Set<string>();
-  for (const c of effectiveCampaigns) {
-    if (isCampaignSlotInAutoShowWindow(c.startAt, c.endAt, nowMs, preShowHours)) {
-      visibleGroups.add(c.name.trim().toLocaleLowerCase('vi-VN'));
-    }
-  }
-  const storefrontCampaigns = showEmpty
-    ? effectiveCampaigns
-    : effectiveCampaigns.filter((c) =>
-        visibleGroups.has(c.name.trim().toLocaleLowerCase('vi-VN'))
-      );
+  // Keep future slots mounted so the client can refresh at pre-show/start/end.
+  // Filtering them on the server prevents an already open homepage from waking up.
+  const storefrontCampaigns = campaigns.filter((c) => Date.parse(c.endAt) > nowMs);
 
   const hasRunningCampaign = storefrontCampaigns.some(
     (c) => Date.parse(c.startAt) <= nowMs && Date.parse(c.endAt) > nowMs
@@ -132,6 +116,7 @@ export default async function FlashSaleSection({
     <>
       <HotSaleCampaigns
         campaigns={storefrontCampaigns}
+        campaignOrder={resolvedSettings?.hotSaleCampaignOrder}
         bannerImage={bannerImage}
         mobileBannerImage={mobileBannerImage}
         bannerLink={bannerLink}

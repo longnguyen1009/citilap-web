@@ -242,7 +242,7 @@ export const getCachedCatalogState = cache(async (now = Date.now()) => {
 export const getCachedHotSaleCampaigns = cache(async (now = Date.now()) => {
   const settings = await getStorefrontSettings().catch(() => null);
   const preShowHours = settings?.flashSalePreShowHours ?? DEFAULT_FLASH_SALE_PRE_SHOW_HOURS;
-  const cached = await cachedJson('public-hot-sale-campaigns-v2', PUBLIC_CMS_TTL_SECONDS, async () => {
+  const cached = await cachedJson('public-hot-sale-campaigns-v4', PUBLIC_CMS_TTL_SECONDS, async () => {
     const fetchNow = Date.now();
     const { getHotSaleCampaigns } = await import('@/server/services/hot-sale.service');
     const campaigns = await getHotSaleCampaigns(undefined, new Date(fetchNow));

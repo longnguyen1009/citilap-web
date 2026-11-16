@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import {
   Check,
+  Flame,
   Gift,
   Phone,
   ShoppingCart,
@@ -27,6 +28,7 @@ import ProductQuickCheckoutModal from "./ProductQuickCheckoutModal";
 import ProductFloatingBar from "./ProductFloatingBar";
 import InstallmentCalculatorModal from "./InstallmentCalculatorModal";
 import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
+import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export interface HeroVariantItem {
   id: string;
@@ -35,6 +37,7 @@ export interface HeroVariantItem {
   subSpecs?: string;
   price: number;
   originalPrice?: number | null;
+  isFlashSale?: boolean;
   tag?: string;
   condition?: string;
   conditionLabel?: string;
@@ -270,12 +273,12 @@ export default function ProductHeroSection({
               {productName}
             </h1>
 
-            <div className="mt-2 flex items-center justify-between gap-2 text-xs sm:text-sm text-slate-600">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 min-w-0">
+            <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 text-xs text-slate-600">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0">
                 {reviewCount > 0 && (
                   <a
                     href="#danh-gia-khach-hang"
-                    className="inline-flex min-h-11 items-center gap-1 text-amber-500 font-bold hover:underline"
+                    className="inline-flex min-h-11 items-center gap-1 whitespace-nowrap text-amber-500 font-bold hover:underline"
                   >
                     <span aria-hidden="true">{'★'.repeat(Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}{'☆'.repeat(5 - Math.max(0, Math.min(5, Math.round(Number(averageRating) || 0))))}</span>
                     <span className="text-slate-800 ml-0.5">{averageRating}</span>
@@ -283,17 +286,14 @@ export default function ProductHeroSection({
                   </a>
                 )}
                 {brandName && brandName.trim() && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
-                    <span>
-                      Hãng:{" "}
-                      <strong className="text-blue-600 font-semibold">{brandName.trim()}</strong>
-                    </span>
+                  <span className="inline-flex min-h-11 items-center" aria-label={`Hãng ${brandName.trim()}`}>
+                    <BrandLogo brand={brandName.trim()} />
                   </span>
                 )}
                 {modelCode && modelCode.trim() && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
+                  <span className="inline-flex min-h-11 items-center whitespace-nowrap">
                     <span>
-                      Mã model:{" "}
+                      Model:{" "}
                       <strong className="text-slate-800 font-semibold font-mono">
                         {modelCode.trim()}
                       </strong>
@@ -301,7 +301,7 @@ export default function ProductHeroSection({
                   </span>
                 )}
                 {!modelCode?.trim() && productionYear && productionYear.trim() && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
+                  <span className="inline-flex min-h-11 items-center whitespace-nowrap">
                     <span>
                       Năm SX:{" "}
                       <strong className="text-slate-800 font-semibold">
@@ -311,7 +311,7 @@ export default function ProductHeroSection({
                   </span>
                 )}
                 {hasSpecs && (
-                  <span className="inline-flex items-center gap-1.5 before:content-['•'] before:text-slate-300 first:before:hidden">
+                  <span className="inline-flex items-center whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => {
@@ -324,12 +324,12 @@ export default function ProductHeroSection({
                       <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
-                      <span>Xem cấu hình chi tiết</span>
+                      <span>Cấu hình chi tiết</span>
                     </button>
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex min-h-11 items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
@@ -478,7 +478,11 @@ export default function ProductHeroSection({
                       onClick={() => handleSelectVariant(item)}
                       aria-pressed={isSelected}
                       className={`relative min-h-11 text-left p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 transition-all flex flex-col justify-between cursor-pointer select-none ${
-                        isSelected
+                        item.isFlashSale
+                          ? isSelected
+                            ? "border-rose-600 bg-rose-50 text-rose-950 shadow-xs ring-2 ring-rose-500/25"
+                            : "border-rose-300 bg-gradient-to-b from-rose-50 to-white hover:border-rose-500 text-slate-800"
+                          : isSelected
                           ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/40 text-blue-950 shadow-xs ring-2 ring-blue-500/25"
                           : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/60 text-slate-800"
                       }`}
@@ -498,6 +502,12 @@ export default function ProductHeroSection({
                       )}
 
                       <div>
+                        {item.isFlashSale && (
+                          <span className="mb-1.5 inline-flex items-center gap-1 rounded-md bg-rose-600 px-1.5 py-0.5 text-[10px] sm:text-xs font-black text-white">
+                            <Flame aria-hidden="true" className="h-3 w-3 shrink-0" />
+                            FLASH SALE
+                          </span>
+                        )}
                         <span className={`text-xs sm:text-sm font-black uppercase tracking-tight block pr-5 sm:pr-6 leading-snug ${
                           isSelected ? "text-blue-950" : "text-slate-900"
                         }`}>

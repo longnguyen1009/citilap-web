@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { buildCampaignWindows } from '@/lib/campaign-schedule';
 
 export const campaignStatusSchema = z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]);
 export type CampaignStatus = z.infer<typeof campaignStatusSchema>;
@@ -48,11 +49,21 @@ export const campaignDocumentSchema = z
     description: z.string().max(500).nullable().optional(),
     status: campaignStatusSchema.default("DRAFT"),
     revision: z.number().int().nonnegative().optional().default(0),
-    startAt: z.string().min(1, "Thời điểm bắt đầu không được để trống"), // ISO 8601 UTC
-    endAt: z.string().min(1, "Thời điểm kết thúc không được để trống"), // ISO 8601 UTC
+    startAt: z.iso.datetime({ offset: true, message: "Ngày giờ bắt đầu phải kèm múi giờ (UTC hoặc UTC+7)." }),
+    endAt: z.iso.datetime({ offset: true, message: "Ngày giờ kết thúc phải kèm múi giờ (UTC hoặc UTC+7)." }),
+    schedule: z.object({
+      mode: z.literal('daily_slots'),
+      startDate: z.string(),
+      endDate: z.string(),
+      slots: z.array(z.object({ startTime: z.string(), endTime: z.string() })).min(1).max(12),
+    }).nullable().optional(),
     items: z.array(campaignItemSchema).default([]),
   })
   .superRefine((data, ctx) => {
+    if (data.schedule) {
+      try { buildCampaignWindows(data.schedule); }
+      catch (error) { ctx.addIssue({ code: 'custom', path: ['schedule'], message: (error as Error).message }); }
+    }
     const start = new Date(data.startAt).getTime();
     const end = new Date(data.endAt).getTime();
     if (Number.isNaN(start)) {

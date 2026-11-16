@@ -304,12 +304,12 @@ export default function CampaignItemsTable({
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                             {hasBlankSale ? (
-                              <span className="text-slate-400">
-                                Bỏ trống = không giảm option này
+                              <span className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-semibold text-slate-600">
+                                Không giảm giá · dùng giá bán thường
                               </span>
                             ) : isHomepageWinner && isValidSale ? (
                               <span className="inline-flex items-center rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 font-semibold text-emerald-700">
-                                Hiển thị ngoài Homepage ({sale.toLocaleString('vi-VN')}₫ · -{discountPct}%)
+                                Giảm {discountPct}% · ưu tiên homepage ({sale.toLocaleString('vi-VN')}₫)
                               </span>
                             ) : isValidSale && discountPct !== null ? (
                               <span className="inline-flex items-center rounded bg-rose-50 px-1.5 py-0.5 font-semibold text-rose-700">
@@ -366,9 +366,9 @@ export default function CampaignItemsTable({
                           {!readOnly && (
                             <button
                               type="button"
-                              onClick={() => onRemoveRow(idx)}
+                              onClick={() => onChangeRow(idx, 'salePrice', '')}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
-                              title="Xóa option này"
+                              title="Bỏ giảm giá option này"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>

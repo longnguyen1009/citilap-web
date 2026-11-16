@@ -232,13 +232,7 @@ export function ProductGallery({
           </div>
 
           <div className="shrink-0">
-            {inStock ? (
-              <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/95 px-2.5 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold text-emerald-700 shadow-2xs">
-                <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="sm:hidden">Sẵn hàng HN &amp; BN</span>
-                <span className="hidden sm:inline">Sẵn hàng tại HN &amp; Bắc Ninh</span>
-              </span>
-            ) : (
+            {!inStock && (
               <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-amber-200 bg-amber-50/95 px-2.5 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold text-amber-700 shadow-2xs">
                 <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-500 shrink-0" />
                 <span className="sm:hidden">Đặt trước · Liên hệ</span>
@@ -390,19 +384,6 @@ export function ProductGallery({
           }}
           className="fixed inset-0 z-50 m-0 h-dvh max-h-none w-full max-w-none flex-col items-center justify-center bg-slate-950/90 p-2 sm:p-4 backdrop-blur-xs overscroll-contain open:flex backdrop:bg-transparent"
         >
-          <button
-            autoFocus
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setLightboxOpen(false);
-            }}
-            className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/25 cursor-pointer"
-            aria-label="Đóng ảnh phóng to"
-          >
-            <X className="h-6 w-6" />
-          </button>
-
           <div className="relative flex w-full max-w-[880px] items-center justify-center gap-1.5 sm:gap-3">
             {normalizedImages.length > 1 && (
               <button
@@ -425,8 +406,17 @@ export function ProductGallery({
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
               onTouchCancel={handleTouchCancel}
-              className="flex flex-col h-[min(58dvh,calc(100dvh-9rem))] sm:h-[min(68dvh,calc(100dvh-9rem))] max-h-[640px] min-w-0 flex-1 max-w-[760px] items-center justify-between overflow-hidden rounded-2xl bg-white p-3 sm:p-6 shadow-2xl touch-pan-y touch-pinch-zoom"
+              className="relative flex flex-col h-[min(58dvh,calc(100dvh-9rem))] sm:h-[min(68dvh,calc(100dvh-9rem))] max-h-[640px] min-w-0 flex-1 max-w-[760px] items-center justify-between overflow-hidden rounded-2xl bg-white p-3 sm:p-6 shadow-2xl touch-pan-y touch-pinch-zoom"
             >
+              <button
+                autoFocus
+                type="button"
+                onClick={() => setLightboxOpen(false)}
+                className="absolute top-2 right-2 z-10 flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-sm transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600 cursor-pointer"
+                aria-label="Đóng ảnh phóng to"
+              >
+                <X className="h-6 w-6" />
+              </button>
               <div className="flex-1 w-full min-h-0 flex items-center justify-center p-2">
                 <img
                   src={activeImg.url}

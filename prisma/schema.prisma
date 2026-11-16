@@ -732,6 +732,7 @@ model PromotionCampaign {
   description String?
   status      String   @default("DRAFT") // DRAFT, PUBLISHED, ARCHIVED
   revision    Int      @default(0)
+  scheduleJson String? // Daily occurrences, stored under one campaign
   startAt     DateTime
   endAt       DateTime
   items       PromotionCampaignItem[]
