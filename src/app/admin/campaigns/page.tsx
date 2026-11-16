@@ -176,12 +176,16 @@ export default function AdminCampaignsPage() {
       setNowMs(Date.now());
       void fetchCampaigns();
     }, 0);
-    const clock = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => {
-      clearTimeout(timer);
-      clearInterval(clock);
-    };
+    return () => clearTimeout(timer);
   }, [fetchCampaigns]);
+
+  useEffect(() => {
+    if (isEditorOpen) return;
+    const clock = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(clock);
+  }, [isEditorOpen]);
+
+  const closeEditor = useCallback(() => setIsEditorOpen(false), []);
 
   const campaignCounts = useMemo(() => {
     let active = 0;
@@ -372,15 +376,22 @@ export default function AdminCampaignsPage() {
     ]);
   };
 
-  const handleRemoveItem = (index: number) => {
+  const handleRemoveItem = useCallback((index: number) => {
     setFormItems((prev) => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const handleItemChange = (index: number, field: keyof CampaignItemForm, value: string) => {
-    setFormItems((prev) =>
-      prev.map((it, i) => (i === index ? { ...it, [field]: value } : it))
-    );
-  };
+  const handleRemoveProduct = useCallback((productId: string) => {
+    setFormItems((prev) => prev.filter((it) => it.productId !== productId));
+  }, []);
+
+  const handleItemChange = useCallback(
+    (index: number, field: keyof CampaignItemForm, value: string) => {
+      setFormItems((prev) =>
+        prev.map((it, i) => (i === index ? { ...it, [field]: value } : it))
+      );
+    },
+    []
+  );
 
   const applyBulkDiscountPct = (pct: number) => {
     setFormItems((prev) =>
@@ -478,14 +489,29 @@ export default function AdminCampaignsPage() {
         windows = expanded;
       }
 
-      const willPublishAny = enabled && windows.some((w) => new Date(w.endAt).getTime() > Date.now());
-      if (willPublishAny && formItems.length < 1) {
-        throw new Error('Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.');
+      const productsWithValidDiscount = new Set(
+        formItems
+          .filter((it) => it.productId.trim() && String(it.salePrice ?? '').trim() !== '')
+          .map((it) => it.productId.trim())
+      );
+
+      for (const it of formItems) {
+        const pid = it.productId.trim();
+        if (pid && !productsWithValidDiscount.has(pid)) {
+          const label = it.displayName?.split(' · ')[0] || pid;
+          throw new Error(
+            `Sản phẩm "${label}": Vui lòng nhập Giá sale cho ít nhất 1 option (hoặc dùng nút -3%, -5%, -10%...).`
+          );
+        }
       }
 
-      const parsedItems = formItems.map((it, idx) => {
+      const parsedItems = formItems.flatMap((it, idx) => {
         if (!it.productId.trim()) {
           throw new Error(`Dòng ${idx + 1}: Vui lòng nhập Product ID.`);
+        }
+        if (String(it.salePrice ?? '').trim() === '') {
+          // Un-discounted option inside a multi-option product: omit from campaign items so discounted options apply cleanly.
+          return [];
         }
         const salePrice = Number(it.salePrice);
         if (!Number.isFinite(salePrice) || salePrice <= 0) {
@@ -532,7 +558,7 @@ export default function AdminCampaignsPage() {
           );
         }
 
-        return {
+        return [{
           id: it.id,
           productId: it.productId.trim(),
           variantId: it.variantId && it.variantId.trim() ? it.variantId.trim() : null,
@@ -541,8 +567,13 @@ export default function AdminCampaignsPage() {
           quantityLimit,
           perCustomerLimit,
           soldCount: typeof it.soldCount === 'number' && it.soldCount >= 0 ? it.soldCount : 0,
-        };
+        }];
       });
+
+      const willPublishAny = enabled && windows.some((w) => new Date(w.endAt).getTime() > Date.now());
+      if (willPublishAny && parsedItems.length < 1) {
+        throw new Error('Chiến dịch xuất bản phải có ít nhất 1 sản phẩm khuyến mại.');
+      }
 
       let savedCount = 0;
       for (let idx = 0; idx < windows.length; idx++) {
@@ -999,7 +1030,7 @@ export default function AdminCampaignsPage() {
         formRevision={formRevision}
         saving={saving}
         formError={formError}
-        onClose={() => setIsEditorOpen(false)}
+        onClose={closeEditor}
         onChangeName={setFormName}
         onChangeDescription={setFormDescription}
         onChangeEnabled={setFormEnabled}
@@ -1025,6 +1056,7 @@ export default function AdminCampaignsPage() {
           ])
         }
         onRemoveItem={handleRemoveItem}
+        onRemoveProduct={handleRemoveProduct}
         onChangeItem={handleItemChange}
         onApplyBulkDiscountPct={applyBulkDiscountPct}
         onSave={(enabled) => void handleSave(enabled)}

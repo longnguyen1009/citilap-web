@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useRef } from 'react';
 import { Zap, X, AlertCircle, AlertTriangle, Archive, Copy, Plus, Trash2, Clock } from 'lucide-react';
 import { type CampaignPickerTarget } from '@/components/admin/products/CampaignProductPicker';
 import CampaignItemsTable from './CampaignItemsTable';
@@ -54,6 +54,7 @@ interface CampaignFormModalProps {
   onAddEmptyItem: () => void;
   onPickerAddItems: (targets: CampaignPickerTarget[]) => void;
   onRemoveItem: (index: number) => void;
+  onRemoveProduct?: (productId: string) => void;
   onChangeItem: (index: number, field: keyof CampaignItemForm, value: string) => void;
   onApplyBulkDiscountPct: (pct: number) => void;
   onSave: (enabled?: boolean) => void;
@@ -92,6 +93,7 @@ export default function CampaignFormModal({
   onAddEmptyItem,
   onPickerAddItems,
   onRemoveItem,
+  onRemoveProduct,
   onChangeItem,
   onApplyBulkDiscountPct,
   onSave,
@@ -100,6 +102,11 @@ export default function CampaignFormModal({
   const nameInputId = useId();
   const descInputId = useId();
   const daysInputId = useId();
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -109,7 +116,7 @@ export default function CampaignFormModal({
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
       if (event.key !== 'Tab' || !dialog) return;
       const items = [
@@ -132,7 +139,7 @@ export default function CampaignFormModal({
       document.removeEventListener('keydown', handleKey);
       previous?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const effectiveMode: ScheduleMode = scheduleMode;
 
@@ -750,6 +757,7 @@ export default function CampaignFormModal({
             onAddEmptyRow={onAddEmptyItem}
             onPickerAdd={onPickerAddItems}
             onRemoveRow={onRemoveItem}
+            onRemoveProduct={onRemoveProduct}
             onChangeRow={onChangeItem}
             onApplyBulkDiscountPct={onApplyBulkDiscountPct}
           />

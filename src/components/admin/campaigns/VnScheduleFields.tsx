@@ -132,7 +132,7 @@ export function VnDateField({
     } else {
       tryCommit(next);
     }
-    if (digits.length === maxLen && digits.length > prevLen && nextRef?.current) {
+    if (digits.length === maxLen && digits.length > prevLen && nextRef?.current && !nextRef.current.value) {
       nextRef.current.focus();
       nextRef.current.select();
     }
@@ -289,8 +289,10 @@ export function VnDateField({
           aria-invalid={touchedInvalid || undefined}
           placeholder="DD"
           value={segments.day}
+          onMouseDown={(e) => {
+            if (document.activeElement !== e.currentTarget) justFocusedRef.current = e.currentTarget;
+          }}
           onFocus={(e) => {
-            justFocusedRef.current = e.currentTarget;
             e.currentTarget.select();
           }}
           onMouseUp={(e) => selectSegmentOnMouseUp(e, justFocusedRef)}
@@ -315,8 +317,10 @@ export function VnDateField({
           aria-invalid={touchedInvalid || undefined}
           placeholder="MM"
           value={segments.month}
+          onMouseDown={(e) => {
+            if (document.activeElement !== e.currentTarget) justFocusedRef.current = e.currentTarget;
+          }}
           onFocus={(e) => {
-            justFocusedRef.current = e.currentTarget;
             e.currentTarget.select();
           }}
           onMouseUp={(e) => selectSegmentOnMouseUp(e, justFocusedRef)}
@@ -341,8 +345,10 @@ export function VnDateField({
           aria-invalid={touchedInvalid || undefined}
           placeholder="YYYY"
           value={segments.year}
+          onMouseDown={(e) => {
+            if (document.activeElement !== e.currentTarget) justFocusedRef.current = e.currentTarget;
+          }}
           onFocus={(e) => {
-            justFocusedRef.current = e.currentTarget;
             e.currentTarget.select();
           }}
           onMouseUp={(e) => selectSegmentOnMouseUp(e, justFocusedRef)}
@@ -436,7 +442,7 @@ export function VnTimeField({
     const next = { ...segments, [part]: digits };
     setSegments(next);
     tryCommit(next);
-    if (digits.length === 2 && digits.length > prevLen && nextRef?.current) {
+    if (digits.length === 2 && digits.length > prevLen && nextRef?.current && !nextRef.current.value) {
       nextRef.current.focus();
       nextRef.current.select();
     }
@@ -579,8 +585,10 @@ export function VnTimeField({
           aria-invalid={touchedInvalid || undefined}
           placeholder="HH"
           value={segments.hour}
+          onMouseDown={(e) => {
+            if (document.activeElement !== e.currentTarget) justFocusedRef.current = e.currentTarget;
+          }}
           onFocus={(e) => {
-            justFocusedRef.current = e.currentTarget;
             e.currentTarget.select();
           }}
           onMouseUp={(e) => selectSegmentOnMouseUp(e, justFocusedRef)}
@@ -605,8 +613,10 @@ export function VnTimeField({
           aria-invalid={touchedInvalid || undefined}
           placeholder="mm"
           value={segments.minute}
+          onMouseDown={(e) => {
+            if (document.activeElement !== e.currentTarget) justFocusedRef.current = e.currentTarget;
+          }}
           onFocus={(e) => {
-            justFocusedRef.current = e.currentTarget;
             e.currentTarget.select();
           }}
           onMouseUp={(e) => selectSegmentOnMouseUp(e, justFocusedRef)}
