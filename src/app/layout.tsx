@@ -133,6 +133,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <head>
         <script
+          async
+          src="https://www.googletagmanager.com/gtm.js?id=GTM-PDBZQPL4"
+        />
+        <script
+          id="google-tag-init"
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());`,
+          }}
+        />
+        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: structuredDataString }}
         />
