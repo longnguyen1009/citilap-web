@@ -14,7 +14,13 @@ import { ChevronRight, Calendar, User, ArrowLeft, Tag, Sparkles } from "lucide-r
 import ProductCard from "@/components/product/ProductCard";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { businessProfile } from "@/config/business-profile";
-import { generateBreadcrumbJsonLd, serializeJsonLd } from "@/lib/seo-helpers";
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
 
 interface PostDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -25,18 +31,28 @@ export async function generateMetadata({ params }: PostDetailPageProps): Promise
   try {
     const post = await getCachedPublicPost(slug);
     if (!post) throw new Error("not found");
-    const title = `${post.seo.title} | ${businessProfile.brandName}`;
-    const description = post.seo.description || post.excerpt || undefined;
+    const rawTitle = post.seo.title || post.title;
+    const titleString = formatSeoTitleString(rawTitle, post.title);
+    const description = cleanSeoDescription(
+      post.seo.description || post.excerpt,
+      `${post.title} — Bài viết chia sẻ kinh nghiệm chọn mua và sử dụng laptop tại CitiLap.`
+    );
 
-    const ogImage = post.seo.ogImageUrl || post.coverImage?.url || '/brand/marketing-banner.webp';
+    const rawOgImage = post.seo.ogImageUrl || post.coverImage?.url || businessProfile.bannerAsset;
+    const ogImage = /^https?:\/\//i.test(rawOgImage)
+      ? rawOgImage
+      : `${businessProfile.canonicalSiteUrl}${rawOgImage.startsWith("/") ? "" : "/"}${rawOgImage}`;
 
     return {
-      title,
+      title: formatSeoTitle(rawTitle, post.title),
       description,
       openGraph: {
-        title,
+        title: titleString,
         description,
+        url: `${businessProfile.canonicalSiteUrl}/news/${post.slug}`,
         type: "article",
+        siteName: businessProfile.brandName,
+        locale: "vi_VN",
         publishedTime: post.publishedAt,
         modifiedTime: post.updatedAt,
         authors: post.authorName ? [post.authorName] : undefined,
@@ -44,7 +60,7 @@ export async function generateMetadata({ params }: PostDetailPageProps): Promise
       },
       twitter: {
         card: "summary_large_image",
-        title,
+        title: titleString,
         description,
         images: [ogImage],
       },
@@ -54,7 +70,8 @@ export async function generateMetadata({ params }: PostDetailPageProps): Promise
     };
   } catch {
     return {
-      title: `Bài viết không tồn tại | ${businessProfile.brandName}`,
+      title: formatSeoTitle("Bài viết không tồn tại"),
+      robots: { index: false, follow: false },
     };
   }
 }

@@ -5,6 +5,15 @@ import { sanitizeHtml } from "@/lib/sanitize-html";
 import { businessProfile } from "@/config/business-profile";
 import { getPublishedNavigation, getCachedPublicPage } from '@/server/services/storefront-cms.service';
 import CategoryPage, { generateMetadata as categoryMetadata } from '@/components/category/CategoryPage';
+import {
+  cleanSeoDescription,
+  extractFaqsFromHtml,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  generateFaqJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
 
 interface CustomPageProps {
   params: Promise<{ slug: string }>;
@@ -18,27 +27,44 @@ export async function generateMetadata({ params, searchParams }: CustomPageProps
   try {
     const page = await getCachedPublicPage(slug);
     if (!page) throw new Error("not found");
-    const title = `${page.seo.title} | ${businessProfile.brandName}`;
-    const description = page.seo.description || `Thông tin chính thức từ ${businessProfile.brandName}.`;
+    const rawTitle = page.seo.title || page.title;
+    const titleString = formatSeoTitleString(rawTitle);
+    const description = cleanSeoDescription(
+      page.seo.description,
+      `${page.title} — Thông tin chính thức từ ${businessProfile.brandName}.`,
+      { rejectPolicyBoilerplate: true }
+    );
+    const canonicalUrl = `${businessProfile.canonicalSiteUrl}/${page.slug}`;
+    const ogImage = page.seo.ogImageUrl || `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
 
     return {
-      title,
+      title: formatSeoTitle(rawTitle),
       description,
       openGraph: {
-        title,
+        title: titleString,
         description,
+        url: canonicalUrl,
         type: "article",
+        siteName: businessProfile.brandName,
+        locale: "vi_VN",
         publishedTime: page.publishedAt,
         modifiedTime: page.updatedAt,
-        images: page.seo.ogImageUrl ? [{ url: page.seo.ogImageUrl }] : undefined,
+        images: [{ url: ogImage, alt: page.title }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: titleString,
+        description,
+        images: [ogImage],
       },
       alternates: {
-        canonical: `${businessProfile.canonicalSiteUrl}/${page.slug}`,
+        canonical: canonicalUrl,
       },
     };
   } catch {
     return {
-      title: `Trang không tồn tại | ${businessProfile.brandName}`,
+      title: formatSeoTitle("Trang không tồn tại"),
+      robots: { index: false, follow: false },
     };
   }
 }
@@ -62,14 +88,27 @@ export default async function CustomCmsPage({ params, searchParams }: CustomPage
     permanentRedirect(`/${encodeURIComponent(page.slug)}`);
   }
 
+  const faqs = extractFaqsFromHtml(page.contentHtml, page.slug === 'cau-hoi-thuong-gap');
+  const faqJsonLd = faqs.length > 0 ? generateFaqJsonLd(faqs) : null;
+  const breadcrumbJsonLd = generateBreadcrumbJsonLd([
+    { name: "Trang chủ", href: "/" },
+    { name: page.title, href: `/${page.slug}` },
+  ]);
+
   return (
     <PolicyLayout
       currentSlug={page.slug}
       title={page.title}
-      subtitle={page.seo.description || undefined}
+      subtitle={cleanSeoDescription(page.seo.description, `${page.title} tại ${businessProfile.brandName}.`, { rejectPolicyBoilerplate: true })}
       isPublished={true}
       lastUpdated={new Date(page.updatedAt).toLocaleDateString("vi-VN")}
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(faqJsonLd ? [breadcrumbJsonLd, faqJsonLd] : breadcrumbJsonLd),
+        }}
+      />
       <div
         className="prose prose-sm sm:prose-base max-w-none text-slate-700 leading-relaxed"
         dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.contentHtml) }}

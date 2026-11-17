@@ -3,26 +3,60 @@ import PolicyLayout from "@/components/policy/PolicyLayout";
 import { businessProfile } from "@/config/business-profile";
 import { getCachedSystemPageResolution, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
+
+const warrantyFallbackDesc = `Chính sách bảo hành laptop & phụ kiện tại ${businessProfile.brandName}: gói bảo hành linh hoạt 3, 6 hoặc 12 tháng, lỗi 1 đổi 1 trong 7 ngày đầu và quy trình tiếp nhận minh bạch tại Hà Nội & Bắc Ninh.`;
 
 export async function generateMetadata(): Promise<Metadata> {
+  const canonicalUrl = `${businessProfile.canonicalSiteUrl}/chinh-sach-bao-hanh`;
+  const ogFallback = `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
   try {
     const resolution = await getCachedSystemPageResolution("WARRANTY");
-    if (resolution.state === "PUBLISHED") {
-      const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
-      const description = resolution.page.seo.description || `Quy định về bảo hành laptop tại ${businessProfile.brandName}.`;
+    if (resolution.state === "UNPUBLISHED") {
       return {
-        title,
+        title: formatSeoTitle("Chính sách bảo hành sản phẩm"),
+        description: warrantyFallbackDesc,
+        alternates: { canonical: canonicalUrl },
+        robots: { index: false, follow: true },
+      };
+    }
+    if (resolution.state === "PUBLISHED") {
+      const rawTitle = resolution.page.seo.title || "Chính sách bảo hành sản phẩm";
+      const titleString = formatSeoTitleString(rawTitle);
+      const description = cleanSeoDescription(
+        resolution.page.seo.description,
+        warrantyFallbackDesc,
+        { rejectPolicyBoilerplate: true }
+      );
+      const ogImage = resolution.page.seo.ogImageUrl || ogFallback;
+      return {
+        title: formatSeoTitle(rawTitle),
         description,
         openGraph: {
-          title,
+          title: titleString,
           description,
+          url: canonicalUrl,
           type: "article",
+          siteName: businessProfile.brandName,
+          locale: "vi_VN",
           publishedTime: resolution.page.publishedAt,
           modifiedTime: resolution.page.updatedAt,
-          images: resolution.page.seo.ogImageUrl ? [{ url: resolution.page.seo.ogImageUrl }] : undefined,
+          images: [{ url: ogImage, alt: titleString }],
+        },
+        twitter: {
+          card: "summary_large_image",
+          title: titleString,
+          description,
+          images: [ogImage],
         },
         alternates: {
-          canonical: `${businessProfile.canonicalSiteUrl}/chinh-sach-bao-hanh`,
+          canonical: canonicalUrl,
         },
       };
     }
@@ -31,8 +65,9 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: `Chính sách bảo hành sản phẩm | ${businessProfile.brandName}`,
-    description: `Thông tin quy định về thời hạn, điều kiện tiếp nhận và quy trình bảo hành laptop tại ${businessProfile.brandName}.`,
+    title: formatSeoTitle("Chính sách bảo hành sản phẩm"),
+    description: warrantyFallbackDesc,
+    alternates: { canonical: canonicalUrl },
     robots: {
       index: true,
       follow: true,
@@ -56,14 +91,22 @@ export default async function WarrantyPolicyPage() {
   // State C: Published CMS content
   if (resolution.state === "PUBLISHED") {
     const cmsPage = resolution.page;
+    const breadcrumbJsonLd = generateBreadcrumbJsonLd([
+      { name: "Trang chủ", href: "/" },
+      { name: cmsPage.title, href: "/chinh-sach-bao-hanh" },
+    ]);
     return (
       <PolicyLayout
         currentSlug="chinh-sach-bao-hanh"
         title={cmsPage.title}
-        subtitle={cmsPage.seo.description || undefined}
+        subtitle={cleanSeoDescription(cmsPage.seo.description, warrantyFallbackDesc, { rejectPolicyBoilerplate: true })}
         isPublished={true}
         lastUpdated={new Date(cmsPage.updatedAt).toLocaleDateString("vi-VN")}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+        />
         <div
           className="prose prose-sm sm:prose-base max-w-none text-slate-700 leading-relaxed"
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(cmsPage.contentHtml) }}

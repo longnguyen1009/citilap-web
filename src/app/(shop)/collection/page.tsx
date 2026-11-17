@@ -4,20 +4,58 @@ import Image from 'next/image';
 import { ChevronRight, Layers, ArrowRight } from 'lucide-react';
 import { getPublishedCollectionList } from '@/server/services/storefront-cms.service';
 import { businessProfile } from '@/config/business-profile';
+import { formatSeoTitle, formatSeoTitleString, generateBreadcrumbJsonLd, serializeJsonLd } from '@/lib/seo-helpers';
+
+const collectionIndexTitle = 'Bộ Sưu Tập Laptop & Phụ Kiện Tuyển Chọn';
+const collectionIndexDesc = `Khám phá các bộ sưu tập laptop gaming, ultrabook, máy trạm đồ họa và phụ kiện công nghệ tuyển chọn theo nhu cầu tại ${businessProfile.brandName}.`;
 
 export const metadata: Metadata = {
-  title: `Bộ Sưu Tập Sản Phẩm | ${businessProfile.brandName}`,
-  description: `Khám phá các bộ sưu tập laptop gaming, ultrabook và phụ kiện công nghệ tuyển chọn tại ${businessProfile.brandName}.`,
+  title: formatSeoTitle(collectionIndexTitle),
+  description: collectionIndexDesc,
   alternates: {
     canonical: `${businessProfile.canonicalSiteUrl}/collection`,
+  },
+  openGraph: {
+    title: formatSeoTitleString(collectionIndexTitle),
+    description: collectionIndexDesc,
+    url: `${businessProfile.canonicalSiteUrl}/collection`,
+    type: 'website',
+    siteName: businessProfile.brandName,
+    locale: 'vi_VN',
+    images: [{ url: `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`, alt: collectionIndexTitle }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: formatSeoTitleString(collectionIndexTitle),
+    description: collectionIndexDesc,
+    images: [`${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`],
   },
 };
 
 export default async function CollectionsListingPage() {
   const collections = (await getPublishedCollectionList()) || [];
+  const jsonLd = [
+    generateBreadcrumbJsonLd([
+      { name: 'Trang chủ', href: '/' },
+      { name: 'Bộ sưu tập', href: '/collection' },
+    ]),
+    {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      '@id': `${businessProfile.canonicalSiteUrl}/collection#collection`,
+      name: collectionIndexTitle,
+      description: collectionIndexDesc,
+      url: `${businessProfile.canonicalSiteUrl}/collection`,
+      isPartOf: { '@id': `${businessProfile.canonicalSiteUrl}/#website` },
+    },
+  ];
 
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* Breadcrumb */}
       <div className="bg-white border-b border-slate-200">
         <div className="container mx-auto px-4 max-w-[1370px]">

@@ -1,5 +1,30 @@
 @import "tailwindcss";
 
+/* Same font family as ThegioiSo365; served locally to avoid third-party requests. */
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/fonts/SFProDisplay-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/fonts/SFProDisplay-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("/fonts/SFProDisplay-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* CMS HTML needs explicit typography: Tailwind preflight resets native headings and lists. */
 .prose {
   color: #334155;
@@ -51,7 +76,7 @@
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: "SF Pro Display", Arial, Helvetica, sans-serif;
 
   /* Citilap Brand & Interactive Tokens */
   --color-brand-primary: #2563eb;

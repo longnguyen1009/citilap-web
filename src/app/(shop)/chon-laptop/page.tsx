@@ -4,6 +4,10 @@ import { advisorSchema } from '@/contracts/catalog/advisor';
 import { adviseLaptops } from '@/server/services/advisor.service';
 import { getStorefrontSettings } from '@/server/services/storefront-cms.service';
 import LaptopAdvisorClient from '@/components/advisor/LaptopAdvisorClient';
+import { formatSeoTitle, formatSeoTitleString, generateBreadcrumbJsonLd, serializeJsonLd } from '@/lib/seo-helpers';
+
+const advisorTitle = 'Chọn laptop theo nhu cầu & ngân sách';
+const advisorDesc = 'Công cụ cố vấn cấu hình thông minh của CitiLap giúp bạn tìm kiếm chiếc laptop tối ưu nhất cho học tập, văn phòng, gaming và đồ họa theo đúng ngân sách.';
 
 export async function generateMetadata({
   searchParams,
@@ -12,20 +16,30 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const sp = await searchParams;
   const hasCustomFilters = Object.keys(sp).some(k => ['budget', 'need', 'condition', 'portable'].includes(k));
+  const ogImage = `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
 
   return {
-    title: 'Chọn laptop theo nhu cầu & ngân sách | CitiLap',
-    description: 'Công cụ cố vấn cấu hình thông minh của CitiLap giúp bạn tìm kiếm chiếc laptop tối ưu nhất cho học tập, văn phòng, gaming và đồ họa.',
+    title: formatSeoTitle(advisorTitle),
+    description: advisorDesc,
     alternates: { canonical: `${businessProfile.canonicalSiteUrl}/chon-laptop` },
     robots: {
       index: !hasCustomFilters,
       follow: true,
     },
     openGraph: {
-      title: 'Chọn laptop theo nhu cầu & ngân sách | CitiLap',
-      description: 'Công cụ cố vấn cấu hình thông minh của CitiLap giúp bạn tìm kiếm chiếc laptop tối ưu nhất cho học tập, văn phòng, gaming và đồ họa.',
+      title: formatSeoTitleString(advisorTitle),
+      description: advisorDesc,
       url: `${businessProfile.canonicalSiteUrl}/chon-laptop`,
-      images: ['/brand/marketing-banner.webp'],
+      type: 'website',
+      siteName: businessProfile.brandName,
+      locale: 'vi_VN',
+      images: [{ url: ogImage, alt: advisorTitle }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: formatSeoTitleString(advisorTitle),
+      description: advisorDesc,
+      images: [ogImage],
     },
   };
 }
@@ -51,12 +65,23 @@ export default async function LaptopAdvisor({
     }
   }
 
+  const jsonLd = generateBreadcrumbJsonLd([
+    { name: 'Trang chủ', href: '/' },
+    { name: 'Chọn laptop theo nhu cầu', href: '/chon-laptop' },
+  ]);
+
   return (
-    <LaptopAdvisorClient
-      initialInput={input}
-      initialResults={results}
-      initialError={error}
-      zaloUrl={settings?.zaloUrl}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
+      <LaptopAdvisorClient
+        initialInput={input}
+        initialResults={results}
+        initialError={error}
+        zaloUrl={settings?.zaloUrl}
+      />
+    </>
   );
 }

@@ -1,5 +1,10 @@
 import { businessProfile } from "@/config/business-profile";
-import { serializeJsonLd } from '@/lib/seo-helpers';
+import {
+  formatSeoTitle,
+  formatSeoTitleString,
+  cleanSeoDescription,
+  serializeJsonLd,
+} from '@/lib/seo-helpers';
 import { Metadata } from "next";
 import {
   Sparkles,
@@ -36,9 +41,39 @@ export async function generateMetadata(): Promise<Metadata> {
     getStorefrontSettings(),
     getPublishedHomepage(),
   ]);
-  const title = home?.seo.title || settings?.defaultSeoTitle || `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`;
-  const description = home?.seo.description || settings?.defaultSeoDescription || `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`;
-  return {title,description,alternates:{canonical:`${businessProfile.canonicalSiteUrl}`},openGraph:{title,description,url:`${businessProfile.canonicalSiteUrl}`}};
+  const rawTitle =
+    home?.seo.title ||
+    settings?.defaultSeoTitle ||
+    `${businessProfile.brandName} - Laptop Gaming, Văn Phòng, Đồ Họa & Phụ Kiện`;
+  const titleString = formatSeoTitleString(rawTitle);
+  const description = cleanSeoDescription(
+    home?.seo.description || settings?.defaultSeoDescription,
+    `Cửa hàng chuyên Laptop Gaming, Ultrabook văn phòng, Máy trạm đồ họa và máy Like New tuyển chọn kỹ lưỡng tại Hà Nội & Bắc Ninh. ${businessProfile.traditionalMotto}.`
+  );
+  const ogImage =
+    home?.seo.ogImageUrl ||
+    `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
+
+  return {
+    title: formatSeoTitle(rawTitle),
+    description,
+    alternates: { canonical: `${businessProfile.canonicalSiteUrl}` },
+    openGraph: {
+      title: titleString,
+      description,
+      url: `${businessProfile.canonicalSiteUrl}`,
+      type: "website",
+      siteName: businessProfile.brandName,
+      locale: "vi_VN",
+      images: [{ url: ogImage, alt: titleString }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: titleString,
+      description,
+      images: [ogImage],
+    },
+  };
 }
 
 export default async function Home() {
@@ -49,16 +84,37 @@ export default async function Home() {
     getCachedHotSaleCampaigns().catch(() => undefined),
   ]);
 
+  const rootCategories = (navigation?.categories ?? []).filter((c) => !c.parentId);
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: settings?.storeName || "CitiLap",
+    "@type": "CollectionPage",
+    "@id": `${businessProfile.canonicalSiteUrl}/#homepage`,
+    name: settings?.storeName || businessProfile.brandName,
+    description:
+      cmsHomepage?.seo.description ||
+      settings?.defaultSeoDescription ||
+      businessProfile.primaryTagline,
     url: `${businessProfile.canonicalSiteUrl}`,
-    potentialAction: {
-      "@type": "SearchAction",
-      target: `${businessProfile.canonicalSiteUrl}/search?q={search_term_string}`,
-      "query-input": "required name=search_term_string",
+    isPartOf: {
+      "@id": `${businessProfile.canonicalSiteUrl}/#website`,
     },
+    about: {
+      "@id": `${businessProfile.canonicalSiteUrl}/#organization`,
+    },
+    ...(rootCategories.length > 0
+      ? {
+          mainEntity: {
+            "@type": "ItemList",
+            name: "Danh mục sản phẩm chính tại CitiLap",
+            itemListElement: rootCategories.map((cat, idx) => ({
+              "@type": "ListItem",
+              position: idx + 1,
+              name: cat.name,
+              url: `${businessProfile.canonicalSiteUrl}${cat.href}`,
+            })),
+          },
+        }
+      : {}),
   };
 
   // If a CMS homepage is published, render dynamic sections via BlockRenderer

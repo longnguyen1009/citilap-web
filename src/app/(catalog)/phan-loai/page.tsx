@@ -28,11 +28,31 @@ import EmptyState from "@/components/ui/EmptyState";
 import { getPublishedNavigation, getCachedActiveCategories } from "@/server/services/storefront-cms.service";
 import { ACCESSORY_TYPES } from "@/config/accessory-taxonomy";
 import { businessProfile } from "@/config/business-profile";
+import { formatSeoTitle, formatSeoTitleString, generateBreadcrumbJsonLd, serializeJsonLd } from "@/lib/seo-helpers";
+
+const phanLoaiTitle = "Phân loại sản phẩm — Thế giới Laptop & Phụ kiện";
+const phanLoaiDesc =
+  "Khám phá danh mục Laptop Gaming, Ultrabook Văn phòng, MacBook, Máy Trạm Đồ Họa, Laptop Like New và Hệ sinh thái Phụ kiện chính hãng tại CitiLap.";
 
 export const metadata: Metadata = {
-  title: "Phân loại sản phẩm | Thế giới Laptop & Phụ kiện CitiLap",
-  description: "Khám phá danh mục Laptop Gaming, Ultrabook Văn phòng, MacBook, Máy Trạm Đồ Họa và Hệ sinh thái Phụ kiện chính hãng tại CitiLap.",
+  title: formatSeoTitle(phanLoaiTitle),
+  description: phanLoaiDesc,
   alternates: { canonical: `${businessProfile.canonicalSiteUrl}/phan-loai` },
+  openGraph: {
+    title: formatSeoTitleString(phanLoaiTitle),
+    description: phanLoaiDesc,
+    url: `${businessProfile.canonicalSiteUrl}/phan-loai`,
+    type: "website",
+    siteName: businessProfile.brandName,
+    locale: "vi_VN",
+    images: [{ url: `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`, alt: phanLoaiTitle }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: formatSeoTitleString(phanLoaiTitle),
+    description: phanLoaiDesc,
+    images: [`${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`],
+  },
 };
 
 // Map icons to laptop categories
@@ -82,9 +102,28 @@ export default async function CategoriesPage() {
 
   const primaryLaptopHref = laptopCategories[0]?.href || "/laptop-gaming";
   const primaryAccessoryHref = accessoryCategory?.href || "/phu-kien";
+  const jsonLd = [
+    generateBreadcrumbJsonLd([
+      { label: "Trang chủ", href: "/" },
+      { label: "Phân loại sản phẩm", href: "/phan-loai" },
+    ].map((item) => ({ name: item.label, href: item.href }))),
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "@id": `${businessProfile.canonicalSiteUrl}/phan-loai#collection`,
+      name: "Tất cả phân loại sản phẩm CitiLap",
+      description: phanLoaiDesc,
+      url: `${businessProfile.canonicalSiteUrl}/phan-loai`,
+      isPartOf: { "@id": `${businessProfile.canonicalSiteUrl}/#website` },
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50/60 pb-20">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* Breadcrumb */}
       <Breadcrumb
         items={[

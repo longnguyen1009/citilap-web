@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { businessProfile } from "@/config/business-profile";
 import {
+  formatSeoTitleString,
+  cleanSeoDescription,
   generateOrganizationJsonLd,
   generateLocalBusinessesJsonLd,
   generateWebSiteJsonLd,
@@ -14,11 +15,6 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
 };
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin", "vietnamese"],
-});
 
 const baseMetadata: Metadata = {
   title: {
@@ -86,13 +82,37 @@ const baseMetadata: Metadata = {
 export async function generateMetadata(): Promise<Metadata> {
   const { getStorefrontSettings } = await import('@/server/services/storefront-cms.service');
   const settings = await getStorefrontSettings();
-  const defaults = {
-    title: settings?.defaultSeoTitle || `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
-    description: settings?.defaultSeoDescription || (baseMetadata.description as string),
+  const defaultTitle = formatSeoTitleString(
+    settings?.defaultSeoTitle,
+    `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`
+  );
+  const defaultDescription = cleanSeoDescription(
+    settings?.defaultSeoDescription,
+    baseMetadata.description as string
+  );
+  return {
+    ...baseMetadata,
+    title: {
+      default: defaultTitle,
+      template: `%s | ${businessProfile.brandName}`,
+    },
+    description: defaultDescription,
+    alternates: undefined,
+    icons: {
+      icon: settings?.faviconUrl || '/brand/citilap-mark.svg',
+      apple: '/brand/citilap-mark.png',
+    },
+    openGraph: {
+      ...baseMetadata.openGraph,
+      title: defaultTitle,
+      description: defaultDescription,
+    },
+    twitter: {
+      ...baseMetadata.twitter,
+      title: defaultTitle,
+      description: defaultDescription,
+    },
   };
-  return {...baseMetadata,title:{default:defaults.title,template:'%s | CitiLap'},description:defaults.description,alternates:undefined,
-    icons: { icon: settings?.faviconUrl || '/brand/citilap-mark.svg', apple: '/brand/citilap-mark.png' },
-    openGraph:{...baseMetadata.openGraph,title:defaults.title,description:defaults.description},twitter:{...baseMetadata.twitter,title:defaults.title,description:defaults.description}};
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -109,7 +129,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="vi"
-      className={`${inter.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <head>
         <script

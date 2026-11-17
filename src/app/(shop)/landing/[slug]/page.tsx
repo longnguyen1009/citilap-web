@@ -6,39 +6,73 @@ import { getPublishedLandingPage, getStorefrontSettings } from '@/server/service
 import BlockRenderer from '@/components/builder/BlockRenderer';
 import FlashSaleSection from '@/components/home/FlashSaleSection';
 import { businessProfile } from '@/config/business-profile';
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from '@/lib/seo-helpers';
 
 interface LandingPageProps {
   params: Promise<{ slug: string }>;
   searchParams?: Promise<{ preview?: string }>;
 }
 
-export async function generateMetadata({ params }: LandingPageProps): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: LandingPageProps): Promise<Metadata> {
   const { slug } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const isPreview = sp.preview === 'true';
+
   try {
     const page = await getPublishedLandingPage(slug);
     if (!page) {
-      return { title: `Trang không tồn tại | ${businessProfile.brandName}` };
+      return {
+        title: formatSeoTitle('Trang không tồn tại'),
+        robots: { index: false, follow: false },
+      };
     }
 
-    const title = page.seo.title || `${page.title} | ${businessProfile.brandName}`;
-    const description = page.seo.description || `Khám phá ${page.title} tại ${businessProfile.brandName}.`;
+    const rawTitle = page.seo.title || page.title;
+    const titleString = formatSeoTitleString(rawTitle);
+    const description = cleanSeoDescription(
+      page.seo.description,
+      `Khám phá ${page.title} — Chương trình và bộ sưu tập laptop tuyển chọn tại ${businessProfile.brandName}.`
+    );
+    const canonicalUrl = `${businessProfile.canonicalSiteUrl}/landing/${page.slug}`;
+    const rawOg = page.seo.ogImageUrl || businessProfile.bannerAsset;
+    const ogImage = /^https?:\/\//i.test(rawOg)
+      ? rawOg
+      : `${businessProfile.canonicalSiteUrl}${rawOg.startsWith('/') ? '' : '/'}${rawOg}`;
 
     return {
-      title,
+      title: formatSeoTitle(rawTitle),
       description,
+      robots: isPreview ? { index: false, follow: false } : { index: true, follow: true },
       openGraph: {
-        title,
+        title: titleString,
         description,
         type: 'website',
-        url: `${businessProfile.canonicalSiteUrl}/landing/${page.slug}`,
-        images: page.seo.ogImageUrl ? [{ url: page.seo.ogImageUrl }] : undefined,
+        siteName: businessProfile.brandName,
+        locale: 'vi_VN',
+        url: canonicalUrl,
+        images: [{ url: ogImage, alt: page.title }],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: titleString,
+        description,
+        images: [ogImage],
       },
       alternates: {
-        canonical: `${businessProfile.canonicalSiteUrl}/landing/${page.slug}`,
+        canonical: canonicalUrl,
       },
     };
   } catch {
-    return { title: `Trang không tồn tại | ${businessProfile.brandName}` };
+    return {
+      title: formatSeoTitle('Trang không tồn tại'),
+      robots: { index: false, follow: false },
+    };
   }
 }
 
@@ -69,8 +103,17 @@ export default async function StorefrontLandingPage({ params, searchParams }: La
     notFound();
   }
 
+  const jsonLd = generateBreadcrumbJsonLd([
+    { name: 'Trang chủ', href: '/' },
+    { name: page.title, href: `/landing/${page.slug}` },
+  ]);
+
   return (
     <div className="bg-surface-subtle min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* Preview mode notification banner */}
       {isPreview && (
         <div className="bg-amber-500 text-slate-950 font-bold px-4 py-2.5 text-center text-xs md:text-sm flex items-center justify-center gap-2 sticky top-0 z-50 shadow-md">

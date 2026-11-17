@@ -12,24 +12,50 @@ import { businessProfile } from "@/config/business-profile";
 
 import { getCachedSystemPageResolution, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
+
+const storesDefaultTitle = "Hệ thống cửa hàng & Showroom CitiLap tại Hà Nội, Bắc Ninh";
+const storesDefaultDesc = `Hệ thống cơ sở ${businessProfile.brandName} tại Hà Nội (23/40 Tạ Quang Bửu) và Bắc Ninh (40 Trần Hưng Đạo). Giờ mở cửa Thứ 2 – Thứ 7: 09:00 – 20:00 (Chủ nhật hẹn trước). Trải nghiệm laptop gaming & ultrabook trực tiếp.`;
 
 export async function generateMetadata(): Promise<Metadata> {
+  const ogFallback = `${businessProfile.canonicalSiteUrl}/brand/store-photo-01.webp`;
   try {
     const resolution = await getCachedSystemPageResolution("STORES");
     if (resolution.state === "PUBLISHED") {
-      const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
-      const description = resolution.page.seo.description || `Hệ thống showroom & chi nhánh ${businessProfile.brandName}.`;
+      const rawTitle = resolution.page.seo.title || storesDefaultTitle;
+      const titleString = formatSeoTitleString(rawTitle);
+      const description = cleanSeoDescription(
+        resolution.page.seo.description,
+        storesDefaultDesc,
+        { rejectPolicyBoilerplate: true }
+      );
+      const ogImage = resolution.page.seo.ogImageUrl || ogFallback;
       return {
-        title,
+        title: formatSeoTitle(rawTitle),
         description,
         alternates: {
           canonical: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
         },
         openGraph: {
-          title,
+          title: titleString,
           description,
+          type: "website",
+          siteName: businessProfile.brandName,
+          locale: "vi_VN",
           url: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
-          images: resolution.page.seo.ogImageUrl ? [{ url: resolution.page.seo.ogImageUrl }] : undefined,
+          images: [{ url: ogImage, alt: titleString }],
+        },
+        twitter: {
+          card: "summary_large_image",
+          title: titleString,
+          description,
+          images: [ogImage],
         },
       };
     }
@@ -38,15 +64,25 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: `Hệ thống showroom & chi nhánh | ${businessProfile.brandName}`,
-    description: `Hệ thống cơ sở ${businessProfile.brandName} tại Hà Nội và Bắc Ninh. Địa chỉ, hotline, giờ mở cửa Thứ 2 – Thứ 7: 09:00 – 20:00 (Chủ nhật hẹn trước). Trải nghiệm trực tiếp laptop gaming & ultrabook.`,
+    title: formatSeoTitle(storesDefaultTitle),
+    description: storesDefaultDesc,
     alternates: {
       canonical: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
     },
     openGraph: {
-      title: `Hệ thống cơ sở ${businessProfile.brandName}`,
-      description: `Cơ sở Hà Nội: Số 23/40 Tạ Quang Bửu • Cơ sở Bắc Ninh: Số 40 Trần Hưng Đạo. Giờ làm việc: 09:00 - 20:00.`,
+      title: formatSeoTitleString(storesDefaultTitle),
+      description: storesDefaultDesc,
+      type: "website",
+      siteName: businessProfile.brandName,
+      locale: "vi_VN",
       url: `${businessProfile.canonicalSiteUrl}/he-thong-cua-hang`,
+      images: [{ url: ogFallback, alt: storesDefaultTitle }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: formatSeoTitleString(storesDefaultTitle),
+      description: storesDefaultDesc,
+      images: [ogFallback],
     },
   };
 }
@@ -82,9 +118,17 @@ export default async function StoresPage() {
 
   // 2. Editorial intro / presentation from CMS STORES Page
   const cmsPage = resolution.state === "PUBLISHED" ? resolution.page : null;
+  const jsonLd = generateBreadcrumbJsonLd([
+    { name: "Trang chủ", href: "/" },
+    { name: "Hệ thống cửa hàng CitiLap", href: "/he-thong-cua-hang" },
+  ]);
 
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* 1. Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 max-w-[1370px]">

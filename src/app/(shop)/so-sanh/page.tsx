@@ -1,14 +1,18 @@
 import { businessProfile } from "@/config/business-profile";
 import type { Metadata } from 'next';
 import ComparePageClient from '@/components/product/ComparePageClient';
+import { formatSeoTitle, formatSeoTitleString } from '@/lib/seo-helpers';
 
 interface ComparePageProps {
   searchParams: Promise<{ ids?: string }>;
 }
 
+const compareTitle = 'So sánh laptop & thiết bị công nghệ chính hãng';
+const compareDesc = 'Bảng đối chiếu chi tiết thông số kỹ thuật, cấu hình, màn hình, hiệu năng và mức giá giữa các dòng laptop tại CitiLap.';
+
 export const metadata: Metadata = {
-  title: 'So sánh laptop & thiết bị công nghệ chính hãng | CitiLap',
-  description: 'Bảng đối chiếu chi tiết thông số kỹ thuật, cấu hình, màn hình, hiệu năng và mức giá giữa các dòng laptop tại CitiLap.',
+  title: formatSeoTitle(compareTitle),
+  description: compareDesc,
   alternates: {
     canonical: `${businessProfile.canonicalSiteUrl}/so-sanh`,
   },
@@ -17,10 +21,13 @@ export const metadata: Metadata = {
     follow: true,
   },
   openGraph: {
-    title: 'So sánh laptop & cấu hình chi tiết | CitiLap',
-    description: 'Đối chiếu thông số kỹ thuật, màn hình và giá bán giữa các mẫu máy tại CitiLap.',
+    title: formatSeoTitleString(compareTitle),
+    description: compareDesc,
     url: `${businessProfile.canonicalSiteUrl}/so-sanh`,
-    images: ['/brand/marketing-banner.webp'],
+    type: 'website',
+    siteName: businessProfile.brandName,
+    locale: 'vi_VN',
+    images: [{ url: `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`, alt: compareTitle }],
   },
 };
 

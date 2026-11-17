@@ -3,26 +3,60 @@ import PolicyLayout from "@/components/policy/PolicyLayout";
 import { businessProfile } from "@/config/business-profile";
 import { getCachedSystemPageResolution, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
+
+const returnsFallbackDesc = `Chính sách đổi trả & hoàn tiền tại ${businessProfile.brandName}: hỗ trợ lỗi 1 đổi 1 trong 7 ngày đầu tiên, quy trình kiểm tra minh bạch và đầu mối tiếp nhận tại Hà Nội & Bắc Ninh.`;
 
 export async function generateMetadata(): Promise<Metadata> {
+  const canonicalUrl = `${businessProfile.canonicalSiteUrl}/chinh-sach-doi-tra`;
+  const ogFallback = `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
   try {
     const resolution = await getCachedSystemPageResolution("RETURNS");
-    if (resolution.state === "PUBLISHED") {
-      const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
-      const description = resolution.page.seo.description || `Chính sách đổi trả tại ${businessProfile.brandName}.`;
+    if (resolution.state === "UNPUBLISHED") {
       return {
-        title,
+        title: formatSeoTitle("Chính sách đổi trả & hoàn tiền"),
+        description: returnsFallbackDesc,
+        alternates: { canonical: canonicalUrl },
+        robots: { index: false, follow: true },
+      };
+    }
+    if (resolution.state === "PUBLISHED") {
+      const rawTitle = resolution.page.seo.title || "Chính sách đổi trả & hoàn tiền";
+      const titleString = formatSeoTitleString(rawTitle);
+      const description = cleanSeoDescription(
+        resolution.page.seo.description,
+        returnsFallbackDesc,
+        { rejectPolicyBoilerplate: true }
+      );
+      const ogImage = resolution.page.seo.ogImageUrl || ogFallback;
+      return {
+        title: formatSeoTitle(rawTitle),
         description,
         openGraph: {
-          title,
+          title: titleString,
           description,
+          url: canonicalUrl,
           type: "article",
+          siteName: businessProfile.brandName,
+          locale: "vi_VN",
           publishedTime: resolution.page.publishedAt,
           modifiedTime: resolution.page.updatedAt,
-          images: resolution.page.seo.ogImageUrl ? [{ url: resolution.page.seo.ogImageUrl }] : undefined,
+          images: [{ url: ogImage, alt: titleString }],
+        },
+        twitter: {
+          card: "summary_large_image",
+          title: titleString,
+          description,
+          images: [ogImage],
         },
         alternates: {
-          canonical: `${businessProfile.canonicalSiteUrl}/chinh-sach-doi-tra`,
+          canonical: canonicalUrl,
         },
       };
     }
@@ -31,8 +65,9 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: `Chính sách đổi trả & hoàn tiền | ${businessProfile.brandName}`,
-    description: `Thông tin chính sách đổi trả sản phẩm lỗi và điều kiện hoàn tiền tại ${businessProfile.brandName}.`,
+    title: formatSeoTitle("Chính sách đổi trả & hoàn tiền"),
+    description: returnsFallbackDesc,
+    alternates: { canonical: canonicalUrl },
     robots: {
       index: true,
       follow: true,
@@ -60,14 +95,22 @@ export default async function ReturnPolicyPage() {
   // State C: Published CMS content
   if (resolution.state === "PUBLISHED") {
     const cmsPage = resolution.page;
+    const breadcrumbJsonLd = generateBreadcrumbJsonLd([
+      { name: "Trang chủ", href: "/" },
+      { name: cmsPage.title, href: "/chinh-sach-doi-tra" },
+    ]);
     return (
       <PolicyLayout
         currentSlug="chinh-sach-doi-tra"
         title={cmsPage.title}
-        subtitle={cmsPage.seo.description || undefined}
+        subtitle={cleanSeoDescription(cmsPage.seo.description, returnsFallbackDesc, { rejectPolicyBoilerplate: true })}
         isPublished={true}
         lastUpdated={new Date(cmsPage.updatedAt).toLocaleDateString("vi-VN")}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+        />
         <div
           className="prose prose-sm sm:prose-base max-w-none text-slate-700 leading-relaxed"
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(cmsPage.contentHtml) }}

@@ -61,7 +61,7 @@ export default function Footer({
       : rawMoitImage;
 
   return (
-    <footer className="bg-[#0b1221] text-gray-300">
+    <footer className="bg-[#0b1221] text-gray-300" data-nosnippet>
       {/* 1. Value Proposition Features Bar */}
       <div className="bg-[#0f172a] py-3.5 md:py-6 border-y border-gray-800">
         <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">

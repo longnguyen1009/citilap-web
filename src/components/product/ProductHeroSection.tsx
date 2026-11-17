@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import {
@@ -31,6 +31,7 @@ import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
 import { BrandLogo } from '@/components/ui/BrandLogo';
 
 export interface HeroVariantItem {
+  productName?: string;
   id: string;
   sku: string;
   name: string;
@@ -143,6 +144,8 @@ export default function ProductHeroSection({
     variants[0] ||
     null;
   const [selectedVariant, setSelectedVariant] = useState<HeroVariantItem | null>(initialVariant);
+  useEffect(() => { setSelectedVariant(initialVariant); }, [initialVariant]);
+  const selectedProductName = selectedVariant?.productName || productName;
 
   // 2. Color state
   const [selectedColorIndex, setSelectedColorIndex] = useState(0);
@@ -204,7 +207,7 @@ export default function ProductHeroSection({
     if (v.sku) {
       const url = new URL(window.location.href);
       url.searchParams.set("sku", v.sku);
-      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+      router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
     }
   };
 
@@ -219,7 +222,7 @@ export default function ProductHeroSection({
       productId,
       variantId: selectedVariant?.id,
       warrantyName: selectedWarranty?.name,
-      name: productName,
+      name: selectedProductName,
       image: activeImage,
       price: variantPrice + warrantyDiff,
       displayPrice: `${(variantPrice + warrantyDiff).toLocaleString("vi-VN")}₫`,
@@ -253,7 +256,7 @@ export default function ProductHeroSection({
         <div className="lg:col-span-6">
           <ProductGallery
             images={images}
-            productName={productName}
+            productName={selectedProductName}
             discount={discountBadge}
             conditionLabel={selectedVariant?.conditionLabel || conditionLabel}
             inStock={orderable}
@@ -270,7 +273,7 @@ export default function ProductHeroSection({
           {/* 1. TIÊU ĐỀ SẢN PHẨM & METADATA (ĐÁNH GIÁ, MODEL, THƯƠNG HIỆU) */}
           <div>
             <h1 className="text-[18px] sm:text-[21px] md:text-2xl font-black text-slate-900 leading-snug tracking-tight">
-              {productName}
+              {selectedProductName}
             </h1>
 
             <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 text-xs text-slate-600">
@@ -373,7 +376,7 @@ export default function ProductHeroSection({
                     } else {
                       compareCtx.addToCompare({
                         id: productId,
-                        name: productName,
+                        name: selectedProductName,
                         slug: productSlug || productId,
                         price: totalPrice,
                         image: activeImage,
@@ -769,7 +772,7 @@ export default function ProductHeroSection({
       {/* FLOATING BOTTOM PURCHASE BAR (HIỆN NGAY TRÊN SP, 450PX PC) */}
       {/* ========================================================= */}
       <ProductFloatingBar
-        productName={productName}
+        productName={selectedProductName}
         image={activeImage}
         variantLabel={selectedVariant?.name}
         colorLabel={selectedColor?.name}
@@ -790,7 +793,7 @@ export default function ProductHeroSection({
         productInfo={{
           id: productId,
           items: [{productId,variantId:selectedVariant?.id || null,warrantyName:selectedWarranty?.name || null,quantity:1}, ...accessories.filter(item => selectedAccessoryIds.includes(item.id)).map(item => ({productId:item.id,variantId:item.variantId || null,quantity:1}))],
-          name: productName,
+          name: selectedProductName,
           image: activeImage,
           variantLabel: selectedVariant?.name,
           colorLabel: selectedColor?.name,
@@ -809,7 +812,7 @@ export default function ProductHeroSection({
         isOpen={isInstallmentOpen}
         onClose={() => setIsInstallmentOpen(false)}
         price={totalPrice}
-        productName={productName}
+        productName={selectedProductName}
       />}
     </section>
   );

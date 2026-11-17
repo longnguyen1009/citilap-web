@@ -1,4 +1,5 @@
 import { businessProfile } from "@/config/business-profile";
+import { variantSpecs } from '@/lib/variant-presentation';
 import { categoryAncestors } from '@/lib/category-paths';
 import { productHref } from '@/lib/product-paths';
 import { formatShortWarrantyBadge } from '@/contracts/cms/product-studio';
@@ -22,6 +23,9 @@ import { ProductSpecsSidebarCard } from "@/components/product/ProductSpecsSideba
 import { resolveConditionMeta } from "@/components/ui/ConditionBadge";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
   generateBreadcrumbJsonLd,
   generateFaqJsonLd,
   generateProductJsonLd,
@@ -70,8 +74,9 @@ export async function generateMetadata({
     pub.kind === "LEGACY_INACTIVE"
   ) {
     return {
-      title: "Không tìm thấy sản phẩm | CITILAP.VN",
-      description: "Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã ngừng kinh doanh.",
+      title: formatSeoTitle("Không tìm thấy sản phẩm"),
+      description: "Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã ngừng kinh doanh tại CitiLap.",
+      robots: { index: false, follow: false },
     };
   }
 
@@ -82,39 +87,56 @@ export async function generateMetadata({
   ]);
   if (!product) {
     return {
-      title: "Không tìm thấy sản phẩm | CITILAP.VN",
-      description: "Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã ngừng kinh doanh.",
+      title: formatSeoTitle("Không tìm thấy sản phẩm"),
+      description: "Sản phẩm bạn đang tìm kiếm không tồn tại hoặc đã ngừng kinh doanh tại CitiLap.",
+      robots: { index: false, follow: false },
     };
   }
-  const displayName = studio?.name || product.name;
+  const metadataVariant = studio?.variants.find(v => v.sku === skuParam || v.id === skuParam) || (!skuParam ? studio?.variants[0] : undefined);
+  const displayName = metadataVariant?.options?.productName?.trim() || product.variants.find(v => v.id === product.selectedVariantId)?.options?.productName?.trim() || studio?.name || product.name;
   const primaryImage = studio?.media.find((item) => item.kind === "IMAGE")?.url || product.primaryImageUrl;
-  const title = studio?.seoTitle || product.seoTitle || `${displayName} | CITILAP.VN`;
-  const description =
-    studio?.seoDescription || studio?.description ||
+  const rawTitle = studio?.seoTitle || product.seoTitle || displayName;
+  const titleString = formatSeoTitleString(rawTitle);
+  const priceSummary = product.price > 0 ? `Giá ${product.price.toLocaleString("vi-VN")}đ` : "Liên hệ báo giá";
+  const specSummary = [product.specs.cpu, product.specs.ram, product.specs.ssd, product.specs.gpu].filter(Boolean).join(", ");
+  const fallbackDesc = `${displayName}${specSummary ? ` (${specSummary})` : ""} chính hãng & tuyển chọn tại CitiLap. ${priceSummary}, ${product.conditionLabel}, bảo hành ${product.warranty}, lỗi 1 đổi 1 trong 7 ngày.`;
+  const rawDesc =
+    studio?.seoDescription ||
     product.seoDescription ||
-    product.shortDescription ||
-    `Xem thông số chi tiết, cấu hình ${product.name} chính hãng tại CITILAP.VN. Giá ${product.price.toLocaleString("vi-VN")}đ, ${product.conditionLabel}, bảo hành ${product.warranty}.`;
+    studio?.description ||
+    product.shortDescription;
+  const description = cleanSeoDescription(rawDesc, fallbackDesc);
 
   const canonicalUrl = `${businessProfile.canonicalSiteUrl}` + productHref({ slug: product.canonicalSlug, template: studio?.template, kind: /phu-kien|linh-kien/.test(product.categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' });
+  const isHidden = String(studio?.availability || '') === 'HIDDEN';
+  const absoluteOgImage = primaryImage
+    ? (/^https?:\/\//i.test(primaryImage) ? primaryImage : `${businessProfile.canonicalSiteUrl}${primaryImage.startsWith('/') ? '' : '/'}${primaryImage}`)
+    : `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
 
   return {
-    title,
+    title: formatSeoTitle(rawTitle),
     description,
     alternates: {
       canonical: canonicalUrl,
     },
+    robots: {
+      index: !isHidden,
+      follow: true,
+    },
     openGraph: {
-      title,
+      title: titleString,
       description,
       url: canonicalUrl,
       type: "website",
-      images: primaryImage ? [{ url: primaryImage, alt: displayName }] : [],
+      siteName: businessProfile.brandName,
+      locale: "vi_VN",
+      images: [{ url: absoluteOgImage, alt: displayName }],
     },
     twitter: {
       card: "summary_large_image",
-      title,
+      title: titleString,
       description,
-      images: primaryImage ? [primaryImage] : [],
+      images: [absoluteOgImage],
     },
   };
 }
@@ -192,7 +214,7 @@ export default async function ProductDetailPage({
     ? (studioImages.find((m) => (m.variantId && m.variantId === studioVariant?.id) || (studioVariant?.image && m.assetId === studioVariant.image))?.url || studioImages[0]?.url || "")
     : (product.primaryImageUrl || "");
 
-  const displayName = studio?.name || product.name;
+  const displayName = studioVariant?.options?.productName?.trim() || product.variants.find(v => v.id === product.selectedVariantId)?.options?.productName?.trim() || studio?.name || product.name;
   const selectedVariant = product.variants.find((v) => v.id === product.selectedVariantId) || null;
   const isVariant = Boolean(studioVariant || selectedVariant);
   const activeVariant = studioVariant || selectedVariant;
@@ -260,6 +282,7 @@ export default async function ProductDetailPage({
           id: v.id,
           sku: v.sku,
           name: v.name || v.sku,
+          productName: v.options?.productName?.trim() || studio.name,
           subSpecs: [v.ram, v.storage, v.gpu].filter(Boolean).join(" · "),
           price: vp.effectivePrice,
           originalPrice: vp.compareAtPrice,
@@ -298,6 +321,7 @@ export default async function ProductDetailPage({
           id: v.id,
           sku: v.sku || v.id,
           name: v.name,
+          productName: v.options?.productName?.trim() || product.name,
           subSpecs: [v.ram, v.storage, v.gpu].filter(Boolean).join(" · "),
           price: vp.effectivePrice,
           originalPrice: vp.compareAtPrice,
@@ -430,6 +454,8 @@ export default async function ProductDetailPage({
     upsertStructuredSpec(/^(sku|mã sku|sku phiên bản)$/i, "SKU", vSku);
   }
 
+  structuredSpecs.splice(0, structuredSpecs.length, ...variantSpecs(structuredSpecs, studioVariant?.options || selectedVariant?.options));
+
   const findSpecVal = (pattern: RegExp) =>
     structuredSpecs.find((s) => pattern.test(s.key))?.value;
 
@@ -460,12 +486,14 @@ export default async function ProductDetailPage({
     studio?.availability ||
     (isProductInStock ? "AVAILABLE" : "OUT_OF_STOCK");
 
-  const seoDescriptionText =
+  const seoFallbackText = `${displayName} (${activeConditionLabel}) chính hãng tại CitiLap. ${displayPrice > 0 ? `Giá ${displayPrice.toLocaleString("vi-VN")}đ.` : "Liên hệ báo giá."}`;
+  const seoDescriptionText = cleanSeoDescription(
     studio?.seoDescription ||
-    studio?.description ||
-    product.seoDescription ||
-    product.shortDescription ||
-    `${displayName} chính hãng tại CitiLap. Giá ${displayPrice.toLocaleString("vi-VN")}đ.`;
+      product.seoDescription ||
+      studio?.description ||
+      product.shortDescription,
+    seoFallbackText
+  );
 
   const breadcrumbJsonLd = generateBreadcrumbJsonLd([
     { name: "Trang chủ", href: "/" },
@@ -492,6 +520,7 @@ export default async function ProductDetailPage({
     canOrder: canOrderProduct,
     inStock: isProductInStock,
     specs: structuredSpecs,
+    reviews: approvedReviews,
   });
 
   const recentlyViewedItem = {

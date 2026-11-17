@@ -1,5 +1,6 @@
 import { businessProfile } from "@/config/business-profile";
 import { parseSearchParams } from '@/contracts/catalog/search';
+import { formatSeoTitle } from "@/lib/seo-helpers";
 import Link from 'next/link';
 import { Suspense } from "react";
 import type { Metadata } from "next";
@@ -21,8 +22,8 @@ export async function generateMetadata({
 
   if (q) {
     return {
-      title: `Tìm kiếm "${q}" | CitiLap.vn`,
-      description: `Kết quả tìm kiếm sản phẩm laptop, máy tính và linh kiện cho từ khóa "${q}" tại Citilap.vn. Hàng chính hãng, bảo hành uy tín.`,
+      title: formatSeoTitle(`Tìm kiếm "${q}"`),
+      description: `Kết quả tìm kiếm sản phẩm laptop, máy tính và linh kiện cho từ khóa "${q}" tại CitiLap. Hàng chính hãng, bảo hành uy tín.`,
       alternates: {
         canonical: `${businessProfile.canonicalSiteUrl}/search`,
       },
@@ -34,8 +35,8 @@ export async function generateMetadata({
   }
 
   return {
-    title: "Tìm kiếm sản phẩm laptop chính hãng | CitiLap.vn",
-    description: "Tìm kiếm laptop gaming, laptop văn phòng, đồ họa và linh kiện giá tốt nhất tại Citilap.vn.",
+    title: formatSeoTitle("Tìm kiếm sản phẩm laptop chính hãng"),
+    description: "Tìm kiếm laptop gaming, laptop văn phòng, đồ họa và linh kiện giá tốt nhất tại CitiLap.",
     alternates: {
       canonical: `${businessProfile.canonicalSiteUrl}/search`,
     },

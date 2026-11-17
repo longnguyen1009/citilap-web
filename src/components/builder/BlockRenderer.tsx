@@ -416,6 +416,9 @@ function BannerBlock({ data }: { data: any }) {
 
     return (
       <section className="bg-[#110f14] relative overflow-hidden mb-5 sm:mb-6 md:mb-8 lg:mb-10" aria-label={data.title || 'Hero Banner'}>
+        <h1 className="sr-only">
+          {data.title || 'CitiLap — Chuyên Laptop Gaming, Ultrabook, Workstation & Máy Like New Tuyển Chọn'}
+        </h1>
         <div className="w-full relative">
           {data.link ? (
             <Link
@@ -443,7 +446,7 @@ function BannerBlock({ data }: { data: any }) {
                 { label: 'Dưới 15 triệu', href: '/search?pricePreset=under-15&maxPrice=15000000' },
                 { label: '15 – 20 triệu', href: '/search?pricePreset=15-20&minPrice=15000000&maxPrice=20000000' },
                 { label: '20 – 30 triệu', href: '/search?pricePreset=20-30&minPrice=20000000&maxPrice=30000000' },
-                { label: 'LikeNew 99%', href: '/search?category=laptop-likenew' },
+                { label: 'LikeNew 99%', href: '/laptop-likenew' },
               ].map((chip) => (
                 <Link
                   key={chip.href}

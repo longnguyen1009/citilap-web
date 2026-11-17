@@ -4,16 +4,47 @@ import { Flame, ArrowRight } from 'lucide-react';
 import Breadcrumb from '@/components/layout/Breadcrumb';
 import FlashSaleSection from '@/components/home/FlashSaleSection';
 import { getStorefrontSettings } from '@/server/services/storefront-cms.service';
+import { businessProfile } from '@/config/business-profile';
+import { formatSeoTitle, formatSeoTitleString, generateBreadcrumbJsonLd, serializeJsonLd } from '@/lib/seo-helpers';
+
+const hotSaleTitle = 'HOT SALE — Săn Deal Laptop & Phụ Kiện Ưu Đãi';
+const hotSaleDesc = 'FLASH SALE, ưu đãi tựu trường và các chiến dịch giảm giá trực tiếp tại CitiLap. Xem lịch chạy và giá từng cấu hình laptop gaming, văn phòng chính hãng.';
 
 export const metadata: Metadata = {
-  title: 'HOT SALE — Các chiến dịch ưu đãi | CitiLap',
-  description: 'FLASH SALE, ưu đãi tựu trường và các chiến dịch HOT SALE tại CitiLap. Xem lịch chạy và giá từng cấu hình.',
+  title: formatSeoTitle(hotSaleTitle),
+  description: hotSaleDesc,
+  alternates: {
+    canonical: `${businessProfile.canonicalSiteUrl}/hot-sale`,
+  },
+  openGraph: {
+    title: formatSeoTitleString(hotSaleTitle),
+    description: hotSaleDesc,
+    url: `${businessProfile.canonicalSiteUrl}/hot-sale`,
+    type: 'website',
+    siteName: businessProfile.brandName,
+    locale: 'vi_VN',
+    images: [{ url: `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`, alt: hotSaleTitle }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: formatSeoTitleString(hotSaleTitle),
+    description: hotSaleDesc,
+    images: [`${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`],
+  },
 };
 
 export default async function HotSalePage() {
   const settings = await getStorefrontSettings();
+  const jsonLd = generateBreadcrumbJsonLd([
+    { name: 'Trang chủ', href: '/' },
+    { name: 'HOT SALE', href: '/hot-sale' },
+  ]);
   return (
     <div className="min-h-screen bg-slate-50 pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <Breadcrumb
         items={[
           { label: 'Trang chủ', href: '/' },

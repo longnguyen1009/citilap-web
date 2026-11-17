@@ -7,6 +7,14 @@ import { Container } from "@/components/ui/Container";
 import ProductCard from "@/components/product/ProductCard";
 import { getCachedBrandWithProducts, getCachedPricingContext } from "@/server/services/storefront-cms.service";
 import { applyPricingToHomepageProducts } from "@/server/services/pricing.service";
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
+import { productHref } from "@/lib/product-paths";
 
 interface BrandPageProps {
   params: Promise<{ slug: string }>;
@@ -18,28 +26,44 @@ export async function generateMetadata({ params }: BrandPageProps): Promise<Meta
     const data = await getCachedBrandWithProducts(slug);
     if (!data) throw new Error("not found");
     const brand = data.brand;
-    const title = brand.seoTitle || `${brand.name} Chính Hãng - Giá Tốt Nhất | CitiLap`;
-    const description =
-      brand.seoDescription ||
-      brand.description ||
-      `Khám phá các sản phẩm ${brand.name} chính hãng phân phối tại CitiLap với giá ưu đãi, trả góp 0% và bảo hành uy tín.`;
+    const rawTitle = brand.seoTitle || `Laptop & Sản Phẩm ${brand.name} Chính Hãng`;
+    const titleString = formatSeoTitleString(rawTitle);
+    const description = cleanSeoDescription(
+      brand.seoDescription || brand.description,
+      `Khám phá các dòng laptop và phụ kiện ${brand.name} chính hãng & Like New tuyển chọn tại CitiLap. Đối chiếu cấu hình, bảng giá mới nhất và bảo hành uy tín tại Hà Nội & Bắc Ninh.`
+    );
+    const canonicalUrl = `${businessProfile.canonicalSiteUrl}/brand/${brand.slug}`;
+    const ogImage = brand.logo
+      ? (/^https?:\/\//i.test(brand.logo) ? brand.logo : `${businessProfile.canonicalSiteUrl}${brand.logo}`)
+      : `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
 
     return {
-      title,
+      title: formatSeoTitle(rawTitle),
       description,
       alternates: {
-        canonical: `${businessProfile.canonicalSiteUrl}/brand/${brand.slug}`,
+        canonical: canonicalUrl,
       },
       openGraph: {
-        title,
+        title: titleString,
         description,
-        images: brand.logo ? [{ url: brand.logo }] : undefined,
+        url: canonicalUrl,
+        type: "website",
+        siteName: businessProfile.brandName,
+        locale: "vi_VN",
+        images: [{ url: ogImage, alt: brand.name }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: titleString,
+        description,
+        images: [ogImage],
       },
     };
   } catch {
     return {
-      title: "Thương hiệu | CitiLap",
+      title: formatSeoTitle("Thương hiệu"),
       description: "Danh sách sản phẩm theo thương hiệu tại CitiLap.",
+      robots: { index: false, follow: true },
     };
   }
 }
@@ -58,9 +82,45 @@ export default async function BrandPage({ params }: BrandPageProps) {
 
   const { brand } = brandData;
   const products = applyPricingToHomepageProducts(brandData.products, pricingContext, new Date());
+  const brandUrl = `${businessProfile.canonicalSiteUrl}/brand/${brand.slug}`;
+  const jsonLd = [
+    generateBreadcrumbJsonLd([
+      { name: "Trang chủ", href: "/" },
+      { name: brand.name, href: `/brand/${brand.slug}` },
+    ]),
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "@id": `${brandUrl}#collection`,
+      name: `Sản phẩm ${brand.name} tại CitiLap`,
+      description: brand.seoDescription || brand.description || `Danh sách sản phẩm ${brand.name} tại CitiLap.`,
+      url: brandUrl,
+      isPartOf: { "@id": `${businessProfile.canonicalSiteUrl}/#website` },
+    },
+    ...(products.length > 0
+      ? [
+          {
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: `Sản phẩm ${brand.name}`,
+            numberOfItems: products.length,
+            itemListElement: products.slice(0, 24).map((p, idx) => ({
+              "@type": "ListItem",
+              position: idx + 1,
+              url: businessProfile.canonicalSiteUrl + productHref(p),
+              name: p.name,
+            })),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="bg-slate-50/50 min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="bg-white border-b border-slate-100 py-3 text-xs">
         <Container>

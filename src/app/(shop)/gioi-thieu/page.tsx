@@ -14,24 +14,50 @@ import { businessProfile } from "@/config/business-profile";
 
 import { getCachedSystemPageResolution, getStorefrontSettings } from "@/server/services/storefront-cms.service";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
+
+const aboutDefaultTitle = "Giới thiệu CitiLap — Laptop Gaming, Ultrabook & Máy Like New Tuyển Chọn";
+const aboutDefaultDesc = `Tìm hiểu về ${businessProfile.brandName} — Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy Like New kiểm định kỹ lưỡng tại Hà Nội & Bắc Ninh. Thành lập từ ${businessProfile.founded}. ${businessProfile.traditionalMotto}.`;
 
 export async function generateMetadata(): Promise<Metadata> {
+  const ogFallback = `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
   try {
     const resolution = await getCachedSystemPageResolution("ABOUT");
     if (resolution.state === "PUBLISHED") {
-      const title = `${resolution.page.seo.title} | ${businessProfile.brandName}`;
-      const description = resolution.page.seo.description || `Tìm hiểu về ${businessProfile.brandName}.`;
+      const rawTitle = resolution.page.seo.title || "Giới thiệu CitiLap";
+      const titleString = formatSeoTitleString(rawTitle);
+      const description = cleanSeoDescription(
+        resolution.page.seo.description,
+        aboutDefaultDesc,
+        { rejectPolicyBoilerplate: true }
+      );
+      const ogImage = resolution.page.seo.ogImageUrl || ogFallback;
       return {
-        title,
+        title: formatSeoTitle(rawTitle),
         description,
         alternates: {
           canonical: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
         },
         openGraph: {
-          title,
+          title: titleString,
           description,
+          type: "website",
+          siteName: businessProfile.brandName,
+          locale: "vi_VN",
           url: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
-          images: resolution.page.seo.ogImageUrl ? [{ url: resolution.page.seo.ogImageUrl }] : undefined,
+          images: [{ url: ogImage, alt: titleString }],
+        },
+        twitter: {
+          card: "summary_large_image",
+          title: titleString,
+          description,
+          images: [ogImage],
         },
       };
     }
@@ -40,15 +66,25 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 
   return {
-    title: `Giới thiệu | ${businessProfile.brandName}`,
-    description: `Tìm hiểu về ${businessProfile.brandName} - Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng. Thành lập từ 07/2024. ${businessProfile.traditionalMotto}.`,
+    title: formatSeoTitle(aboutDefaultTitle),
+    description: aboutDefaultDesc,
     alternates: {
       canonical: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
     },
     openGraph: {
-      title: `Giới thiệu ${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
-      description: `Tìm hiểu về ${businessProfile.brandName} - Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp. Thành lập từ 07/2024.`,
+      title: formatSeoTitleString(aboutDefaultTitle),
+      description: aboutDefaultDesc,
+      type: "website",
+      siteName: businessProfile.brandName,
+      locale: "vi_VN",
       url: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
+      images: [{ url: ogFallback, alt: businessProfile.brandName }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: formatSeoTitleString(aboutDefaultTitle),
+      description: aboutDefaultDesc,
+      images: [ogFallback],
     },
   };
 }
@@ -69,9 +105,28 @@ export default async function AboutPage() {
     ? `tel:${settings.storePhone.replace(/[^+\d]/g, "")}`
     : businessProfile.telHref;
   const cmsPage = resolution.state === "PUBLISHED" ? resolution.page : null;
+  const jsonLd = [
+    generateBreadcrumbJsonLd([
+      { name: "Trang chủ", href: "/" },
+      { name: "Giới thiệu CitiLap", href: "/gioi-thieu" },
+    ]),
+    {
+      "@context": "https://schema.org",
+      "@type": "AboutPage",
+      "@id": `${businessProfile.canonicalSiteUrl}/gioi-thieu#about`,
+      name: cmsPage?.title || "Giới thiệu CitiLap",
+      description: aboutDefaultDesc,
+      url: `${businessProfile.canonicalSiteUrl}/gioi-thieu`,
+      mainEntity: { "@id": `${businessProfile.canonicalSiteUrl}/#organization` },
+    },
+  ];
 
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* 1. Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 max-w-[1370px]">

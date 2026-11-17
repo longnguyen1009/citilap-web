@@ -472,18 +472,25 @@ export default function CategoryCatalog({
       {/* 1. KHỐI HEADER DANH MỤC, PHÂN LOẠI CON & NHU CẦU SỬ DỤNG */}
       <section aria-label="Phân loại con và Nhu cầu" className="rounded-xl md:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-xs space-y-2.5 sm:space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight">
-              {category.name}
-            </h1>
-            <span className="text-xs font-semibold text-slate-500 shrink-0">
-              ({result.totalCount} sản phẩm)
-            </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight">
+                {category.name}
+              </h1>
+              <span className="text-xs font-semibold text-slate-500 shrink-0">
+                ({result.totalCount} sản phẩm)
+              </span>
+            </div>
+            {category.description && (
+              <p className="mt-1 text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed">
+                {category.description}
+              </p>
+            )}
           </div>
 
           <Link
             href="/chon-laptop"
-            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-blue-200/80 bg-blue-50/80 px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100/80 transition ml-auto"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-blue-200/80 bg-blue-50/80 px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100/80 transition ml-auto shrink-0"
           >
             <Sparkles size={13} className="text-amber-500 shrink-0" aria-hidden="true" />
             <span>Tư vấn chọn máy</span>

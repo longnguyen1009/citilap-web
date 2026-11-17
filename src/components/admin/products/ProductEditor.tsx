@@ -1967,6 +1967,38 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                                   }
                                   className="matrix-input-cell font-semibold"
                                 />
+                                <details className="rounded border border-slate-200 p-2">
+                                  <summary className="cursor-pointer text-xs font-semibold">Tên sản phẩm & thông số riêng</summary>
+                                  <p className="my-2 text-xs text-slate-500">Để trống để dùng thông tin chung. Tên cấu hình phía trên chỉ dùng cho nút chọn.</p>
+                                  <label className="block text-xs font-medium">
+                                    Tên sản phẩm khi chọn cấu hình này
+                                    <input
+                                      value={variant.options?.productName || ''}
+                                      maxLength={200}
+                                      placeholder={doc.name}
+                                      onChange={e => updateDoc('variants', doc.variants.map((v, i) => i === idx ? { ...v, options: { ...v.options, productName: e.target.value } } : v))}
+                                      className="matrix-input-cell"
+                                    />
+                                  </label>
+                                  <div className="mt-2 space-y-2">
+                                    {Array.from(new Set([
+                                      ...attributeTemplateDefinitions[doc.template].map(s => s.key),
+                                      ...doc.specs.map(s => s.key),
+                                      ...Object.keys(variant.options || {}).filter(key => key.startsWith('spec:')).map(key => key.slice(5)),
+                                    ])).filter(key => doc.template !== 'LAPTOP' || !['RAM', 'SSD', 'GPU'].includes(key)).map(key => (
+                                      <label key={key} className="block text-xs font-medium">
+                                        {key}
+                                        <input
+                                          value={variant.options?.[`spec:${key}`] || ''}
+                                          maxLength={200}
+                                          placeholder={doc.specs.find(s => s.key === key)?.value || 'Dùng thông số chung'}
+                                          onChange={e => updateDoc('variants', doc.variants.map((v, i) => i === idx ? { ...v, options: { ...v.options, [`spec:${key}`]: e.target.value, ...(['CPU', 'Màn hình'].includes(key) ? { [key]: e.target.value } : {}) } } : v))}
+                                          className="matrix-mini-input w-full"
+                                        />
+                                      </label>
+                                    ))}
+                                  </div>
+                                </details>
                                 <div className="flex items-center gap-1">
                                   <input
                                     type="text"

@@ -13,23 +13,43 @@ import {
 import { businessProfile } from "@/config/business-profile";
 import ContactForm from "@/components/contact/ContactForm";
 import { getStorefrontSettings } from "@/server/services/storefront-cms.service";
+import {
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getStorefrontSettings();
   const brandName = settings?.storeName || businessProfile.brandName;
   const phone = settings?.storePhone || businessProfile.displayPhone;
   const email = settings?.storeEmail || businessProfile.email;
+  const rawTitle = `Liên hệ & Đặt lịch xem máy tại ${brandName}`;
+  const titleString = formatSeoTitleString(rawTitle);
+  const description = `Liên hệ tư vấn cấu hình, báo giá và đặt lịch xem máy tại ${brandName}. Hotline: ${phone}, Email: ${email}. Địa chỉ showroom Hà Nội (23/40 Tạ Quang Bửu) & Bắc Ninh (40 Trần Hưng Đạo).`;
+  const ogImage = `${businessProfile.canonicalSiteUrl}/brand/store-photo-01.webp`;
 
   return {
-    title: `Liên hệ & Hệ thống chi nhánh | ${brandName}`,
-    description: `Liên hệ với ${brandName} - Hotline: ${phone}, Email: ${email}. Địa chỉ chi nhánh Hà Nội & Bắc Ninh, giờ làm việc và hướng dẫn chỉ đường.`,
+    title: formatSeoTitle(rawTitle),
+    description,
     alternates: {
       canonical: `${businessProfile.canonicalSiteUrl}/lien-he`,
     },
     openGraph: {
-      title: `Liên hệ ${brandName} - ${settings?.motto || businessProfile.traditionalMotto}`,
-      description: `Hotline: ${phone}. Địa chỉ cơ sở Hà Nội và Bắc Ninh.`,
+      title: titleString,
+      description,
+      type: "website",
+      siteName: brandName,
+      locale: "vi_VN",
       url: `${businessProfile.canonicalSiteUrl}/lien-he`,
+      images: [{ url: ogImage, alt: titleString }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: titleString,
+      description,
+      images: [ogImage],
     },
   };
 }
@@ -54,9 +74,28 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
   const bacNinhPhone = settings?.storePhoneBacNinh || bacNinh.displayPhone;
   const bacNinhTelHref = settings?.storePhoneBacNinh ? `tel:${settings.storePhoneBacNinh.replace(/\s+/g, "")}` : bacNinh.telHref;
   const hours = settings?.openingHours || "T2 - T7: 09:00 - 20:00 (Chủ nhật: Theo lịch hẹn trước)";
+  const jsonLd = [
+    generateBreadcrumbJsonLd([
+      { name: "Trang chủ", href: "/" },
+      { name: "Liên hệ & Chi nhánh", href: "/lien-he" },
+    ]),
+    {
+      "@context": "https://schema.org",
+      "@type": "ContactPage",
+      "@id": `${businessProfile.canonicalSiteUrl}/lien-he#contact`,
+      name: `Liên hệ ${brandName}`,
+      description: `Liên hệ tư vấn, bảo hành và đặt lịch xem laptop tại ${brandName}.`,
+      url: `${businessProfile.canonicalSiteUrl}/lien-he`,
+      mainEntity: { "@id": `${businessProfile.canonicalSiteUrl}/#organization` },
+    },
+  ];
 
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* 1. Breadcrumb */}
       <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 max-w-[1370px]">

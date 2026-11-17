@@ -10,7 +10,7 @@ import { searchProducts } from "@/server/services/search.service";
 import { parseSearchParams } from "@/contracts/catalog/search";
 import { categoryAncestors } from "@/lib/category-paths";
 import { businessProfile } from "@/config/business-profile";
-import { serializeJsonLd } from "@/lib/seo-helpers";
+import { getCategorySeoMeta, serializeJsonLd } from "@/lib/seo-helpers";
 import { productHref } from "@/lib/product-paths";
 
 type Props = {
@@ -96,10 +96,35 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const parsed = parseSearchParams(query);
   const filtered = [...query.keys()].some(key => key !== "page");
   const page = parsed.success ? parsed.data.page : 1;
-  const title = `${current.name}${page > 1 ? ` – Trang ${page}` : ""} | CitiLap`;
-  const description = current.description || `Tìm ${current.name} theo thương hiệu, nhu cầu, giá và cấu hình. So sánh và lưu sản phẩm bạn quan tâm tại CitiLap.`;
+  const seoMeta = getCategorySeoMeta(current, page);
   const canonical = businessProfile.canonicalSiteUrl + current.href + (!filtered && page > 1 ? `?page=${page}` : "");
-  return { title, description, alternates: { canonical }, robots: { index: parsed.success && !filtered, follow: true }, openGraph: { title, description, url: canonical } };
+  const ogImage = current.image
+    ? current.image.startsWith("http")
+      ? current.image
+      : `${businessProfile.canonicalSiteUrl}${current.image}`
+    : `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
+
+  return {
+    title: seoMeta.title,
+    description: seoMeta.description,
+    alternates: { canonical },
+    robots: { index: parsed.success && !filtered, follow: true },
+    openGraph: {
+      title: seoMeta.titleString,
+      description: seoMeta.description,
+      url: canonical,
+      type: "website",
+      siteName: businessProfile.brandName,
+      locale: "vi_VN",
+      images: [{ url: ogImage, alt: current.name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: seoMeta.titleString,
+      description: seoMeta.description,
+      images: [ogImage],
+    },
+  };
 }
 
 export default async function CategoryDetailPage({ params, searchParams }: Props) {
@@ -147,19 +172,57 @@ export default async function CategoryDetailPage({ params, searchParams }: Props
   const brandCounts = parsed.data.brand?.length
     ? (await searchProducts({ ...parsed.data, category: effectiveCategoryScope, brand: undefined, page: 1, limit: 1 })).facets.brands
     : result.facets.brands;
+  const seoMeta = getCategorySeoMeta(current, result.page);
+  const enrichedCategory = {
+    ...current,
+    description: seoMeta.introText,
+  };
   const breadcrumbs = [{ label: "Trang chủ", href: "/" }, ...ancestors.map(c => ({ label: c.name, href: c.href }))];
-  const jsonLd = [{
-    "@context": "https://schema.org", "@type": "BreadcrumbList",
-    itemListElement: breadcrumbs.map((c, index) => ({ "@type": "ListItem", position: index + 1, name: c.label, item: businessProfile.canonicalSiteUrl + c.href })),
-  }, {
-    "@context": "https://schema.org", "@type": "ItemList", name: current.name,
-    itemListElement: result.products.map((p, index) => ({ "@type": "ListItem", position: (result.page - 1) * result.pageSize + index + 1, url: businessProfile.canonicalSiteUrl + productHref(p), name: p.name })),
-  }];
+  const canonicalUrl = businessProfile.canonicalSiteUrl + current.href;
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: breadcrumbs.map((c, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: c.label,
+        item: businessProfile.canonicalSiteUrl + c.href,
+      })),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "@id": `${canonicalUrl}#collection`,
+      name: current.name,
+      description: seoMeta.description,
+      url: canonicalUrl,
+      isPartOf: { "@id": `${businessProfile.canonicalSiteUrl}/#website` },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      name: current.name,
+      description: seoMeta.description,
+      numberOfItems: result.totalCount,
+      itemListElement: result.products.map((p, index) => ({
+        "@type": "ListItem",
+        position: (result.page - 1) * result.pageSize + index + 1,
+        url: businessProfile.canonicalSiteUrl + productHref(p),
+        name: p.name,
+      })),
+    },
+  ];
   return <div className="min-h-screen bg-surface-subtle pb-16">
     <Breadcrumb items={breadcrumbs} />
     <div className="container-shop py-3 sm:py-4">
-      <CategoryCatalog category={current} categories={categories} result={result} facets={facets} brandCounts={brandCounts} params={query} isAccessory={ancestors.some(c => ["phu-kien", "linh-kien"].includes(c.slug))} />
-      {current.description && <p className="mt-6 text-sm text-slate-600">{current.description}</p>}
+      <CategoryCatalog category={enrichedCategory} categories={categories} result={result} facets={facets} brandCounts={brandCounts} params={query} isAccessory={ancestors.some(c => ["phu-kien", "linh-kien"].includes(c.slug))} />
+      {seoMeta.description && (
+        <section aria-label={`Giới thiệu danh mục ${current.name}`} className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
+          <h2 className="text-sm font-bold text-slate-900">{current.name} tại CitiLap</h2>
+          <p className="mt-1.5 text-xs sm:text-sm text-slate-600 leading-relaxed">{seoMeta.description}</p>
+        </section>
+      )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     </div>
   </div>;

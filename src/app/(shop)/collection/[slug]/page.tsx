@@ -5,6 +5,14 @@ import type { Metadata } from 'next';
 import ProductCard from '@/components/product/ProductCard';
 import { MediaError } from '@/server/services/media-library.service';
 import { getPublishedCollection } from '@/server/services/storefront-cms.service';
+import {
+  cleanSeoDescription,
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from '@/lib/seo-helpers';
+import { productHref } from '@/lib/product-paths';
 
 type PageProps = { params: Promise<{ slug: string }> };
 
@@ -21,17 +29,81 @@ async function collectionOr404(slug: string) {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const collection = await collectionOr404((await params).slug);
+  const rawTitle = collection.seo?.title || collection.name;
+  const titleString = formatSeoTitleString(rawTitle);
+  const description = cleanSeoDescription(
+    collection.seo?.description || collection.description,
+    `Khám phá bộ sưu tập ${collection.name} tuyển chọn tại CitiLap. Đối chiếu cấu hình, giá bán và chế độ bảo hành minh bạch.`
+  );
+  const canonicalUrl = `${businessProfile.canonicalSiteUrl}/collection/${collection.slug}`;
+  const ogImage = collection.image
+    ? (/^https?:\/\//i.test(collection.image) ? collection.image : `${businessProfile.canonicalSiteUrl}${collection.image}`)
+    : `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
+
   return {
-    title: `${collection.name} | CitiLap`,
-    description: collection.description || `Khám phá bộ sưu tập ${collection.name} tại CitiLap.`,
-    alternates: { canonical: `${businessProfile.canonicalSiteUrl}/collection/${collection.slug}` },
+    title: formatSeoTitle(rawTitle),
+    description,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      title: titleString,
+      description,
+      url: canonicalUrl,
+      type: 'website',
+      siteName: businessProfile.brandName,
+      locale: 'vi_VN',
+      images: [{ url: ogImage, alt: collection.name }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: titleString,
+      description,
+      images: [ogImage],
+    },
   };
 }
 
 export default async function CollectionPage({ params }: PageProps) {
   const collection = await collectionOr404((await params).slug);
+  const canonicalUrl = `${businessProfile.canonicalSiteUrl}/collection/${collection.slug}`;
+  const jsonLd = [
+    generateBreadcrumbJsonLd([
+      { name: 'Trang chủ', href: '/' },
+      { name: 'Bộ sưu tập', href: '/collection' },
+      { name: collection.name, href: `/collection/${collection.slug}` },
+    ]),
+    {
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      '@id': `${canonicalUrl}#collection`,
+      name: collection.name,
+      description: collection.seo?.description || collection.description || undefined,
+      url: canonicalUrl,
+      isPartOf: { '@id': `${businessProfile.canonicalSiteUrl}/#website` },
+    },
+    ...(collection.products.length > 0
+      ? [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            name: collection.name,
+            numberOfItems: collection.products.length,
+            itemListElement: collection.products.slice(0, 24).map((p, idx) => ({
+              '@type': 'ListItem',
+              position: idx + 1,
+              url: businessProfile.canonicalSiteUrl + productHref(p),
+              name: p.name,
+            })),
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="bg-slate-50 min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       <div className="bg-white border-b border-slate-200">
         <div className="container mx-auto max-w-[1370px] px-4 py-3 text-sm text-slate-500">
           <Link href="/" className="hover:text-blue-600">Trang chủ</Link> / <span className="text-slate-900">{collection.name}</span>

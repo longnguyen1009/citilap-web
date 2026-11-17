@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import {
   ChevronRight,
   Newspaper,
@@ -19,13 +20,63 @@ import {
 import { videoReviewsSectionDataSchema } from "@/contracts/cms/site-builder";
 import { DEFAULT_REVIEW_VIDEOS } from "@/contracts/cms/settings";
 import { businessProfile } from "@/config/business-profile";
+import {
+  formatSeoTitle,
+  formatSeoTitleString,
+  generateBreadcrumbJsonLd,
+  serializeJsonLd,
+} from "@/lib/seo-helpers";
 import NewsVideoSidebarWidget, { type SidebarVideoItem } from "@/components/news/NewsVideoSidebarWidget";
 
-export const metadata = {
-  title: "Tin tức & Đánh giá công nghệ | CITILAP.VN",
-  description:
-    "Tin tức công nghệ mới nhất, đánh giá laptop gaming, ultrabook, mẹo mua sắm và thủ thuật hữu ích từ CITILAP.VN.",
-};
+export async function generateMetadata({ searchParams }: NewsPageProps): Promise<Metadata> {
+  const query = await searchParams;
+  const pageNum = Math.max(1, parseInt(query.page || "1", 10) || 1);
+  const categorySlug = query.category?.trim();
+
+  const categories = await getCachedPublicPostCategories().catch(() => []);
+  const activeCategory = categorySlug ? categories.find((c) => c.slug === categorySlug) : undefined;
+
+  const baseTitle = activeCategory
+    ? `${activeCategory.name} — Tin tức & Đánh giá`
+    : "Tin tức & Đánh giá công nghệ";
+  const rawTitle = pageNum > 1 ? `${baseTitle} – Trang ${pageNum}` : baseTitle;
+  const titleString = formatSeoTitleString(rawTitle);
+  const description = activeCategory
+    ? `Tổng hợp bài viết chuyên mục ${activeCategory.name}: đánh giá laptop, hướng dẫn chọn cấu hình và mẹo sử dụng thực tế tại CitiLap.`
+    : "Tin tức công nghệ mới nhất, đánh giá laptop gaming, ultrabook, máy trạm đồ họa và hướng dẫn kiểm tra máy từ đội ngũ kỹ thuật CitiLap.";
+
+  const canonicalParams = new URLSearchParams();
+  if (activeCategory) canonicalParams.set("category", activeCategory.slug);
+  if (pageNum > 1) canonicalParams.set("page", String(pageNum));
+  const canonicalPath = `/news${canonicalParams.size ? `?${canonicalParams.toString()}` : ""}`;
+  const canonicalUrl = `${businessProfile.canonicalSiteUrl}${canonicalPath}`;
+  const ogImage = `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
+
+  return {
+    title: formatSeoTitle(rawTitle),
+    description,
+    alternates: { canonical: canonicalUrl },
+    robots: {
+      index: !categorySlug || Boolean(activeCategory),
+      follow: true,
+    },
+    openGraph: {
+      title: titleString,
+      description,
+      url: canonicalUrl,
+      type: "website",
+      siteName: businessProfile.brandName,
+      locale: "vi_VN",
+      images: [{ url: ogImage, alt: baseTitle }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: titleString,
+      description,
+      images: [ogImage],
+    },
+  };
+}
 
 const DEFAULT_SIDEBAR_VIDEOS: SidebarVideoItem[] = DEFAULT_REVIEW_VIDEOS;
 
@@ -124,8 +175,34 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
     href: customPromo?.href || settings?.subBanner1Link || "/hot-sale",
   };
 
+  const jsonLd = [
+    generateBreadcrumbJsonLd([
+      { name: "Trang chủ", href: "/" },
+      { name: "Tin tức & Đánh giá", href: "/news" },
+      ...(activeCategory ? [{ name: activeCategory.name, href: `/news?category=${activeCategory.slug}` }] : []),
+    ]),
+    {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      "@id": `${businessProfile.canonicalSiteUrl}/news#blog`,
+      name: activeCategory ? `${activeCategory.name} | CitiLap` : "Tin tức & Đánh giá Công nghệ CitiLap",
+      url: `${businessProfile.canonicalSiteUrl}/news`,
+      publisher: { "@id": `${businessProfile.canonicalSiteUrl}/#organization` },
+      blogPost: items.slice(0, 10).map((post) => ({
+        "@type": "BlogPosting",
+        headline: post.title,
+        url: `${businessProfile.canonicalSiteUrl}/news/${post.slug}`,
+        datePublished: post.publishedAt,
+      })),
+    },
+  ];
+
   return (
     <div className="bg-[#f8fafc] min-h-screen pb-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-200 mb-6">
         <div className="container mx-auto px-4 max-w-[1370px]">
