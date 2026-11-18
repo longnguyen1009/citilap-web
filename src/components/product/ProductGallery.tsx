@@ -271,6 +271,7 @@ export function ProductGallery({
               src={activeImg.url}
               alt={activeImg.alt || productName}
               fill
+              unoptimized
               priority
               fetchPriority="high"
               sizes="(max-width: 640px) calc(100vw - 32px), 460px"

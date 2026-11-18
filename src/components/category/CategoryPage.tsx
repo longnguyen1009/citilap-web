@@ -134,26 +134,16 @@ export default async function CategoryDetailPage({ params, searchParams }: Props
   if (!parsed.success) return <div className="container-shop py-8"><h1 className="text-title font-bold">{current.name}</h1><p role="alert" className="my-4">Bộ lọc không hợp lệ. Kiểm tra khoảng giá, số trang và giá trị đã nhập.</p><Link href={current.href} className="text-brand-primary underline">Xóa bộ lọc</Link></div>;
 
   const ancestors = categoryAncestors(current, categories);
-  const isRoot = ancestors.length === 1;
-  const isLevel2 = ancestors.length === 2;
 
-  // Compute category scope: allow multi-select subcategories on level 1, or level 3 on level 2
+  // Compute category scope: allow multi-select direct child subcategories at any depth
   let effectiveCategoryScope = [current.id];
   const requestedSubcats = query.getAll("subcat");
 
   if (requestedSubcats.length > 0) {
-    if (isRoot) {
-      const level2Categories = categories.filter(c => c.parentId === current.id);
-      const matched = level2Categories.filter(s => requestedSubcats.includes(s.slug) || requestedSubcats.includes(s.id));
-      if (matched.length > 0) {
-        effectiveCategoryScope = matched.map(s => s.id);
-      }
-    } else if (isLevel2) {
-      const level3Categories = categories.filter(c => c.parentId === current.id);
-      const matched = level3Categories.filter(s => requestedSubcats.includes(s.slug) || requestedSubcats.includes(s.id));
-      if (matched.length > 0) {
-        effectiveCategoryScope = matched.map(s => s.id);
-      }
+    const childCategories = categories.filter(c => c.parentId === current.id);
+    const matched = childCategories.filter(s => requestedSubcats.includes(s.slug) || requestedSubcats.includes(s.id));
+    if (matched.length > 0) {
+      effectiveCategoryScope = matched.map(s => s.id);
     }
   }
 

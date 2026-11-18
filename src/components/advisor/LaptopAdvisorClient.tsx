@@ -144,26 +144,25 @@ export default function LaptopAdvisorClient({
     <div className="bg-surface min-h-screen pb-16">
       <Breadcrumb items={breadcrumbItems} />
 
-      <div className="container mx-auto px-4 max-w-[1370px] mt-4 space-y-8">
+      <div className="container mx-auto px-4 max-w-[1370px] mt-4 space-y-6">
         {/* 1. HERO HEADER */}
-        <section className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-lg relative overflow-hidden">
+        <section className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-2xl p-5 sm:p-7 shadow-sm relative overflow-hidden">
           {/* Subtle background glow */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="max-w-3xl space-y-4 relative z-10">
+          <div className="max-w-4xl space-y-3 relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-200 border border-blue-400/30 backdrop-blur-xs">
               <Sparkles className="w-3.5 h-3.5 text-amber-300" />
               <span>CitiLap Smart Advisor • Cố vấn cấu hình thông minh</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
-              Chọn Laptop Chuẩn Nhu Cầu & Ngân Sách
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
+              Chọn laptop đúng nhu cầu, vừa ngân sách
             </h1>
 
             <p className="text-sm sm:text-base text-blue-100/90 leading-relaxed">
-              Hệ thống tự động phân tích hàng trăm mẫu máy đang có sẵn tại CitiLap để đề xuất tối đa 3 chiếc laptop
-              tối ưu nhất cho công việc của bạn. Tất cả máy đều có RAM từ 16GB và qua quy trình kiểm định kỹ thuật nghiêm ngặt.
+              Chọn ngân sách và công việc chính. CitiLap gợi ý 3 laptop phù hợp, kèm lý do nên chọn và điểm cần cân nhắc.
             </p>
 
             {/* Trust chips */}
@@ -185,9 +184,9 @@ export default function LaptopAdvisorClient({
         </section>
 
         {/* 2. INTERACTIVE CONFIGURATION FORM */}
-        <section aria-labelledby="advisor-form-title" className="bg-white border border-slate-200 rounded-3xl p-5 sm:p-8 shadow-xs">
-          <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="border-b border-slate-200 pb-4">
+        <section aria-labelledby="advisor-form-title" className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-xs">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 [&_button]:min-h-11 [&_button]:focus-visible:outline-2 [&_button]:focus-visible:outline-offset-2 [&_button]:focus-visible:outline-blue-600">
+            <div className="lg:col-span-2 border-b border-slate-200 pb-4">
               <h2 id="advisor-form-title" className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-blue-600" />
                 <span>Tiêu chí lựa chọn của bạn</span>
@@ -198,7 +197,7 @@ export default function LaptopAdvisorClient({
             </div>
 
             {/* Step 1: Ngân sách */}
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-xl bg-slate-50 border border-slate-200 p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <label htmlFor={budgetInputId} className="text-sm font-bold text-slate-800 flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold">1</span>
@@ -231,8 +230,8 @@ export default function LaptopAdvisorClient({
                 />
                 <div className="flex justify-between text-[11px] text-slate-400 font-medium">
                   <span>5 triệu</span>
-                  <span>25 triệu</span>
-                  <span>50 triệu</span>
+                  <span>30 triệu</span>
+                  <span>55 triệu</span>
                   <span>80 triệu+</span>
                 </div>
               </div>
@@ -245,6 +244,7 @@ export default function LaptopAdvisorClient({
                   return (
                     <button
                       key={preset.value}
+                      aria-pressed={isSelected}
                       type="button"
                       onClick={() => setBudget(preset.value)}
                       className={`px-3 py-1.5 rounded-full text-xs font-bold transition cursor-pointer border ${
@@ -261,22 +261,23 @@ export default function LaptopAdvisorClient({
             </div>
 
             {/* Step 2: Nhu cầu chính (3 Rich Cards) */}
-            <div className="space-y-3">
+            <div className="space-y-3 lg:col-start-2 lg:row-start-2 lg:row-span-2">
               <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs flex items-center justify-center font-bold">2</span>
                 <span>Nhu cầu sử dụng chính:</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-3">
                 {NEED_OPTIONS.map((opt) => {
                   const isSelected = need === opt.id;
                   const Icon = opt.icon;
                   return (
                     <button
                       key={opt.id}
+                      aria-pressed={isSelected}
                       type="button"
                       onClick={() => setNeed(opt.id)}
-                      className={`p-4 sm:p-5 rounded-2xl border text-left transition relative cursor-pointer flex flex-col justify-between ${
+                      className={`p-4 rounded-xl border text-left transition relative cursor-pointer flex flex-col justify-between ${
                         isSelected
                           ? "border-blue-600 bg-blue-50/50 shadow-md ring-2 ring-blue-500/20"
                           : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
@@ -288,9 +289,9 @@ export default function LaptopAdvisorClient({
                         </span>
                       )}
 
-                      <div className="space-y-2">
+                      <div className="space-y-2 lg:space-y-0 lg:flex lg:items-start lg:gap-3">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                          className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center ${
                             opt.color === "rose"
                               ? "bg-rose-100 text-rose-600"
                               : opt.color === "purple"
@@ -302,7 +303,7 @@ export default function LaptopAdvisorClient({
                         </div>
 
                         <div>
-                          <h3 className="font-bold text-slate-900 text-sm sm:text-base">
+                          <h3 className="font-bold text-slate-900 text-sm sm:text-base pr-6">
                             {opt.title}
                           </h3>
                           <p className="text-xs text-slate-500 mt-1 leading-relaxed">
@@ -311,7 +312,7 @@ export default function LaptopAdvisorClient({
                         </div>
                       </div>
 
-                      <div className="mt-4 pt-3 border-t border-slate-200/60">
+                      <div className="mt-3 pt-2 border-t border-slate-200/60">
                         <span className="inline-block text-[11px] font-semibold text-blue-800 bg-blue-100/60 px-2.5 py-1 rounded-md">
                           {opt.badge}
                         </span>
@@ -323,7 +324,7 @@ export default function LaptopAdvisorClient({
             </div>
 
             {/* Step 3 & 4: Tình trạng máy & Tính di động */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-5">
               {/* Tình trạng máy */}
               <div className="space-y-2">
                 <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -336,6 +337,7 @@ export default function LaptopAdvisorClient({
                     return (
                       <button
                         key={c.value}
+                        aria-pressed={isSelected}
                         type="button"
                         onClick={() => setCondition(c.value)}
                         className={`w-full p-3 rounded-xl border text-left text-xs transition cursor-pointer flex items-center justify-between ${
@@ -367,6 +369,7 @@ export default function LaptopAdvisorClient({
                     return (
                       <button
                         key={p.value}
+                        aria-pressed={isSelected}
                         type="button"
                         onClick={() => setPortable(p.value)}
                         className={`w-full p-3 rounded-xl border text-left text-xs transition cursor-pointer flex items-center justify-between ${
@@ -388,8 +391,8 @@ export default function LaptopAdvisorClient({
             </div>
 
             {/* Action Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-6 border-t border-slate-200">
-              <div className="text-xs text-slate-500 flex items-center gap-1.5">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 lg:col-span-2">
+              <div className="text-xs text-slate-500 flex items-center gap-1.5 max-w-lg">
                 <Info className="w-4 h-4 text-blue-600 shrink-0" />
                 <span>Thuật toán đối soát RAM, GPU, cân nặng và giá bán tự động cập nhật theo thời gian thực.</span>
               </div>
@@ -420,7 +423,7 @@ export default function LaptopAdvisorClient({
         <section aria-labelledby="results-section-title" className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 id="results-section-title" className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+              <h2 id="results-section-title" className="text-xl sm:text-2xl font-bold text-slate-900 flex flex-wrap items-center gap-2">
                 <span>Đề xuất máy tối ưu</span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
                   {initialResults.length} máy phù hợp

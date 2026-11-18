@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { DEFAULT_SETTINGS, type StorefrontSettings } from "@/contracts/cms/settings";
+import { normalizeLegacyCategoryHref } from "@/lib/category-paths";
 
 interface HeroSectionProps {
   settings?: Partial<StorefrontSettings>;
@@ -21,12 +22,12 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
     ...raw,
     heroBgImage,
     heroMobileBgImage,
-    heroCtaPrimaryLink: raw.heroCtaPrimaryLink?.trim() || DEFAULT_SETTINGS.heroCtaPrimaryLink,
-    heroCtaSecondaryLink: raw.heroCtaSecondaryLink?.trim() || DEFAULT_SETTINGS.heroCtaSecondaryLink,
+    heroCtaPrimaryLink: normalizeLegacyCategoryHref(raw.heroCtaPrimaryLink?.trim() || DEFAULT_SETTINGS.heroCtaPrimaryLink),
+    heroCtaSecondaryLink: normalizeLegacyCategoryHref(raw.heroCtaSecondaryLink?.trim() || DEFAULT_SETTINGS.heroCtaSecondaryLink),
     subBanner1Image: raw.subBanner1Image?.trim() || DEFAULT_SETTINGS.subBanner1Image,
-    subBanner1Link: raw.subBanner1Link?.trim() || DEFAULT_SETTINGS.subBanner1Link,
+    subBanner1Link: normalizeLegacyCategoryHref(raw.subBanner1Link?.trim() || DEFAULT_SETTINGS.subBanner1Link),
     subBanner2Image: raw.subBanner2Image?.trim() || DEFAULT_SETTINGS.subBanner2Image,
-    subBanner2Link: raw.subBanner2Link?.trim() || DEFAULT_SETTINGS.subBanner2Link,
+    subBanner2Link: normalizeLegacyCategoryHref(raw.subBanner2Link?.trim() || DEFAULT_SETTINGS.subBanner2Link),
   };
 
   const hasHeroOverlay = Boolean(

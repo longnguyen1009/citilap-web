@@ -222,8 +222,8 @@ export default function StudioPurchaseSection({
         </section>
       )}
 
-      {/* 3. CHỌN CẤU HÌNH THEO DẠNG CARD 365 (CHỈ HIỆN KHI CÓ NHIỀU HƠN 1 CẤU HÌNH) */}
-      {conditionVariants.length > 1 && (
+      {/* 3. CHỌN CẤU HÌNH THEO DẠNG CARD 365 (luôn hiện, 1 cấu hình thì chọn sẵn) */}
+      {conditionVariants.length > 0 && (
         <section aria-label="Chọn cấu hình" className="space-y-2.5">
           <div className="flex items-center justify-between">
             <label className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">

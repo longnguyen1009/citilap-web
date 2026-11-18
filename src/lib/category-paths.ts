@@ -39,6 +39,10 @@ export function canonicalCategoryPath(path: string, categories: readonly (Catego
   return slug ? categories.find(c => c.slug === slug)?.href : undefined;
 }
 
+export function normalizeLegacyCategoryHref(href: string): string {
+  return href.replace(/^\/category\/([^/?#]+)(.*)$/, '/$1$2');
+}
+
 export function categoryDescendantIds(node: CategoryNode, categories: readonly CategoryNode[]): string[] {
   const ids = new Set([node.id]);
   for (let size = -1; size !== ids.size;) {

@@ -41,20 +41,35 @@ export async function readSearchPage(db: D1Database, options: SearchFilterOption
     if (result.totalCount > 2000) return { ...result, page, pageSize, totalPages: Math.ceil(result.totalCount / pageSize), products: result.products.slice(offset, offset + pageSize) };
     const statements = [
       db.prepare('DELETE FROM SearchResultSet WHERE validUntil<=? OR revision<>(SELECT revision FROM SearchCatalogRevision WHERE id=1)').bind(now),
+      db.prepare('DELETE FROM SearchResultItem WHERE cacheKey=? OR cacheKey NOT IN (SELECT cacheKey FROM SearchResultSet)').bind(key),
       db.prepare('DELETE FROM SearchResultSet WHERE cacheKey=?').bind(key),
       db.prepare(`INSERT INTO SearchResultSet(cacheKey,revision,createdAt,validUntil,query,facets,totalCount)
         SELECT ?,revision,?,?,?,?,? FROM SearchCatalogRevision WHERE id=1 AND revision=?`)
         .bind(key, now, validUntil, result.query, JSON.stringify(result.facets), result.totalCount, version.revision),
     ];
-    for (let start = 0; start < result.products.length; start += 80) {
-      statements.push(db.prepare(`INSERT INTO SearchResultItem(cacheKey,position,document)
+    for (let start = 0; start < result.products.length; ) {
+      let end = start + 1;
+      let chunkJson = JSON.stringify(result.products.slice(start, end));
+      // Keep each D1 bound parameter well under D1's 100 KB statement/parameter ceiling.
+      while (end < result.products.length && end - start < 15) {
+        const nextJson = JSON.stringify(result.products.slice(start, end + 1));
+        if (nextJson.length > 40_000) break;
+        chunkJson = nextJson;
+        end++;
+      }
+      statements.push(db.prepare(`INSERT OR REPLACE INTO SearchResultItem(cacheKey,position,document)
         SELECT ?,CAST(j.key AS INTEGER)+?,j.value FROM json_each(?) j WHERE EXISTS(SELECT 1 FROM SearchResultSet WHERE cacheKey=? AND revision=?)`)
-        .bind(key, start, JSON.stringify(result.products.slice(start, start + 80)), key, version.revision));
+        .bind(key, start, chunkJson, key, version.revision));
+      start = end;
     }
     statements.push(db.prepare('DELETE FROM SearchResultSet WHERE cacheKey IN (SELECT cacheKey FROM SearchResultSet WHERE cacheKey<>? ORDER BY createdAt DESC,cacheKey LIMIT -1 OFFSET 31)').bind(key));
-    await db.batch(statements);
-    const stored = await load();
-    if (stored) return stored;
+    try {
+      await db.batch(statements);
+      const stored = await load();
+      if (stored) return stored;
+    } catch {
+      return { ...result, page, pageSize, totalPages: Math.ceil(result.totalCount / pageSize), products: result.products.slice(offset, offset + pageSize) };
+    }
   }
   // Bulk edits can invalidate both attempts; serve a fresh uncached result.
   const result = await compute();

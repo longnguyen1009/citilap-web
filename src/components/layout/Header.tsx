@@ -2,15 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
-import {
-  Menu, PhoneCall,
-  ClipboardCheck, Monitor, ChevronDown, ChevronRight,
-  Laptop, Gamepad2, Briefcase, Palette, RefreshCw, Cpu,
-  Tablet, HardDrive, Camera, Sparkles, X, Heart
-} from "lucide-react";
+import { PhoneCall, ClipboardCheck, Monitor, ChevronDown, Heart, ArrowRight } from "lucide-react";
 import CartIcon from "./CartIcon";
+import MegaMenuPanel from "./MegaMenuPanel";
+import { MenuNodeIcon } from "./menuIcons";
 import { useWishlist } from "@/context/WishlistContext";
 import SearchAutocomplete from "@/components/search/SearchAutocomplete";
 import type { CategorySummary, BrandSummary } from "@/server/services/catalog.service";
@@ -18,40 +14,73 @@ import { businessProfile } from "@/config/business-profile";
 import type { ResolvedNavigation } from "@/contracts/cms/navigation";
 import type { PublicStorefrontSettings } from "@/contracts/cms/settings";
 
-const categoryIcons: Record<string, React.ElementType> = {
-  "laptop-gaming": Gamepad2,
-  "Laptop Gaming": Gamepad2,
-  "laptop-van-phong": Briefcase,
-  "Laptop Văn Phòng": Briefcase,
-  "laptop-do-hoa": Palette,
-  "Laptop Đồ Họa – Kĩ Thuật": Palette,
-  "Laptop Đồ Hoạ - Kỹ Thuật": Palette,
-  "laptop-cu": RefreshCw,
-  "Laptop Like New": RefreshCw,
-  "linh-kien": Cpu,
-  "Linh Kiện – Phụ Kiện": Cpu,
-  "Linh Kiện - Phụ Kiện": Cpu,
-  "laptop-moi": Sparkles,
-  "Laptop Mới": Sparkles,
-  "macbook": Tablet,
-  "pc": HardDrive,
-  "camera": Camera,
-};
+export interface HeaderMenuNode {
+  name: string;
+  href: string;
+  image?: string | null;
+  children?: HeaderMenuNode[];
+}
 
 export interface HeaderCategoryItem {
   id?: string;
   name: string;
   slug?: string;
   href: string;
+  image?: string | null;
   productCount?: number;
-  children?: { name: string; href: string }[];
+  children?: HeaderMenuNode[];
 }
 
 export interface HeaderNavItem {
   name: string;
   href: string;
   hot?: boolean;
-  children?: { name: string; href: string }[];
+  children?: HeaderMenuNode[];
+}
+
+function buildCategoryMenuTree(
+  nav: ResolvedNavigation,
+  rawChildren: { label: string; href: string; children?: { label: string; href: string }[] }[],
+  parentCategoryId?: string,
+): HeaderMenuNode[] {
+  const resolveImage = (href: string) =>
+    nav.collections.find((c) => c.href === href)?.image ||
+    nav.categories.find((c) => c.href === href)?.image ||
+    null;
+
+  const mapNode = (
+    href: string,
+    label: string,
+    depth: number,
+    explicitChildren?: { label: string; href: string }[],
+  ): HeaderMenuNode => {
+    const matchedCat = nav.categories.find((c) => c.href === href);
+    let subNodes: HeaderMenuNode[] = [];
+    if (depth < 2) {
+      if (explicitChildren?.length) {
+        subNodes = explicitChildren.map((ec) => mapNode(ec.href, ec.label, depth + 1));
+      } else if (matchedCat) {
+        const directChildren = nav.categories.filter((c) => c.parentId === matchedCat.id);
+        subNodes = directChildren.map((dc) => mapNode(dc.href, dc.name, depth + 1));
+      }
+    }
+    return {
+      name: label,
+      href,
+      image: resolveImage(href),
+      children: subNodes.length > 0 ? subNodes : undefined,
+    };
+  };
+
+  if (rawChildren.length > 0) {
+    return rawChildren.map((c) => mapNode(c.href, c.label, 1, c.children));
+  }
+  if (parentCategoryId) {
+    return nav.categories
+      .filter((c) => c.parentId === parentCategoryId)
+      .map((c) => mapNode(c.href, c.name, 1));
+  }
+  return [];
 }
 
 export interface HeaderProps {
@@ -62,23 +91,16 @@ export interface HeaderProps {
 }
 
 export default function Header({ categories = [], brands = [], navigation, settings }: HeaderProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [hoveredItem, setHoveredItem] = useState<number | null>(null);
-  const [hoveredNav, setHoveredNav] = useState<number | null>(null);
+  const [openNav, setOpenNav] = useState<number | null>(null);
   const pathname = usePathname();
   const [prevPath, setPrevPath] = useState(pathname);
   const headerRef = useRef<HTMLElement>(null);
-  const categoryButtonRef = useRef<HTMLButtonElement>(null);
-  const categoryDropdownRef = useRef<HTMLDivElement>(null);
   const navListRef = useRef<HTMLUListElement>(null);
-  const [menuTop, setMenuTop] = useState(0);
   const { wishlistCount } = useWishlist();
 
   if (prevPath !== pathname) {
     setPrevPath(pathname);
-    setMenuOpen(false);
-    setHoveredItem(null);
-    setHoveredNav(null);
+    setOpenNav(null);
   }
 
   // Measure rendered header height and expose scoped CSS variable on .storefront-shell
@@ -124,27 +146,13 @@ export default function Header({ categories = [], brands = [], navigation, setti
   }, []);
 
   useEffect(() => {
-    if (!menuOpen) return;
-    const { overflow, paddingRight } = document.body.style;
-    const scrollbar = window.innerWidth - document.documentElement.clientWidth;
-    document.body.style.overflow = "hidden";
-    document.body.style.paddingRight = `${parseFloat(getComputedStyle(document.body).paddingRight) + scrollbar}px`;
-    const syncMenuGeometry = () => {
-      if (window.innerWidth < 768) {
-        setMenuOpen(false);
-      } else {
-        setMenuTop(headerRef.current?.getBoundingClientRect().bottom || 0);
-      }
+    if (openNav === null) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!navListRef.current?.contains(event.target as Node)) setOpenNav(null);
     };
-    window.addEventListener("resize", syncMenuGeometry);
-    window.addEventListener("scroll", syncMenuGeometry, { passive: true });
-    return () => {
-      window.removeEventListener("resize", syncMenuGeometry);
-      window.removeEventListener("scroll", syncMenuGeometry);
-      document.body.style.overflow = overflow;
-      document.body.style.paddingRight = paddingRight;
-    };
-  }, [menuOpen]);
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [openNav]);
 
   // Keyboard accessibility: Escape closes menus and restores focus if focus was inside closed content
   useEffect(() => {
@@ -152,78 +160,21 @@ export default function Header({ categories = [], brands = [], navigation, setti
       if (e.key !== "Escape") return;
       const activeEl = document.activeElement as HTMLElement | null;
 
-      if (menuOpen) {
-        const focusInsideCategory =
-          !!activeEl &&
-          (categoryDropdownRef.current?.contains(activeEl) ||
-            activeEl === categoryButtonRef.current);
-        if (focusInsideCategory) {
-          categoryButtonRef.current?.focus();
-        }
-        setMenuOpen(false);
-        setHoveredItem(null);
-      }
-
-      if (hoveredNav !== null) {
+      if (openNav !== null) {
         const openNavLi = navListRef.current?.querySelector<HTMLElement>(
-          `[data-nav-index="${hoveredNav}"]`
+          `[data-nav-index="${openNav}"]`
         );
         const opener = openNavLi?.querySelector<HTMLElement>("[data-nav-opener]");
         const focusInsideNav = !!activeEl && !!openNavLi?.contains(activeEl);
         if (focusInsideNav && opener) {
           opener.focus();
         }
-        setHoveredNav(null);
+        setOpenNav(null);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [menuOpen, hoveredNav]);
-
-  // Build dynamic dropdown categories from D1 data
-  const dynamicCategoryMenu: HeaderCategoryItem[] = navigation
-    ? navigation.menus.main.flatMap(item => {
-        const cat = navigation.categories.find(cat => cat.href === item.href);
-        return cat ? [{ ...cat, name: item.label }] : [];
-      }).map(cat => {
-        const menu = navigation.menus.main.find(item => item.href === cat.href);
-        return {
-          id: cat.id, name: cat.name, slug: cat.slug, href: cat.href,
-          children: menu?.children.length
-            ? menu.children.map(child => ({ name: child.label, href: child.href }))
-            : navigation.categories.filter(child => child.parentId === cat.id).map(child => ({ name: child.name, href: child.href })),
-        };
-      })
-    : categories.length > 0
-    ? categories.map((cat) => {
-        const children = cat.subCategories && cat.subCategories.length > 0
-          ? cat.subCategories.map((sub) => ({
-              name: sub.name,
-              href: sub.href || `/${sub.slug}`,
-            }))
-          : brands.length > 0 && !cat.slug.includes("linh-kien") && !cat.slug.includes("camera")
-            ? brands.map((b) => ({
-                name: `${cat.name.replace("Laptop ", "")} ${b.name}`,
-                href: `${cat.href || `/${cat.slug}`}?brand=${b.slug}`,
-              }))
-            : undefined;
-
-        return {
-          id: cat.id,
-          name: cat.name,
-          slug: cat.slug,
-          href: cat.href || `/${cat.slug}`,
-          productCount: cat.productCount,
-          children,
-        };
-      })
-    : [
-        { name: "Laptop Gaming", slug: "laptop-gaming", href: "/laptop-gaming" },
-        { name: "Laptop Văn Phòng", slug: "laptop-van-phong", href: "/laptop-van-phong" },
-        { name: "Laptop Đồ Họa – Kĩ Thuật", slug: "laptop-do-hoa", href: "/laptop-workstation" },
-        { name: "Laptop Like New", slug: "laptop-cu", href: "/laptop-likenew" },
-        { name: "Linh Kiện – Phụ Kiện", slug: "linh-kien", href: "/phu-kien" },
-      ];
+  }, [openNav]);
 
   // 1. Phụ kiện Laptop dropdown items
   const accessoryNavChildren = [
@@ -284,23 +235,20 @@ export default function Header({ categories = [], brands = [], navigation, setti
   ];
 
   const dynamicNavItems: HeaderNavItem[] = navigation
-    ? navigation.menus.main.map((item) => ({
-        name: item.label, href: item.href,
-        hot: item.href === '/hot-sale',
-        children: item.children.length ? item.children.map((child) => ({ name: child.label, href: child.href, children:child.children })) : undefined,
-      }))
+    ? navigation.menus.main.map((item) => {
+        const cat = navigation.categories.find((c) => c.href === item.href);
+        const tree = buildCategoryMenuTree(navigation, item.children, cat?.id);
+        return {
+          name: item.label,
+          href: item.href,
+          hot: item.href === '/hot-sale',
+          children: tree.length > 0 ? tree : undefined,
+        };
+      })
     : legacyNavItems;
 
   return (
     <>
-      {menuOpen && (
-        <button
-          type="button"
-          aria-label="Đóng danh mục"
-          onClick={() => setMenuOpen(false)}
-          className="fixed inset-0 z-[49] hidden bg-black/50 backdrop-blur-sm md:block"
-        />
-      )}
       <header ref={headerRef} className="w-full sticky top-0 z-50 shadow-md">
         {/* Top Header */}
         <div className="bg-[#0b1221] text-white py-2 md:py-2.5">
@@ -314,13 +262,13 @@ export default function Header({ categories = [], brands = [], navigation, setti
                   alt={settings.storeName || "CitiLap"}
                   decoding="async"
                   fetchPriority="high"
-                  className="h-auto w-[140px] min-[375px]:w-[160px] md:w-[132px] lg:w-[172px] xl:w-[210px] object-contain"
+                  className="h-auto w-[156px] min-[375px]:w-[178px] md:w-[132px] lg:w-[172px] xl:w-[210px] object-contain"
                 />
               ) : (
                 <>
-                  <Monitor className="w-6 h-6 lg:w-8 lg:h-8 text-blue-400 shrink-0" />
+                  <Monitor className="w-7 h-7 sm:w-8 sm:h-8 text-blue-400 shrink-0" />
                   <div className="flex flex-col">
-                    <span className="text-base sm:text-lg lg:text-xl font-black leading-none tracking-wider text-white">
+                    <span className="text-lg sm:text-xl font-black leading-none tracking-wider text-white">
                       {settings?.storeName || "CITILAP.VN"}
                     </span>
                     <span className="text-[8px] lg:text-[9px] tracking-[0.18em] text-blue-400 font-medium uppercase mt-0.5 hidden lg:block">
@@ -332,126 +280,8 @@ export default function Header({ categories = [], brands = [], navigation, setti
             </Link>
 
             {/* Danh mục & Search */}
-            <div className="flex flex-1 min-w-0 max-w-3xl items-center gap-2 md:gap-2.5 lg:gap-3">
-              <div className="relative hidden md:block shrink-0">
-                {/* Button Danh mục - Click to toggle */}
-                <button
-                  ref={categoryButtonRef}
-                  type="button"
-                  id="category-menu-button"
-                  aria-expanded={menuOpen}
-                  aria-haspopup="true"
-                  aria-controls="category-dropdown-menu"
-                  aria-label="Danh mục sản phẩm"
-                  onClick={() => {
-                    const nextOpen = !menuOpen;
-                    setMenuOpen(nextOpen);
-                    if (nextOpen) {
-                      setHoveredItem(Math.max(0, dynamicCategoryMenu.findIndex(item => item.children?.length)));
-                      setMenuTop(headerRef.current?.getBoundingClientRect().bottom || 0);
-                    }
-                  }}
-                  className={`min-h-11 flex items-center gap-2 text-white px-4 lg:px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap ${
-                    menuOpen
-                      ? "bg-gradient-to-r from-blue-700 to-blue-800 shadow-xl shadow-blue-600/40"
-                      : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg shadow-blue-600/30 hover:shadow-xl hover:shadow-blue-600/40"
-                  }`}
-                >
-                  {menuOpen ? <X className="w-5 h-5 shrink-0" /> : <Menu className="w-5 h-5 shrink-0" />}
-                  <span>Danh mục</span>
-                  <ChevronDown className={`w-3.5 h-3.5 opacity-70 transition-transform duration-200 shrink-0 ${menuOpen ? "rotate-180" : ""}`} />
-                </button>
-
-                {menuOpen && (
-                  <div
-                    ref={categoryDropdownRef}
-                    id="category-dropdown-menu"
-                    role="region"
-                    aria-label="Menu danh mục sản phẩm"
-                    style={{ top: menuTop + 8, maxHeight: `calc(100dvh - ${menuTop + 24}px)` }}
-                    className="fixed inset-x-0 z-50 mx-auto w-full max-w-[1370px] px-3 md:px-4 pointer-events-none"
-                  >
-                    <div
-                      style={{ maxHeight: `calc(100dvh - ${menuTop + 24}px)` }}
-                      className="pointer-events-auto grid grid-cols-[210px_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)] gap-2 text-slate-800"
-                    >
-                      <div className="max-h-full overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                        {dynamicCategoryMenu.map((item, idx) => {
-                          const IconComponent = (item.slug && categoryIcons[item.slug]) || Laptop;
-                          return (
-                            <Link
-                              key={`${item.href}-${idx}`}
-                              href={item.href}
-                              prefetch={false}
-                              onMouseEnter={() => setHoveredItem(idx)}
-                              onFocus={() => setHoveredItem(idx)}
-                              onClick={() => setMenuOpen(false)}
-                              className={
-                                "min-h-11 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition " +
-                                (hoveredItem === idx ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50")
-                              }
-                            >
-                              <IconComponent className="h-5 w-5 shrink-0" />
-                              <span className="min-w-0 flex-1">{item.name}</span>
-                              <ChevronRight className="h-4 w-4 shrink-0" />
-                            </Link>
-                          );
-                        })}
-                      </div>
-                      <div className="max-h-full overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white p-4 lg:p-5 shadow-xl">
-                        {(() => {
-                          const item = dynamicCategoryMenu[hoveredItem ?? 0];
-                          if (!item) return null;
-                          return (
-                            <>
-                              <div className="mb-4 flex items-center justify-between gap-3">
-                                <h2 className="text-base lg:text-lg font-extrabold">{item.name}</h2>
-                                <Link
-                                  href={item.href}
-                                  prefetch={false}
-                                  onClick={() => setMenuOpen(false)}
-                                  className="min-h-11 inline-flex items-center px-2 text-xs font-bold text-blue-700 hover:underline"
-                                >
-                                  Xem tất cả
-                                </Link>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-3">
-                                {(item.children?.length ? item.children : [item]).map((sub, subIdx) => {
-                                  const image =
-                                    navigation?.collections.find(c => c.href === sub.href)?.image ||
-                                    navigation?.categories.find(c => c.href === sub.href)?.image;
-                                  return (
-                                    <Link
-                                      key={`${sub.href}-${subIdx}`}
-                                      href={sub.href}
-                                      prefetch={false}
-                                      onClick={() => setMenuOpen(false)}
-                                      className="flex min-h-14 items-center gap-2.5 rounded-xl border border-slate-200 p-2.5 text-xs lg:text-sm font-semibold hover:border-blue-300 hover:bg-blue-50"
-                                    >
-                                      {image && (
-                                        <Image
-                                          src={image}
-                                          alt=""
-                                          width={48}
-                                          height={40}
-                                          className="h-10 w-12 shrink-0 rounded object-contain"
-                                        />
-                                      )}
-                                      <span className="min-w-0 break-words">{sub.name}</span>
-                                    </Link>
-                                  );
-                                })}
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="relative flex-1 min-w-0">
+            <div className="flex flex-1 min-w-0 items-center justify-end gap-2 md:gap-2.5 lg:gap-3">
+              <div className="relative flex-1 min-w-0 lg:max-w-[460px] xl:max-w-[540px]">
                 <SearchAutocomplete
                   key={pathname}
                   placeholder="Tìm laptop, dòng máy, CPU, GPU..."
@@ -521,7 +351,7 @@ export default function Header({ categories = [], brands = [], navigation, setti
           <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
             <ul
               ref={navListRef}
-              className="flex items-center justify-start lg:justify-between gap-x-3 lg:gap-x-2 xl:gap-x-4 gap-y-0 max-lg:flex-nowrap max-lg:overflow-x-auto hide-scrollbar lg:flex-wrap lg:overflow-visible"
+              className="flex flex-wrap items-center justify-center lg:justify-between gap-x-4 lg:gap-x-2 xl:gap-x-4 gap-y-0"
             >
               {dynamicNavItems.map((item, index) => {
                 const isChildActive = item.children?.some(
@@ -537,74 +367,88 @@ export default function Header({ categories = [], brands = [], navigation, setti
                     key={index}
                     data-nav-index={index}
                     className="relative shrink-0"
-                    onMouseEnter={() => item.children && setHoveredNav(index)}
-                    onMouseLeave={() => item.children && setHoveredNav(null)}
-                    onFocus={(event) => {
-                      if (
-                        item.children &&
-                        !event.currentTarget.contains(event.relatedTarget as Node | null)
-                      ) {
-                        setHoveredNav(index);
-                      }
-                    }}
                     onBlur={(event) => {
                       if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-                        setHoveredNav(null);
+                        setOpenNav(null);
                       }
                     }}
                   >
-                    <Link
-                      href={item.href}
-                      prefetch={false}
-                      data-nav-opener="true"
-                      onFocus={(event) => {
-                        event.currentTarget.scrollIntoView({
-                          block: "nearest",
-                          inline: "nearest",
-                        });
-                      }}
-                      aria-expanded={item.children ? hoveredNav === index : undefined}
-                      aria-current={pathname === item.href ? "page" : undefined}
-                      className={`min-h-11 flex items-center gap-1 px-1 py-2.5 text-[13px] xl:text-sm font-bold uppercase whitespace-nowrap transition hover:text-blue-600 ${
-                        isActive
-                          ? "text-blue-600 border-b-2 border-blue-600"
-                          : item.hot
-                          ? "text-red-600"
-                          : "text-gray-800"
-                      }`}
-                    >
-                      {item.name}
-                      {item.children && <ChevronDown className="w-4 h-4 shrink-0" />}
-                    </Link>
+                    {item.children ? (
+                      <button
+                        type="button"
+                        data-nav-opener="true"
+                        aria-expanded={openNav === index}
+                        aria-controls={`header-submenu-${index}`}
+                        onClick={() => setOpenNav(openNav === index ? null : index)}
+                        className={`min-h-11 flex cursor-pointer items-center gap-1 px-1 py-2.5 text-[13px] xl:text-sm font-bold uppercase whitespace-nowrap transition hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-600 ${isActive || openNav === index ? "text-blue-600" : "text-gray-800"}`}
+                      >
+                        {item.name}
+                        <ChevronDown aria-hidden="true" className={`h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none ${openNav === index ? "rotate-180" : ""}`} />
+                      </button>
+                    ) : (
+                      <Link href={item.href} prefetch={false} aria-current={isActive ? "page" : undefined}
+                        onClick={() => setOpenNav(null)}
+                        className={`min-h-11 flex items-center gap-1 px-1 py-2.5 text-[13px] xl:text-sm font-bold uppercase whitespace-nowrap hover:text-blue-600 focus-visible:outline-2 focus-visible:outline-blue-600 ${isActive ? "text-blue-600" : item.hot ? "text-red-600" : "text-gray-800"}`}>
+                        {item.hot && <MenuNodeIcon name={item.name} className="h-4 w-4 shrink-0 animate-pulse motion-reduce:animate-none" />}
+                        {item.name}
+                      </Link>
+                    )}
+
+                    {/* Pointer: connects the parent item to its dropdown */}
+                    {item.children && openNav === index && (
+                      <>
+                        <span aria-hidden="true" className="pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-blue-600 animate-in fade-in duration-200" />
+                        <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-full z-[60] mt-[3px] h-3.5 w-3.5 -translate-x-1/2 rotate-45 rounded-tl-[3px] border-l border-t border-blue-100 bg-white animate-in fade-in slide-in-from-top-2 duration-200 max-lg:hidden" />
+                      </>
+                    )}
 
                     {/* Dropdown */}
-                    {item.children && hoveredNav === index && (
-                      <div
-                        className={`max-lg:fixed max-lg:inset-x-6 max-lg:top-[var(--storefront-header-height,6.5rem)] max-lg:pt-1 lg:absolute lg:top-full ${
-                          index >= dynamicNavItems.length / 2 ? "lg:right-0" : "lg:left-0"
-                        } lg:pt-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150`}
-                      >
+                    {item.children && openNav === index && (() => {
+                      const hasNestedMenu = item.children.some((sub) => sub.children && sub.children.length > 0);
+                      return (
                         <div
-                          className={`bg-white rounded-xl shadow-xl shadow-gray-200/70 border border-gray-200 py-2 max-h-[calc(100dvh-var(--storefront-header-height,6.5rem)-1.5rem)] overflow-y-auto overscroll-contain max-lg:w-full lg:max-w-[calc(100vw-3rem)] ${
-                            item.children.length > 5
-                              ? "grid grid-cols-2 p-2 gap-1 lg:w-max lg:min-w-[360px]"
-                              : "max-lg:grid max-lg:grid-cols-2 max-lg:p-2 max-lg:gap-1 lg:w-max lg:min-w-[210px]"
-                          }`}
+                          id={`header-submenu-${index}`}
+                          className={
+                            hasNestedMenu
+                              ? `max-lg:fixed max-lg:inset-x-6 max-lg:top-[var(--storefront-header-height,6.5rem)] lg:absolute lg:top-full ${
+                                  index >= dynamicNavItems.length / 2 ? "lg:right-0" : "lg:left-0"
+                                } z-50 pt-2 lg:w-[680px] origin-top animate-in fade-in zoom-in-95 slide-in-from-top-3 duration-200 ease-out`
+                              : `max-lg:fixed max-lg:inset-x-6 max-lg:top-[var(--storefront-header-height,6.5rem)] max-lg:pt-1 lg:absolute lg:top-full ${
+                                  index >= dynamicNavItems.length / 2 ? "lg:right-0" : "lg:left-0"
+                                } lg:pt-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150`
+                          }
                         >
-                          {item.children.map((sub, sidx) => (
-                            <Link
-                              key={sidx}
-                              href={sub.href}
-                              prefetch={false}
-                              onClick={() => setHoveredNav(null)}
-                              className="min-h-11 flex items-center px-3.5 py-2 text-xs lg:text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium rounded-lg"
+                          {hasNestedMenu ? (
+                            <div className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-2xl shadow-blue-900/20 ring-1 ring-black/5 flex">
+                              <MegaMenuPanel key={item.href} title={item.name} href={item.href} nodes={item.children} onNavigate={() => setOpenNav(null)} className="flex-1" />
+                            </div>
+                          ) : (
+                            <div
+                              className={`bg-white rounded-xl shadow-xl shadow-gray-200/70 border border-gray-200 py-2 max-h-[calc(100dvh-var(--storefront-header-height,6.5rem)-1.5rem)] overflow-y-auto overscroll-contain max-lg:w-full lg:max-w-[calc(100vw-3rem)] ${
+                                item.children.length > 5
+                                  ? "grid grid-cols-2 p-2 gap-1 lg:w-max lg:min-w-[360px]"
+                                  : "max-lg:grid max-lg:grid-cols-2 max-lg:p-2 max-lg:gap-1 lg:w-max lg:min-w-[210px]"
+                              }`}
                             >
-                              {sub.name}
-                            </Link>
-                          ))}
+                              {[{ name: `Xem tất cả ${item.name}`, href: item.href }, ...item.children].map((sub, sidx) => (
+                                <Link
+                                  key={sidx}
+                                  href={sub.href}
+                                  prefetch={false}
+                                  onClick={() => setOpenNav(null)}
+                                  className={`group min-h-11 flex items-center gap-3 px-3 py-2 text-xs lg:text-sm hover:bg-blue-50 hover:text-blue-600 transition-colors font-medium rounded-lg ${sidx === 0 ? "text-blue-600" : "text-gray-700"}`}
+                                >
+                                  <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                                    {sidx === 0 ? <ArrowRight className="h-4 w-4" /> : <MenuNodeIcon name={sub.name} className="h-4 w-4" />}
+                                  </span>
+                                  {sub.name}
+                                </Link>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </li>
                 );
               })}
@@ -612,6 +456,13 @@ export default function Header({ categories = [], brands = [], navigation, setti
           </div>
         </div>
       </header>
+      {openNav !== null && dynamicNavItems[openNav]?.children && (
+        <div
+          aria-hidden="true"
+          onClick={() => setOpenNav(null)}
+          className="fixed inset-x-0 bottom-0 top-[var(--storefront-header-height,6.5rem)] z-40 hidden bg-slate-900/45 backdrop-blur-[3px] animate-in fade-in duration-200 md:block"
+        />
+      )}
     </>
   );
 }

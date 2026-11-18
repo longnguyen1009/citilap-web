@@ -121,23 +121,39 @@ export default function CategoryCatalog({
   const ancestors = categoryAncestors(category, categories);
   const isRoot = ancestors.length === 1;
   const isLevel2 = ancestors.length === 2;
-  const isLevel3 = ancestors.length >= 3;
+  const isLevel3 = ancestors.length === 3;
+  const isLevel4 = ancestors.length >= 4;
   const rootCategory = ancestors[0] || category;
 
-  // Danh sách dòng máy phân loại con Cấp 2 thuộc phân loại cha
+  const selected = (key: string, value: string) =>
+    params.getAll(key).some(v => key === "tag" ? catalogNeedTag(v) === value : v === value);
+
+  // Cấp 2 (Hãng / Nhóm con trực tiếp dưới Root: VD Lenovo Gaming, ASUS Gaming...)
   const rawLevel2 = categories.filter(c => c.parentId === rootCategory.id);
   const level2Categories = rawLevel2.filter(c => {
     const isGenericBrand = ['asus', 'gigabyte', 'lenovo', 'acer', 'msi', 'hp', 'dell', 'apple'].includes(c.slug.toLowerCase());
     if (isGenericBrand && rawLevel2.length > 7) return false;
     const hasImage = Boolean(c.image);
     const hasChildren = categories.some(child => child.parentId === c.id);
-    const isDongMay = ['legion', 'rog', 'nitro', 'alienware', 'omen', 'loq', 'predator', 'msi-gaming', 'gigabyte-gaming', 'tuf', 'thinkpad', 'zenbook', 'vivobook', 'xps', 'latitude', 'elitebook', 'swift', 'aspire', 'precision', 'zbook'].some(k => c.slug.includes(k) || c.id.includes(k));
-    return hasImage || hasChildren || isDongMay || rawLevel2.length <= 8;
+    return hasImage || hasChildren || rawLevel2.length <= 16;
   });
 
-  // Phân loại con Cấp 3 (khi ở Cấp 2 hoặc Cấp 3)
-  const currentLevel2 = isLevel2 ? category : isLevel3 ? ancestors[1] : null;
-  const level3Categories = currentLevel2 ? categories.filter(c => c.parentId === currentLevel2.id) : [];
+  // Cấp 3 (Dòng sản phẩm: VD Lenovo Legion, Lenovo LOQ...)
+  const currentLevel2 = ancestors[1] ?? null;
+  const selectedRootSub2 = isRoot
+    ? level2Categories.filter(sub => selected("subcat", sub.slug) || selected("subcat", sub.id))
+    : [];
+  const level3Parent = currentLevel2 ?? (selectedRootSub2.length === 1 ? selectedRootSub2[0] : null);
+  const level3Categories = level3Parent ? categories.filter(c => c.parentId === level3Parent.id) : [];
+
+  // Cấp 4 (Model/Năm chi tiết: VD Legion 5, Legion Pro 5, Legion 7...)
+  const currentLevel3 = ancestors[2] ?? null;
+  const selectedSub3OnLevel2 = isLevel2
+    ? level3Categories.filter(sub => selected("subcat", sub.slug) || selected("subcat", sub.id))
+    : [];
+  const level4Parent = currentLevel3 ?? (selectedSub3OnLevel2.length === 1 ? selectedSub3OnLevel2[0] : null);
+  const level4Categories = level4Parent ? categories.filter(c => c.parentId === level4Parent.id) : [];
+  const currentLevel4 = ancestors[3] ?? null;
 
   const getSubcategoryImage = (sub: Category) => {
     if (sub.image) return sub.image;
@@ -149,9 +165,6 @@ export default function CategoryCatalog({
   };
 
   const url = (query: URLSearchParams) => category.href + (query.size ? `?${query}` : "");
-  
-  const selected = (key: string, value: string) => 
-    params.getAll(key).some(v => key === "tag" ? catalogNeedTag(v) === value : v === value);
 
   const toggle = (key: string, value: string, multi = true) => {
     const next = new URLSearchParams(params);
@@ -206,7 +219,7 @@ export default function CategoryCatalog({
     ...(conditionOptions.length > 0 && !["laptop-moi", "laptop-likenew"].includes(category.slug)
       ? [{ key: "condition", label: "Tình trạng", icon: <ShieldCheck size={14} />, options: conditionOptions }]
       : []),
-    ...(level2Categories.length > 0 && facets.brands.length > 0
+    ...(facets.brands.length > 1
       ? [{ key: "brand", label: "Hãng sản xuất", icon: <Laptop size={14} />, options: facets.brands }]
       : []),
     { key: "cpu", label: "CPU", icon: <Cpu size={14} />, options: facets.cpuSeries },
@@ -249,7 +262,7 @@ export default function CategoryCatalog({
   for (const [key, value] of params) {
     if (["page", "sort", "limit"].includes(key) || (key === "inStock" && value !== "1")) continue;
     const id = ["minPrice", "maxPrice", "pricePreset"].includes(key) ? "price" : key === "tag" && NEED_LABELS[catalogNeedTag(value)] ? "need" : key;
-    const label = id === "price" ? "Giá" : id === "need" ? "Nhu cầu" : key === "subcat" ? (isLevel2 ? "Phiên bản" : "Dòng máy") : FILTER_LABELS[key] || key;
+    const label = id === "price" ? "Giá" : id === "need" ? "Nhu cầu" : key === "subcat" ? (isRoot ? "Hãng" : isLevel2 ? "Dòng máy" : "Phiên bản") : FILTER_LABELS[key] || key;
     const group = active.get(id) || { label, values: [], entries: [] };
     
     let text = "";
@@ -258,9 +271,8 @@ export default function CategoryCatalog({
     } else if (key === "inStock") {
       text = "Sẵn hàng";
     } else if (key === "subcat") {
-      const matchL2 = level2Categories.find(s => s.slug === value || s.id === value);
-      const matchL3 = level3Categories.find(s => s.slug === value || s.id === value);
-      text = matchL2 ? matchL2.name : matchL3 ? matchL3.name : value;
+      const matchedCat = categories.find(s => s.slug === value || s.id === value);
+      text = matchedCat ? matchedCat.name : value;
     } else if (key === "brand") {
       const b = facets.brands.find(o => String(o.value) === value);
       text = b ? b.label : value;
@@ -285,8 +297,16 @@ export default function CategoryCatalog({
   const pages = [...new Set([1, result.page - 1, result.page, result.page + 1, result.totalPages])].filter(page => page > 0 && page <= result.totalPages).sort((a, b) => a - b);
   const currentUrlKey = url(params);
 
+  const rootSlugLower = rootCategory.slug.toLowerCase();
   const visibleNeeds = STANDARD_NEEDS.filter((need) => {
     const slugLower = category.slug.toLowerCase();
+    if (rootSlugLower.includes("gaming")) {
+      if (["van-phong", "doanh-nhan", "sinh-vien"].includes(need.key)) return false;
+    } else if (rootSlugLower.includes("van-phong")) {
+      if (need.key === "gaming") return false;
+    } else if (rootSlugLower.includes("workstation") || rootSlugLower.includes("do-hoa")) {
+      if (["gaming", "van-phong", "sinh-vien"].includes(need.key)) return false;
+    }
     if (need.key === "gaming" && slugLower.includes("gaming")) return false;
     if (need.key === "van-phong" && slugLower.includes("van-phong")) return false;
     if (need.key === "do-hoa" && (slugLower.includes("workstation") || slugLower.includes("do-hoa"))) return false;
@@ -385,9 +405,10 @@ export default function CategoryCatalog({
         const options = selectedOptions(group);
         const activeCount = options.length;
         const values = options.map(o => o.label).join(", ");
+        const defaultExpanded = activeCount > 0 || ["brand", "cpu", "gpu", "type"].includes(group.key);
 
         return (
-          <details key={`${group.key}-${index}`} data-category-filter data-inflow="true" open className="group rounded-xl border border-slate-200/90 bg-slate-50/30">
+          <details key={`${group.key}-${index}`} data-category-filter data-inflow="true" open={defaultExpanded || undefined} className="group rounded-xl border border-slate-200/90 bg-slate-50/30">
             <summary className={`flex min-h-11 w-full cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition select-none [&::-webkit-details-marker]:hidden ${
               activeCount > 0
                 ? "text-blue-800 font-bold"
@@ -474,7 +495,7 @@ export default function CategoryCatalog({
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2 min-w-0">
-              <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight">
+              <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight [text-wrap:balance]">
                 {category.name}
               </h1>
               <span className="text-xs font-semibold text-slate-500 shrink-0">
@@ -497,60 +518,93 @@ export default function CategoryCatalog({
           </Link>
         </div>
 
-        {/* Phần Phân loại con Cấp 2 (Dòng máy của danh mục cha - vuốt ngang mượt trên mobile, wrap trên desktop) */}
+        {/* Phần Phân loại con Cấp 2 (Trên Root: thẻ hình ảnh lớn; khi đã vào Cấp 2/3/4: thanh pill 1 dòng gọn gàng giữ sản phẩm trên màn hình) */}
         {level2Categories.length > 0 ? (
-          <nav aria-label="Chọn dòng máy" className="flex flex-nowrap md:flex-wrap items-center gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
-            {level2Categories.map(sub => {
-              const checked = isRoot
-                ? (selected("subcat", sub.slug) || selected("subcat", sub.id))
-                : (currentLevel2?.id === sub.id || currentLevel2?.slug === sub.slug);
-              const subImage = getSubcategoryImage(sub);
-              const targetHref = isRoot
-                ? toggle("subcat", sub.slug)
-                : currentLevel2?.id === sub.id ? rootCategory.href : sub.href;
+          isRoot ? (
+            <nav aria-label="Chọn hãng hoặc nhóm con" className="flex flex-nowrap md:flex-wrap items-stretch gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
+              {level2Categories.map(sub => {
+                const checked = selected("subcat", sub.slug) || selected("subcat", sub.id);
+                const subImage = getSubcategoryImage(sub);
+                const targetHref = toggle("subcat", sub.slug);
 
-              return (
-                <Link
-                  key={sub.id}
-                  href={targetHref}
-                  aria-current={checked ? "true" : undefined}
-                  title={sub.name}
-                  className={`group relative flex w-[78px] sm:w-[104px] md:w-[114px] min-h-[58px] sm:min-h-[72px] flex-col items-center justify-center rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none shrink-0 snap-start ${
-                    checked
-                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25"
-                      : "border-slate-200 bg-slate-50/40 text-slate-700 hover:border-blue-400 hover:bg-white hover:shadow-xs"
-                  }`}
-                >
-                  {checked && (
-                    <span className="absolute right-1 top-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
-                      ✓
-                    </span>
-                  )}
-
-                  <div className="flex h-5 sm:h-7 items-center justify-center">
-                    {subImage ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img loading="lazy" decoding="async"
-                        src={subImage}
-                        alt={sub.name}
-                        className="max-h-5 sm:max-h-7 max-w-[54px] sm:max-w-[74px] object-contain transition-transform group-hover:scale-105"
-                      />
-                    ) : (
-                      <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-700 uppercase">
-                        {sub.name.slice(0, 6)}
+                return (
+                  <Link
+                    key={sub.id}
+                    href={targetHref}
+                    aria-current={checked ? "true" : undefined}
+                    title={sub.name}
+                    className={`group relative flex w-[92px] sm:w-[118px] md:w-[130px] min-h-[66px] sm:min-h-[76px] flex-col items-center justify-between rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none shrink-0 snap-start ${
+                      checked
+                        ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25"
+                        : "border-slate-200 bg-slate-50/40 text-slate-700 hover:border-blue-400 hover:bg-white hover:shadow-xs"
+                    }`}
+                  >
+                    {checked && (
+                      <span className="absolute right-1 top-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
+                        ✓
                       </span>
                     )}
-                  </div>
 
-                  <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-tight mt-1 line-clamp-2 leading-tight text-center max-w-full px-0.5 ${
-                    checked ? "text-blue-900" : "text-slate-800"
-                  }`}>
-                    {sub.name}
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
+                    <div className="flex h-6 sm:h-7 items-center justify-center">
+                      {subImage ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img loading="lazy" decoding="async"
+                          src={subImage}
+                          alt=""
+                          width={56}
+                          height={28}
+                          className="max-h-6 sm:max-h-7 max-w-[56px] sm:max-w-[76px] object-contain transition-transform group-hover:scale-105"
+                        />
+                      ) : (
+                        <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-700 uppercase">
+                          {sub.name.slice(0, 6)}
+                        </span>
+                      )}
+                    </div>
+
+                    <span className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-tight leading-tight text-center line-clamp-2 max-w-full px-0.5 ${
+                      checked ? "text-blue-900" : "text-slate-800"
+                    }`}>
+                      {sub.name}
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+          ) : (
+            <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:flex-wrap">
+              <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide shrink-0">
+                Hãng:
+              </span>
+              <nav aria-label="Chuyển hãng" className="flex flex-nowrap md:flex-wrap items-center gap-1.5 shrink-0 md:shrink">
+                {level2Categories.map(sub => {
+                  const checked = currentLevel2?.id === sub.id || currentLevel2?.slug === sub.slug;
+                  const subImage = getSubcategoryImage(sub);
+                  const targetHref = checked ? rootCategory.href : sub.href;
+
+                  return (
+                    <Link
+                      key={sub.id}
+                      href={targetHref}
+                      aria-current={checked ? "true" : undefined}
+                      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition whitespace-nowrap shrink-0 ${
+                        checked
+                          ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                          : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-blue-400 hover:bg-white"
+                      }`}
+                    >
+                      {subImage && !checked && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img loading="lazy" decoding="async" src={subImage} alt="" width={18} height={14} className="h-3.5 w-4.5 object-contain shrink-0 rounded-2xs" />
+                      )}
+                      <span>{sub.name}</span>
+                      {checked && <span className="text-[10px] font-black">✕</span>}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          )
         ) : facets.brands.length > 0 ? (
           /* Fallback cho danh mục không có phân loại con: hiển thị thương hiệu kèm số lượng thật */
           <nav aria-label="Chọn thương hiệu" className="flex flex-nowrap md:flex-wrap items-center gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
@@ -604,27 +658,31 @@ export default function CategoryCatalog({
           </nav>
         ) : null}
 
-        {/* HÀNG PHÂN LOẠI CHI TIẾT (CẤP 3) */}
+        {/* HÀNG PHÂN LOẠI CẤP 3 (DÒNG MÁY) */}
         {level3Categories.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
             <span className="text-xs sm:text-sm font-black text-slate-700 flex items-center gap-1.5 shrink-0 mr-1">
               <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" />
-              Phân loại chi tiết:
+              Dòng sản phẩm:
             </span>
 
-            <nav aria-label="Chọn phân loại chi tiết" className="flex flex-wrap items-center gap-2">
+            <nav aria-label="Chọn dòng sản phẩm" className="flex flex-wrap items-center gap-2">
               {level3Categories.map(sub3 => {
-                const checked = isLevel3 && category.id === sub3.id
-                  ? true
-                  : selected("subcat", sub3.slug) || selected("subcat", sub3.id);
-                const sub3Href = toggle("subcat", sub3.slug);
+                const isSelectedOnParent = isLevel2 && (selected("subcat", sub3.slug) || selected("subcat", sub3.id));
+                const isCurrentAncestor = (isLevel3 || isLevel4) && currentLevel3?.id === sub3.id;
+                const checked = isCurrentAncestor || isSelectedOnParent;
+                const sub3Href = isLevel2
+                  ? toggle("subcat", sub3.slug)
+                  : (isLevel3 || isLevel4)
+                    ? (isCurrentAncestor && currentLevel2 ? currentLevel2.href : sub3.href)
+                    : sub3.href;
 
                 return (
                   <Link
                     key={sub3.id}
                     href={sub3Href}
                     aria-current={checked ? "true" : undefined}
-                    className={`inline-flex min-h-11 items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition cursor-pointer select-none shadow-2xs ${
+                    className={`inline-flex min-h-10 items-center gap-2 px-3 py-1.5 rounded-xl border text-xs sm:text-sm font-bold transition cursor-pointer select-none shadow-2xs ${
                       checked
                         ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
                         : "border-slate-200 bg-slate-50/80 text-slate-700 hover:border-indigo-400 hover:bg-white"
@@ -643,58 +701,135 @@ export default function CategoryCatalog({
           </div>
         )}
 
-        {(level2Categories.length > 0 || facets.brands.length > 0) && !isAccessory && (
-          <div className="border-t border-slate-100" />
-        )}
+        {/* HÀNG PHÂN LOẠI CẤP 4 (MODEL / PHIÊN BẢN CHI TIẾT) */}
+        {level4Categories.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <span className="text-xs sm:text-sm font-black text-slate-700 flex items-center gap-1.5 shrink-0 mr-1">
+              <span className="w-2 h-2 rounded-full bg-blue-600 inline-block" />
+              Phiên bản chi tiết:
+            </span>
 
-        {/* Phần Nhu cầu sử dụng (ẩn thẻ trùng với danh mục hiện tại) */}
-        {!isAccessory && visibleNeeds.length > 0 && (
-          <div className="space-y-1.5">
-            <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-              <Sparkles size={14} className="text-blue-600 shrink-0" aria-hidden="true" />
-              <span>Lọc theo nhu cầu</span>
-            </h2>
+            <nav aria-label="Chọn phiên bản chi tiết" className="flex flex-wrap items-center gap-2">
+              {level4Categories.map(sub4 => {
+                const isSelectedOnParent = isLevel3 && (selected("subcat", sub4.slug) || selected("subcat", sub4.id));
+                const isCurrentLeaf = isLevel4 && currentLevel4?.id === sub4.id;
+                const checked = isCurrentLeaf || isSelectedOnParent;
+                const sub4Href = isLevel3
+                  ? toggle("subcat", sub4.slug)
+                  : isLevel4
+                    ? (isCurrentLeaf && currentLevel3 ? currentLevel3.href : sub4.href)
+                    : sub4.href;
 
-            <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:flex-wrap gap-1.5 sm:gap-2">
-              {visibleNeeds.map((need) => {
-                const checked = selected("tag", need.key);
                 return (
                   <Link
-                    key={need.key}
-                    href={toggle("tag", need.key)}
-                    scroll={false}
+                    key={sub4.id}
+                    href={sub4Href}
                     aria-current={checked ? "true" : undefined}
-                    className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[58px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[96px] md:w-[104px] transition text-center select-none ${
+                    className={`inline-flex min-h-9 items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold transition cursor-pointer select-none ${
                       checked
-                        ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
-                        : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"
+                        ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-blue-400 hover:bg-blue-50/50"
                     }`}
                   >
+                    <span>{sub4.name}</span>
                     {checked && (
-                      <span className="hidden sm:flex absolute right-1 top-1 h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
+                      <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-white text-blue-700 text-[10px] font-black">
                         ✓
                       </span>
                     )}
-
-                    <div className="flex h-4 sm:h-6 items-center justify-center shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img loading="lazy" decoding="async"
-                        src={need.image}
-                        alt={need.label}
-                        className="max-h-4 sm:max-h-6 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs"
-                      />
-                    </div>
-
-                    <span className={`text-[11px] sm:text-xs font-bold leading-tight whitespace-nowrap sm:whitespace-normal sm:line-clamp-2 max-w-full ${
-                      checked ? "text-blue-900 font-black" : "text-slate-800"
-                    }`}>
-                      {need.label}
-                    </span>
                   </Link>
                 );
               })}
             </nav>
           </div>
+        )}
+
+        {(level2Categories.length > 0 || facets.brands.length > 0) && !isAccessory && (
+          <div className="border-t border-slate-100" />
+        )}
+
+        {/* Phần Nhu cầu sử dụng (ẩn thẻ trùng & thu gọn thành pill 1 dòng khi đang ở cấp sâu để ưu tiên hiển thị sản phẩm) */}
+        {!isAccessory && visibleNeeds.length > 0 && (
+          isRoot ? (
+            <div className="space-y-1.5">
+              <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <Sparkles size={14} className="text-blue-600 shrink-0" aria-hidden="true" />
+                <span>Lọc theo nhu cầu</span>
+              </h2>
+
+              <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:flex-wrap gap-1.5 sm:gap-2">
+                {visibleNeeds.map((need) => {
+                  const checked = selected("tag", need.key);
+                  return (
+                    <Link
+                      key={need.key}
+                      href={toggle("tag", need.key)}
+                      scroll={false}
+                      aria-current={checked ? "true" : undefined}
+                      className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[60px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[112px] md:w-[122px] transition text-center select-none ${
+                        checked
+                          ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
+                          : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"
+                      }`}
+                    >
+                      {checked && (
+                        <span className="hidden sm:flex absolute right-1 top-1 h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
+                          ✓
+                        </span>
+                      )}
+
+                      <div className="flex h-4 sm:h-6 items-center justify-center shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img loading="lazy" decoding="async"
+                          src={need.image}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="max-h-4 sm:max-h-6 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs"
+                        />
+                      </div>
+
+                      <span className={`text-[11px] sm:text-xs font-bold leading-tight whitespace-nowrap sm:line-clamp-2 max-w-full ${
+                        checked ? "text-blue-900 font-black" : "text-slate-800"
+                      }`}>
+                        {need.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:flex-wrap pt-1.5 border-t border-slate-100">
+              <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide flex items-center gap-1 shrink-0">
+                <Sparkles size={12} className="text-blue-600 shrink-0" aria-hidden="true" />
+                Nhu cầu:
+              </span>
+              <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap md:flex-wrap items-center gap-1.5 shrink-0 md:shrink">
+                {visibleNeeds.map((need) => {
+                  const checked = selected("tag", need.key);
+                  return (
+                    <Link
+                      key={need.key}
+                      href={toggle("tag", need.key)}
+                      scroll={false}
+                      aria-current={checked ? "true" : undefined}
+                      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition whitespace-nowrap shrink-0 ${
+                        checked
+                          ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                          : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-blue-400 hover:bg-white"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img loading="lazy" decoding="async" src={need.image} alt="" width={16} height={16} className="h-4 w-4 object-contain shrink-0" />
+                      <span>{need.label}</span>
+                      {checked && <span className="text-[10px] font-black">✓</span>}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          )
         )}
 
       </section>

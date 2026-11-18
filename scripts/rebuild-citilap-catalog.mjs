@@ -3,14 +3,16 @@ import { createHash, randomUUID } from 'node:crypto';
 import { DatabaseSync, backup } from 'node:sqlite';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
+import sharp from 'sharp';
+import { buildCitiLapContent, paraphraseToCitiLapStyle, productKind } from './lib/citilap-copy.mjs';
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare';
 
 const CRAWL_DIR = '.wrangler/laptopnew-crawl';
 const MEDIA_CACHE_DIR = `${CRAWL_DIR}/media-cache`;
 const PREPARED_PATH = `${CRAWL_DIR}/citilap-prepared.json`;
 const MODE = process.argv[2] || '--prepare';
-assert(['--prepare', '--apply'].includes(MODE), 'Usage: node scripts/rebuild-citilap-catalog.mjs [--prepare|--apply]');
 
 mkdirSync(MEDIA_CACHE_DIR, { recursive: true });
 mkdirSync('public/brands', { recursive: true });
@@ -808,7 +810,7 @@ ${specList ? `<ul>\n${specList}\n</ul>` : ''}
 </ul>`;
 }
 
-function buildEditorialReviewHtml({
+export function buildEditorialReviewHtml({
   cleanName,
   categoryId,
   brand,
@@ -876,9 +878,13 @@ ${quickHighlights.map((item) => `  <li>${item}</li>`).join('\n')}
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-    bodyHtml = rewritten;
+    bodyHtml = paraphraseToCitiLapStyle(rewritten);
   } else {
-    bodyHtml = buildGeneratedCitiLapArticle({ cleanName, catName, catPath, brand, specs, isAccessory, specObj });
+    return buildCitiLapContent({
+      name: cleanName, brand, specs,
+      kind: productKind(getRootCatId(categoryId), isAccessory ? 'ACCESSORY' : 'LAPTOP'),
+      catPath, catName,
+    });
   }
 
   const footerBox = `
@@ -907,7 +913,7 @@ function pickUnique(list, count, usedIds) {
 }
 
 function curateCatalog() {
-  const products = JSON.parse(readFileSync(`${CRAWL_DIR}/products.json`, 'utf8'));
+  const products = JSON.parse(readFileSync(existsSync(`${CRAWL_DIR}/products-all.json`) ? `${CRAWL_DIR}/products-all.json` : `${CRAWL_DIR}/products.json`, 'utf8'));
   const membership = JSON.parse(readFileSync(`${CRAWL_DIR}/collection-membership.json`, 'utf8'));
   const byId = new Map(products.map((p) => [p.id, p]));
 
@@ -928,86 +934,76 @@ function curateCatalog() {
     }
   };
 
-  // --- A. LAPTOP GAMING (Target: ~90 SKUs split evenly across Cấp 2/3 subcategories!) ---
-  const gamingPool = products.filter((p) => p.price > 0 && p.images?.length > 0 && !/claw/i.test(p.name));
-  pushBatch((p) => {
-    if (/slim/i.test(p.name)) return 'tax-legion-slim-5';
-    if (/legion\s*(pro\s*)?7|y9000/i.test(p.name)) return 'tax-legion-7';
-    if (/pro\s*5|r7000p|y7000p/i.test(p.name)) return 'tax-legion-pro-5';
-    return 'tax-legion-5';
-  }, 'LAPTOP', pickUnique(gamingPool.filter((p) => /legion/i.test(p.name)), 10, usedIds));
-
-  pushBatch((p) => {
-    if (/essential/i.test(p.name)) return 'tax-loq-essential';
-    if (/15arp|15aph|ryzen/i.test(p.name)) return 'tax-loq-15arp';
-    return 'tax-loq-15irx';
-  }, 'LAPTOP', pickUnique(gamingPool.filter((p) => /\bloq\b/i.test(p.name)), 9, usedIds));
-
-  pushBatch('taxonomy-lenovo-lecoo-gaming', 'LAPTOP', pickUnique(gamingPool.filter((p) => /lecoo fighter/i.test(p.name)), 2, usedIds));
-
-  pushBatch((p) => {
-    if (/scar/i.test(p.name)) return 'tax-rog-strix-scar';
-    if (/zephyrus/i.test(p.name)) return 'tax-rog-zephyrus';
-    if (/flow/i.test(p.name)) return 'tax-rog-flow';
-    return 'tax-rog-strix-g';
-  }, 'LAPTOP', pickUnique(gamingPool.filter((p) => /\brog\b/i.test(p.name) && !/mouse|keyboard|headset/i.test(p.name)), 9, usedIds));
-
-  pushBatch((p) => {
-    if (/a14|fa401/i.test(p.name)) return 'tax-tuf-a14';
-    if (/f15|f16|fx50|fx60/i.test(p.name)) return 'tax-tuf-f15-f16';
-    return 'tax-tuf-a15';
-  }, 'LAPTOP', pickUnique(gamingPool.filter((p) => /\btuf\b/i.test(p.name)), 10, usedIds));
-
-  pushBatch((p) => (/cyborg\s*14|a13u/i.test(p.name) && /14/i.test(p.name) ? 'tax-cyborg-14' : 'tax-cyborg-15'), 'LAPTOP', pickUnique(gamingPool.filter((p) => /cyborg/i.test(p.name)), 8, usedIds));
-  pushBatch((p) => (/a15|a17|katana\s*17/i.test(p.name) ? 'tax-katana-a15' : 'tax-katana-15'), 'LAPTOP', pickUnique(gamingPool.filter((p) => /katana/i.test(p.name)), 8, usedIds));
-  pushBatch((p) => (/a16|a17/i.test(p.name) ? 'tax-crosshair-a16' : 'tax-crosshair-16'), 'LAPTOP', pickUnique(gamingPool.filter((p) => /crosshair/i.test(p.name)), 8, usedIds));
-  pushBatch('taxonomy-msi-vector', 'LAPTOP', pickUnique(gamingPool.filter((p) => /vector/i.test(p.name)), 2, usedIds));
-  pushBatch('taxonomy-msi-raider', 'LAPTOP', pickUnique(gamingPool.filter((p) => /raider/i.test(p.name)), 5, usedIds));
-  pushBatch('taxonomy-msi-stealth', 'LAPTOP', pickUnique(gamingPool.filter((p) => /stealth/i.test(p.name)), 5, usedIds));
-  pushBatch('taxonomy-msi-titan', 'LAPTOP', pickUnique(gamingPool.filter((p) => /titan/i.test(p.name)), 3, usedIds));
-  pushBatch((p) => (/aorus/i.test(p.name) ? 'tax-gigabyte-aorus' : 'taxonomy-gigabyte-gaming'), 'LAPTOP', pickUnique(fromCol('laptop-gigabyte-gaming'), 8, usedIds));
-  pushBatch((p) => (/aurora/i.test(p.name) ? 'tax-alienware-aurora' : 'tax-alienware-m'), 'LAPTOP', pickUnique(gamingPool.filter((p) => /alienware/i.test(p.name) && !/balo/i.test(p.name)), 6, usedIds));
-  pushBatch('taxonomy-hp-omen', 'LAPTOP', pickUnique(gamingPool.filter((p) => /\bomen\b/i.test(p.name)), 2, usedIds));
-  pushBatch((p) => (/nitro\s*16|an16/i.test(p.name) ? 'tax-nitro-16' : /nitro\s*v|anv/i.test(p.name) ? 'tax-nitro-v' : 'tax-nitro-5'), 'LAPTOP', pickUnique(gamingPool.filter((p) => /\bnitro\b/i.test(p.name)), 1, usedIds));
-  pushBatch('taxonomy-razer-blade', 'LAPTOP', pickUnique(gamingPool.filter((p) => /razer blade/i.test(p.name)), 3, usedIds));
-
-  // --- B. LAPTOP VĂN PHÒNG (unmerged Brand -> Series -> Model!) ---
+  // --- A/B/C. LAPTOPS: Gaming (<=200), Văn phòng (<=100), Workstation (<=100) ---
   const allPriced = products.filter((p) => p.price > 0 && p.images?.length > 0);
-  pushBatch((p) => (/slim\s*5|pro\s*5|xiaoxin/i.test(p.name) ? 'tax-ideapad-slim-5' : 'tax-ideapad-slim-3'), 'LAPTOP', pickUnique(allPriced.filter((p) => /ideapad/i.test(p.name)), 10, usedIds));
-  pushBatch((p) => (/16/i.test(p.name) ? 'tax-thinkbook-16' : 'tax-thinkbook-14'), 'LAPTOP', pickUnique(allPriced.filter((p) => /thinkbook/i.test(p.name)), 4, usedIds));
-  pushBatch((p) => (/x1/i.test(p.name) ? 'tax-thinkpad-x1' : /\bt14|\bt16/i.test(p.name) ? 'tax-thinkpad-t' : 'tax-thinkpad-e'), 'LAPTOP', pickUnique(allPriced.filter((p) => /thinkpad(?!\s+p\d)/i.test(p.name)), 6, usedIds));
-  pushBatch((p) => (/2-in-1|book|flip/i.test(p.name) ? 'tax-yoga-2in1' : 'tax-yoga-slim'), 'LAPTOP', pickUnique(allPriced.filter((p) => /\byoga\b/i.test(p.name)), 6, usedIds));
-  pushBatch((p) => {
-    if (/oled|\bs\s*14|\bs\s*16|m54|m56|s54|s56/i.test(p.name)) return 'tax-vivobook-s-oled';
-    if (/16\b|x16|m16|k36/i.test(p.name)) return 'tax-vivobook-16';
-    if (/14\b|e14|x14|a14/i.test(p.name)) return 'tax-vivobook-14';
-    return 'tax-vivobook-15';
-  }, 'LAPTOP', pickUnique(allPriced.filter((p) => /vivobook/i.test(p.name)), 12, usedIds));
-  pushBatch((p) => {
-    if (/duo|ux84/i.test(p.name)) return 'tax-zenbook-duo';
-    if (/\bs\s*14|\bs\s*16|a14|ux54|ux56/i.test(p.name)) return 'tax-zenbook-s';
-    return 'tax-zenbook-14';
-  }, 'LAPTOP', pickUnique(allPriced.filter((p) => /zenbook/i.test(p.name)), 10, usedIds));
-  pushBatch((p) => (/14|5440|7440/i.test(p.name) ? 'tax-inspiron-14' : 'tax-inspiron-15'), 'LAPTOP', pickUnique(allPriced.filter((p) => /inspiron/i.test(p.name)), 7, usedIds));
-  pushBatch((p) => (/14|16|9440|9640/i.test(p.name) ? 'tax-xps-14-16' : 'tax-xps-13'), 'LAPTOP', pickUnique(allPriced.filter((p) => /\bxps\b/i.test(p.name)), 6, usedIds));
-  pushBatch('taxonomy-dell-latitude', 'LAPTOP', pickUnique(allPriced.filter((p) => /latitude/i.test(p.name)), 4, usedIds));
-  pushBatch('taxonomy-dell-pro', 'LAPTOP', pickUnique(allPriced.filter((p) => /dell pro\b/i.test(p.name)), 2, usedIds));
-  pushBatch('taxonomy-dell-vostro', 'LAPTOP', pickUnique(allPriced.filter((p) => /vostro/i.test(p.name)), 1, usedIds));
-  pushBatch((p) => (/flip/i.test(p.name) ? 'tax-omnibook-flip' : 'tax-omnibook-x'), 'LAPTOP', pickUnique(allPriced.filter((p) => /omnibook/i.test(p.name)), 10, usedIds));
-  pushBatch('taxonomy-hp-series', 'LAPTOP', pickUnique(fromCol('laptop-hp-van-phong', (p) => !/omnibook/i.test(p.name)), 6, usedIds));
-  pushBatch((p) => (/modern\s*15/i.test(p.name) ? 'tax-modern-15' : 'tax-modern-14'), 'LAPTOP', pickUnique(allPriced.filter((p) => /msi\s+modern/i.test(p.name)), 8, usedIds));
-  pushBatch((p) => (/13/i.test(p.name) ? 'tax-prestige-13' : 'tax-prestige-14-16'), 'LAPTOP', pickUnique(allPriced.filter((p) => /msi\s+prestige/i.test(p.name) && !/^copy-of-/i.test(p.alias)), 8, usedIds));
-  pushBatch('taxonomy-msi-venture', 'LAPTOP', pickUnique(allPriced.filter((p) => /msi\s+venture/i.test(p.name)), 3, usedIds));
-  pushBatch((p) => (/lite/i.test(p.name) ? 'tax-aspire-lite' : 'tax-aspire-go'), 'LAPTOP', pickUnique(allPriced.filter((p) => /acer\s+aspire/i.test(p.name)), 8, usedIds));
-  pushBatch('taxonomy-acer-swift', 'LAPTOP', pickUnique(allPriced.filter((p) => /acer\s+swift/i.test(p.name)), 2, usedIds));
-
-  // --- C. LAPTOP ĐỒ HỌA & WORKSTATION (Brand -> Series -> Model!) ---
-  const precPriced = fromCol('laptop-dell-precision');
-  const precZero = (membership['laptop-dell-precision'] || []).map((id) => byId.get(id)).filter((p) => p && !usedIds.has(p.id));
-  pushBatch((p) => (/3\d{3}/.test(p.name) ? 'tax-precision-3000' : /7\d{3}/.test(p.name) ? 'tax-precision-7000' : 'tax-precision-5000'), 'LAPTOP', pickUnique([...precPriced, ...precZero], 10, usedIds), { fallbackPrice: 36990000 });
-  pushBatch((p) => (/\bp1\b/i.test(p.name) ? 'tax-thinkpad-p1' : 'tax-thinkpad-p16'), 'LAPTOP', pickUnique(allPriced.filter((p) => /thinkpad\s+p\d/i.test(p.name)), 1, usedIds));
-  pushBatch((p) => (/fury/i.test(p.name) ? 'tax-zbook-fury' : /firefly/i.test(p.name) ? 'tax-zbook-firefly' : 'tax-zbook-studio'), 'LAPTOP', pickUnique(allPriced.filter((p) => /zbook/i.test(p.name)), 1, usedIds));
-  pushBatch('taxonomy-gigabyte-aero', 'LAPTOP', pickUnique(fromCol('laptop-gigabyte-aero'), 2, usedIds));
+  const priced = (p) => p.price > 0 || (p.variants || []).some((v) => v.price > 0);
+  const laptops = products.filter((p) => /^laptop/i.test(p.name) && p.images?.length > 0 && !/claw|macbook/i.test(p.name));
+  const isWs = (p) => /precision|zbook|thinkpad\s*p\d|proart|creator|\baero\b|workstation|rtx\s*a\d{3,4}|\d{4}\s*ada|quadro/i.test(p.name);
+  const isGaming = (p) => /rtx|gaming|legion|\bloq\b|\brog\b|\btuf\b|katana|cyborg|crosshair|vector|raider|stealth|titan|nitro|predator|omen|victus|alienware|aorus|razer|lecoo|sword|msi\s+thin|rx\s*\d{4}/i.test(p.name);
+  const brandKey = (p) => normalizeBrand(p.vendor, p.name).toLowerCase();
+  const gamingCat = (p) => {
+    const n = p.name;
+    if (/legion/i.test(n)) return /slim/i.test(n) ? 'tax-legion-slim-5' : /legion\s*(pro\s*)?7|y9000/i.test(n) ? 'tax-legion-7' : /pro\s*5|r7000p|y7000p/i.test(n) ? 'tax-legion-pro-5' : 'tax-legion-5';
+    if (/\bloq\b/i.test(n)) return /essential/i.test(n) ? 'tax-loq-essential' : /15arp|15aph|ryzen/i.test(n) ? 'tax-loq-15arp' : 'tax-loq-15irx';
+    if (/lecoo/i.test(n)) return 'taxonomy-lenovo-lecoo-gaming';
+    if (/\brog\b/i.test(n)) return /scar/i.test(n) ? 'tax-rog-strix-scar' : /zephyrus/i.test(n) ? 'tax-rog-zephyrus' : /flow/i.test(n) ? 'tax-rog-flow' : 'tax-rog-strix-g';
+    if (/\btuf\b/i.test(n)) return /a14|fa401/i.test(n) ? 'tax-tuf-a14' : /f15|f16|fx50|fx60/i.test(n) ? 'tax-tuf-f15-f16' : 'tax-tuf-a15';
+    if (/cyborg/i.test(n)) return /cyborg\s*14/i.test(n) ? 'tax-cyborg-14' : 'tax-cyborg-15';
+    if (/katana/i.test(n)) return /a15|a17|katana\s*17/i.test(n) ? 'tax-katana-a15' : 'tax-katana-15';
+    if (/crosshair/i.test(n)) return /a16|a17/i.test(n) ? 'tax-crosshair-a16' : 'tax-crosshair-16';
+    for (const k of ['vector', 'raider', 'stealth', 'titan', 'thin', 'sword']) if (new RegExp(k, 'i').test(n) && /msi/i.test(n)) return 'taxonomy-msi-' + k;
+    if (/aorus/i.test(n)) return 'tax-gigabyte-aorus';
+    if (/alienware/i.test(n)) return /aurora/i.test(n) ? 'tax-alienware-aurora' : 'tax-alienware-m';
+    if (/\bomen\b/i.test(n)) return 'taxonomy-hp-omen';
+    if (/victus/i.test(n)) return 'taxonomy-hp-victus';
+    if (/predator|helios/i.test(n)) return 'taxonomy-acer-predator';
+    if (/nitro/i.test(n)) return /nitro\s*16|an16/i.test(n) ? 'tax-nitro-16' : /nitro\s*v|anv/i.test(n) ? 'tax-nitro-v' : 'tax-nitro-5';
+    if (/razer/i.test(n)) return 'taxonomy-razer-blade';
+    const b = brandKey(p);
+    if (b === 'gigabyte') return 'taxonomy-gigabyte-gaming';
+    if (b === 'dell') return 'taxonomy-dell-gaming-g';
+    return CATEGORY_DEFS.some((c) => c.id === 'tax-gaming-' + b) ? 'tax-gaming-' + b : 'cat-gaming';
+  };
+  const officeCat = (p) => {
+    const n = p.name;
+    if (/ideapad|xiaoxin/i.test(n)) return /slim\s*5|pro\s*5|xiaoxin/i.test(n) ? 'tax-ideapad-slim-5' : 'tax-ideapad-slim-3';
+    if (/thinkbook/i.test(n)) return /\b16/i.test(n) ? 'tax-thinkbook-16' : 'tax-thinkbook-14';
+    if (/thinkpad/i.test(n)) return /x1/i.test(n) ? 'tax-thinkpad-x1' : /\bt1[46]/i.test(n) ? 'tax-thinkpad-t' : 'tax-thinkpad-e';
+    if (/\byoga\b/i.test(n)) return /2-in-1|2in1|book|flip/i.test(n) ? 'tax-yoga-2in1' : 'tax-yoga-slim';
+    if (/vivobook/i.test(n)) return /oled|\bs\s*1[46]|m54|m56|s54|s56/i.test(n) ? 'tax-vivobook-s-oled' : /16\b|x16|m16|k36/i.test(n) ? 'tax-vivobook-16' : /14\b|e14|x14|a14/i.test(n) ? 'tax-vivobook-14' : 'tax-vivobook-15';
+    if (/zenbook/i.test(n)) return /duo|ux84/i.test(n) ? 'tax-zenbook-duo' : /\bs\s*1[46]|a14|ux54|ux56/i.test(n) ? 'tax-zenbook-s' : 'tax-zenbook-14';
+    if (/inspiron/i.test(n)) return /14|5440|7440/i.test(n) ? 'tax-inspiron-14' : 'tax-inspiron-15';
+    if (/\bxps\b/i.test(n)) return /14|16|9440|9640/i.test(n) ? 'tax-xps-14-16' : 'tax-xps-13';
+    if (/latitude/i.test(n)) return 'taxonomy-dell-latitude';
+    if (/vostro/i.test(n)) return 'taxonomy-dell-vostro';
+    if (/dell\s+(pro|\d)/i.test(n)) return 'taxonomy-dell-pro';
+    if (/omnibook/i.test(n)) return /flip|omnibook\s*5/i.test(n) ? 'tax-omnibook-flip' : 'tax-omnibook-x';
+    if (/elitebook|probook/i.test(n)) return 'taxonomy-hp-elitebook';
+    if (/modern/i.test(n)) return /modern\s*15/i.test(n) ? 'tax-modern-15' : 'tax-modern-14';
+    if (/prestige/i.test(n)) return /13/i.test(n) ? 'tax-prestige-13' : 'tax-prestige-14-16';
+    if (/venture/i.test(n)) return 'taxonomy-msi-venture';
+    if (/aspire/i.test(n)) return /lite/i.test(n) ? 'tax-aspire-lite' : 'tax-aspire-go';
+    if (/swift/i.test(n)) return 'taxonomy-acer-swift';
+    if (/surface/i.test(n)) return /pro/i.test(n) ? 'tax-surface-pro' : 'tax-surface-laptop';
+    if (/\bgram\b/i.test(n)) return 'tax-lg-gram-14-16';
+    const b = brandKey(p);
+    if (b === 'hp') return 'taxonomy-hp-series';
+    return CATEGORY_DEFS.some((c) => c.id === 'tax-office-' + b) ? 'tax-office-' + b : 'cat-van-phong';
+  };
+  const wsCat = (p) => {
+    const n = p.name;
+    if (/precision/i.test(n)) return /\b3\d{3}/.test(n) ? 'tax-precision-3000' : /\b7\d{3}/.test(n) ? 'tax-precision-7000' : 'tax-precision-5000';
+    if (/thinkpad\s*p/i.test(n)) return /\bp1\b/i.test(n) ? 'tax-thinkpad-p1' : 'tax-thinkpad-p16';
+    if (/zbook/i.test(n)) return /fury/i.test(n) ? 'tax-zbook-fury' : /firefly/i.test(n) ? 'tax-zbook-firefly' : 'tax-zbook-studio';
+    if (/proart/i.test(n)) return /p16/i.test(n) ? 'tax-proart-p16' : 'tax-proart-px-pz';
+    if (/creator/i.test(n)) return /16\s*ai/i.test(n) ? 'tax-creator-16-ai' : 'tax-creator-z16';
+    if (/aero/i.test(n)) return 'taxonomy-gigabyte-aero';
+    const b = brandKey(p);
+    return CATEGORY_DEFS.some((c) => c.id === 'tax-ws-' + b) ? 'tax-ws-' + b : 'cat-do-hoa';
+  };
+  pushBatch(gamingCat, 'LAPTOP', pickUnique(laptops.filter((p) => !isWs(p) && isGaming(p) && priced(p)), 200, usedIds));
+  pushBatch(officeCat, 'LAPTOP', pickUnique(laptops.filter((p) => !isWs(p) && !isGaming(p) && priced(p)), 100, usedIds));
+  pushBatch(wsCat, 'LAPTOP', pickUnique(laptops.filter(isWs), 100, usedIds), { fallbackPrice: 36990000 });
 
   const syntheticWorkstations = [
     { categoryId: 'tax-thinkpad-p16', name: 'Lenovo ThinkPad P16 Gen 2 (i7-13850HX / RTX 2000 Ada)', slug: 'lenovo-thinkpad-p16-gen-2-i7', brand: 'Lenovo', model: 'ThinkPad P16 Gen 2', price: 52990000, originalPrice: 57990000, cpu: 'Intel Core i7-13850HX', gpu: 'NVIDIA RTX 2000 Ada 8GB', ram: '32GB DDR5', ssd: '1TB NVMe PCIe Gen4', display: '16.0 inch WUXGA IPS 100% sRGB', hz: '60Hz', r2AssetId: '2c109a04-e3f3-47c6-bf97-f53fa29f65f3' },
@@ -1161,7 +1157,7 @@ function prepareAll() {
         ram: specObj.RAM || undefined,
         storage: specObj.SSD || undefined,
         gpu: specObj.GPU || undefined,
-        options: isAccessory ? { 'Phiên bản': 'Chính hãng' } : { ram: specObj.RAM || '16GB', storage: specObj.SSD || '512GB' },
+        options: { 'Cấu hình': isAccessory ? 'Tiêu chuẩn' : `${specObj.RAM || '16GB'} / ${specObj.SSD || '512GB'}` },
       };
       const contentHtml = buildEditorialReviewHtml({
         cleanName: s.name,
@@ -1221,66 +1217,54 @@ function prepareAll() {
     const specObj = Object.fromEntries(specs.map((x) => [x.key, x.value]));
     const fallbackPrice = entry.fallbackPrice || 24990000;
 
-    const rawVars = (p.variants || []).filter((v) => v.price > 0 || fallbackPrice > 0);
-    const hasHardwareVariants = rawVars.some((v) => /RAM\s*\d+|SSD\s*\d+|Đen|Trắng|Hồng|Bạc|Xanh/i.test(v.title));
-    let variants = [];
-    if (hasHardwareVariants) {
-      const seenCombo = new Set();
-      rawVars.forEach((v, vi) => {
-        const cleanVarTitle = decodeEntities(v.title)
-          .replace(/Newseal\s*-\s*BH\s*\d+\s*THÁNG\s*-\s*Test\s*\d+\s*ngày\s*\/?/gi, '')
-          .replace(/Openbox\s*-\s*BH\s*\d+\s*THÁNG\s*-\s*Test\s*\d+\s*ngày\s*\/?/gi, '')
-          .replace(/BH\s*\d+\s*THÁNG\s*-\s*1\s*Đổi\s*1[^/]*/gi, '')
-          .replace(/THÀNH VIÊN LTN|HS-SV[^/]*|Tất cả khách hàng|KHÁCH HÀNG KHÁC/gi, '')
-          .replace(/^[\s/]+|[\s/]+$/g, '')
-          .trim() || `Phiên bản ${vi + 1}`;
-        const vRam = cleanVarTitle.match(/RAM\s*(\d+\s*GB)/i)?.[1] || specObj.RAM;
-        const vSsd = cleanVarTitle.match(/SSD\s*(\d+\s*(?:GB|TB))/i)?.[1] || specObj.SSD;
-        const comboKey = `${cleanVarTitle.toLowerCase()}_${vRam || ''}_${vSsd || ''}`;
-        if (seenCombo.has(comboKey)) return;
-        seenCombo.add(comboKey);
-        const price = v.price > 0 ? Math.round(v.price) : fallbackPrice;
-        const orig = v.compare_at_price && v.compare_at_price >= price ? Math.round(v.compare_at_price) : null;
-        variants.push({
-          id: `${id}-v${variants.length + 1}`,
-          name: cleanVarTitle.slice(0, 120),
-          sku: `CTL-${slug.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 14)}-${variants.length + 1}`,
-          condition: 'NEW',
-          price,
-          originalPrice: orig,
-          stock: 10,
-          availability: 'AVAILABLE',
-          ram: vRam || undefined,
-          storage: vSsd || undefined,
-          gpu: specObj.GPU || undefined,
-          options: { 'Phiên bản': cleanVarTitle.slice(0, 80) },
-        });
-      });
+    const shortSpec = (v) => String(v || '').replace(/\s*\(.*$/, '').trim().slice(0, 40);
+    const groups = new Map();
+    for (const v of p.variants || []) {
+      const text = decodeEntities([...(v.options || []), v.title || ''].join(' / '));
+      const ram = text.match(/RAM\s*(\d+\s*GB)/i)?.[1]?.replace(/\s+/g, '');
+      const ssd = text.match(/SSD\s*(\d+\s*(?:GB|TB))/i)?.[1]?.replace(/\s+/g, '');
+      const color = text.match(/\b(Đen|Trắng|Hồng|Bạc|Xám|Xanh(?:\s+\S+)?)\b/i)?.[1];
+      const key = [ram, ssd, color].join('|');
+      const price = v.price > 0 ? Math.round(v.price) : 0;
+      const pref = /openbox/i.test(text) ? 1 : 0; // prefer Newseal pricing
+      const cur = groups.get(key);
+      if (!cur || (price && (!cur.price || pref < cur.pref || (pref === cur.pref && price < cur.price)))) {
+        groups.set(key, { ram, ssd, color, price, pref, compare: v.compare_at_price || 0 });
+      }
     }
-    if (variants.length === 0) {
-      const baseV = rawVars[0] || {};
-      const price = baseV.price > 0 ? baseV.price : p.price > 0 ? p.price : fallbackPrice;
-      const origRaw = baseV.compare_at_price || p.compare_at_price_max || null;
-      const orig = origRaw && origRaw >= price ? Math.round(origRaw) : null;
-      variants.push({
-        id: `${id}-v1`,
-        name: isAccessory ? 'Chính hãng' : [specObj.RAM, specObj.SSD].filter(Boolean).join(' / ') || 'Tiêu chuẩn',
+    const fallbackPriceOf = p.price > 0 ? Math.round(p.price) : fallbackPrice;
+    let variants = [...groups.values()]
+      .filter((g) => g.price > 0 || groups.size === 1)
+      .filter((g) => g.ram || g.ssd || g.color || groups.size === 1)
+      .map((g) => ({ ...g, price: g.price || fallbackPriceOf }));
+    if (!variants.length) variants = [{ price: fallbackPriceOf, compare: p.compare_at_price_max || 0 }];
+    variants.sort((a, b) => a.price - b.price);
+    const seenVarNames = new Set();
+    variants = variants.map((g) => {
+      const ramLabel = g.ram || shortSpec(specObj.RAM) || '16GB';
+      const ssdLabel = g.ssd || shortSpec(specObj.SSD) || '512GB';
+      const label = isAccessory ? (g.color || 'Chính hãng') : [`${ramLabel} / ${ssdLabel}`, g.color].filter(Boolean).join(' · ');
+      return { ...g, label };
+    }).filter((g) => !seenVarNames.has(g.label.toLowerCase()) && seenVarNames.add(g.label.toLowerCase()));
+    variants = variants.map((g, vi) => {
+      const name = g.label;
+      return {
+        id: `${id}-v${vi + 1}`,
+        name: name.slice(0, 120),
         sku: partCode
-          ? `CTL-${partCode.replace(/[^A-Za-z0-9-]/g, '').toUpperCase()}-${idx + 1}`.slice(0, 48)
-          : `CTL-${slug.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16)}-${idx + 1}`,
+          ? `CTL-${partCode.replace(/[^A-Za-z0-9-]/g, '').toUpperCase()}-${vi + 1}`.slice(0, 48)
+          : `CTL-${slug.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16)}-${vi + 1}`,
         condition: 'NEW',
-        price: Math.round(price),
-        originalPrice: orig,
+        price: g.price,
+        originalPrice: g.compare && g.compare > g.price ? Math.round(g.compare) : null,
         stock: 10,
         availability: 'AVAILABLE',
-        ram: specObj.RAM || undefined,
-        storage: specObj.SSD || undefined,
-        gpu: specObj.GPU || undefined,
-        options: isAccessory
-          ? { 'Phiên bản': 'Chính hãng' }
-          : { ram: specObj.RAM || '16GB', storage: specObj.SSD || '512GB' },
-      });
-    }
+        ram: isAccessory ? undefined : (g.ram || specObj.RAM || undefined),
+        storage: isAccessory ? undefined : (g.ssd || specObj.SSD || undefined),
+        gpu: isAccessory ? undefined : (specObj.GPU || undefined),
+        options: { 'Cấu hình': name.slice(0, 80) },
+      };
+    });
 
     const minPrice = Math.min(...variants.map((v) => v.price));
     const maxOrig = variants.find((v) => v.price === minPrice)?.originalPrice ?? null;
@@ -1337,6 +1321,16 @@ function prepareAll() {
       isFlashSale: false,
     };
   });
+
+  // Ensure unique product ids (64-char truncation can collide) and re-key variant ids
+  const seenIds = new Set();
+  for (const prod of preparedProducts) {
+    let pid = prod.id, k = 2;
+    while (seenIds.has(pid)) pid = `${prod.id.slice(0, 60)}-${k++}`;
+    seenIds.add(pid);
+    prod.id = pid;
+    prod.variants.forEach((v, vi) => { v.id = `${pid}-v${vi + 1}`; });
+  }
 
   // Ensure unique SKUs across all products
   const seenSku = new Set();
@@ -1491,6 +1485,21 @@ async function downloadCachedImage(url) {
   return buf;
 }
 
+export async function compressImage(buf) {
+  const detail = await sharp(buf, { failOn: 'none' }).rotate().resize({ width: 1600, withoutEnlargement: true }).webp({ quality: 94, smartSubsample: true }).toBuffer();
+  const thumb = await sharp(buf, { failOn: 'none' }).rotate().resize({ width: 480, withoutEnlargement: true }).webp({ quality: 70 }).toBuffer();
+  return { detail, thumb };
+}
+
+async function uploadCompressed(api, env, buf, baseName) {
+  const { detail, thumb } = await compressImage(buf);
+  const name = baseName.replace(/\.[a-z0-9]+$/i, '') + '.webp';
+  const res = await api.uploadLibraryImage(env, new File([detail], name, { type: 'image/webp' }), {
+    folder: 'products', originalName: name, clientThumb: new File([thumb], 'thumb.webp', { type: 'image/webp' }),
+  });
+  return { assetId: res.asset.id, url: res.asset.url, before: buf.length, after: detail.length };
+}
+
 async function applyToLocal() {
   prepareAll();
   await syncBrandIcons();
@@ -1569,6 +1578,7 @@ async function applyToLocal() {
         if(!/^(?:library|products|brand)\//.test(key || '')) return new Response(null,{status:400});
         if(r.method==='PUT'){await e.PRODUCT_MEDIA.put(key,r.body,{httpMetadata:{contentType:r.headers.get('Content-Type')}});return new Response(null,{status:204});}
         if(r.method==='DELETE'){await e.PRODUCT_MEDIA.delete(key);return new Response(null,{status:204});}
+        if(r.method==='GET'){const o=await e.PRODUCT_MEDIA.get(key);return o?new Response(o.body):new Response(null,{status:404});}
         if(r.method==='HEAD') return new Response(null,{status:await e.PRODUCT_MEDIA.head(key)?204:404});
         return new Response(null,{status:405});
       }}`,
@@ -1606,7 +1616,7 @@ async function applyToLocal() {
     const allRemoteUrls = [...new Set(prepared.flatMap((p) => [...p.galleryUrls, ...p.contentImgUrls]))];
     console.log(`Downloading & uploading ${allRemoteUrls.length} unique images to local R2...`);
     const urlToAsset = new Map();
-    const mapCachePath = `${CRAWL_DIR}/r2-url-map.json`;
+    const mapCachePath = `${CRAWL_DIR}/r2-url-map-webp.json`;
     const savedMap = existsSync(mapCachePath) ? JSON.parse(readFileSync(mapCachePath, 'utf8')) : {};
 
     for (const [u, info] of Object.entries(savedMap)) {
@@ -1617,6 +1627,7 @@ async function applyToLocal() {
     }
 
     const pendingUrls = allRemoteUrls.filter((u) => !urlToAsset.has(u));
+    let bytesBefore = 0, bytesAfter = 0;
     console.log(`Already in R2: ${urlToAsset.size}, remaining to upload: ${pendingUrls.length}`);
 
     for (let i = 0; i < pendingUrls.length; i += 8) {
@@ -1626,11 +1637,9 @@ async function applyToLocal() {
           const buf = await downloadCachedImage(u);
           const rawName = u.split('/').pop()?.split('?')[0] || 'image.jpg';
           const cleanFileName = rawName.replace(/laptopnew/gi, 'citilap');
-          const res = await api.uploadLibraryImage(env, new File([buf], cleanFileName), {
-            folder: 'products',
-            originalName: cleanFileName,
-          });
-          const info = { assetId: res.asset.id, url: res.asset.url };
+          const info = await uploadCompressed(api, env, buf, cleanFileName);
+          bytesBefore += info.before; bytesAfter += info.after;
+          delete info.before; delete info.after;
           urlToAsset.set(u, info);
           savedMap[u] = info;
         } catch (err) {
@@ -1643,6 +1652,31 @@ async function applyToLocal() {
       }
     }
     writeFileSync(mapCachePath, JSON.stringify(savedMap, null, 2));
+    console.log(`Image compression: ${(bytesBefore / 1048576).toFixed(1)}MB -> ${(bytesAfter / 1048576).toFixed(1)}MB`);
+
+    // 1b. Re-upload (compressed) images of curated products that point at old R2 assets
+    const reAsset = new Map();
+    for (const prod of prepared) {
+      if (!prod.r2AssetId) continue;
+      if (!reAsset.has(prod.r2AssetId)) {
+        const row = db.prepare('SELECT storageKey, name FROM MediaAsset WHERE id=?').get(prod.r2AssetId);
+        let next = null;
+        if (row?.storageKey) {
+          const r = await mf.dispatchFetch('http://localhost/?key=' + encodeURIComponent(row.storageKey), { headers: { Authorization: 'Bearer ' + token } });
+          if (r.ok) next = (await uploadCompressed(api, env, Buffer.from(await r.arrayBuffer()), row.name || 'image.jpg')).assetId;
+        }
+        reAsset.set(prod.r2AssetId, next);
+      }
+      prod.r2AssetId = reAsset.get(prod.r2AssetId);
+    }
+    const newAssetIds = new Set([...urlToAsset.values()].map((x) => x.assetId).concat([...reAsset.values()].filter(Boolean)));
+    db.exec('CREATE TEMP TABLE IF NOT EXISTS old_product_assets(id TEXT PRIMARY KEY)');
+    db.exec("INSERT OR IGNORE INTO old_product_assets SELECT assetId FROM MediaUsage WHERE ownerType IN ('PRODUCT','PRODUCT_REVISION','PRODUCT_CONTENT','NAVIGATION_REVISION')");
+    if (process.env.OLD_DB) {
+      const old = new DatabaseSync(process.env.OLD_DB, { readOnly: true });
+      for (const r of old.prepare("SELECT assetId FROM MediaUsage WHERE ownerType IN ('PRODUCT','PRODUCT_REVISION','PRODUCT_CONTENT','NAVIGATION_REVISION')").all()) db.prepare('INSERT OR IGNORE INTO old_product_assets VALUES(?)').run(r.assetId);
+      old.close();
+    }
 
     // 2. Clear all old Orders, Reviews, Campaigns, Inventory, Old Products
     console.log('Clearing old orders, reviews, campaigns, inventory, and old products...');
@@ -1933,8 +1967,8 @@ async function applyToLocal() {
         media,
         variants: prod.variants,
         warranties: [
-          { name: 'Bảo hành tiêu chuẩn CitiLap 6 tháng', description: 'Bảo hành phần cứng 6 tháng tại CitiLap · Lỗi 1 đổi 1 trong 7 ngày đầu tiên.', adjustment: 0, recommended: true, type: 'SHOP', months: 6 },
-          { name: 'Gói bảo hành mở rộng 12 tháng', description: 'Mở rộng bảo hành phần cứng 12 tháng toàn diện tại CitiLap.', adjustment: isAcc ? 100000 : 500000, recommended: false, type: 'SHOP', months: 12 },
+          { name: 'Bảo hành tiêu chuẩn CitiLap 6 tháng', description: '', adjustment: 0, recommended: true, type: 'SHOP', months: 6 },
+          { name: 'Gói bảo hành mở rộng 12 tháng', description: '', adjustment: isAcc ? 100000 : 500000, recommended: false, type: 'SHOP', months: 12 },
         ],
         faqs: [],
         gifts: isAcc ? [] : ['Tặng túi chống sốc CitiLap & chuột không dây', 'Hỗ trợ cài đặt phần mềm & vệ sinh máy trọn đời'],
@@ -2178,6 +2212,20 @@ async function applyToLocal() {
       console.log('Updated LandingPageStudio revision ->', nextLpRev);
     }
 
+    const stale = db.prepare(`SELECT id, storageKey FROM MediaAsset WHERE kind='IMAGE'
+      AND (folder='products' OR id IN (SELECT id FROM old_product_assets))
+      AND id NOT IN (SELECT assetId FROM MediaUsage)`).all().filter((a) => !newAssetIds.has(a.id));
+    let removedImages = 0;
+    for (const a of stale) {
+      try {
+        db.prepare('DELETE FROM MediaAsset WHERE id=?').run(a.id);
+        if (a.storageKey) await env.PRODUCT_MEDIA.delete(a.storageKey).catch(() => {});
+        await env.PRODUCT_MEDIA.delete(`library/${a.id}_thumb-v2.webp`).catch(() => {});
+        removedImages++;
+      } catch (err) { console.warn('Keep asset', a.id, String(err)); }
+    }
+    console.log(`Removed ${removedImages} old product images`);
+
     assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), [], 'Foreign key check failed');
     const finalCounts = {
       products: db.prepare("SELECT count(*) n FROM Product WHERE deletedAt IS NULL AND status='ACTIVE'").get().n,
@@ -2195,8 +2243,11 @@ async function applyToLocal() {
   }
 }
 
-if (MODE === '--prepare') {
-  prepareAll();
-} else {
-  await applyToLocal();
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  assert(['--prepare', '--apply'].includes(MODE), 'Usage: node scripts/rebuild-citilap-catalog.mjs [--prepare|--apply]');
+  if (MODE === '--prepare') {
+    prepareAll();
+  } else {
+    await applyToLocal();
+  }
 }

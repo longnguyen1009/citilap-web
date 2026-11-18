@@ -417,7 +417,7 @@ export default function ProductCard({
         <div className="relative block w-full h-full">
           {(() => {
             const rawImage = product.thumbnailUrl || product.image || (product as { primaryImage?: string }).primaryImage || null;
-            const cardImage = product.thumbnailUrl || (rawImage && rawImage.startsWith('/api/library/') && !rawImage.includes('?') ? `${rawImage}?size=thumb&v=2` : rawImage);
+            const cardImage = rawImage && rawImage.startsWith('/api/library/') && !rawImage.includes('?') ? `${rawImage}?size=thumb&v=2` : rawImage;
             return cardImage && !imageError ? (
               <Image
                 src={cardImage}

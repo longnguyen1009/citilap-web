@@ -14,6 +14,7 @@ import {
   ArrowRight,
   Heart,
   Scale,
+  ChevronDown,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useOptionalWishlist } from "@/context/WishlistContext";
@@ -144,6 +145,8 @@ export default function ProductHeroSection({
     variants[0] ||
     null;
   const [selectedVariant, setSelectedVariant] = useState<HeroVariantItem | null>(initialVariant);
+  const [showAllVariants, setShowAllVariants] = useState(false);
+  const hiddenVariantCount = variants.filter((item, index) => index >= 4 && item.id !== selectedVariant?.id).length;
   useEffect(() => { setSelectedVariant(initialVariant); }, [initialVariant]);
   const selectedProductName = selectedVariant?.productName || productName;
 
@@ -415,10 +418,10 @@ export default function ProductHeroSection({
           </div>
 
           {/* 2. KHỐI GIÁ NẰM TRÊN ĐẦU (DỄ THEO DÕI NHẤT) */}
-          <div className="rounded-2xl border-2 border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-3.5 sm:p-4 shadow-xs relative overflow-hidden">
+          <div className="rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-amber-50/50 p-3 sm:p-3.5 relative overflow-hidden">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 rounded-md bg-rose-600 text-white text-xs font-black uppercase tracking-wider animate-pulse motion-reduce:animate-none">
+                <span className="text-rose-700 text-[11px] font-bold uppercase tracking-wider">
                   {saving ? 'GIÁ ƯU ĐÃI' : 'GIÁ BÁN'}
                 </span>
               </div>
@@ -440,10 +443,10 @@ export default function ProductHeroSection({
             </div>
 
             {/* Tóm tắt cấu hình đang chọn */}
-            <div className="mt-3 pt-3 border-t border-rose-100 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
               <div className="flex items-center gap-1.5 text-slate-700 flex-wrap">
                 <span className="font-bold text-slate-900">Đang chọn:</span>
-                <span className="font-semibold text-blue-700 bg-white px-2.5 py-0.5 rounded-md border border-slate-200">
+                <span className="font-semibold text-blue-700">
                   {selectedVariant?.name || productName}
                 </span>
                 {selectedColor && (
@@ -461,18 +464,17 @@ export default function ProductHeroSection({
             </div>
           </div>
 
-          {/* 3. CHỌN CẤU HÌNH CARD 365 (ẨN NẾU <= 1 OPTION) */}
-          {variants.length > 1 && (
+          {/* 3. CHỌN CẤU HÌNH (luôn hiện, kể cả chỉ 1 cấu hình — mặc định chọn sẵn) */}
+          {variants.length > 0 && (
             <section aria-label="Chọn cấu hình" className="space-y-2 sm:space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
-                  <span>CHỌN CẤU HÌNH ({variants.length}):</span>
-                </label>
+                <h2 className="text-xs sm:text-sm font-bold text-slate-900">
+                  Chọn cấu hình <span className="font-normal text-slate-500">({variants.length} phiên bản)</span>
+                </h2>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-2 gap-2 sm:gap-2.5">
-                {variants.map((item) => {
+              <div id="product-variant-options" className="grid grid-cols-1 min-[360px]:grid-cols-2 gap-2">
+                {variants.map((item, index) => {
                   const isSelected = item.id === selectedVariant?.id;
                   return (
                     <button
@@ -480,26 +482,26 @@ export default function ProductHeroSection({
                       type="button"
                       onClick={() => handleSelectVariant(item)}
                       aria-pressed={isSelected}
-                      className={`relative min-h-11 text-left p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border-2 transition-all flex flex-col justify-between cursor-pointer select-none ${
+                      className={`relative min-w-0 min-h-11 text-left px-3 py-2 rounded-lg border transition-colors ${!showAllVariants && index >= 4 && !isSelected ? 'hidden' : 'flex'} flex-col gap-0.5 cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
                         item.isFlashSale
                           ? isSelected
-                            ? "border-rose-600 bg-rose-50 text-rose-950 shadow-xs ring-2 ring-rose-500/25"
+                            ? "border-rose-600 bg-rose-50 text-rose-950 ring-1 ring-rose-600"
                             : "border-rose-300 bg-gradient-to-b from-rose-50 to-white hover:border-rose-500 text-slate-800"
                           : isSelected
-                          ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/40 text-blue-950 shadow-xs ring-2 ring-blue-500/25"
+                          ? "border-blue-600 bg-blue-50/70 text-blue-950 ring-1 ring-blue-600"
                           : "border-slate-200 bg-white hover:border-blue-400 hover:bg-slate-50/60 text-slate-800"
                       }`}
                     >
                       {/* Checkmark badge */}
                       {isSelected && (
-                        <span className="absolute top-2 right-2 sm:top-2.5 sm:right-2.5 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px] sm:text-xs font-black shadow-2xs">
-                          <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 stroke-[3]" />
+                        <span className="absolute top-2 right-2 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white">
+                          <Check aria-hidden="true" className="w-2.5 h-2.5 stroke-[3]" />
                         </span>
                       )}
 
                       {/* Tag badge */}
                       {item.tag && (
-                        <span className="absolute -top-2.5 left-2.5 sm:left-3 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-bold shadow-xs">
+                        <span className="mb-1 inline-flex rounded bg-amber-100 px-1.5 py-0.5 text-amber-900 text-[10px] font-bold">
                           {item.tag}
                         </span>
                       )}
@@ -511,20 +513,20 @@ export default function ProductHeroSection({
                             FLASH SALE
                           </span>
                         )}
-                        <span className={`text-xs sm:text-sm font-black uppercase tracking-tight block pr-5 sm:pr-6 leading-snug ${
+                        <span className={`text-xs font-bold block pr-4 leading-snug break-words ${
                           isSelected ? "text-blue-950" : "text-slate-900"
                         }`}>
                           {item.name}
                         </span>
                         {item.subSpecs && (
-                          <p className="text-[11px] sm:text-xs text-slate-500 break-words mt-0.5 sm:mt-1 font-medium leading-snug">
+                          <p className="text-[11px] text-slate-600 break-words mt-0.5 leading-snug">
                             {item.subSpecs}
                           </p>
                         )}
                       </div>
 
-                      <div className="pt-2 mt-2 sm:pt-2.5 sm:mt-2.5 border-t border-slate-200/70 flex flex-wrap items-baseline justify-between gap-1">
-                        <span className="text-xs sm:text-sm font-black text-rose-600 tabular-nums">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <span className="text-xs font-bold text-rose-600 tabular-nums">
                           {item.price.toLocaleString("vi-VN")}₫
                         </span>
                         {item.originalPrice && item.originalPrice > item.price && (
@@ -537,6 +539,18 @@ export default function ProductHeroSection({
                   );
                 })}
               </div>
+              {(showAllVariants || hiddenVariantCount > 0) && (
+                <button
+                  type="button"
+                  aria-expanded={showAllVariants}
+                  aria-controls="product-variant-options"
+                  onClick={() => setShowAllVariants(!showAllVariants)}
+                  className="flex min-h-11 w-full items-center justify-center gap-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg focus-visible:outline-2 focus-visible:outline-blue-600"
+                >
+                  {showAllVariants ? 'Thu gọn cấu hình' : `Xem thêm ${hiddenVariantCount} cấu hình`}
+                  <ChevronDown aria-hidden="true" className={`h-3.5 w-3.5 transition-transform ${showAllVariants ? 'rotate-180' : ''}`} />
+                </button>
+              )}
             </section>
           )}
 
@@ -544,10 +558,7 @@ export default function ProductHeroSection({
           {colorOptions.length > 1 && (
             <section aria-label="Chọn màu sắc" className="space-y-2 sm:space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-bold">2</span>
-                  <span>CHỌN MÀU SẮC ({colorOptions.length}):</span>
-                </label>
+                <h2 className="text-xs sm:text-sm font-bold text-slate-900">Chọn màu sắc <span className="font-normal text-slate-500">({colorOptions.length})</span></h2>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
@@ -590,10 +601,7 @@ export default function ProductHeroSection({
           {warranties.length > 1 && (
             <section aria-label="Chọn bảo hành" className="space-y-2 sm:space-y-2.5">
               <div className="flex items-center justify-between">
-                <label className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">3</span>
-                  <span>CHỌN GÓI BẢO HÀNH:</span>
-                </label>
+                <h2 className="text-xs sm:text-sm font-bold text-slate-900">Chọn gói bảo hành</h2>
                 <Link
                   href="/chinh-sach-bao-hanh"
                   className="inline-flex min-h-11 items-center text-[11px] sm:text-xs text-blue-600 hover:underline font-semibold"
@@ -602,7 +610,7 @@ export default function ProductHeroSection({
                 </Link>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
+              <div className={`grid grid-cols-2 ${warranties.length > 2 ? 'sm:grid-cols-3' : ''} gap-2 sm:gap-2.5`}>
                 {warranties.map((w, idx) => {
                   const isSelected = idx === selectedWarrantyIndex;
                   return (
@@ -610,9 +618,10 @@ export default function ProductHeroSection({
                       key={w.id}
                       type="button"
                       onClick={() => setSelectedWarrantyIndex(idx)}
-                      className={`relative min-h-11 rounded-xl sm:rounded-2xl border-2 text-left p-2.5 sm:p-3 transition flex flex-col justify-between cursor-pointer select-none ${
+                      aria-pressed={isSelected}
+                      className={`relative min-h-11 rounded-lg border text-left p-2.5 transition flex flex-col justify-between cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
                         isSelected
-                          ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 shadow-2xs ring-2 ring-emerald-500/20"
+                          ? "border-emerald-600 bg-emerald-50/70 text-emerald-950 ring-1 ring-emerald-600"
                           : "border-slate-200 bg-white hover:border-emerald-400 text-slate-800"
                       }`}
                     >
@@ -641,13 +650,10 @@ export default function ProductHeroSection({
                         )}
                       </div>
 
-                      <div className="mt-2 pt-1.5 sm:mt-2.5 sm:pt-2 border-t border-slate-200/70 flex items-center justify-between gap-1">
+                      <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
                         <span className={`text-xs sm:text-sm font-bold tabular-nums ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
-                          {w.priceDiff === 0 ? "Mặc định (0₫)" : `${w.priceDiff > 0 ? '+' : ''}${w.priceDiff.toLocaleString("vi-VN")}₫`}
+                          {w.priceDiff === 0 ? "Miễn phí" : `${w.priceDiff > 0 ? '+' : ''}${w.priceDiff.toLocaleString("vi-VN")}₫`}
                         </span>
-                        {isSelected && (
-                          <span className="text-[10px] sm:text-xs text-emerald-700 font-bold hidden sm:inline">Đã chọn</span>
-                        )}
                       </div>
                     </button>
                   );

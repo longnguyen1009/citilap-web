@@ -238,16 +238,16 @@ export default function CatalogFilterPanel({
       >
         <div className="rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-xs space-y-3">
           <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
-            <h2 className="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-              <SlidersHorizontal size={15} className="text-blue-600 shrink-0" aria-hidden="true" />
+            <h2 className="text-[13px] font-black uppercase tracking-wide text-slate-800 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <SlidersHorizontal size={14} className="text-blue-600 shrink-0" aria-hidden="true" />
               <span>Bộ lọc chi tiết</span>
             </h2>
             {activeCount > 0 && (
               <Link
                 href={resetHref}
-                className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition"
+                className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition whitespace-nowrap shrink-0"
               >
-                <RotateCcw size={12} aria-hidden="true" />
+                <RotateCcw size={11} aria-hidden="true" />
                 <span>Xóa ({activeCount})</span>
               </Link>
             )}

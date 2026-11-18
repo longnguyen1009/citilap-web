@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useLayoutEffect, useRef, useCallback } from "react";
+import { useState, useLayoutEffect, useRef, useCallback, useMemo, useId } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   Grid3X3,
@@ -11,6 +11,7 @@ import {
   User,
   X,
   ChevronRight,
+  ChevronDown,
   Gamepad2,
   Briefcase,
   Palette,
@@ -49,13 +50,47 @@ interface MobileBottomNavProps {
 
 export default function MobileBottomNav({ categories = [], navigation, settings }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchInputId = useId();
   const { cartCount } = useCart();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerQuery, setDrawerQuery] = useState("");
+  const [openTopId, setOpenTopId] = useState<string | null>("nav-cat-gaming");
+  const [openBrandId, setOpenBrandId] = useState<string | null>(null);
   const [prevPath, setPrevPath] = useState(pathname);
   const triggerButtonRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocusRef = useRef(true);
+
+  const normalizeText = (s: string) =>
+    s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase();
+
+  const navCategories = useMemo(() => navigation?.categories ?? [], [navigation]);
+  const childrenOf = useCallback(
+    (parentHref: string) => {
+      const cat = navCategories.find((c) => c.href === parentHref);
+      return cat ? navCategories.filter((c) => c.parentId === cat.id) : [];
+    },
+    [navCategories]
+  );
+  const drawerHits = useMemo(() => {
+    const q = normalizeText(drawerQuery.trim());
+    if (!q) return [];
+    const byId = new Map(navCategories.map((c) => [c.id, c]));
+    return navCategories
+      .map((c) => {
+        const trail: string[] = [];
+        let cur = c.parentId ? byId.get(c.parentId) : undefined;
+        while (cur) {
+          trail.unshift(cur.name);
+          cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+        }
+        return { cat: c, trail };
+      })
+      .filter((item) => normalizeText([...item.trail, item.cat.name].join(" ")).includes(q))
+      .slice(0, 30);
+  }, [drawerQuery, navCategories]);
 
   const closeDrawer = useCallback((restoreFocus = true) => {
     restoreFocusRef.current = restoreFocus;
@@ -258,50 +293,165 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
               </button>
             </div>
 
-            {/* Content List */}
-            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-2">
-              {/* Direct link to All Categories */}
-              <Link
-                href="/phan-loai"
-                aria-current={pathname === "/phan-loai" ? "page" : undefined}
-                onClick={() => closeDrawer(false)}
-                className="min-h-11 flex items-center justify-between p-3 rounded-control bg-brand-primary-subtle text-brand-primary font-bold text-body-sm mb-3 border border-brand-primary/20"
-              >
-                <span>Xem tất cả danh mục</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
+            {/* Search bar inside drawer */}
+            <div className="px-4 py-2.5 border-b border-border-default bg-surface-subtle/60">
+              <label htmlFor={searchInputId} className="sr-only">Tìm nhanh danh mục hoặc dòng máy</label>
+              <div className="relative flex items-center">
+                <Search className="pointer-events-none absolute left-3 w-4 h-4 text-text-muted" aria-hidden="true" />
+                <input
+                  id={searchInputId}
+                  type="text"
+                  inputMode="search"
+                  value={drawerQuery}
+                  onChange={(e) => setDrawerQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    if (e.key === "Enter" && drawerHits.length > 0) {
+                      e.preventDefault();
+                      closeDrawer(false);
+                      router.push(drawerHits[0].cat.href);
+                    }
+                  }}
+                  placeholder="Tìm nhanh: Legion, TUF, ThinkPad, ZBook..."
+                  className="h-10 w-full rounded-xl border border-border-default bg-white pl-9 pr-9 text-sm text-text-primary placeholder:text-text-muted outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20"
+                />
+                {drawerQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setDrawerQuery("")}
+                    aria-label="Xóa từ khóa tìm danh mục"
+                    className="absolute right-1.5 flex h-7 w-7 items-center justify-center rounded-lg text-text-muted hover:bg-surface-subtle hover:text-text-primary"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
 
-              {/* Category Items */}
-              {navigation?.menus.main && navigation.menus.main.length > 0 ? (
-                navigation.menus.main.map((item) => (
-                  <div key={item.id} className="rounded-lg border border-border-default overflow-hidden">
+            {/* Content List */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-2.5">
+              {drawerQuery.trim() ? (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-text-muted" aria-live="polite">
+                    {drawerHits.length === 0
+                      ? `Không có phân loại khớp “${drawerQuery}”.`
+                      : `Tìm thấy ${drawerHits.length} phân loại`}
+                  </p>
+                  {drawerHits.map(({ cat, trail }) => (
                     <Link
-                      href={item.href}
-                      aria-current={pathname === item.href ? "page" : undefined}
+                      key={cat.id}
+                      href={cat.href}
+                      prefetch={false}
                       onClick={() => closeDrawer(false)}
-                      className="min-h-11 flex items-center justify-between px-3 py-3 text-sm font-semibold text-text-primary hover:text-brand-primary hover:bg-brand-primary-subtle"
+                      className="flex min-h-12 flex-col justify-center rounded-xl border border-border-default bg-white px-3 py-2 hover:border-brand-primary hover:bg-brand-primary-subtle"
                     >
-                      {item.label}
-                      <ChevronRight className="w-4 h-4" />
+                      <span className="text-sm font-bold text-text-primary">{cat.name}</span>
+                      {trail.length > 0 && (
+                        <span className="truncate text-[11px] text-text-muted">{trail.join(" › ")}</span>
+                      )}
                     </Link>
-                    {item.children.length > 0 && (
-                      <div className="border-t border-border-default bg-surface-subtle px-3 py-1">
-                        {item.children.map((child) => (
-                          <Link
-                            key={child.id}
-                            href={child.href}
-                            aria-current={pathname === child.href ? "page" : undefined}
-                            onClick={() => closeDrawer(false)}
-                            className="min-h-11 flex items-center pl-3 py-2 text-sm text-text-secondary hover:text-brand-primary"
-                          >
-                            {child.label}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
+                <>
+                  {/* Direct link to All Categories */}
+                  <Link
+                    href="/phan-loai"
+                    aria-current={pathname === "/phan-loai" ? "page" : undefined}
+                    onClick={() => closeDrawer(false)}
+                    className="min-h-11 flex items-center justify-between p-3 rounded-control bg-brand-primary-subtle text-brand-primary font-bold text-body-sm border border-brand-primary/20"
+                  >
+                    <span>Xem tất cả danh mục</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+
+                  {/* Product group, then brand and series links. */}
+                  {navigation?.menus.main && navigation.menus.main.length > 0 ? (
+                    navigation.menus.main.map((item) => {
+                      const hasChildren = item.children.length > 0;
+                      const isTopExpanded = openTopId === item.id;
+                      return (
+                        <div key={item.id} className="rounded-xl border border-border-default bg-white overflow-hidden">
+                          <div className="flex items-center">
+                            <Link
+                              href={item.href}
+                              prefetch={false}
+                              aria-current={pathname === item.href ? "page" : undefined}
+                              onClick={() => closeDrawer(false)}
+                              className={`min-h-11 flex-1 flex items-center px-3 py-2.5 text-sm font-bold ${
+                                pathname === item.href ? "text-brand-primary" : "text-text-primary hover:text-brand-primary"
+                              }`}
+                            >
+                              {item.label}
+                            </Link>
+                            {hasChildren && (
+                              <button
+                                type="button"
+                                aria-expanded={isTopExpanded}
+                                aria-label={`${isTopExpanded ? "Thu gọn" : "Mở rộng"} ${item.label}`}
+                                onClick={() => setOpenTopId(isTopExpanded ? null : item.id)}
+                                className="flex h-11 w-11 items-center justify-center border-l border-border-default text-text-secondary hover:bg-surface-subtle"
+                              >
+                                <ChevronDown className={`w-4 h-4 transition-transform ${isTopExpanded ? "rotate-180" : ""}`} />
+                              </button>
+                            )}
+                          </div>
+                          {hasChildren && isTopExpanded && (
+                            <div className="border-t border-border-default bg-surface-subtle/70 p-2 space-y-1">
+                              {item.children.map((brand) => {
+                                const seriesList = childrenOf(brand.href);
+                                const isBrandExpanded = openBrandId === brand.id;
+                                return (
+                                  <div key={brand.id} className="rounded-lg bg-white border border-border-default/70 overflow-hidden">
+                                    <div className="flex items-center">
+                                      <Link
+                                        href={brand.href}
+                                        prefetch={false}
+                                        onClick={() => closeDrawer(false)}
+                                        className="min-h-10 flex-1 flex items-center px-2.5 py-1.5 text-xs font-bold text-text-primary hover:text-brand-primary"
+                                      >
+                                        {brand.label}
+                                      </Link>
+                                      {seriesList.length > 0 && (
+                                        <button
+                                          type="button"
+                                          aria-expanded={isBrandExpanded}
+                                          aria-label={`${isBrandExpanded ? "Thu gọn" : "Xem dòng máy"} ${brand.label}`}
+                                          onClick={() => setOpenBrandId(isBrandExpanded ? null : brand.id)}
+                                          className="flex h-10 w-10 items-center justify-center border-l border-border-default/70 text-text-muted"
+                                        >
+                                          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isBrandExpanded ? "rotate-180" : ""}`} />
+                                        </button>
+                                      )}
+                                    </div>
+                                    {seriesList.length > 0 && isBrandExpanded && (
+                                      <div className="border-t border-border-default/70 bg-surface-subtle px-2.5 py-2 space-y-1.5">
+                                        {seriesList.map((series) => {
+                                          const brandName = brand.label.trim().split(/\s+/)[0];
+                                          return (
+                                            <div key={series.id}>
+                                              <Link
+                                                href={series.href}
+                                                prefetch={false}
+                                                onClick={() => closeDrawer(false)}
+                                                className="flex min-h-11 items-center text-sm font-semibold text-text-primary hover:text-brand-primary"
+                                              >
+                                                {series.name.toLowerCase().startsWith(`${brandName.toLowerCase()} `) ? series.name.slice(brandName.length).trim() : series.name}
+                                              </Link>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
                 categories.map((cat) => {
                   const IconComponent = categoryIconMap[cat.slug] || Laptop;
                   const isSelected = pathname === (cat.href || `/${cat.slug}`);
@@ -346,6 +496,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
                     </Link>
                   );
                 })
+              )}
+                </>
               )}
 
               {/* Phụ kiện & Đồ chơi công nghệ nổi bật */}

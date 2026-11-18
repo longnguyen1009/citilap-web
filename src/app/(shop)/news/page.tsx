@@ -20,6 +20,7 @@ import {
 import { videoReviewsSectionDataSchema } from "@/contracts/cms/site-builder";
 import { DEFAULT_REVIEW_VIDEOS } from "@/contracts/cms/settings";
 import { businessProfile } from "@/config/business-profile";
+import { normalizeLegacyCategoryHref } from "@/lib/category-paths";
 import {
   formatSeoTitle,
   formatSeoTitleString,
@@ -172,7 +173,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
       "/brand/store-photo-01.webp",
     title: customPromo?.title || settings?.subBanner1Title || "Săn Deal Laptop Chính Hãng Giá Tốt",
     subtitle: customPromo?.description || settings?.subBanner1Subtitle || "Ưu đãi CitiLap",
-    href: customPromo?.href || settings?.subBanner1Link || "/hot-sale",
+    href: normalizeLegacyCategoryHref(customPromo?.href || settings?.subBanner1Link || "/hot-sale"),
   };
 
   const jsonLd = [

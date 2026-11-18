@@ -186,7 +186,8 @@ export default async function ProductDetailPage({
   }
 
   const category = navigation?.categories.find(c => c.id === product.categoryId);
-  const categoryTrail = category && navigation ? categoryAncestors(category, navigation.categories) : [];
+  // Breadcrumb gọn: chỉ hiện tối đa 2 cấp danh mục (vd: Laptop Gaming > Lenovo Gaming > Tên sản phẩm)
+  const categoryTrail = category && navigation ? categoryAncestors(category, navigation.categories).slice(0, 2) : [];
   const categoryUrl = category?.href || '/phan-loai';
   const canonicalPath = productHref({ slug: resolvedSlug, template: studio?.template, kind: /phu-kien|linh-kien/.test(product.categorySlug || '') ? 'ACCESSORY' : 'LAPTOP' });
 
@@ -400,7 +401,7 @@ export default async function ProductDetailPage({
       product.id,
       product.categoryId,
       product.brandId,
-      4,
+      5,
       manualRelatedIds,
     ),
   ]);
@@ -712,7 +713,7 @@ export default async function ProductDetailPage({
               )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 md:gap-3 lg:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 md:gap-3 lg:gap-4">
               {relatedProducts.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -721,7 +722,7 @@ export default async function ProductDetailPage({
         )}
 
         {/* 4. SẢN PHẨM VỪA XEM */}
-        <RecentlyViewedSection currentProduct={recentlyViewedItem} />
+        <RecentlyViewedSection currentProduct={recentlyViewedItem} maxDisplay={5} />
       </div>
     </div>
   );

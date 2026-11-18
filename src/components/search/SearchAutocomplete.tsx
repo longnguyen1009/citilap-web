@@ -316,9 +316,9 @@ export default function SearchAutocomplete({
 
   // Height and font styling by size with mobile optimization
   const sizeStyles = {
-    sm: "min-h-11 h-11 text-xs sm:text-xs pl-7 sm:pl-9 pr-10 sm:pr-20",
-    md: "min-h-11 h-11 text-xs sm:text-sm pl-7.5 sm:pl-10 pr-10 sm:pr-20",
-    lg: "min-h-11 h-11 sm:h-12 text-xs sm:text-base pl-8.5 sm:pl-12 pr-10 sm:pr-20",
+    sm: "min-h-11 h-11 text-[11px] placeholder:text-[11px] sm:text-xs sm:placeholder:text-xs pl-7 sm:pl-9 pr-9 sm:pr-20",
+    md: "min-h-11 h-11 text-[11px] placeholder:text-[11px] sm:text-sm sm:placeholder:text-sm pl-7 sm:pl-10 pr-9 sm:pr-20",
+    lg: "min-h-11 h-11 sm:h-12 text-xs placeholder:text-xs sm:text-base sm:placeholder:text-base pl-8 sm:pl-12 pr-9 sm:pr-20",
   }[size];
 
   const iconSizes = {

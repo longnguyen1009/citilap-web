@@ -74,21 +74,22 @@ function BreadcrumbNav({ crumbs }: { crumbs: BreadcrumbItem[] }) {
       <Container>
         <nav
           aria-label="Breadcrumb"
-          className="flex items-center text-xs sm:text-sm text-slate-500 py-2.5 font-medium overflow-x-auto hide-scrollbar"
+          className="flex items-center text-[11px] sm:text-sm text-slate-500 py-2 sm:py-2.5 font-medium overflow-x-auto hide-scrollbar"
         >
           {crumbs.map((crumb, i) => (
-            <span key={crumb.href} className="flex items-center whitespace-nowrap">
+            <span key={crumb.href} className="flex items-center whitespace-nowrap min-w-0">
               {i > 0 && (
-                <ChevronRight className="w-3.5 h-3.5 mx-1.5 text-slate-300 shrink-0" />
+                <ChevronRight className="w-3.5 h-3.5 mx-1 sm:mx-1.5 text-slate-300 shrink-0" aria-hidden="true" />
               )}
               {i === crumbs.length - 1 ? (
-                <span className="text-slate-900 font-semibold" aria-current="page">
+                <span className="text-slate-900 font-semibold max-w-[180px] sm:max-w-none truncate" aria-current="page" title={crumb.label}>
                   {crumb.label}
                 </span>
               ) : (
                 <Link
                   href={crumb.href}
-                  className="hover:text-blue-600 transition-colors"
+                  title={crumb.label}
+                  className="hover:text-blue-600 transition-colors max-w-[115px] sm:max-w-none truncate"
                 >
                   {crumb.label}
                 </Link>

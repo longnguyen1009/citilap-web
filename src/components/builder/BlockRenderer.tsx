@@ -742,7 +742,7 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
                 ...category,
                 name: item.customName || category.name,
                 image: item.customImage || category.image,
-                href: item.href || category.href || `/category/${category.slug}`,
+                href: (item.href ? item.href.replace(/^\/category\/([^/?#]+)(.*)$/, '/$1$2') : '') || category.href || `/${category.slug}`,
               },
             ];
           }
@@ -758,7 +758,7 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
           }
           return [];
         })
-    : resolved.map((c) => ({ ...c, href: c.href || `/category/${c.slug}` }));
+    : resolved.map((c) => ({ ...c, href: c.href || `/${c.slug}` }));
 
   const categories = data.limit && data.limit > 0 ? rawCategories.slice(0, data.limit) : rawCategories;
 

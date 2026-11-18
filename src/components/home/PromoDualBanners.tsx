@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Flame, Pause, Play, Sparkles } from "lucide-react";
+import { normalizeLegacyCategoryHref } from "@/lib/category-paths";
 
 export type PromoBannerTheme = "crimson" | "sapphire" | "emerald" | "amber";
 
@@ -30,7 +31,7 @@ export const DEFAULT_PROMO_BANNERS: PromoBannerItem[] = [
     highlight: "GIẢM NGAY 500K",
     subtitle: "",
     ctaText: "Săn ngay",
-    href: "/category/laptop-gaming",
+    href: "/laptop-gaming",
     imageUrl: "/brand/banner-gaming-promo.webp",
     theme: "crimson",
     enabled: true,
@@ -43,7 +44,7 @@ export const DEFAULT_PROMO_BANNERS: PromoBannerItem[] = [
     highlight: "CẤU HÌNH CAO · MỚI ĐẸP",
     subtitle: "",
     ctaText: "Khám phá",
-    href: "/category/laptop-van-phong",
+    href: "/laptop-van-phong",
     imageUrl: "/brand/banner-ultrabook-2026.webp",
     theme: "sapphire",
     enabled: true,
@@ -147,7 +148,7 @@ export default function PromoDualBanners({
             return (
               <Link
                 key={banner.id || index}
-                href={banner.href || "/search"}
+                href={normalizeLegacyCategoryHref(banner.href || "/search")}
                 prefetch={false}
                 className={`group relative block rounded-xl lg:rounded-2xl overflow-hidden border transition-all duration-300 ease-out hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:outline-hidden shadow-sm ${theme.surface} ${theme.border}`}
               >

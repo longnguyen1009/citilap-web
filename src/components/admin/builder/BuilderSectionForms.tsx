@@ -1880,7 +1880,7 @@ export function FeaturedCategoriesForm({
                     update({ items: next });
                   }}
                   className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
-                  placeholder="/category/laptop-gaming"
+                  placeholder="/laptop-gaming"
                 />
               </div>
 
