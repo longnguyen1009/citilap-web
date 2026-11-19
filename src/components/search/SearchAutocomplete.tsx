@@ -1,5 +1,5 @@
 "use client";
-import { productHref } from '@/lib/product-paths';
+import { productVariantHref } from '@/lib/product-paths';
 
 import { useState, useRef, useEffect, useCallback, FormEvent, KeyboardEvent } from "react";
 import Image from "next/image";
@@ -271,7 +271,7 @@ export default function SearchAutocomplete({
         if (activeIndex < suggestions.length) {
           const product = suggestions[activeIndex];
           if (onSelectSuggestion) onSelectSuggestion(product);
-          const href = `${productHref(product)}${product.sku ? `?sku=${product.sku}` : ""}`;
+          const href = productVariantHref(product);
           setIsOpen(false);
           router.push(href);
           return;
@@ -489,7 +489,7 @@ export default function SearchAutocomplete({
                 <div className="space-y-1 mt-1">
                   {suggestions.map((p, idx) => {
                     const isSelected = activeIndex === idx;
-                    const href = `${productHref(p)}${p.sku ? `?sku=${p.sku}` : ""}`;
+                    const href = productVariantHref(p);
 
                     return (
                       <Link

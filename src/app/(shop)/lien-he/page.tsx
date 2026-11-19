@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const email = settings?.storeEmail || businessProfile.email;
   const rawTitle = `Liên hệ & Đặt lịch xem máy tại ${brandName}`;
   const titleString = formatSeoTitleString(rawTitle);
-  const description = `Liên hệ tư vấn cấu hình, báo giá và đặt lịch xem máy tại ${brandName}. Hotline: ${phone}, Email: ${email}. Địa chỉ showroom Hà Nội (23/40 Tạ Quang Bửu) & Bắc Ninh (40 Trần Hưng Đạo).`;
+  const description = `Liên hệ tư vấn cấu hình, báo giá & đặt lịch xem máy tại ${brandName}. Hotline: ${phone}. Showroom Hà Nội (23/40 Tạ Quang Bửu) & Bắc Ninh (40 Trần Hưng Đạo).`;
   const ogImage = `${businessProfile.canonicalSiteUrl}/brand/store-photo-01.webp`;
 
   return {

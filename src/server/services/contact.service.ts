@@ -572,7 +572,7 @@ export async function listApprovedProductReviews(
         },
       },
       orderBy: [{ handledAt: 'desc' }, { createdAt: 'desc' }],
-      take: 100,
+      take: 500,
     });
 
     const normalizedTargets = productNames

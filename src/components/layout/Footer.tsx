@@ -324,7 +324,7 @@ export default function Footer({
       {/* 3. Bottom Copyright, Legal Entity & MOIT badge */}
       <div className="bg-[#050a14] pt-5 pb-20 md:pb-6 text-gray-400 text-[12px] border-t border-gray-800/80">
         <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 flex flex-col items-center text-center gap-2.5">
-          <div className="max-w-4xl space-y-1 leading-relaxed">
+          <div className="max-w-4xl space-y-1 leading-relaxed" data-nosnippet>
             <p className="text-gray-300">
               <span className="font-semibold text-gray-200">{legalName}</span>
               {registrationNumber && (

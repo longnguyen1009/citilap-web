@@ -151,10 +151,10 @@ export function deriveGpuSeries(raw?: string | null): string | null {
 
 export function parseSpecMetrics(specs: Record<string, string | null | undefined>) {
   const cpuStr = specs.CPU || specs.cpu || '';
-  const gpuStr = specs.GPU || specs.gpu || specs.VGA || '';
-  const ramStr = specs.RAM || specs.ram || '';
-  const storageStr = specs.SSD || specs['Ổ cứng'] || specs.storage || '';
-  const displayStr = specs['Màn hình'] || specs.display || '';
+  const gpuStr = specs['Card màn hình'] || specs.GPU || specs.gpu || specs.VGA || '';
+  const ramStr = specs.RAM || specs.Ram || specs.ram || '';
+  const storageStr = specs['Ổ cứng'] || specs.SSD || specs.storage || '';
+  const displayStr = specs['Độ phân giải'] || specs['Màn hình'] || specs.display || '';
 
   const cpuSeries = deriveCpuSeries(cpuStr);
   const gpuSeries = deriveGpuSeries(gpuStr);
@@ -842,10 +842,10 @@ export async function writeStudio(env: MediaEnvironment, id: string | null, inpu
     const primaryVar = (pubVariants.length ? pubVariants : d.variants)[0];
 
     const effectiveCpu = (primaryVar?.options?.CPU || primaryVar?.options?.cpu || specs.CPU || specs.cpu || '').trim() || null;
-    const effectiveGpu = (primaryVar?.gpu || primaryVar?.options?.GPU || primaryVar?.options?.gpu || specs.GPU || specs.gpu || '').trim() || null;
-    const effectiveRam = (primaryVar?.ram || primaryVar?.options?.RAM || primaryVar?.options?.ram || specs.RAM || specs.ram || '').trim() || null;
-    const effectiveStorage = (primaryVar?.storage || primaryVar?.options?.SSD || primaryVar?.options?.['Ổ cứng'] || primaryVar?.options?.storage || specs.SSD || specs['Ổ cứng'] || specs.storage || '').trim() || null;
-    const effectiveDisplay = (primaryVar?.options?.['Màn hình'] || primaryVar?.options?.display || specs['Màn hình'] || specs.display || '').trim() || null;
+    const effectiveGpu = (primaryVar?.gpu || primaryVar?.options?.GPU || primaryVar?.options?.gpu || specs['Card màn hình'] || specs.GPU || specs.gpu || '').trim() || null;
+    const effectiveRam = (primaryVar?.ram || primaryVar?.options?.RAM || primaryVar?.options?.ram || specs.RAM || specs.Ram || specs.ram || '').trim() || null;
+    const effectiveStorage = (primaryVar?.storage || primaryVar?.options?.SSD || primaryVar?.options?.['Ổ cứng'] || primaryVar?.options?.storage || specs['Ổ cứng'] || specs.SSD || specs.storage || '').trim() || null;
+    const effectiveDisplay = (primaryVar?.options?.['Màn hình'] || primaryVar?.options?.display || specs['Độ phân giải'] || specs['Màn hình'] || specs.display || '').trim() || null;
     const effectiveCondition = primaryVar?.condition || d.condition || 'NEW';
     const effectiveWarrantyBadge = formatShortWarrantyBadge(
       d.warrantyType,

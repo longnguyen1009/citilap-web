@@ -417,7 +417,7 @@ export default async function ProductDetailPage({
     if (!val) return false;
     const t = val.trim();
     if (!t) return false;
-    return !/^(n\/a|đang cập nhật|chưa cập nhật|null|undefined|-|—)$/i.test(t);
+    return !/^(n\/a|đang cập nhật|chưa cập nhật|null|undefined)$/i.test(t);
   };
 
   const rawStructuredSpecs: Array<{ key: string; value: string }> = (studio
@@ -427,10 +427,12 @@ export default async function ProductDetailPage({
 
   const structuredSpecs: Array<{ key: string; value: string }> = [...rawStructuredSpecs];
   const upsertStructuredSpec = (pattern: RegExp, defaultKey: string, val?: string | null) => {
-    if (!isMeaningfulSpecValue(val)) return;
+    if (!isMeaningfulSpecValue(val) || val.trim() === '-') return;
     const idx = structuredSpecs.findIndex((s) => pattern.test(s.key.trim()));
     if (idx >= 0) {
-      structuredSpecs[idx] = { ...structuredSpecs[idx], value: val.trim() };
+      if (structuredSpecs[idx].value === '-' || val.trim().length >= structuredSpecs[idx].value.length) {
+        structuredSpecs[idx] = { ...structuredSpecs[idx], value: val.trim() };
+      }
     } else {
       structuredSpecs.push({ key: defaultKey, value: val.trim() });
     }
@@ -448,9 +450,9 @@ export default async function ProductDetailPage({
 
     upsertStructuredSpec(/^(cpu|bộ xử lý|vi xử lý|model cpu)$/i, "CPU", vCpu);
     upsertStructuredSpec(/^(ram|dung lượng ram)$/i, "RAM", vRam);
-    upsertStructuredSpec(/^(ssd|ổ cứng|storage|dung lượng ổ cứng)$/i, "SSD", vStorage);
-    upsertStructuredSpec(/^(gpu|card đồ họa|vga|đồ họa|card đồ họa \(gpu\))$/i, "GPU", vGpu);
-    upsertStructuredSpec(/^(màn hình|display|thông số màn hình)$/i, "Màn hình", vDisplay);
+    upsertStructuredSpec(/^(ssd|ổ cứng|storage|dung lượng ổ cứng)$/i, "Ổ cứng", vStorage);
+    upsertStructuredSpec(/^(gpu|card màn hình|card đồ họa|vga|đồ họa|card đồ họa \(gpu\))$/i, "Card màn hình", vGpu);
+    upsertStructuredSpec(/^(độ phân giải|màn hình|display|thông số màn hình)$/i, "Độ phân giải", vDisplay);
     upsertStructuredSpec(/^(tình trạng|tình trạng máy|condition)$/i, "Tình trạng", vCondLabel);
     upsertStructuredSpec(/^(sku|mã sku|sku phiên bản)$/i, "SKU", vSku);
   }
@@ -529,7 +531,7 @@ export default async function ProductDetailPage({
     slug: resolvedSlug,
     sku: activeSku,
     variantId: activeVariantId,
-    href: activeSku ? `${canonicalPath}?sku=${encodeURIComponent(activeSku)}` : canonicalPath,
+    href: canonicalPath,
     template: studio?.template,
     name: displayName,
     price: displayPrice,
@@ -669,6 +671,7 @@ export default async function ProductDetailPage({
             {/* Thông số kỹ thuật */}
             <section id="thong-so-ky-thuat">
               <ProductSpecsSidebarCard
+                key={product.id}
                 productName={displayName}
                 specs={structuredSpecs.map((spec) => ({
                   label: spec.key,

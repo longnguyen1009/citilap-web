@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import {
@@ -139,7 +139,7 @@ export default function ProductHeroSection({
   const isInCompare = compareCtx?.isInCompare(productId) ?? false;
   const primaryBuyActionRef = useRef<HTMLDivElement>(null);
 
-  // 1. Variant state
+  // 1. Variant state (component is keyed by product.id in ProductDetailPage)
   const initialVariant =
     variants.find((v) => v.sku === selectedSku || v.id === selectedSku) ||
     variants[0] ||
@@ -147,7 +147,6 @@ export default function ProductHeroSection({
   const [selectedVariant, setSelectedVariant] = useState<HeroVariantItem | null>(initialVariant);
   const [showAllVariants, setShowAllVariants] = useState(false);
   const hiddenVariantCount = variants.filter((item, index) => index >= 4 && item.id !== selectedVariant?.id).length;
-  useEffect(() => { setSelectedVariant(initialVariant); }, [initialVariant]);
   const selectedProductName = selectedVariant?.productName || productName;
 
   // 2. Color state
@@ -203,14 +202,32 @@ export default function ProductHeroSection({
     images[0]?.url ||
     "";
 
-  // Switch Variant
+  // Switch Variant (client-side only: no full page reload, syncs URL & specs sidebar smoothly)
   const handleSelectVariant = (v: HeroVariantItem) => {
     setSelectedVariant(v);
     setCartSuccessMsg("");
-    if (v.sku) {
-      const url = new URL(window.location.href);
-      url.searchParams.set("sku", v.sku);
-      router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false });
+    if (typeof window !== "undefined") {
+      if (v.sku) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("sku", v.sku);
+        url.searchParams.delete("variant");
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+      }
+      window.dispatchEvent(
+        new CustomEvent("citilap:variant-change", {
+          detail: {
+            productId,
+            productName: v.productName || productName,
+            sku: v.sku,
+            cpu: v.cpu,
+            ram: v.ram,
+            storage: v.storage,
+            gpu: v.gpu,
+            display: v.display,
+            conditionLabel: v.conditionLabel,
+          },
+        })
+      );
     }
   };
 
@@ -469,7 +486,7 @@ export default function ProductHeroSection({
             <section aria-label="Chọn cấu hình" className="space-y-2 sm:space-y-2.5">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs sm:text-sm font-bold text-slate-900">
-                  Chọn cấu hình <span className="font-normal text-slate-500">({variants.length} phiên bản)</span>
+                  Chọn cấu hình
                 </h2>
               </div>
 
@@ -518,11 +535,6 @@ export default function ProductHeroSection({
                         }`}>
                           {item.name}
                         </span>
-                        {item.subSpecs && (
-                          <p className="text-[11px] text-slate-600 break-words mt-0.5 leading-snug">
-                            {item.subSpecs}
-                          </p>
-                        )}
                       </div>
 
                       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

@@ -228,18 +228,13 @@ export default function StudioPurchaseSection({
           <div className="flex items-center justify-between">
             <label className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[11px] font-bold">1</span>
-              <span>CHỌN CẤU HÌNH PHẦN CỨNG ({conditionVariants.length}):</span>
+              <span>CHỌN CẤU HÌNH:</span>
             </label>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {conditionVariants.map((item) => {
               const isSelected = item.id === variantId;
-              const optionValues = item.options
-                ? Object.entries(item.options).map(([k, v]) => `${k}: ${v}`)
-                : [];
-              const specList = [item.ram, item.storage, item.gpu, ...optionValues].filter(Boolean);
-              const specText = specList.length > 0 ? specList.join(" · ") : conditionNames[item.condition];
 
               return (
                 <button
@@ -271,9 +266,6 @@ export default function StudioPurchaseSection({
                     >
                       {item.name || item.sku}
                     </span>
-                    <p className="text-[11px] text-gray-500 line-clamp-1 mt-1 font-medium">
-                      {specText}
-                    </p>
                   </div>
 
                   <div className="pt-2.5 mt-2.5 border-t border-gray-200/70 flex items-baseline justify-between">

@@ -18,10 +18,10 @@ export const viewport: Viewport = {
 
 const baseMetadata: Metadata = {
   title: {
-    default: `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`,
+    default: `${businessProfile.brandName} — Laptop Gaming, Văn Phòng, Workstation & MacBook Chính Hãng`,
     template: `%s | ${businessProfile.brandName}`,
   },
-  description: `Cửa hàng chuyên Laptop Gaming, Ultrabook cao cấp và máy like-new tuyển chọn kỹ lưỡng. ${businessProfile.traditionalMotto}. Tư vấn cấu hình chuẩn xác, bảo hành chu đáo theo gói sản phẩm.`,
+  description: `CitiLap chuyên Laptop Gaming, Văn Phòng, Workstation & MacBook chính hãng, LikeNew tuyển chọn tại Hà Nội & Bắc Ninh. Bảo hành minh bạch, 1 đổi 1 trong 7 ngày.`,
   keywords: [
     "CitiLap",
     "laptop",

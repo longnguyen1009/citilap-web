@@ -1,11 +1,23 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { X, SlidersHorizontal } from 'lucide-react';
 
 export interface SpecRow {
   label: string;
   value: string;
+}
+
+interface VariantChangeDetail {
+  productId?: string;
+  productName?: string;
+  sku?: string;
+  cpu?: string | null;
+  ram?: string | null;
+  storage?: string | null;
+  gpu?: string | null;
+  display?: string | null;
+  conditionLabel?: string | null;
 }
 
 interface ProductSpecsSidebarCardProps {
@@ -20,7 +32,17 @@ function isValidSpecValue(val?: string | null): boolean {
   if (!val) return false;
   const t = val.trim();
   if (!t) return false;
-  return !/^(n\/a|đang cập nhật|chưa cập nhật|null|undefined|-|—)$/i.test(t);
+  return !/^(n\/a|đang cập nhật|chưa cập nhật|null|undefined)$/i.test(t);
+}
+
+function upsertSpecRow(rows: SpecRow[], pattern: RegExp, fallbackLabel: string, value?: string | null): SpecRow[] {
+  if (!isValidSpecValue(value) || value!.trim() === '-') return rows;
+  const trimmed = value!.trim();
+  const idx = rows.findIndex((row) => pattern.test(row.label.trim()));
+  if (idx >= 0) {
+    return rows.with(idx, { ...rows[idx], value: trimmed });
+  }
+  return [...rows, { label: fallbackLabel, value: trimmed }];
 }
 
 export function ProductSpecsSidebarCard({
@@ -31,6 +53,7 @@ export function ProductSpecsSidebarCard({
   warrantyText,
 }: ProductSpecsSidebarCardProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const [variantOverride, setVariantOverride] = useState<VariantChangeDetail | null>(null);
 
   const openModal = () => {
     const dialog = dialogRef.current;
@@ -49,13 +72,35 @@ export function ProductSpecsSidebarCard({
 
   useEffect(() => {
     const handleOpenEvent = () => openModal();
+    const handleVariantChange = (event: Event) => {
+      const detail = (event as CustomEvent<VariantChangeDetail>).detail;
+      if (!detail) return;
+      setVariantOverride(detail);
+    };
     window.addEventListener('citilap:open-full-specs', handleOpenEvent);
+    window.addEventListener('citilap:variant-change', handleVariantChange);
     return () => {
       window.removeEventListener('citilap:open-full-specs', handleOpenEvent);
+      window.removeEventListener('citilap:variant-change', handleVariantChange);
     };
   }, []);
 
-  const validSpecs = (specs || []).filter(
+  const activeProductName = variantOverride?.productName || productName;
+  const activeSku = variantOverride?.sku || sku;
+  const activeSpecs = (() => {
+    if (!variantOverride) return specs;
+    let next = [...specs];
+    next = upsertSpecRow(next, /^(cpu|bộ xử lý|vi xử lý|model cpu)$/i, 'CPU', variantOverride.cpu);
+    next = upsertSpecRow(next, /^(ram|dung lượng ram)$/i, 'RAM', variantOverride.ram);
+    next = upsertSpecRow(next, /^(ssd|ổ cứng|storage|dung lượng ổ cứng)$/i, 'Ổ cứng', variantOverride.storage);
+    next = upsertSpecRow(next, /^(gpu|card màn hình|card đồ họa|vga|đồ họa|card đồ họa \(gpu\))$/i, 'Card màn hình', variantOverride.gpu);
+    next = upsertSpecRow(next, /^(độ phân giải|màn hình|display|thông số màn hình)$/i, 'Độ phân giải', variantOverride.display);
+    next = upsertSpecRow(next, /^(tình trạng|tình trạng máy|condition)$/i, 'Tình trạng', variantOverride.conditionLabel);
+    next = upsertSpecRow(next, /^(sku|mã sku|sku phiên bản)$/i, 'SKU', variantOverride.sku);
+    return next;
+  })();
+
+  const validSpecs = (activeSpecs || []).filter(
     (s) => s.label && s.label.trim() && isValidSpecValue(s.value)
   );
 
@@ -75,7 +120,7 @@ export function ProductSpecsSidebarCard({
 
   const fullSpecs: SpecRow[] = [
     ...validSpecs,
-    ...(sku && sku.trim() && !hasSkuRow ? [{ label: 'Mã sản phẩm (SKU)', value: sku.trim() }] : []),
+    ...(activeSku && activeSku.trim() && !hasSkuRow ? [{ label: 'Mã sản phẩm (SKU)', value: activeSku.trim() }] : []),
     ...(!hasWarrantyRow
       ? [
           {
@@ -111,7 +156,7 @@ export function ProductSpecsSidebarCard({
                 </span>
                 <span
                   data-spec-key={row.label}
-                  className="col-span-7 sm:col-span-8 font-semibold text-slate-800 text-left break-words leading-snug"
+                  className="col-span-7 sm:col-span-8 font-semibold text-slate-800 text-left break-words whitespace-pre-line leading-snug"
                 >
                   {row.value}
                 </span>
@@ -155,7 +200,7 @@ export function ProductSpecsSidebarCard({
               id="full-specs-modal-title"
               className="text-sm sm:text-lg font-extrabold text-slate-900 line-clamp-2 leading-snug"
             >
-              ⚙️ Thông số kỹ thuật chi tiết — {productName}
+              ⚙️ Thông số kỹ thuật chi tiết — {activeProductName}
             </h3>
             <button
               type="button"
@@ -179,7 +224,7 @@ export function ProductSpecsSidebarCard({
                       <td className="p-2.5 sm:p-3.5 font-bold text-slate-700 w-[38%] sm:w-1/3 align-top break-words">
                         {row.label}
                       </td>
-                      <td className="p-2.5 sm:p-3.5 text-slate-800 font-medium w-[62%] sm:w-2/3 align-top break-words leading-relaxed">
+                      <td className="p-2.5 sm:p-3.5 text-slate-800 font-medium w-[62%] sm:w-2/3 align-top break-words whitespace-pre-line leading-relaxed">
                         {row.value}
                       </td>
                     </tr>

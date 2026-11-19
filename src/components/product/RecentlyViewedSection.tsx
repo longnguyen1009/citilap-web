@@ -5,7 +5,7 @@ import { History, Trash2 } from "lucide-react";
 import ProductCard, { type ProductCardProduct } from "@/components/product/ProductCard";
 
 const STORAGE_KEY = "citilap_recently_viewed_v1";
-const MAX_STORED = 8;
+const MAX_STORED = 10;
 
 interface RecentlyViewedSectionProps {
   currentProduct?: ProductCardProduct;
@@ -15,16 +15,24 @@ interface RecentlyViewedSectionProps {
   subtitle?: string;
 }
 
+function normalizeStoredProduct(item: ProductCardProduct): ProductCardProduct {
+  if (!item.href || !item.href.includes("?")) return item;
+  const cleanPath = item.href.slice(0, item.href.indexOf("?"));
+  return { ...item, href: cleanPath };
+}
+
 function readStoredProducts(): ProductCardProduct[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is ProductCardProduct =>
-        Boolean(item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string")
-    );
+    return parsed
+      .filter(
+        (item): item is ProductCardProduct =>
+          Boolean(item && typeof item === "object" && typeof item.id === "string" && typeof item.name === "string")
+      )
+      .map(normalizeStoredProduct);
   } catch {
     return [];
   }
@@ -33,7 +41,7 @@ function readStoredProducts(): ProductCardProduct[] {
 export default function RecentlyViewedSection({
   currentProduct,
   excludeIds = [],
-  maxDisplay = 4,
+  maxDisplay = 5,
   title = "Sản phẩm bạn vừa xem",
   subtitle = "Tiếp tục tham khảo và so sánh các mẫu máy bạn đã quan tâm trên thiết bị này",
 }: RecentlyViewedSectionProps) {

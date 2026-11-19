@@ -1514,9 +1514,9 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                       </td>
                       <td>
                         <div className="space-y-1">
-                          <input
-                            type="text"
+                          <textarea
                             aria-label={displayLabel}
+                            rows={Math.max(1, Math.min(6, (spec.value || '').split('\n').length))}
                             value={spec.value}
                             onChange={e =>
                               updateDoc(
@@ -1525,7 +1525,7 @@ export default function ProductEditor({ id }: ProductEditorProps) {
                               )
                             }
                             placeholder={def ? `${def.label}...` : `Nhập ${displayLabel.toLowerCase()}...`}
-                            className="matrix-input-cell"
+                            className="matrix-input-cell resize-y leading-snug py-1.5 min-h-[34px]"
                           />
                           {def?.options && def.options.length > 0 && (
                             <div className="flex flex-wrap gap-1">

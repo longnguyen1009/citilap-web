@@ -28,14 +28,22 @@ export async function generateMetadata({ params }: BrandPageProps): Promise<Meta
     const brand = data.brand;
     const rawTitle = brand.seoTitle || `Laptop & Sản Phẩm ${brand.name} Chính Hãng`;
     const titleString = formatSeoTitleString(rawTitle);
+    const rawBrandDesc = (brand.seoDescription || brand.description || "").trim();
+    const enrichedBrandDesc =
+      rawBrandDesc && rawBrandDesc.length < 110
+        ? `Mua Laptop ${brand.name} chính hãng & LikeNew tại CitiLap — ${rawBrandDesc.replace(/\.$/, "")}. Test máy trực tiếp, bảo hành minh bạch, lỗi 1 đổi 1 7 ngày.`
+        : rawBrandDesc;
     const description = cleanSeoDescription(
-      brand.seoDescription || brand.description,
+      enrichedBrandDesc,
       `Khám phá các dòng laptop và phụ kiện ${brand.name} chính hãng & Like New tuyển chọn tại CitiLap. Đối chiếu cấu hình, bảng giá mới nhất và bảo hành uy tín tại Hà Nội & Bắc Ninh.`
     );
     const canonicalUrl = `${businessProfile.canonicalSiteUrl}/brand/${brand.slug}`;
-    const ogImage = brand.logo
-      ? (/^https?:\/\//i.test(brand.logo) ? brand.logo : `${businessProfile.canonicalSiteUrl}${brand.logo}`)
-      : `${businessProfile.canonicalSiteUrl}${businessProfile.bannerAsset}`;
+    const firstProductImg = data.products?.[0]?.image;
+    const rasterLogo = brand.logo && !/\.svg(?:$|\?)/i.test(brand.logo) ? brand.logo : null;
+    const ogSource = rasterLogo || firstProductImg || businessProfile.bannerAsset;
+    const ogImage = /^https?:\/\//i.test(ogSource)
+      ? ogSource
+      : `${businessProfile.canonicalSiteUrl}${ogSource.startsWith("/") ? "" : "/"}${ogSource}`;
 
     return {
       title: formatSeoTitle(rawTitle),

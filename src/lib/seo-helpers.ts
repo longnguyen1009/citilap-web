@@ -39,8 +39,12 @@ export function formatSeoTitleString(
     return `${businessProfile.brandName} - ${businessProfile.traditionalMotto}`;
   }
 
-  // If the title already starts with "CitiLap" or ends with "CitiLap", do not append another "| CitiLap"
-  if (/^citilap\b/i.test(base) || /\bcitilap(?:\.vn)?$/i.test(base)) {
+  // If the title already mentions CitiLap (at start, end, or anywhere in a descriptive title), do not append another "| CitiLap"
+  if (
+    /^citilap\b/i.test(base) ||
+    /\bcitilap(?:\.vn)?$/i.test(base) ||
+    (/\bcitilap\b/i.test(base) && base.length >= 35)
+  ) {
     return base;
   }
 
@@ -116,23 +120,23 @@ interface CategorySeoPreset {
 
 const CATEGORY_SEO_PRESETS: Record<string, CategorySeoPreset> = {
   "laptop-gaming": {
-    title: "Laptop Gaming Chính Hãng — Cấu Hình Chiến Game & Đồ Họa",
+    title: "Laptop Gaming Chính Hãng — Legion, LOQ, ROG, TUF, Nitro, MSI",
     description:
-      "Chuyên Laptop Gaming Lenovo Legion, LOQ, ASUS ROG, TUF, Acer Nitro, Predator, MSI, HP Victus/Omen trang bị card RTX 3050, RTX 4050, RTX 4060, RTX 4070. Kiểm định kỹ thuật 12 bước, bảo hành uy tín tại CitiLap Hà Nội & Bắc Ninh.",
+      "Mua Laptop Gaming Lenovo Legion, LOQ, ASUS ROG/TUF, MSI, Acer Nitro RTX 40/50 Series giá tốt tại CitiLap. Test máy trực tiếp, bảo hành uy tín, lỗi 1 đổi 1 7 ngày.",
     intro:
       "Tuyển chọn các dòng Laptop Gaming tản nhiệt tốt, màn hình tần số quét cao 144Hz–240Hz từ Lenovo Legion, LOQ, ASUS ROG, Acer Nitro đến HP Omen. Đối chiếu trực tiếp GPU, công suất TGP, RAM và giá bán theo từng cấu hình tại CitiLap.",
   },
   "laptop-van-phong": {
     title: "Laptop Văn Phòng & Học Tập — Mỏng Nhẹ, Pin Bền, Giá Tốt",
     description:
-      "Tuyển chọn Laptop Văn Phòng, Học Tập, Sinh Viên & Doanh Nhân tại CitiLap: Lenovo ThinkPad, ThinkBook, Dell XPS, Latitude, Inspiron, ASUS Zenbook, Vivobook, HP EliteBook, LG Gram. Máy mới & Like New kiểm định minh bạch, lỗi 1 đổi 1 7 ngày.",
+      "Laptop Văn Phòng, Học Tập & Doanh Nhân tại CitiLap: ThinkPad, ThinkBook, Dell XPS, ASUS Zenbook/Vivobook, HP EliteBook. Máy mới & LikeNew, bảo hành minh bạch.",
     intro:
       "Danh mục Laptop Văn Phòng, Học Tập & Doanh Nhân mỏng nhẹ, bàn phím gõ êm, thời lượng pin tốt cho làm việc đa nhiệm, lập trình và họp trực tuyến. Hỗ trợ nâng cấp RAM/SSD và cài đặt phần mềm miễn phí tại CitiLap Hà Nội & Bắc Ninh.",
   },
   "laptop-workstation": {
-    title: "Laptop Workstation & Đồ Họa Kỹ Thuật — Chuyên CAD, 3D, Render",
+    title: "Laptop Workstation & Đồ Họa — Chuyên CAD, 3D, Render Phim",
     description:
-      "Chuyên máy trạm Mobile Workstation Dell Precision, Lenovo ThinkPad P Series, HP ZBook cấu hình CPU hiệu năng cao, card đồ họa RTX Ada / Quadro chuyên dụng cho AutoCAD, SolidWorks, Revit, 3ds Max và dựng phim tại CitiLap.",
+      "Máy trạm Mobile Workstation Dell Precision, ThinkPad P, HP ZBook, ProArt cấu hình cao cho AutoCAD, Revit, 3D & dựng phim. Bảo hành chuẩn, hỗ trợ kỹ thuật tại CitiLap.",
     intro:
       "Dòng máy trạm Workstation chuyên nghiệp cho kỹ sư CAD/CAM, kiến trúc sư và nhà sáng tạo nội dung 3D/Video: Dell Precision, ThinkPad P Series, HP ZBook với hệ thống tản nhiệt bền bỉ, VRAM lớn và màn hình chuẩn màu.",
   },
@@ -146,7 +150,7 @@ const CATEGORY_SEO_PRESETS: Record<string, CategorySeoPreset> = {
   macbook: {
     title: "Apple MacBook Air & MacBook Pro (M1, M2, M3, M4) Chính Hãng",
     description:
-      "Khám phá Apple MacBook Air và MacBook Pro 13, 14, 15, 16 inch chip Apple Silicon M1, M2, M3, M4 chính hãng & Like New tuyển chọn tại CitiLap. Màn hình Liquid Retina sắc nét, pin bền bỉ, bảo hành minh bạch tại Hà Nội & Bắc Ninh.",
+      "MacBook Air & MacBook Pro (M1, M2, M3, M4) chính hãng & LikeNew tuyển chọn tại CitiLap. Màn hình Retina sắc nét, pin bền bỉ, bảo hành minh bạch, 1 đổi 1 7 ngày.",
     intro:
       "Hệ sinh thái Apple MacBook Air và MacBook Pro trang bị chip Apple Silicon hiệu năng cao, thiết kế nhôm nguyên khối sang trọng, màn hình Retina chuẩn màu và thời lượng pin ấn tượng cho công việc sáng tạo và di chuyển.",
   },
@@ -181,7 +185,7 @@ const CATEGORY_SEO_PRESETS: Record<string, CategorySeoPreset> = {
   "phu-kien": {
     title: "Phụ Kiện Laptop & Đồ Chơi Công Nghệ Chính Hãng",
     description:
-      "Hệ sinh thái phụ kiện laptop chính hãng tại CitiLap: Chuột & bàn phím cơ, củ sạc nhanh GaN, cáp sạc, Hub chuyển đổi Type-C, balo chống sốc Tomtoc, giá đỡ tản nhiệt, nâng cấp RAM & SSD.",
+      "Phụ kiện laptop chính hãng tại CitiLap: chuột, bàn phím cơ, sạc nhanh GaN, Hub Type-C, balo chống sốc Tomtoc, đế tản nhiệt & nâng cấp RAM/SSD giá tốt.",
     intro:
       "Phụ kiện công nghệ và linh kiện nâng cấp tuyển chọn cho góc làm việc: chuột không dây, bàn phím cơ, sạc nhanh GaN, Hub USB-C, balo chống sốc và RAM/SSD laptop chính hãng.",
   },
@@ -272,16 +276,16 @@ export function getCategorySeoMeta(
   const titleString = formatSeoTitleString(baseTitle);
   const title = { absolute: titleString };
 
-  const description = hasCustomDesc
-    ? rawDesc
-    : preset
+  const description = preset
     ? preset.description
-    : `Khám phá các dòng ${category.name} chính hãng và Like New tuyển chọn tại CitiLap. Đối chiếu chi tiết CPU, RAM, SSD, màn hình, bảng giá mới nhất và nhận tư vấn cấu hình chuẩn nhu cầu tại Hà Nội & Bắc Ninh.`;
-
-  const introText = hasCustomDesc
+    : hasCustomDesc
     ? rawDesc
-    : preset
+    : `Khám phá các dòng ${category.name} chính hãng và Like New tuyển chọn tại CitiLap. Đối chiếu cấu hình, bảng giá mới nhất và bảo hành uy tín tại Hà Nội & Bắc Ninh.`;
+
+  const introText = preset
     ? preset.intro
+    : hasCustomDesc
+    ? rawDesc
     : `Tổng hợp các mẫu ${category.name} được kiểm định kỹ thuật kỹ lưỡng tại CitiLap. Bạn có thể lọc nhanh theo cấu hình CPU, RAM, ổ cứng SSD, card đồ họa và mức giá để chọn chiếc máy phù hợp nhất với nhu cầu thực tế.`;
 
   return {

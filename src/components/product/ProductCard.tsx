@@ -12,7 +12,7 @@ import { ConditionBadge, resolveConditionMeta } from "@/components/ui/ConditionB
 import { StockBadge } from "@/components/ui/StockBadge";
 import { BrandLogo, detectBrandName, getBrandCardTheme } from "@/components/ui/BrandLogo";
 import { defaultWarrantyMonthsForCondition } from "@/contracts/cms/product-studio";
-import { productHref as getProductHref } from "@/lib/product-paths";
+import { productVariantHref } from "@/lib/product-paths";
 
 export type ProductCardProduct = {
   href?: string;
@@ -296,8 +296,7 @@ export default function ProductCard({
     }
   };
 
-  const variantQuery = product.sku ? `?sku=${encodeURIComponent(product.sku)}` : (product.variantId ? `?variant=${encodeURIComponent(product.variantId)}` : "");
-  const productHref = getProductHref(product) + variantQuery;
+  const productHref = productVariantHref(product);
   const isOutOfStock = product.availability ? product.availability === "UNAVAILABLE" : product.stock !== undefined && product.stock !== null && product.stock <= 0;
   const resolvedMeta = resolveConditionMeta(product.condition, product.name);
   const inferredCondition = resolvedMeta.code === "OUTLET" ? "NEW" : resolvedMeta.code;
