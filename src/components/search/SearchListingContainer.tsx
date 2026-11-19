@@ -892,9 +892,9 @@ export default function SearchListingContainer({
 
         {(initialData.totalCount > 0 || totalActiveFilters > 0) && (
           <>
-            {/* Hàng 2: Thương hiệu (1 hàng cuộn ngang trên SP, 8 cột từ md; ẩn hãng 0 kết quả khi có từ khóa) */}
+            {/* Hàng 2: Thương hiệu (Đồng bộ giao diện thẻ logo + tên hãng giống trang Laptop Gaming / Văn phòng) */}
             {brandItems.length > 0 && (
-              <div className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 md:mx-0 md:px-0 md:grid md:grid-cols-8 gap-1.5 sm:gap-2 pt-0.5">
+              <nav aria-label="Chọn thương hiệu" className="flex flex-nowrap md:flex-wrap items-center gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 pt-0.5">
                 {brandItems.map((b) => {
                   const active = activeBrands.includes(b.value);
                   return (
@@ -904,66 +904,94 @@ export default function SearchListingContainer({
                       aria-pressed={active}
                       onClick={() => toggleMultiParam("brand", b.value)}
                       title={b.count > 0 ? `${b.label} (${b.count} sản phẩm)` : b.label}
-                      className={`group relative flex w-[84px] md:w-auto shrink-0 snap-start min-h-11 h-11 items-center justify-center overflow-hidden rounded-xl border px-2 transition cursor-pointer select-none ${
+                      className={`group relative flex w-[78px] sm:w-[104px] md:w-[114px] min-h-[58px] sm:min-h-[72px] flex-col items-center justify-center rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none shrink-0 snap-start cursor-pointer ${
                         active
-                          ? "border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-2xs"
-                          : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white"
+                          ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25"
+                          : "border-slate-200 bg-slate-50/40 text-slate-700 hover:border-blue-400 hover:bg-white hover:shadow-xs"
                       }`}
                     >
-                      {b.logo ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={b.logo}
-                          alt={b.label}
-                          className="max-h-4 sm:max-h-4.5 max-w-[54px] sm:max-w-full w-auto object-contain transition-transform group-hover:scale-105"
-                        />
-                      ) : (
-                        <span className="text-[11px] font-black uppercase text-slate-700 break-words text-center leading-tight">{b.label}</span>
-                      )}
-                      {b.count > 0 && (
-                        <span
-                          className={`ml-1 text-[10px] font-bold px-1 rounded-full leading-tight ${
-                            active ? "bg-blue-600 text-white" : "text-slate-400"
-                          }`}
-                        >
-                          {b.count}
+                      {active && (
+                        <span className="absolute right-1 top-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
+                          ✓
                         </span>
                       )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
 
-            {/* Hàng 3: Nhu cầu sử dụng (1 hàng cuộn ngang gọn trên SP, 8 cột trên PC, ẩn khi chọn Phụ kiện) */}
-            {!isAccessoryScope && (
-              <div className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 md:mx-0 md:px-0 md:grid md:grid-cols-8 gap-1.5 sm:gap-2">
-                {NEED_CARDS.map((need) => {
-                  const active = activeTags.some((t) => catalogNeedTag(t) === need.value);
-                  return (
-                    <button
-                      key={need.value}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => toggleMultiParam("tag", need.value)}
-                      className={`group relative flex shrink-0 snap-start min-h-10 md:min-h-[54px] flex-row md:flex-col items-center justify-center gap-1.5 md:gap-1 rounded-xl border py-1.5 px-2.5 md:px-1.5 transition cursor-pointer select-none ${
-                        active
-                          ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/50 text-blue-900 ring-2 ring-blue-500/20 shadow-2xs"
-                          : "border-slate-200/90 bg-slate-50/40 hover:border-blue-400 hover:bg-white text-slate-700"
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={need.icon}
-                        alt={need.label}
-                        className="h-4 w-4 md:h-5 md:w-5 shrink-0 object-contain transition-transform group-hover:scale-110"
-                      />
-                      <span className={`text-[11px] leading-tight whitespace-nowrap md:whitespace-normal text-center ${active ? "font-black text-blue-900" : "font-bold text-slate-700"}`}>
-                        {need.label}
+                      <div className="flex h-5 sm:h-7 items-center justify-center">
+                        {b.logo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            loading="lazy"
+                            decoding="async"
+                            src={b.logo}
+                            alt={b.label}
+                            className="max-h-5 sm:max-h-7 max-w-[54px] sm:max-w-[74px] object-contain transition-transform group-hover:scale-105"
+                          />
+                        ) : (
+                          <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-700 uppercase">
+                            {b.label}
+                          </span>
+                        )}
+                      </div>
+
+                      <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-tight mt-1 line-clamp-2 leading-tight text-center max-w-full px-0.5 ${
+                        active ? "text-blue-900" : "text-slate-800"
+                      }`}>
+                        {b.label}
                       </span>
                     </button>
                   );
                 })}
+              </nav>
+            )}
+
+            {brandItems.length > 0 && !isAccessoryScope && (
+              <div className="border-t border-slate-100" />
+            )}
+
+            {/* Hàng 3: Nhu cầu sử dụng (Đồng bộ giao diện thẻ nhu cầu giống trang Laptop Gaming / Văn phòng) */}
+            {!isAccessoryScope && (
+              <div className="space-y-1.5">
+                <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" aria-hidden="true" />
+                  <span>Lọc theo nhu cầu</span>
+                </h2>
+                <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:flex-wrap gap-1.5 sm:gap-2">
+                  {NEED_CARDS.map((need) => {
+                    const active = activeTags.some((t) => catalogNeedTag(t) === need.value);
+                    return (
+                      <button
+                        key={need.value}
+                        type="button"
+                        aria-pressed={active}
+                        onClick={() => toggleMultiParam("tag", need.value)}
+                        className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[60px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[112px] md:w-[122px] transition text-center select-none cursor-pointer ${
+                          active
+                            ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
+                            : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"
+                        }`}
+                      >
+                        {active && (
+                          <span className="hidden sm:flex absolute right-1 top-1 h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
+                            ✓
+                          </span>
+                        )}
+                        <div className="flex h-4 sm:h-6 items-center justify-center shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            loading="lazy"
+                            decoding="async"
+                            src={need.icon}
+                            alt=""
+                            className="h-4 w-4 sm:h-6 sm:w-6 object-contain transition-transform group-hover:scale-110"
+                          />
+                        </div>
+                        <span className={`text-[11px] sm:text-xs leading-tight whitespace-nowrap sm:whitespace-normal text-center ${active ? "font-black text-blue-900" : "font-bold text-slate-700"}`}>
+                          {need.label}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
               </div>
             )}
           </>

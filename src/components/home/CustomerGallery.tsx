@@ -8,12 +8,12 @@ import { ChevronLeft, ChevronRight, X, ExternalLink } from 'lucide-react';
 type GalleryImage = { url: string; alt: string; href?: string; enabled?: boolean };
 
 export default function CustomerGallery({
-  title,
+  title = '',
   subtitle,
   limit,
   images,
 }: {
-  title: string;
+  title?: string;
   subtitle?: string;
   limit?: number;
   images: GalleryImage[];
@@ -65,17 +65,24 @@ export default function CustomerGallery({
     el.scrollBy({ left: direction * step, behavior: 'smooth' });
   };
 
-  return <section className="py-4 md:py-6 lg:py-8" aria-label={title}>
+  const cleanTitle = title?.trim() || '';
+  const ariaHeading = cleanTitle || 'Hình ảnh thực tế tại CitiLap';
+
+  return <section className="py-4 md:py-6 lg:py-8" aria-label={ariaHeading}>
     <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
       <div className="rounded-xl lg:rounded-2xl bg-white p-3 md:p-5 shadow-xs border border-slate-200/80">
-        <div className="mb-3 md:mb-4">
-          <div className="flex items-center gap-3">
-            <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
-            <h2 className="max-w-[85%] text-center text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase tracking-tight text-slate-900 leading-snug">{title}</h2>
-            <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
+        {(cleanTitle || subtitle) && (
+          <div className="mb-3 md:mb-4">
+            {cleanTitle && (
+              <div className="flex items-center gap-3">
+                <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
+                <h2 className="max-w-[85%] text-center text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase tracking-tight text-slate-900 leading-snug">{cleanTitle}</h2>
+                <span aria-hidden="true" className="h-px flex-1 bg-slate-200" />
+              </div>
+            )}
+            {subtitle && <p className="text-center text-[12px] md:text-[13px] text-slate-500 mt-1">{subtitle}</p>}
           </div>
-          {subtitle && <p className="text-center text-[12px] md:text-[13px] text-slate-500 mt-1">{subtitle}</p>}
-        </div>
+        )}
         <div className="relative">
           <div
             ref={rail}
@@ -89,10 +96,18 @@ export default function CustomerGallery({
                 key={`${image.url}-${index}`}
                 type="button"
                 onClick={(e) => open(image, e)}
-                aria-label={`Phóng to ảnh ${index + 1}: ${image.alt || title}`}
+                aria-label={`Phóng to ảnh ${index + 1}: ${image.alt || ariaHeading}`}
                 className="group relative aspect-[16/10] w-[75%] shrink-0 snap-start overflow-hidden rounded-lg lg:rounded-xl border border-slate-200 bg-slate-100 cursor-pointer focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600 focus-visible:outline-hidden active:scale-[0.98] transition duration-150 sm:w-[calc((100%-12px)/2)] md:w-[calc((100%-24px)/3)] lg:w-[calc((100%-36px)/4)] xl:w-[calc((100%-48px)/5)]"
               >
-                <Image src={image.url} alt={image.alt} fill sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 260px" className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none" />
+                <Image
+                  src={image.url}
+                  alt={image.alt || ariaHeading}
+                  fill
+                  loading="lazy"
+                  unoptimized={image.url.startsWith('/api/library/') || image.url.startsWith('/brand/')}
+                  sizes="(max-width: 640px) 75vw, (max-width: 1024px) 33vw, 260px"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transform-none"
+                />
               </button>
             ))}
           </div>
@@ -159,7 +174,7 @@ export default function CustomerGallery({
           <X className="h-6 w-6" />
         </button>
       </div>
-      {selected && <div className="relative h-[75dvh]"><Image src={selected.url} alt={selected.alt} fill sizes="(max-width: 1170px) 94vw, 1100px" className="object-contain" /></div>}
+      {selected && <div className="relative h-[75dvh]"><Image src={selected.url} alt={selected.alt || ariaHeading} fill unoptimized={selected.url.startsWith('/api/library/') || selected.url.startsWith('/brand/')} sizes="(max-width: 1170px) 94vw, 1100px" className="object-contain" /></div>}
     </dialog>
   </section>;
 }

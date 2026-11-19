@@ -231,13 +231,13 @@ export const ctaSectionDataSchema = z.object({
 });
 
 export const videoReviewsSectionDataSchema = z.object({
-  title: text(200).default('Video review sản phẩm'),
+  title: text(200).default(''),
   subtitle: text(300).optional(),
   limit: z.number().int().min(1).max(12).optional(),
   youtubeUrl: safeUrlOrPath.optional(),
   tiktokUrl: safeUrlOrPath.optional(),
   videos: z.array(z.object({
-    title: text(200).min(1),
+    title: text(200).default(''),
     url: z.string().max(1000).refine(v => {
       if (youtubeId(v)) return true;
       try { const u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password && !u.port && ['www.tiktok.com', 'tiktok.com'].includes(u.hostname) && /^\/@[^/]+\/video\/\d+$/.test(u.pathname); } catch { return false; }
@@ -249,12 +249,12 @@ export const videoReviewsSectionDataSchema = z.object({
 });
 
 export const customerGallerySectionDataSchema = z.object({
-  title: text(200).default('Hình ảnh khách hàng tại CitiLap'),
+  title: text(200).default(''),
   subtitle: text(300).optional(),
   limit: z.number().int().min(1).max(20).optional(),
   images: z.array(z.object({
     url: safeUrlOrPath,
-    alt: text(300).min(1),
+    alt: text(300).default(''),
     href: safeUrlOrPath.optional(),
     enabled: z.boolean().optional(),
   })).max(20).default([]),

@@ -35,6 +35,7 @@ import MediaSection from '@/components/home/MediaSectionView';
 import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
 import VideoReviews from '@/components/home/VideoReviews';
 import CustomerGallery from '@/components/home/CustomerGallery';
+import LazyBelowFold from '@/components/home/LazyBelowFold';
 import { customerGallerySectionDataSchema, videoReviewsSectionDataSchema } from '@/contracts/cms/site-builder';
 import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
 import type { ProductCardProduct } from '@/components/product/ProductCard';
@@ -172,29 +173,31 @@ export default function BlockRenderer({
           case 'video_reviews': {
             const vData = videoReviewsSectionDataSchema.parse(section.data);
             blockNode = (
-              <VideoReviews
-                key={section.id}
-                title={vData.title}
-                subtitle={vData.subtitle}
-                limit={vData.limit}
-                videos={vData.videos}
-                fallbackVideos={settings?.reviewVideos}
-                youtubeChannelUrl={vData.youtubeUrl || settings?.youtubeUrl}
-                tiktokChannelUrl={vData.tiktokUrl || settings?.tiktokUrl}
-              />
+              <LazyBelowFold key={section.id} minHeight={420}>
+                <VideoReviews
+                  title={vData.title}
+                  subtitle={vData.subtitle}
+                  limit={vData.limit}
+                  videos={vData.videos}
+                  fallbackVideos={settings?.reviewVideos}
+                  youtubeChannelUrl={vData.youtubeUrl || settings?.youtubeUrl}
+                  tiktokChannelUrl={vData.tiktokUrl || settings?.tiktokUrl}
+                />
+              </LazyBelowFold>
             );
             break;
           }
           case 'customer_gallery': {
             const data = customerGallerySectionDataSchema.parse(section.data);
             blockNode = (
-              <CustomerGallery
-                key={section.id}
-                title={data.title}
-                subtitle={data.subtitle}
-                limit={data.limit}
-                images={data.images}
-              />
+              <LazyBelowFold key={section.id} minHeight={280}>
+                <CustomerGallery
+                  title={data.title}
+                  subtitle={data.subtitle}
+                  limit={data.limit}
+                  images={data.images}
+                />
+              </LazyBelowFold>
             );
             break;
           }
@@ -927,7 +930,15 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
 function NewsReviewsBlock({ section }: { section: ResolvedSectionItem }) {
   const d = newsReviewsSectionDataSchema.parse(section.data);
   const items = section.resolvedPosts ?? [];
-  return <MediaSection posts={items} title={d.title} subtitle={d.subtitle} viewAllLink={d.viewAllLink} />;
+  return (
+    <MediaSection
+      posts={items}
+      categories={section.resolvedPostCategories}
+      title={d.title}
+      subtitle={d.subtitle}
+      viewAllLink={d.viewAllLink}
+    />
+  );
 }
 
 // 8. INTRO & FEATURE STRIP BLOCK

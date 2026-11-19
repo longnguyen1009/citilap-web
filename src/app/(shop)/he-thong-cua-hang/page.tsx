@@ -241,6 +241,8 @@ export default async function StoresPage() {
                           src={photoUrl}
                           alt={`Cơ sở CitiLap Hà Nội ảnh ${idx + 1}`}
                           fill
+                          loading="lazy"
+                          unoptimized={photoUrl.startsWith('/api/library/') || photoUrl.startsWith('/brand/')}
                           sizes="(max-width: 768px) 50vw, 25vw"
                           className="object-cover group-hover:scale-105 transition duration-300"
                         />

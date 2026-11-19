@@ -472,6 +472,12 @@ export async function getLandingPageRevisions(db: D1Database, id: string) {
 
 export interface ResolvedSectionItem extends SectionItem {
   resolvedPosts?: Awaited<ReturnType<typeof publicPostList>>['items'];
+  resolvedPostCategories?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    posts: Awaited<ReturnType<typeof publicPostList>>['items'];
+  }>;
   resolvedProducts?: HomepageProduct[];
   resolvedTabs?: {
     id: string;
@@ -620,13 +626,30 @@ export async function resolveSectionsForStorefront(
         }
       } else if (data.type === 'news_reviews') {
         const effectiveLimit = data.limit && data.limit > 0 ? data.limit : 10;
-        const { items } = await publicPostList(db, {
-          ids: data.postIds,
-          categoryId: data.categoryId || undefined,
-          limit: effectiveLimit,
-        });
+        const fetchLimit = data.postIds.length === 0 && !data.categoryId ? Math.max(effectiveLimit, 30) : effectiveLimit;
+        const [{ items }, postCatsResult] = await Promise.all([
+          publicPostList(db, {
+            ids: data.postIds,
+            categoryId: data.categoryId || undefined,
+            limit: fetchLimit,
+          }),
+          data.postIds.length === 0 && !data.categoryId
+            ? db
+                .prepare('SELECT id, name, slug FROM PostCategory ORDER BY sortOrder ASC, name ASC')
+                .all<{ id: string; name: string; slug: string }>()
+                .catch(() => ({ results: [] as Array<{ id: string; name: string; slug: string }> }))
+            : Promise.resolve({ results: [] as Array<{ id: string; name: string; slug: string }> }),
+        ]);
         if (data.postIds.length) items.sort((a, b) => data.postIds.indexOf(a.id) - data.postIds.indexOf(b.id));
         resolvedSec.resolvedPosts = items.slice(0, effectiveLimit);
+        if (postCatsResult.results.length > 0) {
+          resolvedSec.resolvedPostCategories = postCatsResult.results
+            .map((cat) => ({
+              ...cat,
+              posts: items.filter((post) => post.category?.id === cat.id).slice(0, effectiveLimit),
+            }))
+            .filter((cat) => cat.posts.length > 0);
+        }
       } else if (data.type === 'featured_collection') {
         try {
           const col = await publicCollection(db, data.collectionId, pricingContext, evaluatedAt);
@@ -635,12 +658,58 @@ export async function resolveSectionsForStorefront(
           resolvedSec.resolvedCollection = undefined;
         }
       } else if (data.type === 'featured_categories') {
-        const itemCategoryIds = (data.items || []).map((i) => i.categoryId).filter(Boolean);
-        const requestedIds = [...new Set([...(data.categoryIds || []), ...itemCategoryIds])];
+        if (sec.id === 'sec-accessory-categories') {
+          try {
+            const navRow = await db
+              .prepare("SELECT published FROM NavigationStudio WHERE id = 'site'")
+              .first<{ published: string | null }>();
+            const navDoc = navRow?.published ? JSON.parse(navRow.published) : null;
+            const mainMenu = Array.isArray(navDoc?.menus?.main) ? navDoc.menus.main : [];
+            const accMenu = mainMenu.find(
+              (m: { id?: string; target?: { kind?: string; id?: string } }) =>
+                m?.id === 'nav-accessories' || m?.target?.id === 'cat-phu-kien'
+            );
+            const menuChildren: Array<{ label?: string; target?: { kind?: string; id?: string } }> = Array.isArray(accMenu?.children)
+              ? accMenu.children
+              : [];
+            if (menuChildren.length > 0) {
+              const existingItemsByCat = new Map(
+                (data.items || []).map((it) => [it.categoryId, it])
+              );
+              const syncedItems = menuChildren
+                .map((child) => {
+                  const catId = child.target?.kind === 'category' ? child.target.id : undefined;
+                  if (!catId) return null;
+                  const existing = existingItemsByCat.get(catId);
+                  const catObj = allCategories.find((c) => c.id === catId);
+                  if (!catObj && !existing) return null;
+                  return {
+                    categoryId: catId,
+                    customName: child.label || existing?.customName || catObj?.name || '',
+                    href: catObj?.href || existing?.href || '',
+                    customImage: existing?.customImage || '',
+                  };
+                })
+                .filter((x): x is NonNullable<typeof x> => Boolean(x));
+              if (syncedItems.length > 0) {
+                resolvedSec.data = {
+                  ...data,
+                  categoryIds: syncedItems.map((it) => it.categoryId),
+                  items: syncedItems,
+                };
+              }
+            }
+          } catch {
+            // Fallback to authored items if navigation is unavailable
+          }
+        }
+        const effectiveData = resolvedSec.data as typeof data;
+        const itemCategoryIds = (effectiveData.items || []).map((i) => i.categoryId).filter(Boolean);
+        const requestedIds = [...new Set([...(effectiveData.categoryIds || []), ...itemCategoryIds])];
         if (requestedIds.length > 0) {
           resolvedSec.resolvedCategories = allCategories.filter((c) => requestedIds.includes(c.id));
         } else {
-          resolvedSec.resolvedCategories = allCategories.filter((c) => !c.parentId).slice(0, data.limit || 12);
+          resolvedSec.resolvedCategories = allCategories.filter((c) => !c.parentId).slice(0, effectiveData.limit || 12);
         }
       } else if (data.type === 'featured_brands') {
         const brandLimit = data.limit && data.limit > 0 ? data.limit : 12;

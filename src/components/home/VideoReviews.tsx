@@ -1,8 +1,8 @@
 'use client';
 
-import { useRef, useState, useMemo, useEffect } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Play, PlayCircle, X, ExternalLink, ChevronRight, Sparkles, Volume2, ArrowUpRight } from 'lucide-react';
+import { Play, PlayCircle, X, ExternalLink, ChevronRight, Volume2, ArrowUpRight } from 'lucide-react';
 import { youtubeId, tiktokVideoId } from '@/contracts/cms/media';
 import { DEFAULT_REVIEW_VIDEOS } from '@/contracts/cms/settings';
 
@@ -65,8 +65,8 @@ function getEmbedUrl(url: string): string {
 }
 
 export default function VideoReviews({
-  title = 'Đánh Giá Thực Tế Qua Video',
-  subtitle = 'Tổng hợp video review chi tiết, test hiệu năng & trải nghiệm thực tế từ YouTube và TikTok',
+  title = '',
+  subtitle = '',
   limit,
   videos,
   fallbackVideos,
@@ -84,8 +84,8 @@ export default function VideoReviews({
   const dialog = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const [activeVideo, setActiveVideo] = useState<VideoReviewItem | null>(null);
-  const [spotlightVideo, setSpotlightVideo] = useState<VideoReviewItem | null>(null);
-  const [platform, setPlatform] = useState<'all' | 'youtube' | 'tiktok'>('all');
+  const [selectedSpotlight, setSpotlightVideo] = useState<VideoReviewItem | null>(null);
+  const [platform, setPlatform] = useState<'all' | 'youtube' | 'tiktok'>('tiktok');
 
   // Smart video consolidation: Ensure BOTH platforms are represented even if CMS only contains one
   const consolidatedVideos = useMemo(() => {
@@ -135,14 +135,10 @@ export default function VideoReviews({
     [consolidatedVideos]
   );
 
-  // Sync spotlight video when active list changes
-  useEffect(() => {
-    if (activeVideos.length > 0) {
-      setSpotlightVideo(activeVideos[0]);
-    } else {
-      setSpotlightVideo(null);
-    }
-  }, [platform, activeVideos]);
+  const spotlightVideo =
+    selectedSpotlight && activeVideos.some((v) => v.url === selectedSpotlight.url)
+      ? selectedSpotlight
+      : activeVideos[0] || null;
 
   const ytLink = youtubeChannelUrl || 'https://www.youtube.com/@thinkview/videos';
   const tkLink = tiktokChannelUrl || 'https://www.tiktok.com/@citilapvn';
@@ -160,23 +156,26 @@ export default function VideoReviews({
   }
 
   const isTikTokModal = activeVideo?.platform === 'tiktok';
+  const cleanTitle = title?.trim() || '';
+  const cleanSubtitle = subtitle?.trim() || '';
+  const ariaHeading = cleanTitle || 'Video review sản phẩm';
 
   return (
-    <section className="py-4 md:py-6 lg:py-8" aria-label={title}>
+    <section className="py-4 md:py-6 lg:py-8" aria-label={ariaHeading}>
       <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
         <div className="rounded-xl lg:rounded-2xl border border-slate-200/90 bg-white p-3 md:p-5 lg:p-6 shadow-xs overflow-hidden">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-2.5 md:gap-4 pb-3 md:pb-5 border-b border-slate-100">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-red-50 text-red-600 border border-red-200/60 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider mb-1.5 sm:mb-2">
-                <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                <span>Góc Review &amp; Trải Nghiệm Thực Tế</span>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 md:gap-4 pb-3 md:pb-4 border-b border-slate-100">
+            {(cleanTitle || cleanSubtitle) ? (
+              <div>
+                {cleanTitle && (
+                  <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase text-slate-900 tracking-tight leading-snug">
+                    {cleanTitle}
+                  </h2>
+                )}
+                {cleanSubtitle && <p className="text-[12px] md:text-[13px] text-slate-500 mt-0.5 md:mt-1 max-w-2xl line-clamp-2">{cleanSubtitle}</p>}
               </div>
-              <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] xl:text-[24px] font-black uppercase text-slate-900 tracking-tight leading-snug">
-                {title}
-              </h2>
-              {subtitle && <p className="text-[12px] md:text-[13px] text-slate-500 mt-0.5 md:mt-1 max-w-2xl line-clamp-2">{subtitle}</p>}
-            </div>
+            ) : <div />}
 
             {/* Filter Tabs & Channel Links */}
             <div className="flex flex-wrap items-center gap-2 max-w-full">
@@ -251,9 +250,9 @@ export default function VideoReviews({
             </div>
           ) : platform === 'tiktok' ? (
             /* Dedicated TikTok Reels / Shorts Grid View (Portrait 9:16) */
-            <div className="pt-3.5 sm:pt-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
-                {activeVideos.map((v, i) => (
+            <div className="pt-3.5 sm:pt-5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
+                {activeVideos.slice(0, 5).map((v, i) => (
                   <button
                     key={`${v.url}-${i}`}
                     type="button"
@@ -263,7 +262,7 @@ export default function VideoReviews({
                     {/* Thumbnail Image */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={v.thumbnail || '/brand/store-photo-01.webp'}
+                      src={v.thumbnail || '/api/library/citilap-store-photo-01'}
                       alt=""
                       loading="lazy"
                       className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none"
