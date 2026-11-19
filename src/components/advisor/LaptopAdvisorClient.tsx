@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
 import Breadcrumb from "@/components/layout/Breadcrumb";
-import { trackStorefront } from "@/lib/storefront-metrics";
 import { businessProfile } from "@/config/business-profile";
 import type { AdvisorInput } from "@/contracts/catalog/advisor";
 import type { adviseLaptops } from "@/server/services/advisor.service";
@@ -70,12 +69,10 @@ export default function LaptopAdvisorClient({
   initialInput,
   initialResults,
   initialError,
-  zaloUrl,
 }: LaptopAdvisorClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  const effectiveZaloBase = (zaloUrl || businessProfile.socialProfiles.zalo).replace(/\/$/, "");
   const hotline = businessProfile.displayPhone;
   const hotlineTel = `tel:${businessProfile.phone}`;
 
@@ -332,71 +329,14 @@ export default function LaptopAdvisorClient({
               </div>
             </div>
           ) : initialResults.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 items-stretch">
-              {initialResults.map(({ product, reasons, limitation }, idx) => {
-                const rankLabels = ["#1 Tối ưu nhất", "#2 Đáng mua", "#3 Nâng cao"];
-                return (
-                  <article
-                    key={product.id}
-                    className="min-w-0 flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs hover:shadow-md transition-shadow"
-                  >
-                    {/* Top Rank Strip */}
-                    <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
-                      <span
-                        className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          idx === 0
-                            ? "bg-amber-100 text-amber-900 border border-amber-200"
-                            : "bg-blue-50 text-blue-800 border border-blue-200/70"
-                        }`}
-                      >
-                        {rankLabels[idx] || `#${idx + 1} Đề xuất`}
-                      </span>
-                    </div>
-
-                    {/* ProductCard with intrinsic height (overrides h-full to prevent overlap) */}
-                    <div className="border-b border-slate-100">
-                      <ProductCard
-                        product={product}
-                        className="h-auto! border-0! rounded-none! shadow-none! hover:shadow-none! hover:translate-y-0!"
-                      />
-                    </div>
-
-                    {/* Evaluation & Zalo CTA */}
-                    <div className="p-3.5 flex flex-col flex-1 gap-3 bg-slate-50/40">
-                      <ul className="space-y-1 text-xs text-slate-700">
-                        {reasons.map((reason, rIdx) => (
-                          <li key={rIdx} className="flex items-start gap-1.5">
-                            <span className="text-emerald-600 font-bold shrink-0">✓</span>
-                            <span>{reason}</span>
-                          </li>
-                        ))}
-                      </ul>
-
-                      {limitation && (
-                        <p className="text-[11px] text-amber-900 bg-amber-50/80 px-2.5 py-2 rounded-lg border border-amber-200/60 leading-relaxed">
-                          <strong className="font-semibold">Lưu ý: </strong>
-                          {limitation}
-                        </p>
-                      )}
-
-                      <a
-                        href={`${effectiveZaloBase}?text=${encodeURIComponent(
-                          `Chào CitiLap, mình đang xem laptop [${product.name}] giá ${formatCurrency(
-                            typeof product.price === "number" ? product.price : parseInt(String(product.price), 10)
-                          )} theo công cụ tư vấn, cần hỗ trợ thêm thông tin máy.`
-                        )}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => trackStorefront("contact_click")}
-                        className="mt-auto w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Chat Zalo tư vấn máy này</span>
-                      </a>
-                    </div>
-                  </article>
-                );
-              })}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 md:gap-3 lg:gap-4">
+              {initialResults.map(({ product }, idx) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  rank={idx + 1}
+                />
+              ))}
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 text-center space-y-4 max-w-xl mx-auto">

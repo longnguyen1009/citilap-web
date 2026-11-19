@@ -61,7 +61,7 @@ export async function adviseLaptops(input: AdvisorInput) {
     const facts = published ? Object.fromEntries((published.specs || []).map((s: { key: string; value: string }) => [s.key, s.value])) : JSON.parse(row.specs || '{}');
     const match = matchLaptop(input, product, facts);
     return match ? [{ product, ...match }] : [];
-  }).sort((a, b) => b.score - a.score || a.product.price - b.product.price || a.product.id.localeCompare(b.product.id)).slice(0, 3);
+  }).sort((a, b) => b.score - a.score || a.product.price - b.product.price || a.product.id.localeCompare(b.product.id)).slice(0, 10);
 
   // Evict expired entries if cache map grows
   if (advisorCache.size > 200) {
