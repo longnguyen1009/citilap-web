@@ -964,7 +964,7 @@ export default function SearchListingContainer({
                         type="button"
                         aria-pressed={active}
                         onClick={() => toggleMultiParam("tag", need.value)}
-                        className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[60px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[112px] md:w-[122px] transition text-center select-none cursor-pointer ${
+                        className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[58px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[96px] md:w-[104px] transition text-center select-none cursor-pointer ${
                           active
                             ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
                             : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"

@@ -297,16 +297,8 @@ export default function CategoryCatalog({
   const pages = [...new Set([1, result.page - 1, result.page, result.page + 1, result.totalPages])].filter(page => page > 0 && page <= result.totalPages).sort((a, b) => a - b);
   const currentUrlKey = url(params);
 
-  const rootSlugLower = rootCategory.slug.toLowerCase();
   const visibleNeeds = STANDARD_NEEDS.filter((need) => {
     const slugLower = category.slug.toLowerCase();
-    if (rootSlugLower.includes("gaming")) {
-      if (["van-phong", "doanh-nhan", "sinh-vien"].includes(need.key)) return false;
-    } else if (rootSlugLower.includes("van-phong")) {
-      if (need.key === "gaming") return false;
-    } else if (rootSlugLower.includes("workstation") || rootSlugLower.includes("do-hoa")) {
-      if (["gaming", "van-phong", "sinh-vien"].includes(need.key)) return false;
-    }
     if (need.key === "gaming" && slugLower.includes("gaming")) return false;
     if (need.key === "van-phong" && slugLower.includes("van-phong")) return false;
     if (need.key === "do-hoa" && (slugLower.includes("workstation") || slugLower.includes("do-hoa"))) return false;
@@ -518,93 +510,60 @@ export default function CategoryCatalog({
           </Link>
         </div>
 
-        {/* Phần Phân loại con Cấp 2 (Trên Root: thẻ hình ảnh lớn; khi đã vào Cấp 2/3/4: thanh pill 1 dòng gọn gàng giữ sản phẩm trên màn hình) */}
+        {/* Phần Phân loại con Cấp 2 (Dòng máy của danh mục cha - vuốt ngang mượt trên mobile, wrap trên desktop) */}
         {level2Categories.length > 0 ? (
-          isRoot ? (
-            <nav aria-label="Chọn hãng hoặc nhóm con" className="flex flex-nowrap md:flex-wrap items-stretch gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
-              {level2Categories.map(sub => {
-                const checked = selected("subcat", sub.slug) || selected("subcat", sub.id);
-                const subImage = getSubcategoryImage(sub);
-                const targetHref = toggle("subcat", sub.slug);
+          <nav aria-label="Chọn dòng máy" className="flex flex-nowrap md:flex-wrap items-center gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
+            {level2Categories.map(sub => {
+              const checked = isRoot
+                ? (selected("subcat", sub.slug) || selected("subcat", sub.id))
+                : (currentLevel2?.id === sub.id || currentLevel2?.slug === sub.slug);
+              const subImage = getSubcategoryImage(sub);
+              const targetHref = isRoot
+                ? toggle("subcat", sub.slug)
+                : currentLevel2?.id === sub.id ? rootCategory.href : sub.href;
 
-                return (
-                  <Link
-                    key={sub.id}
-                    href={targetHref}
-                    aria-current={checked ? "true" : undefined}
-                    title={sub.name}
-                    className={`group relative flex w-[92px] sm:w-[118px] md:w-[130px] min-h-[66px] sm:min-h-[76px] flex-col items-center justify-between rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none shrink-0 snap-start ${
-                      checked
-                        ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25"
-                        : "border-slate-200 bg-slate-50/40 text-slate-700 hover:border-blue-400 hover:bg-white hover:shadow-xs"
-                    }`}
-                  >
-                    {checked && (
-                      <span className="absolute right-1 top-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
-                        ✓
+              return (
+                <Link
+                  key={sub.id}
+                  href={targetHref}
+                  aria-current={checked ? "true" : undefined}
+                  title={sub.name}
+                  className={`group relative flex w-[78px] sm:w-[104px] md:w-[114px] min-h-[58px] sm:min-h-[72px] flex-col items-center justify-center rounded-lg md:rounded-xl border p-1.5 sm:p-2 transition text-center select-none shrink-0 snap-start ${
+                    checked
+                      ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 text-blue-900 shadow-xs ring-2 ring-blue-500/25"
+                      : "border-slate-200 bg-slate-50/40 text-slate-700 hover:border-blue-400 hover:bg-white hover:shadow-xs"
+                  }`}
+                >
+                  {checked && (
+                    <span className="absolute right-1 top-1 flex h-3.5 w-3.5 sm:h-4 sm:w-4 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] sm:text-[10px] font-black">
+                      ✓
+                    </span>
+                  )}
+
+                  <div className="flex h-5 sm:h-7 items-center justify-center">
+                    {subImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img loading="lazy" decoding="async"
+                        src={subImage}
+                        alt={sub.name}
+                        className="max-h-5 sm:max-h-7 max-w-[54px] sm:max-w-[74px] object-contain transition-transform group-hover:scale-105"
+                      />
+                    ) : (
+                      <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-700 uppercase">
+                        {sub.name.slice(0, 6)}
                       </span>
                     )}
+                  </div>
 
-                    <div className="flex h-6 sm:h-7 items-center justify-center">
-                      {subImage ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img loading="lazy" decoding="async"
-                          src={subImage}
-                          alt=""
-                          width={56}
-                          height={28}
-                          className="max-h-6 sm:max-h-7 max-w-[56px] sm:max-w-[76px] object-contain transition-transform group-hover:scale-105"
-                        />
-                      ) : (
-                        <span className="text-[11px] sm:text-xs font-black tracking-wider text-slate-700 uppercase">
-                          {sub.name.slice(0, 6)}
-                        </span>
-                      )}
-                    </div>
-
-                    <span className={`text-[10px] sm:text-[11px] font-extrabold uppercase tracking-tight leading-tight text-center line-clamp-2 max-w-full px-0.5 ${
-                      checked ? "text-blue-900" : "text-slate-800"
-                    }`}>
-                      {sub.name}
-                    </span>
-                  </Link>
-                );
-              })}
-            </nav>
-          ) : (
-            <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:flex-wrap">
-              <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide shrink-0">
-                Hãng:
-              </span>
-              <nav aria-label="Chuyển hãng" className="flex flex-nowrap md:flex-wrap items-center gap-1.5 shrink-0 md:shrink">
-                {level2Categories.map(sub => {
-                  const checked = currentLevel2?.id === sub.id || currentLevel2?.slug === sub.slug;
-                  const subImage = getSubcategoryImage(sub);
-                  const targetHref = checked ? rootCategory.href : sub.href;
-
-                  return (
-                    <Link
-                      key={sub.id}
-                      href={targetHref}
-                      aria-current={checked ? "true" : undefined}
-                      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition whitespace-nowrap shrink-0 ${
-                        checked
-                          ? "border-blue-600 bg-blue-600 text-white shadow-xs"
-                          : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-blue-400 hover:bg-white"
-                      }`}
-                    >
-                      {subImage && !checked && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img loading="lazy" decoding="async" src={subImage} alt="" width={18} height={14} className="h-3.5 w-4.5 object-contain shrink-0 rounded-2xs" />
-                      )}
-                      <span>{sub.name}</span>
-                      {checked && <span className="text-[10px] font-black">✕</span>}
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-          )
+                  <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-tight mt-1 line-clamp-2 leading-tight text-center max-w-full px-0.5 ${
+                    checked ? "text-blue-900" : "text-slate-800"
+                  }`}>
+                    {sub.name}
+                  </span>
+                </Link>
+              );
+            })}
+          </nav>
         ) : facets.brands.length > 0 ? (
           /* Fallback cho danh mục không có phân loại con: hiển thị thương hiệu kèm số lượng thật */
           <nav aria-label="Chọn thương hiệu" className="flex flex-nowrap md:flex-wrap items-center gap-2 sm:gap-2.5 overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0">
@@ -748,88 +707,54 @@ export default function CategoryCatalog({
           <div className="border-t border-slate-100" />
         )}
 
-        {/* Phần Nhu cầu sử dụng (ẩn thẻ trùng & thu gọn thành pill 1 dòng khi đang ở cấp sâu để ưu tiên hiển thị sản phẩm) */}
+        {/* Phần Nhu cầu sử dụng (ẩn thẻ trùng với danh mục hiện tại) */}
         {!isAccessory && visibleNeeds.length > 0 && (
-          isRoot ? (
-            <div className="space-y-1.5">
-              <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Sparkles size={14} className="text-blue-600 shrink-0" aria-hidden="true" />
-                <span>Lọc theo nhu cầu</span>
-              </h2>
+          <div className="space-y-1.5">
+            <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Sparkles size={14} className="text-blue-600 shrink-0" aria-hidden="true" />
+              <span>Lọc theo nhu cầu</span>
+            </h2>
 
-              <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:flex-wrap gap-1.5 sm:gap-2">
-                {visibleNeeds.map((need) => {
-                  const checked = selected("tag", need.key);
-                  return (
-                    <Link
-                      key={need.key}
-                      href={toggle("tag", need.key)}
-                      scroll={false}
-                      aria-current={checked ? "true" : undefined}
-                      className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[60px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[112px] md:w-[122px] transition text-center select-none ${
-                        checked
-                          ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
-                          : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"
-                      }`}
-                    >
-                      {checked && (
-                        <span className="hidden sm:flex absolute right-1 top-1 h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
-                          ✓
-                        </span>
-                      )}
-
-                      <div className="flex h-4 sm:h-6 items-center justify-center shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img loading="lazy" decoding="async"
-                          src={need.image}
-                          alt=""
-                          width={24}
-                          height={24}
-                          className="max-h-4 sm:max-h-6 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs"
-                        />
-                      </div>
-
-                      <span className={`text-[11px] sm:text-xs font-bold leading-tight whitespace-nowrap sm:line-clamp-2 max-w-full ${
-                        checked ? "text-blue-900 font-black" : "text-slate-800"
-                      }`}>
-                        {need.label}
+            <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap overflow-x-auto md:overflow-visible overscroll-x-contain snap-x snap-mandatory hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:pb-0 md:flex-wrap gap-1.5 sm:gap-2">
+              {visibleNeeds.map((need) => {
+                const checked = selected("tag", need.key);
+                return (
+                  <Link
+                    key={need.key}
+                    href={toggle("tag", need.key)}
+                    scroll={false}
+                    aria-current={checked ? "true" : undefined}
+                    className={`group relative flex shrink-0 snap-start min-h-10 sm:min-h-[58px] flex-row sm:flex-col items-center justify-center gap-1.5 sm:gap-1 rounded-xl border py-1.5 px-2.5 sm:p-2 sm:w-[96px] md:w-[104px] transition text-center select-none ${
+                      checked
+                        ? "border-blue-600 bg-gradient-to-b from-blue-50/90 to-indigo-50/60 shadow-xs ring-2 ring-blue-500/25"
+                        : "border-slate-200 bg-slate-50/40 hover:border-blue-400 hover:bg-white hover:shadow-xs"
+                    }`}
+                  >
+                    {checked && (
+                      <span className="hidden sm:flex absolute right-1 top-1 h-3.5 w-3.5 items-center justify-center rounded-full bg-blue-600 text-white shadow-xs z-10 text-[9px] font-black">
+                        ✓
                       </span>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 overflow-x-auto hide-scrollbar -mx-1 px-1 pb-0.5 md:mx-0 md:px-0 md:flex-wrap pt-1.5 border-t border-slate-100">
-              <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wide flex items-center gap-1 shrink-0">
-                <Sparkles size={12} className="text-blue-600 shrink-0" aria-hidden="true" />
-                Nhu cầu:
-              </span>
-              <nav aria-label="Chọn nhu cầu" className="flex flex-nowrap md:flex-wrap items-center gap-1.5 shrink-0 md:shrink">
-                {visibleNeeds.map((need) => {
-                  const checked = selected("tag", need.key);
-                  return (
-                    <Link
-                      key={need.key}
-                      href={toggle("tag", need.key)}
-                      scroll={false}
-                      aria-current={checked ? "true" : undefined}
-                      className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition whitespace-nowrap shrink-0 ${
-                        checked
-                          ? "border-blue-600 bg-blue-600 text-white shadow-xs"
-                          : "border-slate-200 bg-slate-50/70 text-slate-700 hover:border-blue-400 hover:bg-white"
-                      }`}
-                    >
+                    )}
+
+                    <div className="flex h-4 sm:h-6 items-center justify-center shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img loading="lazy" decoding="async" src={need.image} alt="" width={16} height={16} className="h-4 w-4 object-contain shrink-0" />
-                      <span>{need.label}</span>
-                      {checked && <span className="text-[10px] font-black">✓</span>}
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-          )
+                      <img loading="lazy" decoding="async"
+                        src={need.image}
+                        alt={need.label}
+                        className="max-h-4 sm:max-h-6 w-auto object-contain transition-transform group-hover:scale-110 duration-200 drop-shadow-2xs"
+                      />
+                    </div>
+
+                    <span className={`text-[11px] sm:text-xs font-bold leading-tight whitespace-nowrap sm:whitespace-normal sm:line-clamp-2 max-w-full ${
+                      checked ? "text-blue-900 font-black" : "text-slate-800"
+                    }`}>
+                      {need.label}
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
         )}
 
       </section>
