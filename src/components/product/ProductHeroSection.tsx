@@ -146,7 +146,7 @@ export default function ProductHeroSection({
     null;
   const [selectedVariant, setSelectedVariant] = useState<HeroVariantItem | null>(initialVariant);
   const [showAllVariants, setShowAllVariants] = useState(false);
-  const hiddenVariantCount = variants.filter((item, index) => index >= 4 && item.id !== selectedVariant?.id).length;
+  const hiddenVariantCount = variants.filter((item, index) => index >= 6 && item.id !== selectedVariant?.id).length;
   const selectedProductName = selectedVariant?.productName || productName;
 
   // 2. Color state
@@ -447,7 +447,7 @@ export default function ProductHeroSection({
                   {totalPrice.toLocaleString("vi-VN")}₫
                 </span>
                 {totalOriginalPrice && totalOriginalPrice > totalPrice && (
-                  <span className="text-sm sm:text-base text-slate-400 line-through tabular-nums">
+                  <span className="text-sm sm:text-base text-slate-600 line-through tabular-nums">
                     {totalOriginalPrice.toLocaleString("vi-VN")}₫
                   </span>
                 )}
@@ -499,7 +499,7 @@ export default function ProductHeroSection({
                       type="button"
                       onClick={() => handleSelectVariant(item)}
                       aria-pressed={isSelected}
-                      className={`relative min-w-0 min-h-11 text-left px-3 py-2 rounded-lg border transition-colors ${!showAllVariants && index >= 4 && !isSelected ? 'hidden' : 'flex'} flex-col gap-0.5 cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
+                      className={`relative min-w-0 min-h-11 text-left px-3 py-2 rounded-lg border transition-colors ${!showAllVariants && index >= 6 && !isSelected ? 'hidden' : 'flex'} flex-col gap-0.5 cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 ${
                         item.isFlashSale
                           ? isSelected
                             ? "border-rose-600 bg-rose-50 text-rose-950 ring-1 ring-rose-600"
@@ -542,7 +542,7 @@ export default function ProductHeroSection({
                           {item.price.toLocaleString("vi-VN")}₫
                         </span>
                         {item.originalPrice && item.originalPrice > item.price && (
-                          <span className="text-[10px] sm:text-xs text-slate-400 line-through tabular-nums">
+                          <span className="text-[10px] sm:text-xs text-slate-600 line-through tabular-nums">
                             {item.originalPrice.toLocaleString("vi-VN")}₫
                           </span>
                         )}
@@ -747,17 +747,53 @@ export default function ProductHeroSection({
               </div>
             )}
 
-            {/* Đặt lịch hẹn xem máy trực tiếp tại Showroom */}
-            <Link
-              href={`/lien-he?intent=appointment&product=${encodeURIComponent(productId)}`}
-              className="w-full min-h-11 py-2.5 px-3.5 rounded-xl border border-slate-200 hover:border-blue-300 bg-slate-50/80 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 text-xs sm:text-sm font-semibold transition flex items-center justify-between gap-2"
-            >
-              <span className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>Đặt lịch hẹn xem & kiểm tra máy trực tiếp tại Showroom (HN / Bắc Ninh)</span>
-              </span>
-              <ArrowRight className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-            </Link>
+            {/* Tình trạng showroom & đặt lịch xem máy trực tiếp */}
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/80 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-bold text-slate-900">Xem &amp; test máy trực tiếp tại 2 Showroom</span>
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-bold text-emerald-700 shrink-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                  {orderable ? "Đang mở cửa" : "Liên hệ kiểm kho"}
+                </span>
+              </div>
+              <ul className="space-y-1 text-[11px] sm:text-xs text-slate-700">
+                <li className="flex items-start justify-between gap-2">
+                  <span>
+                    <strong className="text-slate-900">Hà Nội:</strong>{" "}
+                    {settings?.addressHanoi || businessProfile.locations[0]?.address}
+                  </span>
+                  <a
+                    href={`tel:${(settings?.storePhone || businessProfile.phone).replace(/[^+\d]/g, "")}`}
+                    className="font-bold text-blue-700 hover:underline shrink-0 tabular-nums"
+                  >
+                    {settings?.storePhone || businessProfile.displayPhone}
+                  </a>
+                </li>
+                <li className="flex items-start justify-between gap-2">
+                  <span>
+                    <strong className="text-slate-900">Bắc Ninh:</strong>{" "}
+                    {settings?.addressBacNinh || businessProfile.locations[1]?.address}
+                  </span>
+                  <a
+                    href={`tel:${(settings?.storePhoneBacNinh || businessProfile.locations[1]?.phone || businessProfile.phone).replace(/[^+\d]/g, "")}`}
+                    className="font-bold text-blue-700 hover:underline shrink-0 tabular-nums"
+                  >
+                    {settings?.storePhoneBacNinh || businessProfile.locations[1]?.displayPhone}
+                  </a>
+                </li>
+              </ul>
+              <Link
+                href={`/lien-he?intent=appointment&product=${encodeURIComponent(productId)}`}
+                prefetch={false}
+                className="w-full min-h-11 py-2 px-3 rounded-lg border border-blue-200 bg-white hover:bg-blue-50/70 text-blue-700 text-xs font-bold transition flex items-center justify-between gap-2"
+              >
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Đặt lịch hẹn giữ máy &amp; test trực tiếp tại Showroom</span>
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 shrink-0 text-blue-600" />
+              </Link>
+            </div>
 
             {/* Hotline tư vấn */}
             <div className="flex items-center justify-center gap-2 pt-1 text-xs sm:text-sm text-slate-600">

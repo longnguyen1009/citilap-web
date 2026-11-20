@@ -686,19 +686,26 @@ export async function addVideo(db: D1Database, input: unknown) {
   return mediaDetail(db, row!.id);
 }
 
-export async function imageOptimization(env: MediaEnvironment, id: string, retry = false) {
+export async function imageOptimization(
+  env: MediaEnvironment,
+  id: string,
+  retry = false,
+  preset: 'thumb' | 'icon' = 'thumb',
+) {
   const row = await getAsset(env.DB, id);
   const applicable = row.provider === 'R2' && row.storageKey?.startsWith('library/') &&
     row.kind === 'IMAGE' && RASTER_MIME.includes(row.mimeType || '');
   if (!applicable) return { status: 'NOT_APPLICABLE', bytes: null };
-  const key = `library/${id}_thumb-v2.webp`;
+  const key = preset === 'icon' ? `library/${id}_icon-v2.webp` : `library/${id}_thumb-v2.webp`;
+  const targetWidth = preset === 'icon' ? 128 : 480;
+  const targetQuality = preset === 'icon' ? 78 : 75;
   let head = await env.PRODUCT_MEDIA.head(key);
   if (!head && retry) {
     if (!env.IMAGES) throw new MediaError('Dịch vụ tối ưu ảnh chưa sẵn sàng. Thử lại sau.', 503);
     const original = await env.PRODUCT_MEDIA.get(row.storageKey!);
     if (!original) throw new MediaError('Không tìm thấy ảnh gốc.', 404);
     const output = await env.IMAGES.input(original.body)
-      .transform({ width: 480, fit: 'scale-down' }).output({ format: 'image/webp', quality: 75 });
+      .transform({ width: targetWidth, fit: 'scale-down' }).output({ format: 'image/webp', quality: targetQuality });
     const response = output.response();
     const bytes = Buffer.from(await response.arrayBuffer());
     if (!response.ok || detectImageSignature(bytes)?.mime !== 'image/webp') throw new MediaError('Không thể tạo ảnh thu nhỏ.', 503);
@@ -756,22 +763,32 @@ export async function serveLibraryImage(env: MediaEnvironment, id: string, reque
   if (row.provider !== 'R2' || !row.storageKey?.startsWith('library/')) throw new MediaError('Không tìm thấy tệp.', 404);
 
   const url = new URL(request.url);
-  const isThumb = url.searchParams.get('size') === 'thumb' || url.searchParams.get('variant') === 'thumb' || url.searchParams.get('w') === 'thumb';
+  const sizeParam = url.searchParams.get('size');
+  const isIcon = sizeParam === 'icon';
+  const isThumb = isIcon || sizeParam === 'thumb' || url.searchParams.get('variant') === 'thumb' || url.searchParams.get('w') === 'thumb';
 
   let object = null;
   let pendingOptimization = false;
   let contentType = row.mimeType || 'application/octet-stream';
 
   if (isThumb && row.kind === 'IMAGE' && RASTER_MIME.includes(row.mimeType || '')) {
-    const versioned = url.searchParams.get('v') === '2';
-    const thumbKey = versioned ? `library/${id}_thumb-v2.webp` : row.storageKey.replace(/(\.[a-zA-Z0-9]+)$/, '_thumb$1');
+    const versioned = url.searchParams.get('v') === '2' || isIcon;
+    const preset: 'thumb' | 'icon' = isIcon ? 'icon' : 'thumb';
+    const thumbKey = isIcon
+      ? `library/${id}_icon-v2.webp`
+      : versioned
+        ? `library/${id}_thumb-v2.webp`
+        : row.storageKey.replace(/(\.[a-zA-Z0-9]+)$/, '_thumb$1');
     object = await env.PRODUCT_MEDIA.get(thumbKey);
     if (!object && versioned) {
       try {
-        await imageOptimization(env, id, true);
+        await imageOptimization(env, id, true, preset);
         object = await env.PRODUCT_MEDIA.get(thumbKey);
       } catch { /* Keep the original usable; never cache this fallback as immutable. */ }
       pendingOptimization = !object;
+    }
+    if (!object && isIcon) {
+      object = await env.PRODUCT_MEDIA.get(`library/${id}_thumb-v2.webp`);
     }
     if (object) {
       contentType = object.httpMetadata?.contentType || 'image/webp';

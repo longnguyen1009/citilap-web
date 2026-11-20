@@ -89,7 +89,7 @@ export function ProductAccessoriesCombo({
                   +{item.salePrice.toLocaleString('vi-VN')}₫
                 </div>
                 {fallbackOriginalPrice > item.salePrice && (
-                  <div className="text-[11px] sm:text-xs text-slate-400 line-through tabular-nums">
+                  <div className="text-[11px] sm:text-xs text-slate-600 line-through tabular-nums">
                     {fallbackOriginalPrice.toLocaleString('vi-VN')}₫
                   </div>
                 )}

@@ -191,7 +191,7 @@ export default function CategoryProductBlock({
                   item.image &&
                   item.image.startsWith("/api/library/") &&
                   !item.image.includes("?")
-                    ? `${item.image}?size=thumb&v=2`
+                    ? `${item.image}?size=icon&v=2`
                     : item.image;
 
                 return (
@@ -219,7 +219,7 @@ export default function CategoryProductBlock({
                             loading={index < eagerLimit ? "eager" : "lazy"}
                             decoding="async"
                             unoptimized={
-                              thumbSrc.includes("size=thumb") ||
+                              thumbSrc.includes("size=") ||
                               thumbSrc.startsWith("/brand/")
                             }
                             className="w-full h-full object-contain transition-transform duration-300 ease-out group-hover:scale-110 group-hover:-rotate-3 motion-reduce:group-hover:scale-100 motion-reduce:group-hover:rotate-0 mix-blend-multiply"

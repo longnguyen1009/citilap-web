@@ -162,7 +162,7 @@ export default function ProductTabs({
                   className={`${visCls} min-h-11 md:min-h-13 flex-1 shrink-0 items-center justify-center rounded-t-xl md:rounded-t-2xl border-2 px-2 md:px-3.5 py-1 md:py-1.5 text-[12px] md:text-[14px] lg:text-[16px] font-black uppercase whitespace-nowrap transition cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden ${
                     safeIndex === index
                       ? 'border-blue-500 border-b-blue-50 bg-blue-50 text-white'
-                      : 'border-slate-200/80 border-b-blue-500 bg-slate-100/90 text-[#0284c7] shadow-[inset_0_-2px_5px_rgba(0,0,0,0.03)] hover:bg-blue-50/70 hover:text-blue-700'
+                      : 'border-slate-200/80 border-b-blue-500 bg-slate-100/90 text-[#0369a1] shadow-[inset_0_-2px_5px_rgba(0,0,0,0.03)] hover:bg-blue-50/70 hover:text-blue-800'
                   }`}
                 >
                   {safeIndex === index ? (
@@ -204,6 +204,7 @@ export default function ProductTabs({
               <div className="mt-3 md:mt-4 text-center">
                 <Link
                   href={tab.href}
+                  prefetch={false}
                   className="min-h-11 inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-5 md:px-6 py-2.5 text-[12px] md:text-[14px] font-bold uppercase text-white hover:bg-blue-700 active:scale-95 transition duration-150 shadow-xs focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                 >
                   Xem {tab.label}

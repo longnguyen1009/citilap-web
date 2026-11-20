@@ -22,6 +22,8 @@ import FlashSaleSection from "@/components/home/FlashSaleSection";
 import ProductSection from "@/components/home/ProductSection";
 import MediaSection from "@/components/home/MediaSection";
 import VideoReviews from "@/components/home/VideoReviews";
+import CustomerGallery from "@/components/home/CustomerGallery";
+import LazyBelowFold from "@/components/home/LazyBelowFold";
 import TestimonialSection from "@/components/home/TestimonialSection";
 import ContactSection from "@/components/home/ContactSection";
 import BrandSection from "@/components/home/BrandSection";
@@ -117,8 +119,38 @@ export default async function Home() {
       : {}),
   };
 
+  const defaultShowroomGallery = [
+    {
+      url: "/brand/store-photo-01.webp",
+      alt: "Không gian trải nghiệm và bàn giao laptop tại showroom CitiLap Hà Nội",
+      href: "/he-thong-cua-hang",
+    },
+    {
+      url: "/brand/store-photo-02.webp",
+      alt: "Khách hàng kiểm tra và chọn mua laptop trực tiếp tại CitiLap",
+      href: "/he-thong-cua-hang",
+    },
+    {
+      url: "/brand/store-photo-03.webp",
+      alt: "Khu vực trưng bày Laptop Gaming, Ultrabook và Workstation tại CitiLap",
+      href: "/he-thong-cua-hang",
+    },
+    {
+      url: "/brand/store-photo-04.webp",
+      alt: "Kỹ thuật viên CitiLap hỗ trợ test máy và cài đặt phần mềm cho khách hàng",
+      href: "/he-thong-cua-hang",
+    },
+  ];
+
   // If a CMS homepage is published, render dynamic sections via BlockRenderer
   if (cmsHomepage && cmsHomepage.sections && cmsHomepage.sections.length > 0) {
+    const hasVideoReviewsBlock = cmsHomepage.sections.some(
+      (s) => s.enabled && s.type === "video_reviews"
+    );
+    const hasCustomerGalleryBlock = cmsHomepage.sections.some(
+      (s) => s.enabled && s.type === "customer_gallery"
+    );
+
     return (
       <div className="bg-surface-subtle min-h-screen">
         <script
@@ -131,6 +163,27 @@ export default async function Home() {
           flashSale={<FlashSaleSection settings={settings} initialCampaigns={hotSaleCampaigns} />}
         />
         <div className="defer-offscreen">
+          {!hasVideoReviewsBlock && (
+            <LazyBelowFold minHeight={420}>
+              <VideoReviews
+                title="Góc Review & Trải Nghiệm Thực Tế"
+                subtitle="Video mở hộp, test hiệu năng và tư vấn chọn laptop thực tế từ đội ngũ CitiLap"
+                videos={settings?.reviewVideos ?? []}
+                fallbackVideos={settings?.reviewVideos}
+                youtubeChannelUrl={settings?.youtubeUrl}
+                tiktokChannelUrl={settings?.tiktokUrl}
+              />
+            </LazyBelowFold>
+          )}
+          {!hasCustomerGalleryBlock && (
+            <LazyBelowFold minHeight={280}>
+              <CustomerGallery
+                title="Hình Ảnh Thực Tế Tại Showroom CitiLap"
+                subtitle="Không gian trải nghiệm, kiểm định kỹ thuật và bàn giao máy trực tiếp tại Hà Nội & Bắc Ninh"
+                images={defaultShowroomGallery}
+              />
+            </LazyBelowFold>
+          )}
           <TestimonialSection
             testimonials={settings?.testimonials ?? []}
             sourceUrl={settings?.testimonialsSourceUrl}

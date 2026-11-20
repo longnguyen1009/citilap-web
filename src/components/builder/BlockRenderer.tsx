@@ -248,26 +248,18 @@ function BannerBlock({ data }: { data: any }) {
 
   if (layout === 'fullwidth') {
     const imageContent = (
-      <>
+      <picture className="contents">
         {hasSeparateMobileImage && (
-          <Image
-            src={mobileImageUrl}
-            alt={mobileTitle || data.title || 'Banner'}
-            fill
-            unoptimized={mobileImageUrl.startsWith('/brand/')}
-            className="md:hidden object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none"
-            sizes="100vw"
-          />
+          <source media="(max-width: 767px)" srcSet={mobileImageUrl} />
         )}
-        <Image
+        <img
           src={imageUrl}
           alt={data.title || 'Banner'}
-          fill
-          unoptimized={imageUrl.startsWith('/brand/')}
-          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none`}
-          sizes="(max-width: 1280px) 100vw, 1280px"
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 hover:scale-[1.02] motion-reduce:transform-none"
         />
-      </>
+      </picture>
     );
 
     return (
@@ -275,7 +267,7 @@ function BannerBlock({ data }: { data: any }) {
         <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 py-2 md:py-4">
           <div className="relative w-full h-[140px] sm:h-[168px] md:h-[200px] lg:h-[236px] rounded-lg lg:rounded-xl overflow-hidden shadow-xs border border-slate-200/80">
             {data.link ? (
-              <Link href={data.link} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden" aria-label={data.title || 'Banner'}>
+              <Link href={data.link} prefetch={false} className="block relative w-full h-full cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden" aria-label={data.title || 'Banner'}>
                 {imageContent}
               </Link>
             ) : (
@@ -289,26 +281,18 @@ function BannerBlock({ data }: { data: any }) {
 
   if (layout === 'split') {
     const splitImages = (
-      <>
+      <picture className="contents">
         {hasSeparateMobileImage && (
-          <Image
-            src={mobileImageUrl}
-            alt={mobileTitle || data.title || 'Banner'}
-            fill
-            unoptimized={mobileImageUrl.startsWith('/brand/')}
-            className="md:hidden object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none"
-            sizes="100vw"
-          />
+          <source media="(max-width: 767px)" srcSet={mobileImageUrl} />
         )}
-        <Image
+        <img
           src={imageUrl}
           alt={data.title || 'Banner'}
-          fill
-          unoptimized={imageUrl.startsWith('/brand/')}
-          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none`}
-          sizes="(max-width: 767px) 100vw, 50vw"
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transform-none"
         />
-      </>
+      </picture>
     );
 
     return (
@@ -389,32 +373,21 @@ function BannerBlock({ data }: { data: any }) {
 
   if (!hasOverlayContent) {
     const cleanHeroImages = (
-      <>
+      <picture className="block w-full">
         {hasSeparateMobileImage && (
-          <Image
-            src={mobileImageUrl}
-            alt={mobileTitle || data.title || 'Hero banner'}
-            width={800}
-            height={400}
-            className="md:hidden w-full h-auto block"
-            priority
-            fetchPriority="high"
-            unoptimized={mobileImageUrl.startsWith('/brand/')}
-            sizes="100vw"
-          />
+          <source media="(max-width: 767px)" srcSet={mobileImageUrl} />
         )}
-        <Image
+        <img
           src={imageUrl}
           alt={data.title || 'Hero banner'}
           width={1920}
           height={340}
-          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}w-full h-auto block`}
-          priority
+          loading="eager"
           fetchPriority="high"
-          unoptimized={imageUrl.startsWith('/brand/')}
-          sizes="100vw"
+          decoding="async"
+          className="w-full h-auto block"
         />
-      </>
+      </picture>
     );
 
     return (
@@ -426,6 +399,7 @@ function BannerBlock({ data }: { data: any }) {
           {data.link ? (
             <Link
               href={data.link}
+              prefetch={false}
               aria-label={mobileTitle || data.title || 'Hero Banner'}
               className="block w-full focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden"
             >
@@ -454,6 +428,7 @@ function BannerBlock({ data }: { data: any }) {
                 <Link
                   key={chip.href}
                   href={chip.href}
+                  prefetch={false}
                   className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-semibold text-slate-100 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition whitespace-nowrap"
                 >
                   {chip.label}
@@ -469,30 +444,21 @@ function BannerBlock({ data }: { data: any }) {
   return (
     <section className="bg-[#060f23] relative overflow-hidden mb-5 sm:mb-6 md:mb-8 lg:mb-10" aria-label={data.title || 'Hero Banner'}>
       <div className="w-full relative min-h-[216px] sm:min-h-[236px] md:h-[300px] lg:h-[364px]">
-        {hasSeparateMobileImage && (
-          <Image
-            src={mobileImageUrl}
-            alt={mobileTitle || data.title || 'Hero banner'}
-            width={900}
-            height={560}
-            className="md:hidden absolute inset-0 w-full h-full object-cover object-right"
-            priority
+        <picture className="contents">
+          {hasSeparateMobileImage && (
+            <source media="(max-width: 767px)" srcSet={mobileImageUrl} />
+          )}
+          <img
+            src={imageUrl}
+            alt={data.title || 'Hero banner'}
+            width={1920}
+            height={680}
+            loading="eager"
             fetchPriority="high"
-            unoptimized={mobileImageUrl.startsWith('/brand/')}
-            sizes="100vw"
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover object-right"
           />
-        )}
-        <Image
-          src={imageUrl}
-          alt={data.title || 'Hero banner'}
-          width={1920}
-          height={680}
-          className={`${hasSeparateMobileImage ? 'hidden md:block ' : ''}absolute inset-0 w-full h-full object-cover object-right`}
-          priority
-          fetchPriority="high"
-          unoptimized={imageUrl.startsWith('/brand/')}
-          sizes="100vw"
-        />
+        </picture>
         {hideOverlayOnMobile && data.link && (
           <Link
             href={data.link}
@@ -589,6 +555,7 @@ function BannerBlock({ data }: { data: any }) {
               <Link
                 key={chip.href}
                 href={chip.href}
+                prefetch={false}
                 className="inline-flex min-h-8 shrink-0 items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] sm:text-xs font-semibold text-slate-100 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition whitespace-nowrap"
               >
                 {chip.label}
@@ -659,6 +626,7 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
               {data.viewAllLink && (
                 <Link
                   href={data.viewAllLink}
+                  prefetch={false}
                   className="lg:hidden min-h-11 inline-flex items-center gap-0.5 px-2 -mr-1 rounded-lg text-[12px] font-bold text-white/95 hover:text-yellow-300 shrink-0 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                 >
                   <span>Tất cả</span>
@@ -674,6 +642,7 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
                   <Link
                     key={idx}
                     href={link.href}
+                    prefetch={false}
                     className="min-h-11 inline-flex items-center px-3 py-1.5 rounded-full bg-white/15 hover:bg-white hover:text-slate-900 border border-white/15 transition duration-200 motion-reduce:transition-none whitespace-nowrap text-white font-semibold shadow-2xs text-[11px] md:text-[12px] shrink-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                   >
                     {link.label}
@@ -717,6 +686,7 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
               <div className="mt-3 sm:mt-6 text-center">
                 <Link
                   href={data.viewAllLink}
+                  prefetch={false}
                   className="min-h-11 inline-flex items-center justify-center gap-1.5 w-full sm:w-auto px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl sm:rounded-full bg-slate-100 hover:bg-blue-600 hover:text-white active:scale-95 text-slate-800 text-xs font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs"
                 >
                   Xem tất cả {data.title} <ChevronRight className="w-3.5 h-3.5" />
@@ -811,20 +781,21 @@ function FeaturedCategoriesBlock({ section }: { section: ResolvedSectionItem }) 
             <Link
               key={`${c.id}-${index}`}
               href={c.href}
+              prefetch={false}
               className="group min-h-11 min-w-0 snap-start flex flex-col items-center justify-start p-1.5 rounded-xl border border-slate-200 bg-slate-50/70 text-center transition duration-150 active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden md:flex-row md:items-center md:justify-start md:gap-2.5 md:rounded-none md:border-0 md:border-b-2 md:border-r-2 md:border-slate-200 md:bg-gradient-to-b md:from-white md:to-slate-50/90 md:p-2.5 lg:p-3 md:text-left md:hover:from-blue-50/70 md:hover:to-blue-50/30 motion-reduce:transition-none"
             >
               <div
                 className="relative flex shrink-0 items-center justify-center overflow-hidden transition duration-200 group-hover:scale-105 motion-reduce:group-hover:scale-100 mb-1 h-14 w-16 md:mb-0 md:h-14 md:w-16 lg:h-16 lg:w-20"
               >
                 {c.image ? (() => {
-                  const catImg = c.image.startsWith('/api/library/') && !c.image.includes('?') ? `${c.image}?size=thumb&v=2` : c.image;
+                  const catImg = c.image.startsWith('/api/library/') && !c.image.includes('?') ? `${c.image}?size=icon&v=2` : c.image;
                   return (
                     <Image
                       src={catImg}
                       alt={c.name}
                       fill
                       loading={index < 6 ? 'eager' : 'lazy'}
-                      unoptimized={catImg.includes('size=thumb') || catImg.startsWith('/brand/')}
+                      unoptimized={catImg.includes('size=') || catImg.startsWith('/brand/')}
                       className="object-contain p-0.5 mix-blend-multiply"
                       sizes="(max-width: 767px) 64px, 128px"
                     />
@@ -901,6 +872,7 @@ function FeaturedCollectionBlock({ section }: { section: ResolvedSectionItem }) 
             </div>
             <Link
               href={targetHref}
+              prefetch={false}
               className="min-h-11 inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-[12px] font-bold transition shrink-0 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
             >
               Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
@@ -1001,6 +973,7 @@ function IntroBlock({ data, settings }: { data: unknown; settings?: PublicStoref
                 <Link
                   key={item.id}
                   href={item.href}
+                  prefetch={false}
                   className="w-[220px] sm:w-[240px] md:w-auto shrink-0 snap-start group min-h-11 p-2 md:p-3 lg:p-3.5 rounded-lg lg:rounded-xl bg-slate-50/80 border border-slate-200/80 shadow-2xs flex flex-col justify-start gap-1 hover:bg-blue-50/50 hover:border-blue-200 transition motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden"
                 >
                   {cardContent}
@@ -1036,6 +1009,7 @@ function CtaBlock({ data }: { data: unknown }) {
               {d.primaryLink && (
                 <Link
                   href={d.primaryLink}
+                  prefetch={false}
                   className="min-h-11 inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 px-4 md:px-5 py-2.5 text-[12px] md:text-[14px] font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                 >
                   {d.primaryText}
@@ -1044,6 +1018,7 @@ function CtaBlock({ data }: { data: unknown }) {
               {d.secondaryLink && (
                 <Link
                   href={d.secondaryLink}
+                  prefetch={false}
                   className="min-h-11 inline-flex items-center justify-center rounded-xl border border-slate-500 hover:bg-white/10 active:scale-95 px-4 md:px-5 py-2.5 text-[12px] md:text-[14px] font-bold transition duration-150 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
                 >
                   {d.secondaryText}

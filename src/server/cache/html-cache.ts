@@ -163,10 +163,15 @@ export async function invalidatePublicCache(kv: KvLike | undefined): Promise<voi
   try { await bumpCmsVersion(kv); } catch (error) { console.error('[cache] version bump failed', error); }
 }
 
-function respond(entry: HtmlEntry, state: 'HIT' | 'STALE'): Response {
+function respond(entry: HtmlEntry, state: 'HIT' | 'STALE', isRsc = false): Response {
   const headers = new Headers(entry.headers);
   headers.set('content-type', entry.contentType);
-  headers.set('cache-control', 'public, max-age=0, must-revalidate');
+  if (isRsc) {
+    headers.set('cache-control', 'public, max-age=0, must-revalidate');
+  } else {
+    headers.set('cache-control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300');
+    headers.set('cloudflare-cdn-cache-control', 'public, max-age=60, stale-while-revalidate=300');
+  }
   headers.set('x-citilap-cache', state);
   headers.set('x-citilap-cache-age', String(Math.max(0, Math.round((Date.now() - entry.at) / 1000))));
   return new Response(entry.html, {
@@ -292,7 +297,8 @@ export async function serveCachedHtml(
   headers.set('x-citilap-cache', 'MISS');
   const contentType = headers.get('content-type') || '';
   if (response.status === 200 && contentType.includes('text/html') && !headers.has('set-cookie')) {
-    headers.set('cache-control', 'public, max-age=0, must-revalidate');
+    headers.set('cache-control', 'public, max-age=0, s-maxage=60, stale-while-revalidate=300');
+    headers.set('cloudflare-cdn-cache-control', 'public, max-age=60, stale-while-revalidate=300');
   }
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
@@ -323,9 +329,9 @@ export async function serveCachedRsc(
     key = `citilap:rsc:${BUILD_ID}:${await cmsVersion(kv)}:${cleanPathname}${cacheSearch}:${mode}:${prefetch}:${segPrefetch}:${slots}`;
     const entry = await readCachedEntry(kv, key);
     if (entry?.html) {
-      if (Date.now() - entry.at <= FRESH_MS) return respond(entry, 'HIT');
+      if (Date.now() - entry.at <= FRESH_MS) return respond(entry, 'HIT', true);
       ctx.waitUntil(render(cleanRequest.clone()).then((fresh) => store(kv, key, fresh, true)).catch(() => undefined));
-      return respond(entry, 'STALE');
+      return respond(entry, 'STALE', true);
     }
   } catch (error) {
     console.error('[cache] rsc read failed', error);

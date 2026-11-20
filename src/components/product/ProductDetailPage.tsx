@@ -40,7 +40,9 @@ import {
   getCachedPricingContext,
   getCachedProductReviews,
   getCachedRelatedProducts,
+  getCachedHomepageCatalog,
 } from "@/server/services/storefront-cms.service";
+import { resolveProductFaqs } from "@/lib/product-faqs";
 import {
   calculateEffectivePrice,
   applyPricingToHomepageProducts,
@@ -364,9 +366,14 @@ export default async function ProductDetailPage({
     recommended: true,
   }]).map(w => ({id:w.name,name:w.name,desc:w.description,priceDiff:w.adjustment,isDefault:w.recommended}));
   const manualRelatedIds = (studio?.relatedProductIds || []).filter((rid) => rid && rid !== product.id);
-  const [accessoriesRaw, approvedReviews, rawRelatedProducts] = await Promise.all([
+  const isCurrentAccessory =
+    studio?.template === 'ACCESSORY' ||
+    /phu-kien|linh-kien/.test(product.categorySlug || '');
+
+  const manualAccessoryIds = studio?.accessoryProductIds || [];
+  const [accessoriesRaw, approvedReviews, rawRelatedProducts, fallbackCatalog] = await Promise.all([
     Promise.all(
-      (studio?.accessoryProductIds || []).map(async (accessoryId) => {
+      manualAccessoryIds.map(async (accessoryId) => {
         const publication = await getCachedProductPublication(accessoryId, 'id');
         if (publication.kind !== 'CMS_PUBLISHED' && publication.kind !== 'LEGACY_ACTIVE') return null;
         const [accessory, authored] = await Promise.all([
@@ -404,8 +411,26 @@ export default async function ProductDetailPage({
       5,
       manualRelatedIds,
     ),
+    manualAccessoryIds.length === 0 && !isCurrentAccessory
+      ? getCachedHomepageCatalog().catch(() => null)
+      : Promise.resolve(null),
   ]);
-  const accessories = accessoriesRaw.filter((item): item is NonNullable<typeof item> => item !== null);
+  const manualAccessories = accessoriesRaw.filter((item): item is NonNullable<typeof item> => item !== null);
+  const accessories =
+    manualAccessories.length > 0
+      ? manualAccessories
+      : (fallbackCatalog?.accessories || [])
+          .filter((item) => item.id !== product.id && Number(item.price) > 0 && item.availability !== 'UNAVAILABLE' && (item.stock === undefined || item.stock === null || item.stock > 0))
+          .slice(0, 3)
+          .map((item) => ({
+            id: item.id,
+            variantId: item.variantId,
+            name: item.name,
+            slug: item.slug,
+            image: item.image || '/images/placeholder-laptop.svg',
+            salePrice: Number(item.price) || 0,
+            originalPrice: Number(item.originalPrice || item.oldPrice || item.price) || 0,
+          }));
   const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext, evaluatedAt);
 
   // Sanitize description
@@ -503,7 +528,34 @@ export default async function ProductDetailPage({
     ...categoryTrail.map((c) => ({ name: c.name, href: c.href })),
     { name: displayName, href: canonicalPath },
   ]);
-  const faqJsonLd = generateFaqJsonLd(studio?.faqs || []);
+  const resolvedFaqs = resolveProductFaqs(studio?.faqs);
+  const faqJsonLd = generateFaqJsonLd(resolvedFaqs);
+
+  const coreSpecSummary = heroKeySpecs
+    .slice(0, 5)
+    .map((item) => `${item.label}: ${item.value}`)
+    .join(" · ");
+  const inferredUseCase = /gaming|rtx|gtx|radeon rx/i.test(`${displayName} ${coreSpecSummary} ${category?.name || ''}`)
+    ? "Game thủ, đồ họa 3D, dựng video, chạy tác vụ hiệu năng cao và AI."
+    : /workstation|precision|zbook|thinkpad p|quadro|rtx \d+ ada/i.test(`${displayName} ${coreSpecSummary} ${category?.name || ''}`)
+      ? "Kỹ sư AutoCAD/Revit/SolidWorks, kiến trúc sư và nhà sáng tạo nội dung chuyên nghiệp."
+      : /macbook/i.test(displayName)
+        ? "Lập trình viên, thiết kế sáng tạo, văn phòng cao cấp cần pin bền và màn hình chuẩn màu."
+        : isCurrentAccessory
+          ? "Phụ kiện nâng cấp và tối ưu trải nghiệm sử dụng laptop hằng ngày."
+          : "Sinh viên, nhân viên văn phòng, doanh nhân cần máy ổn định, gõ phím êm và dễ mang theo.";
+  const quickSummaryItems = [
+    ...(coreSpecSummary ? [{ label: "Cấu hình trọng tâm", value: coreSpecSummary }] : []),
+    { label: "Phù hợp nhất cho", value: inferredUseCase },
+    {
+      label: "Tình trạng & Bảo hành",
+      value: `${activeConditionLabel} · ${defaultWarrantyName}, lỗi 1 đổi 1 trong ${businessProfile.warrantySummary.returnPolicyDays} ngày đầu.`,
+    },
+    {
+      label: "Mua hàng & Kiểm tra",
+      value: `${displayPrice > 0 ? `Giá ${displayPrice.toLocaleString("vi-VN")}₫ · ` : ""}Xem máy trực tiếp tại CitiLap Hà Nội & Bắc Ninh hoặc ship COD đồng kiểm toàn quốc.`,
+    },
+  ];
   const productJsonLd = generateProductJsonLd({
     id: product.id,
     name: displayName,
@@ -644,13 +696,14 @@ export default async function ProductDetailPage({
             <ProductDescriptionArticle
               safeDescription={safeDescription}
               productName={displayName}
+              quickSummary={quickSummaryItems}
             />
 
             {/* Hồ sơ kiểm định từng máy (nếu có biên bản kiểm tra công khai) */}
             <InspectionReports productId={product.id} variantId={activeVariantId || null} />
 
             {/* Câu hỏi thường gặp FAQ */}
-            <ProductFaqAccordion faqs={studio?.faqs || []} productName={displayName} />
+            <ProductFaqAccordion faqs={resolvedFaqs} productName={displayName} />
 
             {/* Đánh giá từ khách hàng */}
             <div id="danh-gia-khach-hang">

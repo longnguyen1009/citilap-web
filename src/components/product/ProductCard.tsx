@@ -462,7 +462,7 @@ export default function ProductCard({
             {/* Struck Old Price + Red Discount % tag side-by-side */}
             {effectiveOldPrice && Number(effectiveOldPrice) > Number(product.price) && (
               <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[10.5px] md:text-[13px] text-slate-500 line-through tabular-nums font-bold">
+                <span className="text-[10.5px] md:text-[13px] text-slate-600 line-through tabular-nums font-bold">
                   {formatVnd(effectiveOldPrice)}
                 </span>
                 {discountPercent && (
