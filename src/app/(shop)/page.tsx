@@ -25,7 +25,6 @@ import VideoReviews from "@/components/home/VideoReviews";
 import CustomerGallery from "@/components/home/CustomerGallery";
 import LazyBelowFold from "@/components/home/LazyBelowFold";
 import TestimonialSection from "@/components/home/TestimonialSection";
-import ContactSection from "@/components/home/ContactSection";
 import BrandSection from "@/components/home/BrandSection";
 import {
   getPublishedNavigation,
@@ -188,7 +187,6 @@ export default async function Home() {
             testimonials={settings?.testimonials ?? []}
             sourceUrl={settings?.testimonialsSourceUrl}
           />
-          <ContactSection settings={settings} />
         </div>
       </div>
     );
@@ -333,9 +331,6 @@ export default async function Home() {
 
         {/* 13. ĐÁNH GIÁ KHÁCH HÀNG */}
         <TestimonialSection testimonials={settings?.testimonials ?? []} sourceUrl={settings?.testimonialsSourceUrl} />
-
-        {/* 13. TƯ VẤN CHỌN MÁY */}
-        <ContactSection settings={settings} />
 
         {/* 14. KHÁM PHÁ THEO THƯƠNG HIỆU */}
         <BrandSection />

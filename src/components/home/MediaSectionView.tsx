@@ -15,6 +15,44 @@ export type MediaPostCategoryTab = {
   posts: MediaPost[];
 };
 
+function resolvePostBadge(
+  post: MediaPost,
+  fallbackCategoryName?: string,
+): { label: string; className: string } {
+  const rawName = (post.category?.name || fallbackCategoryName || '').trim();
+  const rawSlug = (post.category?.slug || '').toLowerCase();
+  const probe = `${rawName} ${rawSlug} ${post.title}`.toLowerCase();
+
+  if (/review|đánh\s*giá|danh-gia|trải\s*nghiệm/.test(probe)) {
+    return {
+      label: 'Review',
+      className: 'bg-indigo-600/95 text-white border-indigo-400/40',
+    };
+  }
+  if (/tư\s*vấn|tu-van|chọn\s*mua|hướng\s*dẫn|kinh\s*nghiệm|so\s*sánh/.test(probe)) {
+    return {
+      label: 'Tư vấn',
+      className: 'bg-emerald-600/95 text-white border-emerald-400/40',
+    };
+  }
+  if (/tin\s*tức|tin-tuc|công\s*nghệ|cong-nghe|news/.test(probe)) {
+    return {
+      label: 'Tin tức',
+      className: 'bg-blue-600/95 text-white border-blue-400/40',
+    };
+  }
+  if (rawName) {
+    return {
+      label: rawName,
+      className: 'bg-slate-900/90 text-white border-white/20',
+    };
+  }
+  return {
+    label: 'Tin tức',
+    className: 'bg-blue-600/95 text-white border-blue-400/40',
+  };
+}
+
 export default function MediaSectionView({
   posts,
   categories = [],
@@ -177,13 +215,21 @@ export default function MediaSectionView({
               tabIndex={0}
               className="grid grid-flow-col auto-cols-[74%] sm:auto-cols-[calc((100%-10px)/2)] md:auto-cols-[calc((100%-24px)/3)] lg:auto-cols-[calc((100%-48px)/4)] xl:auto-cols-[calc((100%-64px)/5)] gap-2.5 md:gap-3 lg:gap-4 overflow-x-auto overscroll-x-contain hide-scrollbar snap-x snap-mandatory scroll-px-1 scroll-smooth motion-reduce:scroll-auto py-0.5 md:py-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
             >
-              {visiblePosts.map((post) => (
+              {visiblePosts.map((post) => {
+                const badge = resolvePostBadge(post, activeCategory?.name);
+                return (
                 <Link
                   key={post.id}
                   href={`/news/${post.slug}`}
+                  prefetch={false}
                   className="group flex min-w-0 snap-start flex-col rounded-lg lg:rounded-xl border border-slate-200/90 bg-white p-2 md:p-2.5 shadow-2xs transition duration-200 motion-reduce:transition-none hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 hover:border-blue-500 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden"
                 >
                   <div className="relative aspect-[16/9] sm:aspect-[16/10] shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                    <span
+                      className={`absolute top-2 left-2 z-10 inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] md:text-[11px] font-bold uppercase tracking-wide shadow-xs backdrop-blur-xs ${badge.className}`}
+                    >
+                      {badge.label}
+                    </span>
                     {post.coverImage ? (() => {
                       const coverSrc = post.coverImage.thumbnailUrl || post.coverImage.url;
                       return (
@@ -205,7 +251,8 @@ export default function MediaSectionView({
                     {post.title}
                   </h3>
                 </Link>
-              ))}
+                );
+              })}
             </div>
 
             {/* Overlay Side Arrows (Desktop/Tablet) */}

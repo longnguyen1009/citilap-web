@@ -594,8 +594,8 @@ export default function VideoReviews({
                 src={getEmbedUrl(activeVideo.url)}
                 title={activeVideo.title}
                 className="w-full h-full border-0"
-                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                allowFullScreen
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen; accelerometer; gyroscope"
+                referrerPolicy="strict-origin-when-cross-origin"
               />
             </div>
 

@@ -129,6 +129,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="vi"
+      suppressHydrationWarning
       className="h-full antialiased"
     >
       <head>

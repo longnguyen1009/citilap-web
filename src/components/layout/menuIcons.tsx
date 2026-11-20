@@ -1,33 +1,83 @@
 import { createElement } from "react";
 import { siAcer, siApple, siAsus, siDell, siHp, siHuawei, siLenovo, siLg, siMsi, siRazer, siSamsung, siXiaomi } from "simple-icons";
 import {
-  Apple, Backpack, BatteryCharging, Briefcase, Cable, Cpu, Flame, Gamepad2, Headphones, HelpCircle,
-  Info, Keyboard, Laptop, Lamp, MapPin, MessageCircle, MonitorSmartphone, Newspaper, Palette,
-  Sparkles, Usb, Wind, type LucideIcon,
+  Apple, Award, Backpack, BatteryCharging, BookOpen, Box, Briefcase, Building2, Cable,
+  Clapperboard, Compass, Cpu, Crosshair, Crown, Fan, Feather, Flame, Gamepad2, Gauge,
+  GraduationCap, HardDrive, Headphones, HelpCircle, Info, Keyboard, Lamp, Laptop,
+  Layers, MapPin, MemoryStick, MessageCircle, Monitor, MonitorSmartphone, Mouse,
+  Newspaper, Palette, PenTool, RefreshCw, Rocket, Scale, Server, Shield, ShieldCheck,
+  Sparkles, Star, Store, Swords, Tablet, Truck, Usb, Wind, Wrench, Zap, type LucideIcon,
 } from "lucide-react";
 
 const RULES: [RegExp, LucideIcon][] = [
-  [/hot|sale|khuy[eế]n/i, Flame],
-  [/gaming|rog|tuf|legion|loq|omen|victus|nitro|predator|alienware|aorus|katana|cyborg|raider|stealth|titan|vector|sword|crosshair|blade/i, Gamepad2],
-  [/v[aă]n ph[oò]ng|business|thinkpad|latitude|vostro|expertbook|probook|elitebook/i, Briefcase],
-  [/đ[oồ] ho[aạ]|workstation|creator|studio|precision|zbook/i, Palette],
+  // Hot sale / promos
+  [/hot|sale|khuy[eế]n|deal|x[aả]\s*kho/i, Flame],
+
+  // Apple Mac lineup (distinct icon per product form factor)
+  [/macbook\s*air/i, Feather],
+  [/macbook\s*pro/i, Laptop],
+  [/mac\s*mini/i, Box],
+  [/mac\s*studio/i, Server],
+  [/imac/i, Monitor],
   [/mac|apple/i, Apple],
-  [/chu[oộ]t|b[aà]n ph[ií]m/i, Keyboard],
+
+  // Gaming series (distinct icons per line)
+  [/legion|alienware|titan|raider/i, Crown],
+  [/rog|aorus|blade/i, Zap],
+  [/predator|crosshair/i, Crosshair],
+  [/zephyrus|stealth/i, Wind],
+  [/tuf|victus/i, Shield],
+  [/loq|nitro|cyborg/i, Rocket],
+  [/katana|sword|omen/i, Swords],
+  [/gaming/i, Gamepad2],
+
+  // Workstation / Creator / Graphics (distinct icons)
+  [/proart|creator|conceptd|aero/i, Palette],
+  [/precision|zbook|thinkpad\s*p/i, Server],
+  [/đ[oồ]\s*ho[aạ]|workstation|k[yỹ]\s*thu[aậ]t/i, PenTool],
+  [/render|d[uự]ng\s*phim|video/i, Clapperboard],
+
+  // Ultrabook / Business / Office / Student (distinct icons)
+  [/thinkpad|latitude|elitebook/i, ShieldCheck],
+  [/thinkbook|probook|vostro|expertbook/i, Building2],
+  [/xps|zenbook|spectre|envy|gram|omnibook|swift|prestige/i, Sparkles],
+  [/yoga|surface|2\s*in\s*1|c[aả]m\s*[uứ]ng/i, Tablet],
+  [/ideapad|vivobook|inspiron|aspire|modern|pavilion|sinh\s*vi[eê]n/i, GraduationCap],
+  [/v[aă]n\s*ph[oò]ng|business|doanh\s*nh[aâ]n/i, Briefcase],
+  [/m[oỏ]ng\s*nh[eẹ]|ultrabook/i, Feather],
+  [/ai\b|copilot/i, Cpu],
+
+  // Accessories (distinct icons)
+  [/chu[oộ]t(?!.*b[aà]n\s*ph[ií]m)/i, Mouse],
+  [/chu[oộ]t|b[aà]n\s*ph[ií]m/i, Keyboard],
   [/balo|t[uú]i/i, Backpack],
   [/s[aạ]c|gan/i, BatteryCharging],
   [/hub|type-c|c[aá]p/i, Usb],
-  [/t[aả]n nhi[eệ]t|gi[aá] đ[oỡ]/i, Wind],
-  [/đ[eè]n|desk/i, Lamp],
-  [/tai nghe|[aâ]m thanh/i, Headphones],
-  [/ram|ssd|n[aâ]ng c[aấ]p/i, Cpu],
-  [/gi[oớ]i thi[eệ]u/i, Info],
-  [/c[uử]a h[aà]ng/i, MapPin],
-  [/t[uư] v[aấ]n|ch[oọ]n/i, Sparkles],
-  [/c[aâ]u h[oỏ]i|faq/i, HelpCircle],
-  [/li[eê]n h[eệ]|h[oỗ] tr[oợ]/i, MessageCircle],
-  [/tin t[uứ]c|news/i, Newspaper],
-  [/like new|c[uũ]/i, MonitorSmartphone],
-  [/ph[uụ] ki[eệ]n/i, Cable],
+  [/t[aả]n\s*nhi[eệ]t|gi[aá]\s*đ[oỡ]/i, Fan],
+  [/đ[eè]n|desk|screenbar/i, Lamp],
+  [/tai\s*nghe|[aâ]m\s*thanh/i, Headphones],
+  [/ssd|[oổ]\s*c[uứ]ng/i, HardDrive],
+  [/ram|n[aâ]ng\s*c[aấ]p/i, MemoryStick],
+  [/ph[uụ]\s*ki[eệ]n/i, Cable],
+
+  // News, Reviews, Guides & About (distinct icons)
+  [/review|đ[aá]nh\s*gi[aá]/i, Star],
+  [/so\s*s[aá]nh/i, Scale],
+  [/t[uư]\s*v[aấ]n|ch[oọ]n\s*laptop|ch[oọ]n\s*m[aá]y/i, Compass],
+  [/h[uướ]ng\s*d[aẫ]n|th[uủ]\s*thu[aậ]t|kinh\s*nghi[eệ]m/i, BookOpen],
+  [/tin\s*t[uứ]c|news/i, Newspaper],
+  [/b[aả]o\s*h[aà]nh/i, Award],
+  [/đ[oổ]i\s*tr[aả]/i, RefreshCw],
+  [/v[aậ]n\s*chuy[eể]n|giao\s*h[aà]ng/i, Truck],
+  [/gi[oớ]i\s*thi[eệ]u/i, Info],
+  [/c[uử]a\s*h[aà]ng|showroom/i, Store],
+  [/đ[iị]a\s*ch[iỉ]|b[aả]n\s*đ[oồ]/i, MapPin],
+  [/c[aâ]u\s*h[oỏ]i|faq/i, HelpCircle],
+  [/li[eê]n\s*h[eệ]|h[oỗ]\s*tr[oợ]/i, MessageCircle],
+  [/ki[eể]m\s*đ[iị]nh|k[yỹ]\s*thu[aậ]t/i, Wrench],
+  [/like\s*new|c[uũ]/i, MonitorSmartphone],
+  [/hi[eệ]u\s*n[aă]ng/i, Gauge],
+  [/studio/i, Layers],
 ];
 
 export function iconForName(name: string): LucideIcon {
