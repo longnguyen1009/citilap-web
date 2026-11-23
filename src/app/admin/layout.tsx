@@ -29,6 +29,7 @@ import {
   CornerUpRight,
   Folder,
   Boxes,
+  Ticket,
 } from "lucide-react";
 import AdminNotificationBell from "@/components/admin/notifications/AdminNotificationBell";
 import AdminCommandPalette from "@/components/admin/ui/AdminCommandPalette";
@@ -77,6 +78,7 @@ const navGroups: NavGroup[] = [
       { name: "Bố cục trang", href: "/admin/builder", icon: LayoutTemplate, keywords: "trang chủ landing builder bố cục" },
       { name: "Menu & Bộ sưu tập", href: "/admin/navigation", icon: Menu, keywords: "mega menu điều hướng collection nhóm sản phẩm" },
       { name: "Flash Sale", href: "/admin/campaigns", icon: Zap, keywords: "chiến dịch khuyến mãi campaign" },
+      { name: "Mã giảm giá", href: "/admin/coupons", icon: Ticket, keywords: "voucher coupon khuyen mai black friday" },
     ],
   },
   {

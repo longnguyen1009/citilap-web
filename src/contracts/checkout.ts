@@ -14,6 +14,7 @@ export const checkoutSelectionSchema = z.object({
   shippingMethod: z.enum(['standard', 'pickup']),
   showroomId: id.nullish(),
   paymentMethod: z.enum(['COD', 'BANK_TRANSFER']).optional(),
+  couponCode: z.string().trim().max(40).nullish(),
 });
 export const checkoutAcknowledgmentSchema = z.object({
   shippingFee: money,
@@ -22,17 +23,28 @@ export const checkoutAcknowledgmentSchema = z.object({
 });
 export type CheckoutSelection = z.infer<typeof checkoutSelectionSchema>;
 export type CheckoutAcknowledgment = z.infer<typeof checkoutAcknowledgmentSchema>;
+export interface CheckoutCouponSummary {
+  id: string;
+  code: string;
+  name: string;
+  discountType: 'FIXED' | 'PERCENT';
+  discountValue: number;
+  discountAmount: number;
+}
 export interface CheckoutSnapshot {
   warranties?: Array<{ productId: string; variantId: string | null; name: string; description: string; adjustment: number }>;
   settingsRevision: number;
   bankAccountInfo: string | null;
   vietQr?: { bankBin: string; accountNumber: string; accountName: string };
   showroom: { id: string; name: string; address: string; phone: string } | null;
+  coupon?: CheckoutCouponSummary | null;
 }
 export interface CheckoutQuote {
   evaluatedAt: string;
   lines: Array<{ productId: string; variantId: string | null; warrantyName?: string | null; productName: string; quantity: number; price: number; lineTotal: number }>;
   subtotal: number;
+  discountAmount: number;
+  coupon: CheckoutCouponSummary | null;
   shippingFee: number;
   totalAmount: number;
   shippingMethod: 'standard' | 'pickup';

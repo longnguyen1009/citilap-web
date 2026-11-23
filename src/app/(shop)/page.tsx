@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import HeroSection from "@/components/home/HeroSection";
+import CampaignStripBanner from "@/components/home/CampaignStripBanner";
 import PromoDualBanners from "@/components/home/PromoDualBanners";
 import CategoryGridSection from "@/components/home/CategoryGridSection";
 import FlashSaleSection from "@/components/home/FlashSaleSection";
@@ -159,6 +160,7 @@ export default async function Home() {
         <BlockRenderer
           sections={cmsHomepage.sections}
           settings={settings}
+          afterHeroBanner={<CampaignStripBanner />}
           flashSale={<FlashSaleSection settings={settings} initialCampaigns={hotSaleCampaigns} />}
         />
         <div className="defer-offscreen">
@@ -202,6 +204,9 @@ export default async function Home() {
 
       {/* 1. HERO SECTION & SUB-BANNERS */}
       <HeroSection settings={settings ?? undefined} />
+
+      {/* 1.5 CAMPAIGN HORIZONTAL STRIP BANNER */}
+      <CampaignStripBanner />
 
       {/* 2. PROMO DUAL ANIMATED BANNERS */}
       <PromoDualBanners />

@@ -137,6 +137,7 @@ async function POSTHandler(request: Request) {
       shippingMethod: typeof body.shippingMethod === 'string' ? body.shippingMethod : 'standard',
       paymentMethod: typeof body.paymentMethod === 'string' ? body.paymentMethod : 'COD',
       showroomId: selection.data.showroomId,
+      couponCode: selection.data.couponCode ?? null,
       checkoutAcknowledgment: acknowledgment?.success ? acknowledgment.data : undefined,
     };
 

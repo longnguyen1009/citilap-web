@@ -7,6 +7,7 @@ import { checkoutSelectionSchema, type CheckoutQuote } from '@/contracts/checkou
 import type { ResolvedOrderItem, PriceChangedError } from './order.service';
 import { computeShippingFee } from './checkout-shipping-policy';
 import { resolveProductWarranty } from '@/lib/product-warranty';
+import { evaluateCouponForCheckout, CouponError, type CouponEvaluationItem } from './coupon.service';
 
 export class CheckoutError extends Error {
   constructor(public code: string, message: string, public status = 400, public details?: unknown) { super(message); }
@@ -33,6 +34,7 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
   const storefrontSettings = await getStorefrontPricingContext(db, evaluatedAt, settings.document);
 
   const resolvedItems: ResolvedOrderItem[] = [];
+  const couponEvalItems: CouponEvaluationItem[] = [];
   const campaignNotes: string[] = [];
   const changedItems: PriceChangedError['details']['changedItems'] = [];
   let subtotalAmount = 0;
@@ -54,7 +56,7 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
     const product = await prisma.product.findFirst({
       where: { id: productId, deletedAt: null },
       select: {
-        id: true, name: true, price: true, originalPrice: true, status: true, isFlashSale: true,
+        id: true, name: true, price: true, originalPrice: true, status: true, condition: true, isFlashSale: true,
         studio: { select: { published: true } },
       },
     });
@@ -163,6 +165,7 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
 
     const lineTotal = price * quantity;
     subtotalAmount += lineTotal;
+    couponEvalItems.push({ productId, condition: product.condition || 'NEW', lineTotal });
     if (![price, lineTotal, subtotalAmount, expectedSubtotal].every(v=>Number.isSafeInteger(v) && v>=0)) {
       throw new CheckoutError('INVALID_CHECKOUT', 'Số tiền không hợp lệ.');
     }
@@ -198,8 +201,31 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
   const showrooms = config.addressHanoi.trim() ? [{id:'hanoi', name:config.storeName + ' Hà Nội', address:config.addressHanoi.trim(), phone:config.storePhone}] : [];
   const showroom = payload.shippingMethod === 'pickup' ? showrooms.find(s => s.id === payload.showroomId) : null;
   if (payload.shippingMethod === 'pickup' && !showroom) throw new CheckoutError('SHOWROOM_UNAVAILABLE', 'Điểm nhận hàng không còn khả dụng. Vui lòng chọn lại.');
+  let discountAmount = 0;
+  let appliedCoupon: CheckoutQuote['coupon'] = null;
+  if (payload.couponCode && payload.couponCode.trim()) {
+    try {
+      const evaluated = await evaluateCouponForCheckout(db, payload.couponCode, couponEvalItems, evaluatedAt);
+      discountAmount = evaluated.discountAmount;
+      appliedCoupon = {
+        id: evaluated.coupon.id,
+        code: evaluated.coupon.code,
+        name: evaluated.coupon.name,
+        discountType: evaluated.coupon.discountType,
+        discountValue: evaluated.coupon.discountValue,
+        discountAmount: evaluated.discountAmount,
+      };
+    } catch (err) {
+      if (err instanceof CouponError) {
+        throw new CheckoutError(err.code, err.message, err.status);
+      }
+      throw err;
+    }
+  }
+
   const shippingFee = computeShippingFee({shippingMethod:payload.shippingMethod, subtotal:subtotalAmount, shippingFee:config.shippingFee, freeShippingThreshold:config.freeShippingThreshold});
-  if (!Number.isSafeInteger(subtotalAmount + shippingFee)) throw new CheckoutError('INVALID_CHECKOUT', 'Tổng tiền vượt giới hạn.');
+  const totalAmount = Math.max(0, subtotalAmount - discountAmount + shippingFee);
+  if (!Number.isSafeInteger(totalAmount)) throw new CheckoutError('INVALID_CHECKOUT', 'Tổng tiền vượt giới hạn.');
   const vietQr =
     payload.paymentMethod === 'BANK_TRANSFER' && config.bankBin.trim() && config.bankAccountNumber.trim()
       ? {
@@ -208,10 +234,10 @@ export async function calculateCheckout(input: unknown, db: D1Database, at = new
           accountName: config.bankAccountName.trim(),
         }
       : undefined;
-  const snapshot = {settingsRevision:settings.revision, showroom:showroom || null, bankAccountInfo:payload.paymentMethod === 'BANK_TRANSFER' ? config.bankAccountInfo.trim() : null, ...(vietQr ? {vietQr} : {}), ...(warranties.length ? {warranties} : {})};
-  const terms = JSON.stringify({shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,showroom:snapshot.showroom,bankAccountInfo:snapshot.bankAccountInfo, ...(vietQr ? {vietQr} : {}), ...(warranties.length ? {warranties} : {})});
+  const snapshot = {settingsRevision:settings.revision, showroom:showroom || null, bankAccountInfo:payload.paymentMethod === 'BANK_TRANSFER' ? config.bankAccountInfo.trim() : null, ...(vietQr ? {vietQr} : {}), ...(warranties.length ? {warranties} : {}), ...(appliedCoupon ? {coupon:appliedCoupon} : {})};
+  const terms = JSON.stringify({shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,showroom:snapshot.showroom,bankAccountInfo:snapshot.bankAccountInfo, ...(vietQr ? {vietQr} : {}), ...(warranties.length ? {warranties} : {}), ...(appliedCoupon ? {coupon:appliedCoupon} : {})});
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(terms));
   const termsVersion = Array.from(new Uint8Array(digest), b=>b.toString(16).padStart(2,'0')).join('');
-  const quote: CheckoutQuote = {evaluatedAt:at.toISOString(),lines:resolvedItems.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName,productName:i.variantNameSnapshot ? i.productName+' - '+i.variantNameSnapshot : i.productName,quantity:i.quantity,price:i.price,lineTotal:i.lineTotal})),subtotal:subtotalAmount,shippingFee,totalAmount:subtotalAmount+shippingFee,shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,allowedPaymentMethods,showrooms,snapshot,termsVersion};
+  const quote: CheckoutQuote = {evaluatedAt:at.toISOString(),lines:resolvedItems.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName,productName:i.variantNameSnapshot ? i.productName+' - '+i.variantNameSnapshot : i.productName,quantity:i.quantity,price:i.price,lineTotal:i.lineTotal})),subtotal:subtotalAmount,discountAmount,coupon:appliedCoupon,shippingFee,totalAmount,shippingMethod:payload.shippingMethod,paymentMethod:payload.paymentMethod || null,allowedPaymentMethods,showrooms,snapshot,termsVersion};
   return {quote,resolvedItems,campaignNotes,changedItems,expectedSubtotal};
 }

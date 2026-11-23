@@ -85,10 +85,12 @@ const THEME_GRADIENT_MAP: Record<string, string> = {
 export default function BlockRenderer({
   sections,
   flashSale,
+  afterHeroBanner,
   settings,
 }: {
   sections: ResolvedSectionItem[];
   flashSale?: ReactNode;
+  afterHeroBanner?: ReactNode;
   settings?: PublicStorefrontSettings | null;
 }) {
   if (!sections || sections.length === 0) {
@@ -113,7 +115,12 @@ export default function BlockRenderer({
         let blockNode: ReactNode = null;
         switch (section.type) {
           case 'banner':
-            blockNode = <BannerBlock key={section.id} data={section.data} />;
+            blockNode = (
+              <Fragment key={section.id}>
+                <BannerBlock data={section.data} />
+                {section.id === 'sec-hero' && afterHeroBanner}
+              </Fragment>
+            );
             break;
 
           case 'promo_banners': {

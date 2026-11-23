@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, MapPin, Building2, Truck, ShieldCheck, CheckCircle2, AlertCircle, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, MapPin, Building2, Truck, ShieldCheck, CheckCircle2, AlertCircle, Loader2, AlertTriangle, Ticket, X } from "lucide-react";
+import type { PublicCouponDto } from "@/contracts/coupon";
 import { useCart } from "@/context/CartContext";
 import CartValidationStatus from '@/components/cart/CartValidationStatus';
 import { useRouter } from "next/navigation";
@@ -55,9 +56,13 @@ export default function CheckoutPage() {
   const [loaded, setLoaded] = useState(false);
   const [quoteState, setQuoteState] = useState<{key:string;data:CheckoutQuote | null;error:string}>({key:'',data:null,error:''});
   const [quoteRetry, setQuoteRetry] = useState(0);
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCouponCode, setAppliedCouponCode] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [publicCoupons, setPublicCoupons] = useState<PublicCouponDto[]>([]);
   const [pending, setPending] = useState<{key:string;body:string} | null>(null);
   const sending = useRef(false);
-  const quoteRequest = JSON.stringify({items:cart.map(i=>({productId:i.productId,variantId:i.variantId || null,warrantyName:i.warrantyName || null,quantity:i.quantity})),shippingMethod:deliveryType === 'pickup' ? 'pickup' : 'standard',showroomId:deliveryType === 'pickup' ? selectedShowroom : null,...(paymentMethod?{paymentMethod}:{})});
+  const quoteRequest = JSON.stringify({items:cart.map(i=>({productId:i.productId,variantId:i.variantId || null,warrantyName:i.warrantyName || null,quantity:i.quantity})),shippingMethod:deliveryType === 'pickup' ? 'pickup' : 'standard',showroomId:deliveryType === 'pickup' ? selectedShowroom : null,...(paymentMethod?{paymentMethod}:{}),...(appliedCouponCode?{couponCode:appliedCouponCode}:{})});
   const quote = quoteState.data;
   const quoteKey = quoteRequest + ':' + quoteRetry;
   const quoteReady = loaded && quoteState.key === quoteKey && !!quote && !quoteState.error && !!paymentMethod && checkoutReady;
@@ -83,7 +88,17 @@ export default function CheckoutPage() {
       }
       const attempt = JSON.parse(sessionStorage.getItem('citilap-checkout-attempt-v1') || 'null');
       if (typeof attempt?.key === 'string' && typeof attempt?.body === 'string') setPending(attempt);
+      const urlCoupon = new URLSearchParams(window.location.search).get('coupon')?.trim().toUpperCase();
+      const savedCoupon = sessionStorage.getItem('citilap-saved-coupon-v1')?.trim().toUpperCase();
+      const initialCoupon = urlCoupon || savedCoupon || '';
+      if (initialCoupon) {
+        setCouponInput(initialCoupon);
+        setAppliedCouponCode(initialCoupon);
+      }
     } catch { /* Invalid local draft is ignored; never used as server authority. */ }
+    fetch('/api/coupons/public').then(r => r.json()).then(d => {
+      if (d?.success && Array.isArray(d.data)) setPublicCoupons(d.data);
+    }).catch(() => {});
     setLoaded(true);
   },[]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -92,8 +107,16 @@ export default function CheckoutPage() {
     if (!loaded || !cart.length) return;
     const controller = new AbortController();
     fetch('/api/checkout/quote',{method:'POST',headers:{'Content-Type':'application/json'},body:quoteRequest,signal:controller.signal})
-      .then(async r=>{const data=await r.json();if(!r.ok || !data.success){if(!controller.signal.aborted && data.error?.code === 'PAYMENT_METHOD_DISABLED')setPaymentMethod('');throw Error(data.error?.message || 'Chưa thể tính tổng tiền.');}return data.data as CheckoutQuote;})
-      .then(data=>{if(!controller.signal.aborted)setQuoteState({key:quoteKey,data,error:''});})
+      .then(async r=>{const data=await r.json();if(!r.ok || !data.success){
+        if(!controller.signal.aborted && data.error?.code === 'PAYMENT_METHOD_DISABLED')setPaymentMethod('');
+        if(!controller.signal.aborted && typeof data.error?.code === 'string' && data.error.code.startsWith('COUPON_')){
+          setCouponError(data.error.message || 'Mã giảm giá không hợp lệ.');
+          setAppliedCouponCode('');
+          return null;
+        }
+        throw Error(data.error?.message || 'Chưa thể tính tổng tiền.');
+      }return data.data as CheckoutQuote;})
+      .then(data=>{if(!controller.signal.aborted && data){setCouponError('');setQuoteState({key:quoteKey,data,error:''});}})
       .catch(error=>{if(!controller.signal.aborted)setQuoteState(prev=>({...prev,key:quoteKey,error:error.message || 'Chưa thể tính tổng tiền.'}));});
     return ()=>controller.abort();
   },[loaded,cart.length,quoteRequest,quoteKey]);
@@ -145,7 +168,7 @@ export default function CheckoutPage() {
     ]
       .filter(Boolean)
       .join(' — ');
-    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName || null,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.ward.trim(),form.province].join(', ') : null,note:combinedNote,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
+    const body=JSON.stringify({items:quote.lines.map(i=>({productId:i.productId,variantId:i.variantId,warrantyName:i.warrantyName || null,quantity:i.quantity,expectedPrice:i.price})),customerName:form.fullName,customerPhone:form.phone,customerEmail:form.email,shippingAddress:deliveryType==='delivery' ? [form.address.trim(),form.ward.trim(),form.province].join(', ') : null,note:combinedNote,shippingMethod:quote.shippingMethod,showroomId:quote.snapshot.showroom?.id || null,paymentMethod,...(quote.coupon?.code ? {couponCode:quote.coupon.code} : {}),checkoutAcknowledgment:{shippingFee:quote.shippingFee,totalAmount:quote.totalAmount,termsVersion:quote.termsVersion}});
     const attempt={key:crypto.randomUUID(),body};
     try{sessionStorage.setItem('citilap-checkout-attempt-v1',JSON.stringify(attempt));}catch{setFormError('Không thể lưu yêu cầu để thử lại an toàn. Vui lòng bật lưu trữ trình duyệt.');return;}
     setPending(attempt);await sendAttempt(attempt);
@@ -619,12 +642,100 @@ export default function CheckoutPage() {
                   />
                 )}
               </fieldset>
+              {/* Mã giảm giá */}
+              <div className="border-t border-gray-200 pt-4 mt-4 space-y-2.5">
+                <label htmlFor="checkout-coupon-input" className="text-xs font-bold text-gray-800 uppercase tracking-wide flex items-center gap-1.5">
+                  <Ticket className="w-4 h-4 text-red-600" />
+                  Mã giảm giá / Voucher
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="checkout-coupon-input"
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                    placeholder="Nhập mã (VD: BF999, BF599...)"
+                    disabled={locked}
+                    className="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-900 placeholder:normal-case placeholder:font-normal focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
+                  />
+                  {quote?.coupon ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedCouponCode('');
+                        setCouponInput('');
+                        setCouponError('');
+                        try { sessionStorage.removeItem('citilap-saved-coupon-v1'); } catch {}
+                      }}
+                      className="px-3 py-2 rounded-lg border border-gray-300 bg-gray-50 hover:bg-gray-100 text-xs font-bold text-gray-700 inline-flex items-center gap-1 shrink-0 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" /> Bỏ mã
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!couponInput.trim() || locked}
+                      onClick={() => {
+                        const code = couponInput.trim().toUpperCase();
+                        if (!code) return;
+                        setCouponError('');
+                        setAppliedCouponCode(code);
+                        try { sessionStorage.setItem('citilap-saved-coupon-v1', code); } catch {}
+                      }}
+                      className="px-3.5 py-2 rounded-lg bg-gray-900 hover:bg-red-600 disabled:bg-gray-300 text-white text-xs font-bold transition shrink-0 cursor-pointer"
+                    >
+                      Áp dụng
+                    </button>
+                  )}
+                </div>
+                {couponError && (
+                  <p className="text-xs text-red-600 font-medium flex items-center gap-1" role="alert">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" /> {couponError}
+                  </p>
+                )}
+                {quote?.coupon && (
+                  <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800 flex items-center justify-between gap-2">
+                    <span className="font-semibold">
+                      Đã áp mã <strong className="font-black">{quote.coupon.code}</strong> ({quote.coupon.name})
+                    </span>
+                    <span className="font-black text-emerald-700 shrink-0">
+                      -{quote.coupon.discountAmount.toLocaleString("vi-VN")}đ
+                    </span>
+                  </div>
+                )}
+                {!quote?.coupon && publicCoupons.filter(c => !c.isExhausted).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {publicCoupons.filter(c => !c.isExhausted).slice(0, 4).map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setCouponInput(c.code);
+                          setCouponError('');
+                          setAppliedCouponCode(c.code);
+                          try { sessionStorage.setItem('citilap-saved-coupon-v1', c.code); } catch {}
+                        }}
+                        className="text-[11px] font-bold px-2 py-1 rounded-md border border-red-200 bg-red-50/70 text-red-700 hover:bg-red-100 transition cursor-pointer"
+                      >
+                        {c.code} (-{c.discountType === 'PERCENT' ? `${c.discountValue}%` : `${Math.round(c.discountValue / 1000)}K`})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Tổng tiền */}
               <div className="border-t border-gray-200 pt-4 mt-4 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-600">
                   <span>Tạm tính ({cart.reduce((s, i) => s + i.quantity, 0)} SP):</span>
                   <span className="font-bold text-gray-900">{quote ? quote.subtotal.toLocaleString("vi-VN") + "đ" : "—"}</span>
                 </div>
+                {quote && quote.discountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-700 text-xs font-semibold">
+                    <span>Giảm giá ({quote.coupon?.code}):</span>
+                    <span>-{quote.discountAmount.toLocaleString("vi-VN")}đ</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-gray-600 text-xs">
                   <span>Phí vận chuyển:</span>
                   <span className="text-blue-700 font-semibold">{quote ? (quote.shippingFee === 0 ? "Miễn phí" : quote.shippingFee.toLocaleString("vi-VN") + "đ") : "—"}</span>

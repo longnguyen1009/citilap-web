@@ -1,0 +1,99 @@
+/* Black Friday landing page — modern-web-guidance compliant tabs & accordion styles */
+
+.bf-tablist {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+  padding-block-end: 0.25rem;
+}
+
+.bf-tab {
+  position: relative;
+  flex-shrink: 0;
+  padding: 0.625rem 1.125rem;
+  border-radius: 0.75rem 0.75rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.bf-tab:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Style selected tab from aria-selected with a border underline (not color alone, no box-shadow) */
+.bf-tab[aria-selected="true"] {
+  color: #fbbf24;
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.bf-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  border-block-end: 3px solid #f59e0b;
+}
+
+/* Native <details> accordion following modern-web-guidance */
+.bf-accordion details {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.875rem;
+  background: rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+}
+
+.bf-accordion summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #f8fafc;
+  cursor: pointer;
+}
+
+.bf-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.bf-accordion summary::before {
+  content: "";
+  inline-size: 0.65rem;
+  block-size: 0.65rem;
+  flex-shrink: 0;
+  border-inline-end: 2px solid #f59e0b;
+  border-block-end: 2px solid #f59e0b;
+  transform: rotate(-45deg);
+}
+
+.bf-accordion details[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.bf-accordion details::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+
+.bf-accordion details:not([open])::details-content {
+  block-size: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .bf-accordion summary::before {
+    transition: transform 0.2s ease;
+  }
+  .bf-accordion details::details-content {
+    transition: block-size 0.25s ease-in-out, content-visibility 0.25s ease-in-out allow-discrete;
+  }
+}

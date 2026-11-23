@@ -21,7 +21,7 @@ export function adminCapability(path: string): AdminCapability {
   if (/^\/(api\/)?(admin\/)?(orders|notifications)(\/|$)/.test(path)) return 'orders';
   if (/^\/(api\/)?(admin\/)?contacts(\/|$)/.test(path)) return 'contacts';
   if (/^\/(api\/)?(admin\/)?customers(\/|$)/.test(path)) return 'customers';
-  if (/^\/(api\/)?admin\/campaigns(\/|$)/.test(path)) return 'commerce';
+  if (/^\/(api\/)?admin\/(campaigns|coupons)(\/|$)/.test(path)) return 'commerce';
   if (/^\/(api\/)?(admin\/)?(schedules|products|product-studio|inventory|categories|brands|media|library|upload|navigation|builder|pages|posts|post-categories)(\/|$)/.test(path)) return 'content';
   return 'system';
 }

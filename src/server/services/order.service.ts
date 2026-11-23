@@ -23,6 +23,7 @@ export interface CreateOrderInput {
   shippingMethod?: string;
   paymentMethod?: string;
   showroomId?: string | null;
+  couponCode?: string | null;
   checkoutAcknowledgment?: CheckoutAcknowledgment;
 }
 
@@ -373,7 +374,7 @@ export async function computeOrderPayloadHash(payload: CreateOrderInput): Promis
   };
 
   // Preserve legacy hashes for retries without the new acknowledgment.
-  const jsonStr = JSON.stringify(payload.checkoutAcknowledgment ? { ...normalized, checkoutVersion: 1, showroomId: payload.showroomId || null, acknowledgment: payload.checkoutAcknowledgment, prices: payload.items.map(i => ({ productId: i.productId, variantId: i.variantId || null, expectedPrice: i.expectedPrice })).sort((a, b) => (a.productId + ':' + a.variantId).localeCompare(b.productId + ':' + b.variantId)) } : normalized);
+  const jsonStr = JSON.stringify(payload.checkoutAcknowledgment ? { ...normalized, checkoutVersion: 1, showroomId: payload.showroomId || null, ...(payload.couponCode ? { couponCode: payload.couponCode.trim().toUpperCase() } : {}), acknowledgment: payload.checkoutAcknowledgment, prices: payload.items.map(i => ({ productId: i.productId, variantId: i.variantId || null, expectedPrice: i.expectedPrice })).sort((a, b) => (a.productId + ':' + a.variantId).localeCompare(b.productId + ':' + b.variantId)) } : normalized);
   const enc = new TextEncoder().encode(jsonStr);
   const buf = await crypto.subtle.digest('SHA-256', enc);
   return Array.from(new Uint8Array(buf))
@@ -463,7 +464,8 @@ export async function createOrder(
   }
   const { quote, resolvedItems, campaignNotes, changedItems, expectedSubtotal } = await calculateCheckout(payload, db);
   const now = quote.evaluatedAt.replace('Z', '+00:00');
-  const subtotalAmount = quote.subtotal, shippingFee = quote.shippingFee, totalAmount = quote.totalAmount;
+  const subtotalAmount = quote.subtotal, shippingFee = quote.shippingFee, discountAmount = quote.discountAmount || 0, totalAmount = quote.totalAmount;
+  const appliedCoupon = quote.coupon;
   const checkoutSnapshot = JSON.stringify(quote.snapshot);
   if (quote.snapshot.showroom) shippingAddress = 'Nhận tại showroom: ' + quote.snapshot.showroom.name + ' (' + quote.snapshot.showroom.address + ')';
   else if (!shippingAddress || shippingAddress.length > 500) throw new CheckoutError('INVALID_CHECKOUT', 'Vui lòng nhập địa chỉ giao hàng.');
@@ -500,7 +502,7 @@ export async function createOrder(
     0,
     subtotalAmount,
     shippingFee,
-    0,
+    discountAmount,
     totalAmount,
     customerName,
     customerPhone,
@@ -563,7 +565,11 @@ export async function createOrder(
     null,
     'NEW',
     'Khách đặt hàng qua website',
-    [note, campaignNotes.length > 0 ? `Khuyến mãi: ${campaignNotes.join('; ')}` : null].filter(Boolean).join(' | ') || null,
+    [
+      note,
+      appliedCoupon ? `Mã giảm giá: ${appliedCoupon.code} (-${appliedCoupon.discountAmount.toLocaleString('vi-VN')}đ)` : null,
+      campaignNotes.length > 0 ? `Khuyến mãi: ${campaignNotes.join('; ')}` : null,
+    ].filter(Boolean).join(' | ') || null,
     'Khách hàng',
     now
   );
@@ -603,8 +609,34 @@ export async function createOrder(
     }
   });
 
+  const couponStmts = appliedCoupon
+    ? [
+        db
+          .prepare(
+            `UPDATE "Coupon"
+             SET "usedCount" = "usedCount" + 1, "updatedAt" = ?
+             WHERE "id" = ? AND "status" = 'ACTIVE' AND ("quantityLimit" IS NULL OR "usedCount" < "quantityLimit")`
+          )
+          .bind(now, appliedCoupon.id),
+        db
+          .prepare(
+            `INSERT INTO "CouponRedemption" ("id", "couponId", "orderId", "orderNumber", "customerPhone", "discountAmount", "createdAt")
+             VALUES (?, ?, ?, ?, ?, ?, ?)`
+          )
+          .bind(
+            'cr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+            appliedCoupon.id,
+            orderId,
+            orderNumber,
+            customerPhone,
+            discountAmount,
+            now
+          ),
+      ]
+    : [];
+
   try {
-    await db.batch([orderStmt, ...itemStmts, ...campaignQuotaStmts, initialEventStmt, notifStmt]);
+    await db.batch([orderStmt, ...itemStmts, ...campaignQuotaStmts, ...couponStmts, initialEventStmt, notifStmt]);
   } catch (error) {
     // A concurrent retry may commit first. Read its immutable result before live validation.
     if (cleanIdempotencyKey) {
@@ -637,7 +669,7 @@ export async function createOrder(
       revision: 0,
       subtotalAmount,
       shippingFee,
-      discountAmount: 0,
+      discountAmount,
       totalAmount,
       shippingAddress,
       customerName,
