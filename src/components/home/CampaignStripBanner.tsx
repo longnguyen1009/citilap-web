@@ -30,7 +30,7 @@ export default function CampaignStripBanner({
           width={1376}
           height={250}
           decoding="async"
-          className="w-full h-auto block object-cover group-hover:scale-[1.01] transition-transform duration-300"
+          className="w-full h-[60px] sm:h-[88px] md:h-[115px] lg:h-[125px] block object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
         />
       </Link>
     </section>
