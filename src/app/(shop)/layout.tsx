@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Header from "@/components/layout/Header";
 import StorefrontProviders from '@/components/layout/StorefrontProviders';
 import Footer from "@/components/layout/Footer";
@@ -45,7 +46,9 @@ export default async function ShopLayout({
       <a href="#main-content" className="storefront-skip-link">
         Chuyển đến nội dung chính
       </a>
-      <NavigationProgress />
+      <Suspense fallback={null}>
+        <NavigationProgress />
+      </Suspense>
       <PublicPriceRefresh nextChange={boundary.nextChange} version={boundary.token} serverTime={serverTime}/>
       <Header categories={categories} brands={brands} navigation={navigation} settings={settings} />
       <main id="main-content" tabIndex={-1} className="storefront-main flex-grow min-w-0">{children}</main>

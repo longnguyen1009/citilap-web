@@ -1,60 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const PREFETCH_TTL_MS = 45_000;
 const NON_PREFETCH_PREFIXES = ["/admin", "/api", "/login", "/cart", "/checkout", "/profile"];
-
-/**
- * Tracks which App Router route patterns already have their `prefetch-loading-shell`
- * template seeded in Vinext's `optimisticRouteTemplates`.
- * Keying by route pattern (instead of per-URL) avoids firing 80+ redundant prefetch
- * requests on pages with many links while guaranteeing instant URL + skeleton updates.
- */
-const seededRoutePatterns = new Set<string>();
-
-const STATIC_SINGLE_SEGMENT_ROUTES = new Set([
-  "/",
-  "/hot-sale",
-  "/phu-kien",
-  "/phan-loai",
-  "/news",
-  "/gioi-thieu",
-  "/he-thong-cua-hang",
-  "/chinh-sach-bao-hanh",
-  "/chinh-sach-doi-tra",
-  "/chinh-sach-van-chuyen",
-  "/chinh-sach-bao-mat",
-  "/dieu-khoan-mua-hang",
-  "/huong-dan-mua-hang",
-  "/cau-hoi-thuong-gap",
-  "/lien-he",
-  "/chon-laptop",
-  "/search",
-  "/wishlist",
-  "/so-sanh",
-  "/order-tracking",
-]);
-
-function getRoutePatternKey(pathname: string): string {
-  if (STATIC_SINGLE_SEGMENT_ROUTES.has(pathname)) return `route:${pathname}`;
-  if (pathname.startsWith("/laptop/")) return "route:/laptop/[id]";
-  if (pathname.startsWith("/phu-kien/")) return "route:/phu-kien/[id]";
-  if (pathname.startsWith("/product/")) return "route:/product/[id]";
-  if (pathname.startsWith("/san-pham/")) return "route:/san-pham/[id]";
-  if (pathname.startsWith("/news/category/")) return "route:/news/category/[slug]";
-  if (pathname.startsWith("/news/")) return "route:/news/[slug]";
-  if (pathname.startsWith("/brand/")) return "route:/brand/[slug]";
-  if (pathname.startsWith("/category/")) return "route:/category/[slug]";
-  if (pathname.startsWith("/collection/")) return "route:/collection/[slug]";
-  if (pathname.startsWith("/landing/")) return "route:/landing/[slug]";
-  if (pathname.startsWith("/phan-loai/")) return "route:/phan-loai/[...category]";
-
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length === 1) return "route:/[slug]";
-  return "route:/[...category]";
-}
 
 function parseInternalStorefrontAnchor(
   anchor: HTMLAnchorElement,
@@ -72,6 +22,11 @@ function parseInternalStorefrontAnchor(
 
   if (url.origin !== window.location.origin) return null;
   if (NON_PREFETCH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return null;
+  // Ignore pure hash jumps on the same page
+  if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) {
+    return null;
+  }
+
   return {
     fullHref: `${url.pathname}${url.search}`,
     pathname: url.pathname,
@@ -81,13 +36,27 @@ function parseInternalStorefrontAnchor(
 export default function NavigationProgress() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams?.toString() ?? "";
+
   const containerRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const prefetchedMapRef = useRef<Map<string, number>>(new Map());
   const timerRef = useRef<number | null>(null);
   const hideTimerRef = useRef<number | null>(null);
+  const dimTimerRef = useRef<number | null>(null);
   const activeRef = useRef(false);
   const progressRef = useRef(0);
+
+  const setMainNavigating = (navigating: boolean) => {
+    const main = document.getElementById("main-content");
+    if (!main) return;
+    if (navigating) {
+      main.setAttribute("data-navigating", "true");
+    } else {
+      main.removeAttribute("data-navigating");
+    }
+  };
 
   const applyBarStyle = (pct: number, show: boolean) => {
     const container = containerRef.current;
@@ -99,13 +68,18 @@ export default function NavigationProgress() {
   };
 
   const completeProgress = () => {
+    if (dimTimerRef.current !== null) {
+      window.clearTimeout(dimTimerRef.current);
+      dimTimerRef.current = null;
+    }
+    setMainNavigating(false);
+
     if (!activeRef.current) return;
     activeRef.current = false;
     if (timerRef.current !== null) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    document.documentElement.style.cursor = "";
     progressRef.current = 100;
     applyBarStyle(100, true);
     if (hideTimerRef.current !== null) {
@@ -117,52 +91,65 @@ export default function NavigationProgress() {
     }, 180);
   };
 
-  // Seed at most 1 loading-shell prefetch (pathname without query string) per route pattern
-  // after navigation settles so clicking any product/category/article link commits its URL
-  // and skeleton shell in <5ms without flooding the network or prefetch cache.
+  // Complete progress bar whenever the committed route or query changes
   useEffect(() => {
-    const timers: number[] = [];
-    const scanTimer = window.setTimeout(() => {
-      const anchors = document.querySelectorAll<HTMLAnchorElement>("a[href]");
-      const toSeed: string[] = [];
-      const queuedPatterns = new Set<string>();
+    completeProgress();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, searchKey]);
 
-      for (const anchor of anchors) {
-        const parsed = parseInternalStorefrontAnchor(anchor);
-        if (!parsed || parsed.pathname === window.location.pathname) continue;
-        const patternKey = getRoutePatternKey(parsed.pathname);
-        if (seededRoutePatterns.has(patternKey) || queuedPatterns.has(patternKey)) continue;
-        queuedPatterns.add(patternKey);
-        toSeed.push(parsed.pathname);
-        if (toSeed.length >= 6) break;
+  useEffect(() => {
+    const startProgress = (targetHref: string) => {
+      if (hideTimerRef.current !== null) {
+        window.clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+      if (timerRef.current !== null) {
+        window.clearInterval(timerRef.current);
+      }
+      if (dimTimerRef.current !== null) {
+        window.clearTimeout(dimTimerRef.current);
       }
 
-      toSeed.forEach((seedPathname, index) => {
-        const t = window.setTimeout(() => {
-          const patternKey = getRoutePatternKey(seedPathname);
-          if (seededRoutePatterns.has(patternKey)) return;
-          seededRoutePatterns.add(patternKey);
-          try {
-            // Prefetch pathname WITHOUT search params using default kind ("auto")
-            // so Vinext sends `X-Vinext-Rsc-Render-Mode: prefetch-loading-shell`
-            // and learns the optimistic route template for this route pattern.
-            router.prefetch(seedPathname);
-          } catch {
-            seededRoutePatterns.delete(patternKey);
-          }
-        }, index * 45);
-        timers.push(t);
-      });
-    }, 180);
+      activeRef.current = true;
+      progressRef.current = 28;
+      applyBarStyle(28, true);
 
-    return () => {
-      window.clearTimeout(scanTimer);
-      timers.forEach((t) => window.clearTimeout(t));
+      // Subtle tactile feedback on slow connections (>120ms) without flashing on instant cache hits
+      dimTimerRef.current = window.setTimeout(() => {
+        if (activeRef.current) {
+          setMainNavigating(true);
+        }
+      }, 120);
+
+      const startedAt = Date.now();
+      const startHref = `${window.location.pathname}${window.location.search}`;
+
+      timerRef.current = window.setInterval(() => {
+        const now = Date.now();
+        const nowHref = `${window.location.pathname}${window.location.search}`;
+        const isShowingSkeleton = Boolean(
+          document.querySelector('[data-route-loading="true"]'),
+        );
+
+        if (
+          (nowHref !== startHref && nowHref === targetHref && !isShowingSkeleton) ||
+          now - startedAt > 6000
+        ) {
+          completeProgress();
+          return;
+        }
+
+        const prev = progressRef.current;
+        if (prev < 90) {
+          const step = prev < 58 ? 14 : prev < 78 ? 5 : 1.5;
+          const next = Math.min(90, prev + step);
+          progressRef.current = next;
+          applyBarStyle(next, true);
+        }
+      }, 60);
     };
-  }, [pathname, router]);
 
-  useEffect(() => {
-    const warmOnIntent = (target: EventTarget | null) => {
+    const prefetchOnIntent = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return;
       const anchor = target.closest("a");
       if (!(anchor instanceof HTMLAnchorElement)) return;
@@ -171,44 +158,27 @@ export default function NavigationProgress() {
       const current = `${window.location.pathname}${window.location.search}`;
       if (parsed.fullHref === current) return;
 
-      // 1. Ensure the route pattern's optimistic loading-shell template is seeded
-      const patternKey = getRoutePatternKey(parsed.pathname);
-      if (!seededRoutePatterns.has(patternKey)) {
-        seededRoutePatterns.add(patternKey);
-        try {
-          router.prefetch(parsed.pathname);
-        } catch {
-          seededRoutePatterns.delete(patternKey);
-        }
-      }
-
-      // 2. Warm the Worker Edge RSC cache in the background WITHOUT calling
-      // `router.prefetch(href, { kind: "full" })` (which would delete the optimistic
-      // loading shell and block URL/skeleton commit on an in-flight `entry.pending`).
       const now = Date.now();
       const lastPrefetched = prefetchedMapRef.current.get(parsed.fullHref);
       if (lastPrefetched && now - lastPrefetched < PREFETCH_TTL_MS) return;
       prefetchedMapRef.current.set(parsed.fullHref, now);
 
-      const rscWarmUrl = `${parsed.fullHref}${parsed.fullHref.includes("?") ? "&" : "?"}_rsc`;
-      fetch(rscWarmUrl, {
-        headers: {
-          RSC: "1",
-          Accept: "text/x-component",
-        },
-        credentials: "include",
-        priority: "low",
-      } as RequestInit).catch(() => {
-        // Ignore background cache warm errors
-      });
+      // Use router.prefetch exclusively (avoid duplicate manual ?_rsc fetch & stale pattern seeding)
+      try {
+        router.prefetch(parsed.fullHref);
+      } catch {
+        // Ignore prefetch errors
+      }
     };
 
-    const handlePointerOver = (e: MouseEvent) => {
-      warmOnIntent(e.target);
+    const handlePointerOver = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") {
+        prefetchOnIntent(e.target);
+      }
     };
 
     const handleTouchStart = (e: TouchEvent) => {
-      warmOnIntent(e.target);
+      prefetchOnIntent(e.target);
     };
 
     const handleClick = (e: MouseEvent) => {
@@ -224,64 +194,30 @@ export default function NavigationProgress() {
       const current = `${window.location.pathname}${window.location.search}`;
       if (parsed.fullHref === current) return;
 
-      if (hideTimerRef.current !== null) {
-        window.clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = null;
-      }
-      if (timerRef.current !== null) {
-        window.clearInterval(timerRef.current);
-      }
+      startProgress(parsed.fullHref);
+    };
 
-      activeRef.current = true;
-      progressRef.current = 32;
-      applyBarStyle(32, true);
-
-      const startedAt = Date.now();
-      let urlChangedAt: number | null = null;
-
-      timerRef.current = window.setInterval(() => {
-        const now = Date.now();
-        const nowPath = `${window.location.pathname}${window.location.search}`;
-        if (nowPath !== current && urlChangedAt === null) {
-          urlChangedAt = now;
-        }
-
-        const isShowingSkeleton = Boolean(
-          document.querySelector('[data-route-loading="true"]'),
-        );
-
-        // Complete once the URL has updated AND the optimistic skeleton has been
-        // replaced by the actual page content (with an 80ms grace check).
-        if (
-          (urlChangedAt !== null && now - urlChangedAt >= 80 && !isShowingSkeleton) ||
-          now - startedAt > 6000
-        ) {
-          completeProgress();
-          return;
-        }
-
-        const prev = progressRef.current;
-        if (prev < 90) {
-          const step = prev < 60 ? 14 : prev < 78 ? 5 : 1.5;
-          const next = Math.min(90, prev + step);
-          progressRef.current = next;
-          applyBarStyle(next, true);
-        }
-      }, 50);
+    const handlePopState = () => {
+      // Ensure back/forward traversal always clears any stale navigating state
+      completeProgress();
     };
 
     document.addEventListener("pointerover", handlePointerOver, { passive: true });
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("click", handleClick, { capture: true });
+    window.addEventListener("popstate", handlePopState);
 
     return () => {
       document.removeEventListener("pointerover", handlePointerOver);
       document.removeEventListener("touchstart", handleTouchStart);
       document.removeEventListener("click", handleClick, { capture: true });
+      window.removeEventListener("popstate", handlePopState);
       if (timerRef.current !== null) window.clearInterval(timerRef.current);
       if (hideTimerRef.current !== null) window.clearTimeout(hideTimerRef.current);
-      document.documentElement.style.cursor = "";
+      if (dimTimerRef.current !== null) window.clearTimeout(dimTimerRef.current);
+      setMainNavigating(false);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   return (

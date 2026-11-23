@@ -388,7 +388,32 @@ textarea,
 .skeleton {
   background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.35s ease-in-out infinite;
+}
+
+/* Progressive section reveal as streamed Suspense chunks arrive */
+@keyframes progressiveReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.progressive-reveal {
+  animation: progressiveReveal 180ms ease-out both;
+}
+
+/* Immediate subtle feedback when navigating over slow mobile links */
+#main-content {
+  transition: opacity 140ms ease-out;
+}
+
+#main-content[data-navigating="true"] {
+  opacity: 0.72;
 }
 
 /* Respect user motion preferences */

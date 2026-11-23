@@ -98,7 +98,7 @@ export default function StudioPurchaseSection({
     const query = new URLSearchParams(searchParams.toString());
     query.set("sku", next.sku);
     query.delete("variant");
-    window.history.replaceState(null, "", `${pathname}?${query}`);
+    window.history.replaceState(window.history.state, "", `${pathname}?${query}`);
   };
 
   const selectCondition = (condition: ProductDocument["variants"][number]["condition"]) => {

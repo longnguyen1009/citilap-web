@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { businessProfile } from "@/config/business-profile";
 import {
   formatSeoTitle,
@@ -31,10 +32,13 @@ import {
   getPublishedNavigation,
   getPublishedHomepage,
   getStorefrontSettings,
-  getCachedHotSaleCampaigns,
   getCachedHomepageCatalog,
 } from "@/server/services/storefront-cms.service";
 import BlockRenderer from "@/components/builder/BlockRenderer";
+import {
+  FlashSaleSkeleton,
+  ProductGridSectionSkeleton,
+} from "@/components/ui/SectionSkeletons";
 
 export const revalidate = 60;
 
@@ -78,144 +82,10 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default async function Home() {
-  const [navigation, cmsHomepage, settings, hotSaleCampaigns] = await Promise.all([
-    getPublishedNavigation(),
-    getPublishedHomepage(),
-    getStorefrontSettings(),
-    getCachedHotSaleCampaigns().catch(() => undefined),
-  ]);
-
-  const rootCategories = (navigation?.categories ?? []).filter((c) => !c.parentId);
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "@id": `${businessProfile.canonicalSiteUrl}/#homepage`,
-    name: settings?.storeName || businessProfile.brandName,
-    description:
-      cmsHomepage?.seo.description ||
-      settings?.defaultSeoDescription ||
-      businessProfile.primaryTagline,
-    url: `${businessProfile.canonicalSiteUrl}`,
-    isPartOf: {
-      "@id": `${businessProfile.canonicalSiteUrl}/#website`,
-    },
-    about: {
-      "@id": `${businessProfile.canonicalSiteUrl}/#organization`,
-    },
-    ...(rootCategories.length > 0
-      ? {
-          mainEntity: {
-            "@type": "ItemList",
-            name: "Danh mục sản phẩm chính tại CitiLap",
-            itemListElement: rootCategories.map((cat, idx) => ({
-              "@type": "ListItem",
-              position: idx + 1,
-              name: cat.name,
-              url: `${businessProfile.canonicalSiteUrl}${cat.href}`,
-            })),
-          },
-        }
-      : {}),
-  };
-
-  const defaultShowroomGallery = [
-    {
-      url: "/brand/store-photo-01.webp",
-      alt: "Không gian trải nghiệm và bàn giao laptop tại showroom CitiLap Hà Nội",
-      href: "/he-thong-cua-hang",
-    },
-    {
-      url: "/brand/store-photo-02.webp",
-      alt: "Khách hàng kiểm tra và chọn mua laptop trực tiếp tại CitiLap",
-      href: "/he-thong-cua-hang",
-    },
-    {
-      url: "/brand/store-photo-03.webp",
-      alt: "Khu vực trưng bày Laptop Gaming, Ultrabook và Workstation tại CitiLap",
-      href: "/he-thong-cua-hang",
-    },
-    {
-      url: "/brand/store-photo-04.webp",
-      alt: "Kỹ thuật viên CitiLap hỗ trợ test máy và cài đặt phần mềm cho khách hàng",
-      href: "/he-thong-cua-hang",
-    },
-  ];
-
-  // If a CMS homepage is published, render dynamic sections via BlockRenderer
-  if (cmsHomepage && cmsHomepage.sections && cmsHomepage.sections.length > 0) {
-    const hasVideoReviewsBlock = cmsHomepage.sections.some(
-      (s) => s.enabled && s.type === "video_reviews"
-    );
-    const hasCustomerGalleryBlock = cmsHomepage.sections.some(
-      (s) => s.enabled && s.type === "customer_gallery"
-    );
-
-    return (
-      <div className="bg-surface-subtle min-h-screen">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-        />
-        <BlockRenderer
-          sections={cmsHomepage.sections}
-          settings={settings}
-          flashSale={<FlashSaleSection settings={settings} initialCampaigns={hotSaleCampaigns} />}
-        />
-        <div className="defer-offscreen">
-          {!hasVideoReviewsBlock && (
-            <LazyBelowFold minHeight={420}>
-              <VideoReviews
-                title="Góc Review & Trải Nghiệm Thực Tế"
-                subtitle="Video mở hộp, test hiệu năng và tư vấn chọn laptop thực tế từ đội ngũ CitiLap"
-                videos={settings?.reviewVideos ?? []}
-                fallbackVideos={settings?.reviewVideos}
-                youtubeChannelUrl={settings?.youtubeUrl}
-                tiktokChannelUrl={settings?.tiktokUrl}
-              />
-            </LazyBelowFold>
-          )}
-          {!hasCustomerGalleryBlock && (
-            <LazyBelowFold minHeight={280}>
-              <CustomerGallery
-                title="Hình Ảnh Thực Tế Tại Showroom CitiLap"
-                subtitle="Không gian trải nghiệm, kiểm định kỹ thuật và bàn giao máy trực tiếp tại Hà Nội & Bắc Ninh"
-                images={defaultShowroomGallery}
-              />
-            </LazyBelowFold>
-          )}
-          <TestimonialSection
-            testimonials={settings?.testimonials ?? []}
-            sourceUrl={settings?.testimonialsSourceUrl}
-          />
-        </div>
-      </div>
-    );
-  }
-
+async function FallbackHomepageCatalog() {
   const catalog = await getCachedHomepageCatalog().catch(() => null);
   return (
-    <div className="bg-surface-subtle min-h-screen">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
-      />
-
-      {/* 1. HERO SECTION & SUB-BANNERS */}
-      <HeroSection settings={settings ?? undefined} />
-
-      {/* 1.5 CAMPAIGN HORIZONTAL STRIP BANNER */}
-      <CampaignStripBanner />
-
-      {/* 2. PROMO DUAL ANIMATED BANNERS */}
-      <PromoDualBanners />
-
-      {/* 3. KHÁM PHÁ HỆ SINH THÁI DANH MỤC & PHỤ KIỆN TECH */}
-      <CategoryGridSection navigation={navigation} />
-
-      {/* 4. FLASH SALE */}
-      <FlashSaleSection settings={settings} initialCampaigns={hotSaleCampaigns} />
-
+    <div className="progressive-reveal">
       {/* 4. HÀNG MỚI VỀ */}
       <ProductSection
         products={catalog?.newArrivals}
@@ -319,7 +189,159 @@ export default async function Home() {
           badgeColor="bg-orange-600 text-white shadow-xs"
           rank={true}
         />
+      </div>
+    </div>
+  );
+}
 
+export default async function Home() {
+  const [navigation, cmsHomepage, settings] = await Promise.all([
+    getPublishedNavigation(),
+    getPublishedHomepage(),
+    getStorefrontSettings(),
+  ]);
+
+  const rootCategories = (navigation?.categories ?? []).filter((c) => !c.parentId);
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    "@id": `${businessProfile.canonicalSiteUrl}/#homepage`,
+    name: settings?.storeName || businessProfile.brandName,
+    description:
+      cmsHomepage?.seo.description ||
+      settings?.defaultSeoDescription ||
+      businessProfile.primaryTagline,
+    url: `${businessProfile.canonicalSiteUrl}`,
+    isPartOf: {
+      "@id": `${businessProfile.canonicalSiteUrl}/#website`,
+    },
+    about: {
+      "@id": `${businessProfile.canonicalSiteUrl}/#organization`,
+    },
+    ...(rootCategories.length > 0
+      ? {
+          mainEntity: {
+            "@type": "ItemList",
+            name: "Danh mục sản phẩm chính tại CitiLap",
+            itemListElement: rootCategories.map((cat, idx) => ({
+              "@type": "ListItem",
+              position: idx + 1,
+              name: cat.name,
+              url: `${businessProfile.canonicalSiteUrl}${cat.href}`,
+            })),
+          },
+        }
+      : {}),
+  };
+
+  const defaultShowroomGallery = [
+    {
+      url: "/brand/store-photo-01.webp",
+      alt: "Không gian trải nghiệm và bàn giao laptop tại showroom CitiLap Hà Nội",
+      href: "/he-thong-cua-hang",
+    },
+    {
+      url: "/brand/store-photo-02.webp",
+      alt: "Khách hàng kiểm tra và chọn mua laptop trực tiếp tại CitiLap",
+      href: "/he-thong-cua-hang",
+    },
+    {
+      url: "/brand/store-photo-03.webp",
+      alt: "Khu vực trưng bày Laptop Gaming, Ultrabook và Workstation tại CitiLap",
+      href: "/he-thong-cua-hang",
+    },
+    {
+      url: "/brand/store-photo-04.webp",
+      alt: "Kỹ thuật viên CitiLap hỗ trợ test máy và cài đặt phần mềm cho khách hàng",
+      href: "/he-thong-cua-hang",
+    },
+  ];
+
+  // If a CMS homepage is published, render dynamic sections via BlockRenderer
+  if (cmsHomepage && cmsHomepage.sections && cmsHomepage.sections.length > 0) {
+    const hasVideoReviewsBlock = cmsHomepage.sections.some(
+      (s) => s.enabled && s.type === "video_reviews"
+    );
+    const hasCustomerGalleryBlock = cmsHomepage.sections.some(
+      (s) => s.enabled && s.type === "customer_gallery"
+    );
+
+    return (
+      <div className="bg-surface-subtle min-h-screen">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+        />
+        <BlockRenderer
+          sections={cmsHomepage.sections}
+          settings={settings}
+          flashSale={
+            <Suspense fallback={<FlashSaleSkeleton />}>
+              <FlashSaleSection settings={settings} />
+            </Suspense>
+          }
+        />
+        <div className="defer-offscreen">
+          {!hasVideoReviewsBlock && (
+            <LazyBelowFold minHeight={420}>
+              <VideoReviews
+                title="Góc Review & Trải Nghiệm Thực Tế"
+                subtitle="Video mở hộp, test hiệu năng và tư vấn chọn laptop thực tế từ đội ngũ CitiLap"
+                videos={settings?.reviewVideos ?? []}
+                fallbackVideos={settings?.reviewVideos}
+                youtubeChannelUrl={settings?.youtubeUrl}
+                tiktokChannelUrl={settings?.tiktokUrl}
+              />
+            </LazyBelowFold>
+          )}
+          {!hasCustomerGalleryBlock && (
+            <LazyBelowFold minHeight={280}>
+              <CustomerGallery
+                title="Hình Ảnh Thực Tế Tại Showroom CitiLap"
+                subtitle="Không gian trải nghiệm, kiểm định kỹ thuật và bàn giao máy trực tiếp tại Hà Nội & Bắc Ninh"
+                images={defaultShowroomGallery}
+              />
+            </LazyBelowFold>
+          )}
+          <TestimonialSection
+            testimonials={settings?.testimonials ?? []}
+            sourceUrl={settings?.testimonialsSourceUrl}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-surface-subtle min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
+      />
+
+      {/* 1. HERO SECTION & SUB-BANNERS */}
+      <HeroSection settings={settings ?? undefined} />
+
+      {/* 1.5 CAMPAIGN HORIZONTAL STRIP BANNER */}
+      <CampaignStripBanner />
+
+      {/* 2. PROMO DUAL ANIMATED BANNERS */}
+      <PromoDualBanners />
+
+      {/* 3. KHÁM PHÁ HỆ SINH THÁI DANH MỤC & PHỤ KIỆN TECH */}
+      <CategoryGridSection navigation={navigation} />
+
+      {/* 4. FLASH SALE (streamed progressively) */}
+      <Suspense fallback={<FlashSaleSkeleton />}>
+        <FlashSaleSection settings={settings} />
+      </Suspense>
+
+      {/* 5-9. PRODUCT SECTIONS (streamed progressively) */}
+      <Suspense fallback={<ProductGridSectionSkeleton rows={2} />}>
+        <FallbackHomepageCatalog />
+      </Suspense>
+
+      <div className="defer-offscreen">
         {/* 11. GÓC CITILAP MEDIA */}
         <MediaSection />
 

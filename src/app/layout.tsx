@@ -133,15 +133,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className="h-full antialiased"
     >
       <head>
-        <script
-          async
-          src="https://www.googletagmanager.com/gtm.js?id=GTM-PDBZQPL4"
+        <link
+          rel="preload"
+          href="/fonts/SFProDisplay-Regular.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
         />
-        <script
-          id="google-tag-init"
-          dangerouslySetInnerHTML={{
-            __html: `window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());`,
-          }}
+        <link
+          rel="preload"
+          href="/fonts/SFProDisplay-Bold.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
         />
         <script
           type="application/ld+json"
@@ -150,6 +154,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-full flex flex-col">
         {children}
+        <script
+          id="google-tag-init"
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());`,
+          }}
+        />
+        <script
+          defer
+          src="https://www.googletagmanager.com/gtm.js?id=GTM-PDBZQPL4"
+        />
       </body>
     </html>
   );

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { businessProfile } from "@/config/business-profile";
 import { variantSpecs } from '@/lib/variant-presentation';
 import { categoryAncestors } from '@/lib/category-paths';
@@ -46,7 +47,9 @@ import { resolveProductFaqs } from "@/lib/product-faqs";
 import {
   calculateEffectivePrice,
   applyPricingToHomepageProducts,
+  type PriceEvaluationContext,
 } from "@/server/services/pricing.service";
+import { RelatedProductsSkeleton } from "@/components/ui/SectionSkeletons";
 
 export interface ProductPageProps {
   namespace?: string;
@@ -371,7 +374,7 @@ export default async function ProductDetailPage({
     /phu-kien|linh-kien/.test(product.categorySlug || '');
 
   const manualAccessoryIds = studio?.accessoryProductIds || [];
-  const [accessoriesRaw, approvedReviews, rawRelatedProducts, fallbackCatalog] = await Promise.all([
+  const [accessoriesRaw, approvedReviews, fallbackCatalog] = await Promise.all([
     Promise.all(
       manualAccessoryIds.map(async (accessoryId) => {
         const publication = await getCachedProductPublication(accessoryId, 'id');
@@ -404,13 +407,6 @@ export default async function ProductDetailPage({
       })
     ),
     getCachedProductReviews([displayName, product.name]),
-    getCachedRelatedProducts(
-      product.id,
-      product.categoryId,
-      product.brandId,
-      5,
-      manualRelatedIds,
-    ),
     manualAccessoryIds.length === 0 && !isCurrentAccessory
       ? getCachedHomepageCatalog().catch(() => null)
       : Promise.resolve(null),
@@ -431,7 +427,6 @@ export default async function ProductDetailPage({
             salePrice: Number(item.price) || 0,
             originalPrice: Number(item.originalPrice || item.oldPrice || item.price) || 0,
           }));
-  const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext, evaluatedAt);
 
   // Sanitize description
   const safeDescription = sanitizeHtml(
@@ -721,39 +716,82 @@ export default async function ProductDetailPage({
           </div>
         </section>
 
-        {/* 3. NỘI DUNG DƯỚI CÙNG: SẢN PHẨM TƯƠNG TỰ */}
-        {relatedProducts.length > 0 && (
-          <section className="mt-10 md:mt-12" aria-label="Sản phẩm tương tự">
-            <div className="flex items-center justify-between gap-3 mb-4 md:mb-6">
-              <div className="min-w-0">
-                <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] font-black text-gray-900 uppercase tracking-tight">
-                  Sản phẩm tương tự
-                </h2>
-                <p className="text-xs text-gray-500 line-clamp-1 sm:line-clamp-none">
-                  Các mẫu laptop cùng phân khúc và danh mục được quan tâm nhiều
-                </p>
-              </div>
-              {product.categorySlug && (
-                <Link
-                  href={categoryUrl}
-                  className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition shrink-0 whitespace-nowrap"
-                >
-                  Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 md:gap-3 lg:gap-4">
-              {relatedProducts.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* 3. NỘI DUNG DƯỚI CÙNG: SẢN PHẨM TƯƠNG TỰ (streamed progressively) */}
+        <Suspense fallback={<RelatedProductsSkeleton />}>
+          <RelatedProductsStream
+            productId={product.id}
+            categoryId={product.categoryId}
+            brandId={product.brandId}
+            manualRelatedIds={manualRelatedIds}
+            pricingContext={pricingContext}
+            evaluatedAt={evaluatedAt}
+            categorySlug={product.categorySlug}
+            categoryUrl={categoryUrl}
+          />
+        </Suspense>
 
         {/* 4. SẢN PHẨM VỪA XEM */}
         <RecentlyViewedSection currentProduct={recentlyViewedItem} maxDisplay={5} />
       </div>
     </div>
+  );
+}
+
+async function RelatedProductsStream({
+  productId,
+  categoryId,
+  brandId,
+  manualRelatedIds,
+  pricingContext,
+  evaluatedAt,
+  categorySlug,
+  categoryUrl,
+}: {
+  productId: string;
+  categoryId: string | null | undefined;
+  brandId: string | null | undefined;
+  manualRelatedIds: string[];
+  pricingContext: PriceEvaluationContext;
+  evaluatedAt: Date;
+  categorySlug?: string | null;
+  categoryUrl: string;
+}) {
+  const rawRelatedProducts = await getCachedRelatedProducts(
+    productId,
+    categoryId,
+    brandId,
+    5,
+    manualRelatedIds,
+  );
+  const relatedProducts = applyPricingToHomepageProducts(rawRelatedProducts, pricingContext, evaluatedAt);
+  if (relatedProducts.length === 0) return null;
+
+  return (
+    <section className="mt-10 md:mt-12 progressive-reveal" aria-label="Sản phẩm tương tự">
+      <div className="flex items-center justify-between gap-3 mb-4 md:mb-6">
+        <div className="min-w-0">
+          <h2 className="text-[16px] sm:text-[18px] lg:text-[22px] font-black text-gray-900 uppercase tracking-tight">
+            Sản phẩm tương tự
+          </h2>
+          <p className="text-xs text-gray-500 line-clamp-1 sm:line-clamp-none">
+            Các mẫu laptop cùng phân khúc và danh mục được quan tâm nhiều
+          </p>
+        </div>
+        {categorySlug && (
+          <Link
+            href={categoryUrl}
+            className="inline-flex min-h-11 items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 transition shrink-0 whitespace-nowrap"
+          >
+            Xem tất cả <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 md:gap-3 lg:gap-4">
+        {relatedProducts.map((p) => (
+          <ProductCard key={p.id} product={p} />
+        ))}
+      </div>
+    </section>
   );
 }

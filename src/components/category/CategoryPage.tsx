@@ -1,9 +1,10 @@
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Breadcrumb from "@/components/layout/Breadcrumb";
 import CategoryCatalog from "@/components/category/CategoryCatalog";
+import { CategoryCatalogSkeleton } from "@/components/ui/SectionSkeletons";
 import { getPublishedNavigation, getCachedActiveCategories } from "@/server/services/storefront-cms.service";
 import { cachedJson } from "@/server/cache/kv-cache";
 import { searchProducts } from "@/server/services/search.service";
@@ -127,47 +128,55 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   };
 }
 
-export default async function CategoryDetailPage({ params, searchParams }: Props) {
-  const { current, categories } = await resolveCategory('/' + (await params).category.join('/'));
-  const query = filterParams(await searchParams);
-  const parsed = parseSearchParams(query);
-  if (!parsed.success) return <div className="container-shop py-8"><h1 className="text-title font-bold">{current.name}</h1><p role="alert" className="my-4">Bộ lọc không hợp lệ. Kiểm tra khoảng giá, số trang và giá trị đã nhập.</p><Link href={current.href} className="text-brand-primary underline">Xóa bộ lọc</Link></div>;
-
-  const ancestors = categoryAncestors(current, categories);
-
-  // Compute category scope: allow multi-select direct child subcategories at any depth
-  let effectiveCategoryScope = [current.id];
-  const requestedSubcats = query.getAll("subcat");
-
-  if (requestedSubcats.length > 0) {
-    const childCategories = categories.filter(c => c.parentId === current.id);
-    const matched = childCategories.filter(s => requestedSubcats.includes(s.slug) || requestedSubcats.includes(s.id));
-    if (matched.length > 0) {
-      effectiveCategoryScope = matched.map(s => s.id);
-    }
-  }
-
-  // The route owns category scope; query parameters cannot escape this branch.
-  const limitVal = query.has("limit") ? parsed.data.limit : 24;
+async function CategoryCatalogStream({
+  current,
+  categories,
+  ancestors,
+  effectiveCategoryScope,
+  parsedData,
+  query,
+  breadcrumbs,
+}: {
+  current: Awaited<ReturnType<typeof resolveCategory>>["current"];
+  categories: Awaited<ReturnType<typeof resolveCategory>>["categories"];
+  ancestors: ReturnType<typeof categoryAncestors>;
+  effectiveCategoryScope: string[];
+  parsedData: Extract<ReturnType<typeof parseSearchParams>, { success: true }>["data"];
+  query: URLSearchParams;
+  breadcrumbs: Array<{ label: string; href: string }>;
+}) {
+  const limitVal = query.has("limit") ? parsedData.limit : 24;
   const isDefaultView = query.size === 0 || (query.size === 1 && query.has("page"));
-  const result = isDefaultView
-    ? await cachedJson(
-        `public-cat-search:${effectiveCategoryScope.join(",")}:p${parsed.data.page}:l${limitVal}`,
-        60,
-        () => searchProducts({ ...parsed.data, category: effectiveCategoryScope, limit: limitVal })
-      )
-    : await searchProducts({ ...parsed.data, category: effectiveCategoryScope, limit: limitVal });
+
+  // Run primary search, base facets, and brand counts in parallel instead of sequentially
+  const [result, facetsRes, brandCountsRes] = await Promise.all([
+    isDefaultView
+      ? cachedJson(
+          `public-cat-search:${effectiveCategoryScope.join(",")}:p${parsedData.page}:l${limitVal}`,
+          60,
+          () => searchProducts({ ...parsedData, category: effectiveCategoryScope, limit: limitVal })
+        )
+      : searchProducts({ ...parsedData, category: effectiveCategoryScope, limit: limitVal }),
+    query.size > 0
+      ? cachedJson(
+          `public-cat-facets:${effectiveCategoryScope.join(",")}`,
+          60,
+          () => searchProducts({ category: effectiveCategoryScope, limit: 1 })
+        )
+      : Promise.resolve(null),
+    parsedData.brand?.length
+      ? searchProducts({ ...parsedData, category: effectiveCategoryScope, brand: undefined, page: 1, limit: 1 })
+      : Promise.resolve(null),
+  ]);
+
   if (result.page > Math.max(1, result.totalPages)) notFound();
-  const facets = query.size ? (await searchProducts({ category: effectiveCategoryScope, limit: 1 })).facets : result.facets;
-  const brandCounts = parsed.data.brand?.length
-    ? (await searchProducts({ ...parsed.data, category: effectiveCategoryScope, brand: undefined, page: 1, limit: 1 })).facets.brands
-    : result.facets.brands;
+  const facets = facetsRes ? facetsRes.facets : result.facets;
+  const brandCounts = brandCountsRes ? brandCountsRes.facets.brands : result.facets.brands;
   const seoMeta = getCategorySeoMeta(current, result.page);
   const enrichedCategory = {
     ...current,
     description: seoMeta.introText,
   };
-  const breadcrumbs = [{ label: "Trang chủ", href: "/" }, ...ancestors.map(c => ({ label: c.name, href: c.href }))];
   const canonicalUrl = businessProfile.canonicalSiteUrl + current.href;
   const jsonLd = [
     {
@@ -203,10 +212,18 @@ export default async function CategoryDetailPage({ params, searchParams }: Props
       })),
     },
   ];
-  return <div className="min-h-screen bg-surface-subtle pb-16">
-    <Breadcrumb items={breadcrumbs} />
-    <div className="container-shop py-3 sm:py-4">
-      <CategoryCatalog category={enrichedCategory} categories={categories} result={result} facets={facets} brandCounts={brandCounts} params={query} isAccessory={ancestors.some(c => ["phu-kien", "linh-kien"].includes(c.slug))} />
+
+  return (
+    <div className="progressive-reveal">
+      <CategoryCatalog
+        category={enrichedCategory}
+        categories={categories}
+        result={result}
+        facets={facets}
+        brandCounts={brandCounts}
+        params={query}
+        isAccessory={ancestors.some(c => ["phu-kien", "linh-kien"].includes(c.slug))}
+      />
       {seoMeta.description && (
         <section aria-label={`Giới thiệu danh mục ${current.name}`} className="mt-6 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 shadow-2xs">
           <h2 className="text-sm font-bold text-slate-900">{current.name} tại CitiLap</h2>
@@ -215,5 +232,47 @@ export default async function CategoryDetailPage({ params, searchParams }: Props
       )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     </div>
-  </div>;
+  );
+}
+
+export default async function CategoryDetailPage({ params, searchParams }: Props) {
+  const { current, categories } = await resolveCategory('/' + (await params).category.join('/'));
+  const query = filterParams(await searchParams);
+  const parsed = parseSearchParams(query);
+  if (!parsed.success) return <div className="container-shop py-8"><h1 className="text-title font-bold">{current.name}</h1><p role="alert" className="my-4">Bộ lọc không hợp lệ. Kiểm tra khoảng giá, số trang và giá trị đã nhập.</p><Link href={current.href} className="text-brand-primary underline">Xóa bộ lọc</Link></div>;
+
+  const ancestors = categoryAncestors(current, categories);
+
+  // Compute category scope: allow multi-select direct child subcategories at any depth
+  let effectiveCategoryScope = [current.id];
+  const requestedSubcats = query.getAll("subcat");
+
+  if (requestedSubcats.length > 0) {
+    const childCategories = categories.filter(c => c.parentId === current.id);
+    const matched = childCategories.filter(s => requestedSubcats.includes(s.slug) || requestedSubcats.includes(s.id));
+    if (matched.length > 0) {
+      effectiveCategoryScope = matched.map(s => s.id);
+    }
+  }
+
+  const breadcrumbs = [{ label: "Trang chủ", href: "/" }, ...ancestors.map(c => ({ label: c.name, href: c.href }))];
+
+  return (
+    <div className="min-h-screen bg-surface-subtle pb-16">
+      <Breadcrumb items={breadcrumbs} />
+      <div className="container-shop py-3 sm:py-4">
+        <Suspense fallback={<CategoryCatalogSkeleton />}>
+          <CategoryCatalogStream
+            current={current}
+            categories={categories}
+            ancestors={ancestors}
+            effectiveCategoryScope={effectiveCategoryScope}
+            parsedData={parsed.data}
+            query={query}
+            breadcrumbs={breadcrumbs}
+          />
+        </Suspense>
+      </div>
+    </div>
+  );
 }

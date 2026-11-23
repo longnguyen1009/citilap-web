@@ -116,7 +116,7 @@ export default function OrderTrackingPortal() {
       setLinkOrIdInput(initialOrderId);
       setTokenInput(initialToken);
       if (typeof window !== 'undefined' && window.location.search.includes('token=')) {
-        window.history.replaceState(null, '', '/order-tracking');
+        window.history.replaceState(window.history.state, '', '/order-tracking');
       }
       void fetchOrderWithToken(initialOrderId, initialToken);
     }
