@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, ChevronDown, Sparkles } from "lucide-react";
+import { FileText, ChevronDown } from "lucide-react";
 
 export interface ProductQuickSummaryItem {
   label: string;
@@ -17,7 +17,6 @@ interface ProductDescriptionArticleProps {
 export default function ProductDescriptionArticle({
   safeDescription,
   productName,
-  quickSummary = [],
 }: ProductDescriptionArticleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -31,26 +30,6 @@ export default function ProductDescriptionArticle({
       <h2 className="text-lg sm:text-xl font-black text-gray-900 border-b border-gray-100 pb-3 mb-5 uppercase flex items-center gap-2">
         <FileText className="w-5 h-5 text-blue-600" /> Đánh giá chi tiết sản phẩm
       </h2>
-
-      {quickSummary.length > 0 && (
-        <section
-          aria-label={`Tóm tắt nhanh ${productName}`}
-          className="mb-6 rounded-xl border border-blue-200/80 bg-blue-50/50 p-4 sm:p-5"
-        >
-          <h3 className="text-xs sm:text-sm font-black uppercase tracking-wide text-blue-950 flex items-center gap-1.5 mb-2.5">
-            <Sparkles className="w-4 h-4 text-blue-600 shrink-0" aria-hidden="true" />
-            <span>Tóm tắt nhanh: {productName} phù hợp với ai?</span>
-          </h3>
-          <dl className="space-y-1.5 text-xs sm:text-sm text-slate-700 leading-relaxed">
-            {quickSummary.map((item) => (
-              <div key={item.label} className="flex flex-col sm:flex-row sm:gap-1.5">
-                <dt className="font-bold text-slate-900 shrink-0">{item.label}:</dt>
-                <dd className="text-slate-700">{item.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      )}
 
       {hasContent ? (
         <>

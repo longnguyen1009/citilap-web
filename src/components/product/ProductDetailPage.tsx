@@ -531,31 +531,6 @@ export default async function ProductDetailPage({
   const resolvedFaqs = resolveProductFaqs(studio?.faqs);
   const faqJsonLd = generateFaqJsonLd(resolvedFaqs);
 
-  const coreSpecSummary = heroKeySpecs
-    .slice(0, 5)
-    .map((item) => `${item.label}: ${item.value}`)
-    .join(" · ");
-  const inferredUseCase = /gaming|rtx|gtx|radeon rx/i.test(`${displayName} ${coreSpecSummary} ${category?.name || ''}`)
-    ? "Game thủ, đồ họa 3D, dựng video, chạy tác vụ hiệu năng cao và AI."
-    : /workstation|precision|zbook|thinkpad p|quadro|rtx \d+ ada/i.test(`${displayName} ${coreSpecSummary} ${category?.name || ''}`)
-      ? "Kỹ sư AutoCAD/Revit/SolidWorks, kiến trúc sư và nhà sáng tạo nội dung chuyên nghiệp."
-      : /macbook/i.test(displayName)
-        ? "Lập trình viên, thiết kế sáng tạo, văn phòng cao cấp cần pin bền và màn hình chuẩn màu."
-        : isCurrentAccessory
-          ? "Phụ kiện nâng cấp và tối ưu trải nghiệm sử dụng laptop hằng ngày."
-          : "Sinh viên, nhân viên văn phòng, doanh nhân cần máy ổn định, gõ phím êm và dễ mang theo.";
-  const quickSummaryItems = [
-    ...(coreSpecSummary ? [{ label: "Cấu hình trọng tâm", value: coreSpecSummary }] : []),
-    { label: "Phù hợp nhất cho", value: inferredUseCase },
-    {
-      label: "Tình trạng & Bảo hành",
-      value: `${activeConditionLabel} · ${defaultWarrantyName}, lỗi 1 đổi 1 trong ${businessProfile.warrantySummary.returnPolicyDays} ngày đầu.`,
-    },
-    {
-      label: "Mua hàng & Kiểm tra",
-      value: `${displayPrice > 0 ? `Giá ${displayPrice.toLocaleString("vi-VN")}₫ · ` : ""}Xem máy trực tiếp tại CitiLap Hà Nội & Bắc Ninh hoặc ship COD đồng kiểm toàn quốc.`,
-    },
-  ];
   const productJsonLd = generateProductJsonLd({
     id: product.id,
     name: displayName,
@@ -696,7 +671,6 @@ export default async function ProductDetailPage({
             <ProductDescriptionArticle
               safeDescription={safeDescription}
               productName={displayName}
-              quickSummary={quickSummaryItems}
             />
 
             {/* Hồ sơ kiểm định từng máy (nếu có biên bản kiểm tra công khai) */}

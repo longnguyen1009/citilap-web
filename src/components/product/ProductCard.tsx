@@ -56,6 +56,7 @@ export interface ProductCardProps {
   hideQuickActions?: boolean;
   hideMetaRow?: boolean;
   inlineOldPrice?: boolean;
+  compactMobile?: boolean;
   topRightSticker?: string;
   className?: string;
   imageLoading?: "eager" | "lazy";
@@ -231,6 +232,7 @@ export default function ProductCard({
   hideQuickActions = false,
   hideMetaRow = false,
   inlineOldPrice = false,
+  compactMobile = false,
   topRightSticker,
   className = "",
   imageLoading = "lazy",
@@ -351,7 +353,7 @@ export default function ProductCard({
 
         {topRightSticker ? (
           <div className="shrink-0 pointer-events-none">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#dc2626] via-[#ea580c] to-[#f59e0b] text-white font-black text-[11px] md:text-xs tracking-tight shadow-md shadow-red-600/40 ring-2 ring-amber-300/90">
+            <span className="inline-flex items-center px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg bg-gradient-to-r from-[#dc2626] via-[#ea580c] to-[#f59e0b] text-white font-black text-[10px] sm:text-[11px] md:text-xs tracking-tight shadow-md shadow-red-600/40 ring-1 sm:ring-2 ring-amber-300/90">
               {topRightSticker}
             </span>
           </div>
@@ -395,7 +397,7 @@ export default function ProductCard({
 
       {/* Product Image Container */}
       <div
-        className={`relative aspect-[16/11] md:aspect-[4/3] p-2 pt-8 pb-1 md:p-3.5 md:pt-8 md:pb-2 w-full border-b border-black/[0.04] ${brandTheme.imageBg} flex items-center justify-center overflow-hidden`}
+        className={`relative aspect-[16/11] md:aspect-[4/3] ${compactMobile ? "p-1.5 pt-7 pb-1" : "p-2 pt-8 pb-1"} md:p-3.5 md:pt-8 md:pb-2 w-full border-b border-black/[0.04] ${brandTheme.imageBg} flex items-center justify-center overflow-hidden`}
       >
         <div className="relative block w-full h-full">
           {(() => {
@@ -433,7 +435,7 @@ export default function ProductCard({
       </div>
 
       {/* Card Body */}
-      <div className="flex flex-col flex-1 p-2.5 md:p-3 pt-2 md:pt-2">
+      <div className={`flex flex-col flex-1 ${compactMobile ? "p-1.5 sm:p-2.5 pt-1.5" : "p-2.5 pt-2"} md:p-3 md:pt-2`}>
         {/* Top Content: Brand Card (Left) & Old Struck Price + Discount % (Right) */}
         <div className="flex flex-col">
           {/* Row directly under image: Brand Card on left, Struck Old Price + Red Discount % on right */}
