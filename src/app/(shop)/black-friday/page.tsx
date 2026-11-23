@@ -9,7 +9,6 @@ export const dynamic = 'force-dynamic';
 
 const EVENT_START_ISO = '2026-11-24T17:00:00.000Z'; // 00:00 25/11/2026 GMT+7
 const EVENT_END_ISO = '2026-11-29T16:59:59.000Z';   // 23:59:59 29/11/2026 GMT+7
-const DEFAULT_FLASH_DISCOUNT = 399_000;
 
 const bfTitle = 'Black Friday 2026 — Săn Deal Laptop LikeNew 99% Giảm Tới 999K';
 const bfDesc =
@@ -45,6 +44,7 @@ interface RawLikeNewRow {
   brand: string | null;
   price: number;
   originalPrice: number | null;
+  stock: number | null;
   images: string;
   cpu: string | null;
   gpu: string | null;
@@ -54,7 +54,6 @@ interface RawLikeNewRow {
   warranty: string | null;
   variantId: string | null;
   sku: string | null;
-  campaignSalePrice: number | null;
 }
 
 export default async function BlackFridayPage() {
@@ -66,14 +65,10 @@ export default async function BlackFridayPage() {
     const [prodResult, publicCoupons] = await Promise.all([
       DB.prepare(
         `SELECT
-          p.id, p.name, p.slug, p.brand, p.price, p.originalPrice, p.images,
+          p.id, p.name, p.slug, p.brand, p.price, p.originalPrice, p.stock, p.images,
           p.cpu, p.gpu, p.ram, p.storage, p.display, p.warranty,
           (SELECT v.id FROM ProductVariant v WHERE v.productId = p.id AND v.status = 'ACTIVE' ORDER BY v.createdAt ASC LIMIT 1) AS variantId,
-          (SELECT v.sku FROM ProductVariant v WHERE v.productId = p.id AND v.status = 'ACTIVE' ORDER BY v.createdAt ASC LIMIT 1) AS sku,
-          (SELECT pci.salePrice FROM PromotionCampaignItem pci
-           JOIN PromotionCampaign pc ON pc.id = pci.campaignId
-           WHERE pci.productId = p.id AND pc.id = 'camp_black_friday_2026'
-           LIMIT 1) AS campaignSalePrice
+          (SELECT v.sku FROM ProductVariant v WHERE v.productId = p.id AND v.status = 'ACTIVE' ORDER BY v.createdAt ASC LIMIT 1) AS sku
          FROM Product p
          WHERE p.condition = 'LIKE_NEW' AND p.status = 'ACTIVE' AND p.deletedAt IS NULL
          ORDER BY p.isFeatured DESC, p.price DESC`
@@ -90,10 +85,6 @@ export default async function BlackFridayPage() {
       } catch {
         firstImage = null;
       }
-      const flashSalePrice =
-        row.campaignSalePrice != null && row.campaignSalePrice > 0
-          ? Number(row.campaignSalePrice)
-          : Math.max(0, Number(row.price) - DEFAULT_FLASH_DISCOUNT);
 
       return {
         id: row.id,
@@ -103,8 +94,8 @@ export default async function BlackFridayPage() {
         slug: row.slug,
         brand: row.brand || 'Khác',
         price: Number(row.price),
-        flashSalePrice,
         originalPrice: row.originalPrice != null ? Number(row.originalPrice) : null,
+        stock: row.stock ?? 5,
         image: firstImage,
         cpu: row.cpu,
         gpu: row.gpu,

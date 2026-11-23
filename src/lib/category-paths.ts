@@ -4,7 +4,7 @@ export const RESERVED_CATEGORY_ROOTS = new Set([
   'admin', 'api', 'auth', 'login', 'logout', 'preview', '_next', 'san-pham',
   'product', 'laptop', 'category', 'phan-loai', 'brand', 'collection', 'landing', 'news',
   'search', 'cart', 'checkout', 'contact', 'wishlist', 'profile', 'order-tracking',
-  'hot-sale', 'chon-laptop', 'lien-he', 'gioi-thieu', 'he-thong-cua-hang',
+  'hot-sale', 'black-friday', 'chon-laptop', 'lien-he', 'gioi-thieu', 'he-thong-cua-hang',
   'chinh-sach', 'chinh-sach-bao-hanh', 'chinh-sach-doi-tra', 'chinh-sach-van-chuyen',
   'chinh-sach-bao-mat', 'huong-dan-mua-hang', 'dieu-khoan-mua-hang', 'cau-hoi-thuong-gap',
 ]);
