@@ -645,7 +645,7 @@ export default function ProductHeroSection({
                       )}
 
                       <div>
-                        <div className="flex items-start justify-between gap-1 mb-0.5 sm:mb-1">
+                        <div className="flex items-start justify-between gap-1">
                           <span className={`text-xs sm:text-sm font-black leading-tight ${isSelected ? "text-emerald-950" : "text-slate-900"}`}>
                             {w.name}
                           </span>
@@ -655,14 +655,9 @@ export default function ProductHeroSection({
                             </span>
                           )}
                         </div>
-                        {w.desc && (
-                          <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-2 leading-tight">
-                            {w.desc}
-                          </p>
-                        )}
                       </div>
 
-                      <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
+                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-1">
                         <span className={`text-xs sm:text-sm font-bold tabular-nums ${w.priceDiff <= 0 ? "text-emerald-700" : "text-slate-900"}`}>
                           {w.priceDiff === 0 ? "Miễn phí" : `${w.priceDiff > 0 ? '+' : ''}${w.priceDiff.toLocaleString("vi-VN")}₫`}
                         </span>

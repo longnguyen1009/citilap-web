@@ -322,7 +322,7 @@ export default function StudioPurchaseSection({
                   }`}
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-1 mb-1">
+                    <div className="flex items-start justify-between gap-1">
                       <span className={`text-xs font-black ${isSelected ? "text-emerald-950" : "text-gray-900"}`}>
                         {item.name}
                       </span>
@@ -332,14 +332,9 @@ export default function StudioPurchaseSection({
                         </span>
                       )}
                     </div>
-                    {item.description && (
-                      <p className="text-[10.5px] text-gray-500 line-clamp-2 leading-tight">
-                        {item.description}
-                      </p>
-                    )}
                   </div>
 
-                  <div className="mt-2.5 pt-2 border-t border-gray-200/70 flex items-center justify-between">
+                  <div className="mt-2 pt-2 border-t border-gray-200/70 flex items-center justify-between">
                     <span className={`text-xs font-bold ${item.adjustment <= 0 ? "text-emerald-700" : "text-gray-900"}`}>
                       {item.adjustment === 0
                         ? "Đã bao gồm"
