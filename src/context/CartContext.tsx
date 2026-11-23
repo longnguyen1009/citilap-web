@@ -162,7 +162,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           if (data.items.some(s=>typeof s.available!=='boolean' || (s.available && (!Number.isSafeInteger(s.price) || s.price!<0)))) throw new Error('INVALID_CART_RESPONSE');
           if (number !== requestNumber.current) return;
           setCart((prev) => {
-            if (JSON.stringify(prev.map(i=>[i.id,i.productId,i.variantId || null,i.quantity,i.price])) !== cartKey) return prev;
+            if (JSON.stringify(prev.map(i=>[i.id,i.productId,i.variantId || null,i.warrantyName || null,i.quantity,i.price])) !== cartKey) return prev;
             const next = prev.map((item) => {
               const serverItem = data.items.find((s) => s.id === item.id);
               if (serverItem) {

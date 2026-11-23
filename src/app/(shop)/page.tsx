@@ -160,7 +160,6 @@ export default async function Home() {
         <BlockRenderer
           sections={cmsHomepage.sections}
           settings={settings}
-          afterHeroBanner={<CampaignStripBanner />}
           flashSale={<FlashSaleSection settings={settings} initialCampaigns={hotSaleCampaigns} />}
         />
         <div className="defer-offscreen">

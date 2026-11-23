@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Flame,
   Zap,
@@ -19,8 +18,8 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import type { PublicCouponDto } from '@/contracts/coupon';
-import { useCart } from '@/context/CartContext';
 import ProductCard from '@/components/product/ProductCard';
+import ProductQuickCheckoutModal, { type QuickCheckoutProductInfo } from '@/components/product/ProductQuickCheckoutModal';
 import './black-friday.css';
 
 export interface BlackFridayProduct {
@@ -73,15 +72,13 @@ export default function BlackFridayClient({
   eventStartIso,
   eventEndIso,
 }: BlackFridayClientProps) {
-  const router = useRouter();
-  const { addToCart } = useCart();
-
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeBrand, setActiveBrand] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [priceRange, setPriceRange] = useState<'ALL' | 'UNDER_20' | '20_30' | '30_40' | 'OVER_40'>('ALL');
   const [sortBy, setSortBy] = useState<'FEATURED' | 'PRICE_ASC' | 'PRICE_DESC'>('FEATURED');
+  const [quickBuyProduct, setQuickBuyProduct] = useState<QuickCheckoutProductInfo | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNowMs(Date.now()), 1000);
@@ -127,86 +124,91 @@ export default function BlackFridayClient({
   }, [products, activeBrand, searchQuery, priceRange, sortBy]);
 
   const handleSaveVoucher = (code: string) => {
-    navigator.clipboard?.writeText(code).catch(() => {});
+    navigator.clipboard?.writeText(code).catch(() => { });
     try {
       sessionStorage.setItem('citilap-saved-coupon-v1', code);
-    } catch {}
+    } catch { }
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2200);
   };
 
   const handleBuyNow = (p: BlackFridayProduct) => {
-    addToCart({
-      id: p.variantId ? `${p.id}-${p.variantId}` : p.id,
-      productId: p.id,
-      variantId: p.variantId || undefined,
+      setQuickBuyProduct({
+        id: p.id,
       name: p.name,
-      price: p.price,
-      displayPrice: formatVnd(p.price),
       image: p.image || '',
-      quantity: 1,
+      variantLabel: [p.ram?.split(' ')[0], p.storage?.split(' ')[0]].filter(Boolean).join(' / ') || undefined,
+      warrantyLabel: p.warranty || 'BH 3 tháng',
+      totalPrice: p.price,
+      items: [
+        {
+          productId: p.id,
+          variantId: p.variantId || null,
+          warrantyName: null,
+          quantity: 1,
+        },
+      ],
     });
-    router.push('/checkout');
   };
 
   const displayCoupons: PublicCouponDto[] = coupons.length
     ? coupons
     : [
-        {
-          id: 'bf999',
-          code: 'BF999',
-          name: 'Siêu Deal Black Friday Giảm 999K',
-          description: 'Áp dụng trực tiếp vào giá bán cho tất cả Laptop LikeNew 99%',
-          discountType: 'FIXED',
-          discountValue: 999_000,
-          maxDiscountAmount: null,
-          minOrderAmount: 0,
-          quantityLimit: 20,
-          usedCount: 0,
-          remaining: 20,
-          startAt: eventStartIso,
-          endAt: eventEndIso,
-          applyScope: 'CONDITION_LIKE_NEW',
-          isExhausted: false,
-        },
-        {
-          id: 'bf599',
-          code: 'BF599',
-          name: 'Deal Hot Black Friday Giảm 599K',
-          description: 'Áp dụng trực tiếp vào giá bán cho tất cả Laptop LikeNew 99%',
-          discountType: 'FIXED',
-          discountValue: 599_000,
-          maxDiscountAmount: null,
-          minOrderAmount: 0,
-          quantityLimit: 50,
-          usedCount: 0,
-          remaining: 50,
-          startAt: eventStartIso,
-          endAt: eventEndIso,
-          applyScope: 'CONDITION_LIKE_NEW',
-          isExhausted: false,
-        },
-        {
-          id: 'bf399',
-          code: 'BF399',
-          name: 'Deal Black Friday Giảm 399K',
-          description: 'Áp dụng trực tiếp vào giá bán cho tất cả Laptop LikeNew 99%',
-          discountType: 'FIXED',
-          discountValue: 399_000,
-          maxDiscountAmount: null,
-          minOrderAmount: 0,
-          quantityLimit: 100,
-          usedCount: 0,
-          remaining: 100,
-          startAt: eventStartIso,
-          endAt: eventEndIso,
-          applyScope: 'CONDITION_LIKE_NEW',
-          isExhausted: false,
-        },
-      ];
+      {
+        id: 'cpn_bf2026_999',
+        code: 'CITILAP999',
+        name: 'Black Friday Siêu Deal Giảm 999K',
+        description: 'Áp dụng trực tiếp vào giá bán cho tất cả Laptop LikeNew 99%',
+        discountType: 'FIXED',
+        discountValue: 999_000,
+        maxDiscountAmount: null,
+        minOrderAmount: 0,
+        quantityLimit: 20,
+        usedCount: 0,
+        remaining: 20,
+        startAt: eventStartIso,
+        endAt: eventEndIso,
+        applyScope: 'CONDITION_LIKE_NEW',
+        isExhausted: false,
+      },
+      {
+        id: 'cpn_bf2026_599',
+        code: 'CITILAP599',
+        name: 'Black Friday Hot Deal Giảm 599K',
+        description: 'Áp dụng trực tiếp vào giá bán cho tất cả Laptop LikeNew 99%',
+        discountType: 'FIXED',
+        discountValue: 599_000,
+        maxDiscountAmount: null,
+        minOrderAmount: 0,
+        quantityLimit: 50,
+        usedCount: 0,
+        remaining: 50,
+        startAt: eventStartIso,
+        endAt: eventEndIso,
+        applyScope: 'CONDITION_LIKE_NEW',
+        isExhausted: false,
+      },
+      {
+        id: 'cpn_bf2026_399',
+        code: 'CITILAP399',
+        name: 'Black Friday Deal Giảm 399K',
+        description: 'Áp dụng trực tiếp vào giá bán cho tất cả Laptop LikeNew 99%',
+        discountType: 'FIXED',
+        discountValue: 399_000,
+        maxDiscountAmount: null,
+        minOrderAmount: 0,
+        quantityLimit: 100,
+        usedCount: 0,
+        remaining: 100,
+        startAt: eventStartIso,
+        endAt: eventEndIso,
+        applyScope: 'CONDITION_LIKE_NEW',
+        isExhausted: false,
+      },
+    ];
 
   const topCoupon = displayCoupons.find((c) => !c.isExhausted) || displayCoupons[0];
-  const topCouponCode = topCoupon?.code || 'BF999';
+  const topCouponCode = topCoupon?.code || 'CITILAP999';
   const topCouponLabel =
     topCoupon?.discountType === 'PERCENT'
       ? `${topCoupon.discountValue}%`
@@ -335,11 +337,10 @@ export default function BlackFridayClient({
             return (
               <div
                 key={c.id}
-                className={`relative rounded-2xl p-5 border flex flex-col justify-between gap-4 transition ${
-                  isTop
+                className={`relative rounded-2xl p-5 border flex flex-col justify-between gap-4 transition ${isTop
                     ? 'bg-gradient-to-br from-red-950/90 via-[#1a0d12] to-[#120b14] border-amber-400/50 shadow-xl shadow-red-950/40'
                     : 'bg-gradient-to-br from-slate-900/95 to-[#12121a] border-white/12 hover:border-red-500/40'
-                }`}
+                  }`}
               >
                 {isTop && (
                   <span className="absolute -top-3 right-4 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-black text-[11px] font-black uppercase shadow">
@@ -379,11 +380,10 @@ export default function BlackFridayClient({
                     </div>
                     <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${
-                          isTop
+                        className={`h-full rounded-full ${isTop
                             ? 'bg-gradient-to-r from-amber-400 to-red-500'
                             : 'bg-gradient-to-r from-orange-500 to-red-600'
-                        }`}
+                          }`}
                         style={{ width: `${Math.max(8, usedPct)}%` }}
                       />
                     </div>
@@ -393,15 +393,14 @@ export default function BlackFridayClient({
                     type="button"
                     disabled={c.isExhausted}
                     onClick={() => handleSaveVoucher(c.code)}
-                    className={`w-full py-2.5 px-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
-                      c.isExhausted
+                    className={`w-full py-2.5 px-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition cursor-pointer ${c.isExhausted
                         ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                         : isCopied
                           ? 'bg-emerald-600 text-white'
                           : isTop
                             ? 'bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-black'
                             : 'bg-red-600 hover:bg-red-500 text-white'
-                    }`}
+                      }`}
                   >
                     {c.isExhausted ? (
                       'Đã hết mã'
@@ -436,7 +435,7 @@ export default function BlackFridayClient({
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-1">
                 Chọn mẫu máy bạn yêu thích và nhập mã <strong className="text-amber-300">{topCouponCode}</strong> (hoặc{' '}
-                <strong className="text-white">BF599 / BF399</strong>) tại bước thanh toán để được giảm trực tiếp vào giá bán!
+                <strong className="text-white">CITILAP599 / CITILAP399</strong>) tại bước thanh toán để được giảm trực tiếp vào giá bán!
               </p>
             </div>
           </div>
@@ -520,76 +519,77 @@ export default function BlackFridayClient({
               filteredProducts.map((p) => {
                 const discountedPrice = Math.max(0, p.price - 1_000_000);
                 return (
-                <ProductCard
-                  key={p.id}
-                  hideQuickActions
-                  hideMetaRow
-                  topRightSticker={`-${topCouponLabel}`}
-                  product={{
-                    id: p.id,
-                    name: p.name,
-                    slug: p.slug,
-                    href: `/san-pham/${p.slug}`,
-                    sku: p.sku || undefined,
-                    variantId: p.variantId || undefined,
-                    brand: p.brand,
-                    price: discountedPrice,
-                    originalPrice: p.price,
-                    condition: 'LIKE_NEW',
-                    stock: p.stock ?? 5,
-                    image: p.image,
-                    warranty: p.warranty || 'BH 3 tháng',
-                    specs: {
-                      cpu: p.cpu || undefined,
-                      gpu: p.gpu || undefined,
-                      ram: p.ram || undefined,
-                      ssd: p.storage || undefined,
-                      display: p.display || undefined,
-                    },
-                  }}
-                  footerAction={
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSaveVoucher(topCouponCode)}
-                        className="w-full rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 text-[11px] text-amber-950 font-semibold text-left flex items-center justify-between gap-1 transition cursor-pointer"
-                        title={`Bấm để lưu mã ${topCouponCode}`}
-                      >
-                        <span>
-                          Áp mã <strong className="font-black text-red-700">{topCouponCode}</strong> để giảm ngay{' '}
-                          <strong className="font-black text-red-700">{topCouponLabel}</strong>
-                        </span>
-                        {copiedCode === topCouponCode ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        ) : (
-                          <Copy className="w-3 h-3 text-amber-700 shrink-0" />
-                        )}
-                      </button>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <Link
-                          href={`/san-pham/${p.slug}`}
-                          className="py-2 px-2 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold text-center transition"
-                        >
-                          Chi tiết
-                        </Link>
+                  <ProductCard
+                    key={p.id}
+                    hideQuickActions
+                    hideMetaRow
+                    inlineOldPrice
+                    topRightSticker={`-${topCouponLabel}`}
+                    product={{
+                      id: p.id,
+                      name: p.name,
+                      slug: p.slug,
+                      href: `/san-pham/${p.slug}`,
+                      sku: p.sku || undefined,
+                      variantId: p.variantId || undefined,
+                      brand: p.brand,
+                      price: discountedPrice,
+                      originalPrice: p.price,
+                      condition: 'LIKE_NEW',
+                      stock: p.stock ?? 5,
+                      image: p.image,
+                      warranty: p.warranty || 'BH 3 tháng',
+                      specs: {
+                        cpu: p.cpu || undefined,
+                        gpu: p.gpu || undefined,
+                        ram: p.ram || undefined,
+                        ssd: p.storage || undefined,
+                        display: p.display || undefined,
+                      },
+                    }}
+                    footerAction={
+                      <div className="space-y-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            try {
-                              if (!sessionStorage.getItem('citilap-saved-coupon-v1')) {
-                                sessionStorage.setItem('citilap-saved-coupon-v1', topCouponCode);
-                              }
-                            } catch {}
-                            handleBuyNow(p);
-                          }}
-                          className="py-2 px-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black text-center transition cursor-pointer"
+                          onClick={() => handleSaveVoucher(topCouponCode)}
+                          className="w-full rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 text-[11px] text-amber-950 font-semibold text-left flex items-center justify-between gap-1 transition cursor-pointer"
+                          title={`Bấm để lưu mã ${topCouponCode}`}
                         >
-                          Mua ngay
+                          <span>
+                            Áp mã <strong className="font-black text-red-700">{topCouponCode}</strong> để giảm ngay{' '}
+                            <strong className="font-black text-red-700">{topCouponLabel}</strong>
+                          </span>
+                          {copiedCode === topCouponCode ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-amber-700 shrink-0" />
+                          )}
                         </button>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          <Link
+                            href={`/san-pham/${p.slug}`}
+                            className="py-2 px-2 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold text-center transition"
+                          >
+                            Chi tiết
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try {
+                                if (!sessionStorage.getItem('citilap-saved-coupon-v1')) {
+                                  sessionStorage.setItem('citilap-saved-coupon-v1', topCouponCode);
+                                }
+                              } catch { }
+                              handleBuyNow(p);
+                            }}
+                            className="py-2 px-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black text-center transition cursor-pointer"
+                          >
+                            Mua ngay
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  }
-                />
+                    }
+                  />
                 );
               })
             )}
@@ -606,7 +606,7 @@ export default function BlackFridayClient({
             </div>
             <h3 className="text-lg font-black text-white">Mua Online Trên Website CitiLap.vn</h3>
             <ol className="text-sm text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
-              <li>Bấm <strong className="text-amber-300">Lưu &amp; Sao chép mã</strong> (<code className="text-amber-300">BF999</code>, <code className="text-amber-300">BF599</code> hoặc <code className="text-amber-300">BF399</code>) ở khu vực Kho Voucher.</li>
+              <li>Bấm <strong className="text-amber-300">Lưu &amp; Sao chép mã</strong> (<code className="text-amber-300">CITILAP999</code>, <code className="text-amber-300">CITILAP599</code> hoặc <code className="text-amber-300">CITILAP399</code>) ở khu vực Kho Voucher.</li>
               <li>Chọn mẫu Laptop LikeNew 99% yêu thích và bấm <strong>Mua ngay</strong>.</li>
               <li>Tại trang Thanh toán, nhập mã giảm giá vào ô <strong>Mã giảm giá / Voucher</strong> để trừ tiền trực tiếp và giữ suất ưu đãi ngay lập tức.</li>
             </ol>
@@ -620,7 +620,7 @@ export default function BlackFridayClient({
             <ol className="text-sm text-slate-300 space-y-2 list-decimal list-inside leading-relaxed">
               <li>Ghé trực tiếp showroom CitiLap trong khung thời gian <strong className="text-amber-300">25/11 – 29/11/2026</strong>.</li>
               <li>Kiểm tra ngoại hình, test máy thoải mái cùng đội ngũ kỹ thuật viên.</li>
-              <li>Đọc trực tiếp mã giảm giá (<code className="text-amber-300">BF999</code> / <code className="text-amber-300">BF599</code> / <code className="text-amber-300">BF399</code>) cho nhân viên bán hàng để trừ thẳng vào hóa đơn (áp dụng đến khi hết lượt).</li>
+              <li>Đọc trực tiếp mã giảm giá (<code className="text-amber-300">CITILAP999</code> / <code className="text-amber-300">CITILAP599</code> / <code className="text-amber-300">CITILAP399</code>) cho nhân viên bán hàng để trừ thẳng vào hóa đơn (áp dụng đến khi hết lượt).</li>
             </ol>
             <div className="pt-1 text-xs text-slate-400 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -663,9 +663,9 @@ export default function BlackFridayClient({
               <summary>Cơ cấu mã giảm giá 999K / 599K / 399K hoạt động như thế nào?</summary>
               <div className="px-5 pb-4 text-sm text-slate-300 leading-relaxed">
                 CitiLap tung ra{' '}
-                <strong className="text-amber-300">20 deal giảm 999K (BF999)</strong>,{' '}
-                <strong className="text-amber-300">50 deal giảm 599K (BF599)</strong> và{' '}
-                <strong className="text-amber-300">100 deal giảm 399K (BF399)</strong> trừ trực tiếp vào giá bán khi thanh toán online hoặc đọc mã tại showroom. Hệ thống tự động đếm ngược số lượt và ngừng áp dụng khi hết mã.
+                <strong className="text-amber-300">20 deal giảm 999K (CITILAP999)</strong>,{' '}
+                <strong className="text-amber-300">50 deal giảm 599K (CITILAP599)</strong> và{' '}
+                <strong className="text-amber-300">100 deal giảm 399K (CITILAP399)</strong> trừ trực tiếp vào giá bán khi thanh toán online hoặc đọc mã tại showroom. Hệ thống tự động đếm ngược số lượt và ngừng áp dụng khi hết mã.
               </div>
             </details>
 
@@ -689,6 +689,14 @@ export default function BlackFridayClient({
           </div>
         </div>
       </section>
+
+      {quickBuyProduct && (
+        <ProductQuickCheckoutModal
+          isOpen={Boolean(quickBuyProduct)}
+          onClose={() => setQuickBuyProduct(null)}
+          productInfo={quickBuyProduct}
+        />
+      )}
     </div>
   );
 }

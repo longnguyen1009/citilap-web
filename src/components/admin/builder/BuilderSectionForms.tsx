@@ -2571,15 +2571,130 @@ export function PromoBannersForm({
   data,
   update,
   onPickMedia,
+  onPickMobileMedia,
+  onPickStripMedia,
+  onPickStripMobileMedia,
 }: {
   data: PromoBannersData;
   update: (p: Partial<PromoBannersData>) => void;
   onPickMedia: (bannerIdx: number) => void;
+  onPickMobileMedia?: (bannerIdx: number) => void;
+  onPickStripMedia?: () => void;
+  onPickStripMobileMedia?: () => void;
 }) {
   const banners = data.banners || [];
+  const strip = {
+    enabled: data.stripBanner?.enabled ?? true,
+    imageUrl: data.stripBanner?.imageUrl ?? '/images/banners/campaign-strip.webp',
+    mobileImageUrl: data.stripBanner?.mobileImageUrl ?? '',
+    href: data.stripBanner?.href ?? '/black-friday',
+    alt: data.stripBanner?.alt ?? 'Black Friday CitiLap 2026 (25/11 - 29/11) — Săn Deal Laptop LikeNew 99% giảm tới 999K',
+  };
+  const updateStrip = (patch: Partial<typeof strip>) => {
+    update({ stripBanner: { ...strip, ...patch } });
+  };
 
   return (
     <div className="space-y-4">
+      {/* Banner ngang chiến dịch ngay dưới Hero Banner */}
+      <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5">
+        <div className="flex items-center justify-between border-b border-amber-200/80 pb-2">
+          <span className="font-bold text-xs text-amber-950">
+            Banner ngang chiến dịch (Ngay dưới Hero Banner)
+          </span>
+          <label className="flex items-center gap-1.5 text-[11px] text-amber-900 font-semibold cursor-pointer">
+            <input
+              type="checkbox"
+              checked={strip.enabled}
+              onChange={(e) => updateStrip({ enabled: e.target.checked })}
+              className="rounded text-red-600"
+            />
+            <span>Hiển thị</span>
+          </label>
+        </div>
+
+        <div>
+          <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Ảnh banner ngang (URL)</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={strip.imageUrl}
+              onChange={(e) => updateStrip({ imageUrl: e.target.value })}
+              placeholder="/images/banners/campaign-strip.webp"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+            />
+            {onPickStripMedia && (
+              <button
+                type="button"
+                onClick={onPickStripMedia}
+                className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded text-xs font-semibold shrink-0 cursor-pointer"
+              >
+                Chọn ảnh
+              </button>
+            )}
+          </div>
+          {strip.imageUrl && (
+            <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 bg-slate-900">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={strip.imageUrl} alt={strip.alt || 'Banner ngang'} className="w-full h-auto max-h-24 object-contain" />
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="text-[11px] font-bold text-blue-700 block mb-0.5">
+            Ảnh banner ngang trên Mobile SP (Tùy chọn)
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={strip.mobileImageUrl || ''}
+              onChange={(e) => updateStrip({ mobileImageUrl: e.target.value })}
+              placeholder="Để trống nếu dùng chung ảnh PC"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+            />
+            {onPickStripMobileMedia && (
+              <button
+                type="button"
+                onClick={onPickStripMobileMedia}
+                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded text-xs font-semibold shrink-0 cursor-pointer"
+              >
+                Chọn ảnh SP
+              </button>
+            )}
+          </div>
+          {strip.mobileImageUrl && (
+            <div className="mt-2 rounded-lg overflow-hidden border border-slate-200 bg-slate-900 max-w-xs">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={strip.mobileImageUrl} alt="Banner ngang SP" className="w-full h-auto max-h-24 object-contain" />
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Đường dẫn khi bấm (Link)</label>
+            <input
+              type="text"
+              value={strip.href}
+              onChange={(e) => updateStrip({ href: e.target.value })}
+              placeholder="/black-friday"
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-bold text-slate-700 block mb-0.5">Mô tả ảnh (Alt SEO)</label>
+            <input
+              type="text"
+              value={strip.alt}
+              onChange={(e) => updateStrip({ alt: e.target.value })}
+              placeholder="Black Friday CitiLap..."
+              className="w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white"
+            />
+          </div>
+        </div>
+      </div>
+
       <div>
         <label className="font-bold text-slate-700 block mb-1">Nhãn khối (ARIA Label)</label>
         <input
@@ -2751,6 +2866,34 @@ export function PromoBannersForm({
                 >
                   Chọn ảnh
                 </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-blue-700 block mb-0.5">
+                Ảnh nền trên Mobile SP (Tùy chọn)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={banner.mobileImageUrl || ''}
+                  onChange={(e) => {
+                    const next = [...banners];
+                    next[idx] = { ...next[idx], mobileImageUrl: e.target.value };
+                    update({ banners: next });
+                  }}
+                  placeholder="Để trống nếu dùng chung ảnh PC"
+                  className="flex-1 px-2.5 py-1.5 border border-slate-300 rounded text-xs bg-white font-mono"
+                />
+                {onPickMobileMedia && (
+                  <button
+                    type="button"
+                    onClick={() => onPickMobileMedia(idx)}
+                    className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded text-xs font-semibold cursor-pointer shrink-0"
+                  >
+                    Chọn ảnh SP
+                  </button>
+                )}
               </div>
             </div>
           </div>

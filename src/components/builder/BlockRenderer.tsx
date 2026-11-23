@@ -30,6 +30,7 @@ import {
 } from '@/contracts/cms/site-builder';
 import type { SliderSectionData } from '@/components/home/SliderSection';
 import FeatureStrip from '@/components/home/FeatureStrip';
+import CampaignStripBanner from '@/components/home/CampaignStripBanner';
 import PromoDualBanners from '@/components/home/PromoDualBanners';
 import MediaSection from '@/components/home/MediaSectionView';
 import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
@@ -85,12 +86,10 @@ const THEME_GRADIENT_MAP: Record<string, string> = {
 export default function BlockRenderer({
   sections,
   flashSale,
-  afterHeroBanner,
   settings,
 }: {
   sections: ResolvedSectionItem[];
   flashSale?: ReactNode;
-  afterHeroBanner?: ReactNode;
   settings?: PublicStorefrontSettings | null;
 }) {
   if (!sections || sections.length === 0) {
@@ -115,22 +114,31 @@ export default function BlockRenderer({
         let blockNode: ReactNode = null;
         switch (section.type) {
           case 'banner':
-            blockNode = (
-              <Fragment key={section.id}>
-                <BannerBlock data={section.data} />
-                {section.id === 'sec-hero' && afterHeroBanner}
-              </Fragment>
-            );
+            blockNode = <BannerBlock key={section.id} data={section.data} />;
             break;
 
           case 'promo_banners': {
             const pData = promoBannersSectionDataSchema.parse(section.data);
+            const stripEnabled = pData.stripBanner ? pData.stripBanner.enabled : true;
+            const stripImage = pData.stripBanner?.imageUrl || '/images/banners/campaign-strip.webp';
+            const stripMobileImage = pData.stripBanner?.mobileImageUrl || undefined;
+            const stripHref = pData.stripBanner?.href || '/black-friday';
+            const stripAlt = pData.stripBanner?.alt || 'Black Friday CitiLap 2026 (25/11 - 29/11) — Săn Deal Laptop LikeNew 99% giảm tới 999K';
             blockNode = (
-              <PromoDualBanners
-                key={section.id}
-                banners={pData.banners}
-                ariaLabel={pData.title || 'Chương trình khuyến mãi nổi bật'}
-              />
+              <Fragment key={section.id}>
+                {stripEnabled && stripImage && (
+                  <CampaignStripBanner
+                    href={stripHref}
+                    imageSrc={stripImage}
+                    mobileImageSrc={stripMobileImage}
+                    alt={stripAlt}
+                  />
+                )}
+                <PromoDualBanners
+                  banners={pData.banners}
+                  ariaLabel={pData.title || 'Chương trình khuyến mãi nổi bật'}
+                />
+              </Fragment>
             );
             break;
           }

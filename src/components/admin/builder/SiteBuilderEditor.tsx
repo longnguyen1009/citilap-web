@@ -1472,6 +1472,9 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                       data={selectedSection.data}
                       update={updateSelectedSectionData}
                       onPickMedia={(bannerIdx) => setMediaPickerTarget(`promo_banner_image:${bannerIdx}`)}
+                      onPickMobileMedia={(bannerIdx) => setMediaPickerTarget(`promo_banner_mobile_image:${bannerIdx}`)}
+                      onPickStripMedia={() => setMediaPickerTarget('promo_strip_banner_image')}
+                      onPickStripMobileMedia={() => setMediaPickerTarget('promo_strip_mobile_image')}
                     />
                   )}
                   {selectedSection.data.type === 'slider' && (
@@ -1583,6 +1586,44 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                   setOgImageAssetId(asset.id);
                 } else if (mediaPickerTarget === 'cta_bg_image' && selectedSection?.data.type === 'cta') {
                   updateSelectedSectionData({ bgImageUrl: asset.url || '' });
+                } else if (
+                  mediaPickerTarget === 'promo_strip_banner_image' &&
+                  selectedSection?.data.type === 'promo_banners'
+                ) {
+                  const prevStrip = selectedSection.data.stripBanner;
+                  updateSelectedSectionData({
+                    stripBanner: {
+                      enabled: prevStrip?.enabled ?? true,
+                      href: prevStrip?.href ?? '/black-friday',
+                      alt: prevStrip?.alt ?? 'Black Friday CitiLap 2026',
+                      mobileImageUrl: prevStrip?.mobileImageUrl,
+                      imageUrl: asset.url || '',
+                    },
+                  });
+                } else if (
+                  mediaPickerTarget === 'promo_strip_mobile_image' &&
+                  selectedSection?.data.type === 'promo_banners'
+                ) {
+                  const prevStrip = selectedSection.data.stripBanner;
+                  updateSelectedSectionData({
+                    stripBanner: {
+                      enabled: prevStrip?.enabled ?? true,
+                      href: prevStrip?.href ?? '/black-friday',
+                      alt: prevStrip?.alt ?? 'Black Friday CitiLap 2026',
+                      imageUrl: prevStrip?.imageUrl ?? '/images/banners/campaign-strip.webp',
+                      mobileImageUrl: asset.url || '',
+                    },
+                  });
+                } else if (
+                  mediaPickerTarget.startsWith('promo_banner_mobile_image:') &&
+                  selectedSection?.data.type === 'promo_banners'
+                ) {
+                  const bIdx = parseInt(mediaPickerTarget.split(':')[1], 10);
+                  const banners = [...(selectedSection.data.banners || [])];
+                  if (banners[bIdx]) {
+                    banners[bIdx] = { ...banners[bIdx], mobileImageUrl: asset.url || '' };
+                    updateSelectedSectionData({ banners });
+                  }
                 } else if (
                   mediaPickerTarget.startsWith('promo_banner_image:') &&
                   selectedSection?.data.type === 'promo_banners'

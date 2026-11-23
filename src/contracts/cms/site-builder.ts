@@ -270,12 +270,22 @@ export const promoBannerItemSchema = z.object({
   ctaText: text(60).default('Xem ngay'),
   href: safeUrlOrPath.default('/search'),
   imageUrl: safeUrlOrPath.default(''),
+  mobileImageUrl: safeUrlOrPath.optional(),
   theme: z.enum(['crimson', 'sapphire', 'emerald', 'amber']).default('crimson'),
   enabled: z.boolean().optional(),
 });
 
+export const promoStripBannerSchema = z.object({
+  enabled: z.boolean().default(true),
+  imageUrl: safeUrlOrPath.default('/images/banners/campaign-strip.webp'),
+  mobileImageUrl: safeUrlOrPath.optional(),
+  href: safeUrlOrPath.default('/black-friday'),
+  alt: text(240).default('Black Friday CitiLap 2026 (25/11 - 29/11) — Săn Deal Laptop LikeNew 99% giảm tới 999K'),
+});
+
 export const promoBannersSectionDataSchema = z.object({
   title: text(200).default(''),
+  stripBanner: promoStripBannerSchema.optional(),
   banners: z.array(promoBannerItemSchema).min(1).max(2).default([]),
 });
 

@@ -13,6 +13,7 @@ interface OrderDetail {
     bankAccountInfo: string | null;
     vietQr?: { bankBin: string; accountNumber: string; accountName: string };
     showroom: {name:string;address:string} | null;
+    coupon?: { code: string; name: string; discountAmount: number } | null;
   } | null;
   id: string;
   orderNumber: string;
@@ -23,6 +24,7 @@ interface OrderDetail {
   shippingAddress: string | null;
   note: string | null;
   subtotalAmount: number;
+  discountAmount?: number;
   shippingFee: number;
   totalAmount: number;
   items: Array<{
@@ -188,14 +190,34 @@ function SuccessContent() {
               ))}
             </div>
 
-            <div className="border-t border-gray-200 mt-3 pt-3 flex justify-between items-center text-sm">
-              <span className="font-bold text-gray-700">Tổng thanh toán:</span>
-              <span className="font-black text-red-600 text-base">
-                {order.totalAmount.toLocaleString("vi-VN")}đ
-              </span>
-            </div>
-            <div className="text-[11px] text-gray-500 italic text-right mt-1">
-              Tạm tính: {order.subtotalAmount.toLocaleString('vi-VN')}đ · Phí giao hàng: {order.shippingFee.toLocaleString('vi-VN')}đ
+            <div className="border-t border-gray-200 mt-3 pt-3 space-y-2 text-xs md:text-sm">
+              <div className="flex justify-between items-center text-gray-600">
+                <span>Tiền hàng ({order.items.reduce((s, i) => s + i.quantity, 0)} sản phẩm):</span>
+                <span className="font-bold text-gray-900 tabular-nums">{order.subtotalAmount.toLocaleString("vi-VN")}đ</span>
+              </div>
+              {Number(order.discountAmount || 0) > 0 && (
+                <div className="flex justify-between items-center text-emerald-700 font-semibold">
+                  <span>
+                    Giảm giá{order.checkoutSnapshot?.coupon?.code ? ` (Mã ${order.checkoutSnapshot.coupon.code})` : ''}:
+                  </span>
+                  <span className="tabular-nums">-{Number(order.discountAmount).toLocaleString("vi-VN")}đ</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center text-gray-600">
+                <span>Phí giao hàng:</span>
+                <span className={`font-bold tabular-nums ${order.shippingFee === 0 ? 'text-emerald-700' : 'text-gray-900'}`}>
+                  {order.shippingFee === 0 ? 'Miễn phí' : `${order.shippingFee.toLocaleString("vi-VN")}đ`}
+                </span>
+              </div>
+              <div className="mt-2 p-3 rounded-xl bg-rose-50 border border-rose-200 flex justify-between items-center gap-2">
+                <div>
+                  <div className="font-black text-gray-900 uppercase text-xs md:text-sm">Tổng thanh toán</div>
+                  <div className="text-[11px] text-gray-500">Đã bao gồm tiền hàng, ưu đãi &amp; phí giao hàng</div>
+                </div>
+                <span className="font-black text-red-600 text-lg md:text-xl tabular-nums shrink-0">
+                  {order.totalAmount.toLocaleString("vi-VN")}đ
+                </span>
+              </div>
             </div>
           </div>
         )}

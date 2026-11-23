@@ -18,6 +18,7 @@ export interface PromoBannerItem {
   ctaText: string;
   href: string;
   imageUrl: string;
+  mobileImageUrl?: string;
   theme?: PromoBannerTheme;
   enabled?: boolean;
 }
@@ -144,6 +145,7 @@ export default function PromoDualBanners({
             const imgSrc =
               banner.imageUrl?.trim() ||
               (isFirst ? "/brand/banner-gaming-promo.webp" : "/brand/banner-ultrabook-2026.webp");
+            const mobileImgSrc = banner.mobileImageUrl?.trim() || "";
 
             return (
               <Link
@@ -165,8 +167,21 @@ export default function PromoDualBanners({
                         decoding="async"
                         unoptimized={imgSrc.startsWith("/brand/")}
                         sizes="(max-width: 767px) 100vw, 50vw"
-                        className="promo-banner-kenburns w-full h-full object-cover object-right"
+                        className={`promo-banner-kenburns w-full h-full object-cover object-right ${mobileImgSrc ? "hidden md:block" : ""}`}
                       />
+                      {mobileImgSrc && (
+                        <Image
+                          src={mobileImgSrc}
+                          alt={`${banner.title} ${banner.highlight}`.trim()}
+                          width={750}
+                          height={420}
+                          loading="eager"
+                          decoding="async"
+                          unoptimized={mobileImgSrc.startsWith("/brand/")}
+                          sizes="100vw"
+                          className="promo-banner-kenburns w-full h-full object-cover object-center md:hidden"
+                        />
+                      )}
                     </div>
                   </div>
 
