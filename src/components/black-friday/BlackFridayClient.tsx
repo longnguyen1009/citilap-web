@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   Flame,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { PublicCouponDto } from '@/contracts/coupon';
 import { useCart } from '@/context/CartContext';
+import ProductCard from '@/components/product/ProductCard';
 import './black-friday.css';
 
 export interface BlackFridayProduct {
@@ -30,9 +30,9 @@ export interface BlackFridayProduct {
   name: string;
   slug: string;
   brand: string;
-  price: number; // Base selling price
-  flashSalePrice: number; // Default -399k flash sale price
+  price: number;
   originalPrice: number | null;
+  stock: number | null;
   image: string | null;
   cpu: string | null;
   gpu: string | null;
@@ -48,8 +48,6 @@ interface BlackFridayClientProps {
   eventStartIso: string;
   eventEndIso: string;
 }
-
-const DEFAULT_FLASH_DISCOUNT = 399_000;
 
 function formatVnd(n: number): string {
   return n.toLocaleString('vi-VN') + 'đ';
@@ -117,14 +115,14 @@ export default function BlackFridayClient({
         const hay = `${p.name} ${p.brand} ${p.cpu || ''} ${p.gpu || ''} ${p.ram || ''}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
-      if (priceRange === 'UNDER_20' && p.flashSalePrice >= 20_000_000) return false;
-      if (priceRange === '20_30' && (p.flashSalePrice < 20_000_000 || p.flashSalePrice >= 30_000_000)) return false;
-      if (priceRange === '30_40' && (p.flashSalePrice < 30_000_000 || p.flashSalePrice >= 40_000_000)) return false;
-      if (priceRange === 'OVER_40' && p.flashSalePrice < 40_000_000) return false;
+      if (priceRange === 'UNDER_20' && p.price >= 20_000_000) return false;
+      if (priceRange === '20_30' && (p.price < 20_000_000 || p.price >= 30_000_000)) return false;
+      if (priceRange === '30_40' && (p.price < 30_000_000 || p.price >= 40_000_000)) return false;
+      if (priceRange === 'OVER_40' && p.price < 40_000_000) return false;
       return true;
     });
-    if (sortBy === 'PRICE_ASC') return [...list].sort((a, b) => a.flashSalePrice - b.flashSalePrice);
-    if (sortBy === 'PRICE_DESC') return [...list].sort((a, b) => b.flashSalePrice - a.flashSalePrice);
+    if (sortBy === 'PRICE_ASC') return [...list].sort((a, b) => a.price - b.price);
+    if (sortBy === 'PRICE_DESC') return [...list].sort((a, b) => b.price - a.price);
     return list;
   }, [products, activeBrand, searchQuery, priceRange, sortBy]);
 
@@ -143,15 +141,14 @@ export default function BlackFridayClient({
       productId: p.id,
       variantId: p.variantId || undefined,
       name: p.name,
-      price: p.flashSalePrice,
-      displayPrice: formatVnd(p.flashSalePrice),
+      price: p.price,
+      displayPrice: formatVnd(p.price),
       image: p.image || '',
       quantity: 1,
     });
     router.push('/checkout');
   };
 
-  // Fallback display coupons if DB hasn't been seeded yet
   const displayCoupons: PublicCouponDto[] = coupons.length
     ? coupons
     : [
@@ -208,6 +205,13 @@ export default function BlackFridayClient({
         },
       ];
 
+  const topCoupon = displayCoupons.find((c) => !c.isExhausted) || displayCoupons[0];
+  const topCouponCode = topCoupon?.code || 'BF999';
+  const topCouponLabel =
+    topCoupon?.discountType === 'PERCENT'
+      ? `${topCoupon.discountValue}%`
+      : `${Math.round((topCoupon?.discountValue || 999_000) / 1000)}K`;
+
   return (
     <div className="min-h-screen bg-[#0b0b10] text-slate-100 pb-20">
       {/* 1. HERO BANNER — CellphoneS Black Fire-Day inspired */}
@@ -244,11 +248,11 @@ export default function BlackFridayClient({
                   Săn Mã Giảm 999K Ngay
                 </a>
                 <a
-                  href="#flash-sale-deals"
+                  href="#black-friday-deals"
                   className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-white font-bold text-sm transition"
                 >
                   <Zap className="w-4 h-4 text-amber-400" />
-                  Xem {products.length} Máy Flash Sale
+                  Xem {products.length} Máy LikeNew 99%
                 </a>
               </div>
             </div>
@@ -418,21 +422,21 @@ export default function BlackFridayClient({
         </div>
       </section>
 
-      {/* 3. FLASH SALE LIKENEW 99% GRID */}
-      <section id="flash-sale-deals" className="container mx-auto max-w-[1370px] px-4 pt-12">
+      {/* 3. DANH SÁCH LAPTOP LIKENEW 99% ÁP DỤNG BLACK FRIDAY */}
+      <section id="black-friday-deals" className="container mx-auto max-w-[1370px] px-4 pt-12">
         <div className="rounded-3xl border border-red-500/25 bg-gradient-to-b from-[#170c12] via-[#111118] to-[#0e0e14] p-4 sm:p-6 md:p-8 shadow-2xl">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-white/10">
             <div>
               <div className="inline-flex items-center gap-1.5 text-red-400 text-xs font-black uppercase tracking-wider">
                 <Zap className="w-4 h-4 text-amber-400" />
-                <span>Flash Sale Black Friday • Mặc Định Giảm 399K</span>
+                <span>Áp Dụng Toàn Bộ Sản Phẩm LikeNew 99% Có Sẵn</span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-black text-white mt-1">
-                TOÀN BỘ LAPTOP LIKENEW 99% ĐANG SALE SỐC
+                SĂN DEAL LAPTOP LIKENEW 99% BLACK FRIDAY
               </h2>
               <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                Giá hiển thị đã giảm mặc định <strong className="text-amber-300">399.000đ</strong>. Nhập thêm mã{' '}
-                <strong className="text-white">BF999 / BF599 / BF399</strong> ở bước thanh toán để nhận mức giá ưu đãi thực tế!
+                Chọn mẫu máy bạn yêu thích và nhập mã <strong className="text-amber-300">{topCouponCode}</strong> (hoặc{' '}
+                <strong className="text-white">BF599 / BF399</strong>) tại bước thanh toán để được giảm trực tiếp vào giá bán!
               </p>
             </div>
           </div>
@@ -502,11 +506,11 @@ export default function BlackFridayClient({
             </div>
           </div>
 
-          {/* Product Grid */}
+          {/* Standard CitiLap ProductCard Grid */}
           <div
             role="tabpanel"
             aria-labelledby={`bf-tab-${activeBrand}`}
-            className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+            className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4"
           >
             {filteredProducts.length === 0 ? (
               <div className="col-span-full py-16 text-center text-slate-400 text-sm">
@@ -514,83 +518,78 @@ export default function BlackFridayClient({
               </div>
             ) : (
               filteredProducts.map((p) => {
-                const withBf999 = Math.max(0, p.price - 999_000);
+                const discountedPrice = Math.max(0, p.price - 1_000_000);
                 return (
-                  <article
-                    key={p.id}
-                    className="group rounded-2xl bg-white text-slate-900 overflow-hidden border border-white/10 shadow-md hover:shadow-xl hover:shadow-red-900/30 transition flex flex-col"
-                  >
-                    <Link
-                      href={`/san-pham/${p.slug}`}
-                      className="relative aspect-[4/3] bg-slate-50 block overflow-hidden p-3"
-                    >
-                      <div className="absolute top-2.5 left-2.5 z-10 flex flex-wrap gap-1">
-                        <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-red-600 to-orange-600 text-white text-[10px] font-black uppercase shadow-sm">
-                          -399K FLASH SALE
+                <ProductCard
+                  key={p.id}
+                  hideQuickActions
+                  hideMetaRow
+                  topRightSticker={`-${topCouponLabel}`}
+                  product={{
+                    id: p.id,
+                    name: p.name,
+                    slug: p.slug,
+                    href: `/san-pham/${p.slug}`,
+                    sku: p.sku || undefined,
+                    variantId: p.variantId || undefined,
+                    brand: p.brand,
+                    price: discountedPrice,
+                    originalPrice: p.price,
+                    condition: 'LIKE_NEW',
+                    stock: p.stock ?? 5,
+                    image: p.image,
+                    warranty: p.warranty || 'BH 3 tháng',
+                    specs: {
+                      cpu: p.cpu || undefined,
+                      gpu: p.gpu || undefined,
+                      ram: p.ram || undefined,
+                      ssd: p.storage || undefined,
+                      display: p.display || undefined,
+                    },
+                  }}
+                  footerAction={
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => handleSaveVoucher(topCouponCode)}
+                        className="w-full rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 text-[11px] text-amber-950 font-semibold text-left flex items-center justify-between gap-1 transition cursor-pointer"
+                        title={`Bấm để lưu mã ${topCouponCode}`}
+                      >
+                        <span>
+                          Áp mã <strong className="font-black text-red-700">{topCouponCode}</strong> để giảm ngay{' '}
+                          <strong className="font-black text-red-700">{topCouponLabel}</strong>
                         </span>
-                        <span className="px-2 py-0.5 rounded-md bg-slate-900/90 text-amber-300 text-[10px] font-bold uppercase">
-                          LikeNew 99%
-                        </span>
-                      </div>
-                      {p.image ? (
-                        <Image
-                          src={p.image}
-                          alt={p.name}
-                          fill
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                          className="object-contain p-3 group-hover:scale-105 transition duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">
-                          CitiLap LikeNew
-                        </div>
-                      )}
-                    </Link>
-
-                    <div className="p-4 flex-1 flex flex-col justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] font-bold uppercase text-red-600 tracking-wide">{p.brand}</div>
+                        {copiedCode === topCouponCode ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Copy className="w-3 h-3 text-amber-700 shrink-0" />
+                        )}
+                      </button>
+                      <div className="grid grid-cols-2 gap-1.5">
                         <Link
                           href={`/san-pham/${p.slug}`}
-                          className="font-bold text-sm text-slate-900 line-clamp-2 hover:text-red-600 transition mt-0.5"
+                          className="py-2 px-2 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold text-center transition"
                         >
-                          {p.name}
+                          Chi tiết
                         </Link>
-                        <div className="mt-2 flex flex-wrap gap-1 text-[11px] text-slate-600">
-                          {p.ram && <span className="px-1.5 py-0.5 rounded bg-slate-100 font-medium">{p.ram.split(' ')[0]}</span>}
-                          {p.storage && <span className="px-1.5 py-0.5 rounded bg-slate-100 font-medium">{p.storage.split(' ')[0]}</span>}
-                          {p.warranty && <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">{p.warranty}</span>}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 pt-2 border-t border-slate-100">
-                        <div className="flex items-baseline gap-2 flex-wrap">
-                          <span className="text-lg font-black text-red-600">{formatVnd(p.flashSalePrice)}</span>
-                          <span className="text-xs text-slate-400 line-through">{formatVnd(p.price)}</span>
-                        </div>
-                        <div className="rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5 text-[11px] text-amber-900 font-semibold">
-                          Áp mã <strong className="font-black text-red-700">BF999</strong> chỉ còn{' '}
-                          <strong className="font-black text-red-700">{formatVnd(withBf999)}</strong>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                          <Link
-                            href={`/san-pham/${p.slug}`}
-                            className="py-2 px-2.5 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold text-center transition"
-                          >
-                            Chi tiết
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleBuyNow(p)}
-                            className="py-2 px-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black text-center transition cursor-pointer"
-                          >
-                            Mua ngay
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try {
+                              if (!sessionStorage.getItem('citilap-saved-coupon-v1')) {
+                                sessionStorage.setItem('citilap-saved-coupon-v1', topCouponCode);
+                              }
+                            } catch {}
+                            handleBuyNow(p);
+                          }}
+                          className="py-2 px-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black text-center transition cursor-pointer"
+                        >
+                          Mua ngay
+                        </button>
                       </div>
                     </div>
-                  </article>
+                  }
+                />
                 );
               })
             )}
@@ -663,10 +662,10 @@ export default function BlackFridayClient({
             <details>
               <summary>Cơ cấu mã giảm giá 999K / 599K / 399K hoạt động như thế nào?</summary>
               <div className="px-5 pb-4 text-sm text-slate-300 leading-relaxed">
-                Toàn bộ sản phẩm trong chương trình có giá Flash Sale mặc định giảm {formatVnd(DEFAULT_FLASH_DISCOUNT)}. Ngoài ra, CitiLap tung ra{' '}
+                CitiLap tung ra{' '}
                 <strong className="text-amber-300">20 deal giảm 999K (BF999)</strong>,{' '}
                 <strong className="text-amber-300">50 deal giảm 599K (BF599)</strong> và{' '}
-                <strong className="text-amber-300">100 deal giảm 399K (BF399)</strong> trừ trực tiếp vào giá bán. Hệ thống tự động đếm ngược số lượt và ngừng áp dụng khi hết mã.
+                <strong className="text-amber-300">100 deal giảm 399K (BF399)</strong> trừ trực tiếp vào giá bán khi thanh toán online hoặc đọc mã tại showroom. Hệ thống tự động đếm ngược số lượt và ngừng áp dụng khi hết mã.
               </div>
             </details>
 

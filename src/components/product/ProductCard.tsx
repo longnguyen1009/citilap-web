@@ -53,6 +53,9 @@ export interface ProductCardProps {
   rank?: number;
   footerAction?: React.ReactNode;
   showSpecs?: boolean;
+  hideQuickActions?: boolean;
+  hideMetaRow?: boolean;
+  topRightSticker?: string;
   className?: string;
   imageLoading?: "eager" | "lazy";
   variant?: "default" | "flash";
@@ -66,20 +69,25 @@ function isMeaningfulSpec(val?: string | null): val is string {
 }
 
 /**
- * Smart spec formatters for PC grid chips
+ * Smart concise spec formatters (shared by PC chips & mobile rows)
  */
 function formatCpuSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
-  let s = val.split(/[\/,;]/)[0].replace(/\([^)]*\)/g, "").trim();
+  let s = val
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\btốc\s*độ.*$/i, "")
+    .replace(/\bGen\s*\d+\w*/gi, "")
+    .replace(/®|™/g, "")
+    .split(/[\/,;]/)[0]
+    .trim();
   s = s
-    .replace(/^(?:Intel|AMD|Apple|Qualcomm)\s+/i, "")
-    .replace(/^(?:Core|Processor)\s+/i, "")
+    .replace(/^(?:Intel|AMD|Qualcomm)\s+/i, "")
+    .replace(/^(?:Core|Processor)\s+(?=(?:i\d|Ultra))/i, "")
     .replace(/Snapdragon\s*X\s*Elite[^ ]*/i, "X Elite")
     .replace(/Snapdragon\s*X\s*Plus[^ ]*/i, "X Plus")
-    .replace(/Ryzen\s*AI\s*(\d)\s*(?:PRO\s*)?(?:HX\s*)?(\d+\w*)?/i, (_, g1, g2) => (g2 ? `AI ${g1}-${g2}` : `AI ${g1}`))
+    .replace(/Ryzen\s*AI\s*(\d)\s*(?:PRO\s*)?(?:HX\s*)?(\d+\w*)?/i, (_, g1, g2) => (g2 ? `Ryzen AI ${g1} ${g2}` : `Ryzen AI ${g1}`))
     .replace(/Ryzen\s*(\d)\s*(?:PRO\s*)?[-–—]?\s*(\d+\w*)?/i, (_, g1, g2) => (g2 ? `R${g1}-${g2}` : `R${g1}`))
-    .replace(/Ultra\s*(\d)\s*[-–—]?\s*(\d+\w*)?/i, (_, g1, g2) => (g2 ? `U${g1}-${g2}` : `U${g1}`))
-    .replace(/Core\s*(\d)\s*[-–—]?\s*(\d+\w*)/i, "C$1-$2")
+    .replace(/Ultra\s*(\d)\s*[-–—]?\s*(\d+\w*)?/i, (_, g1, g2) => (g2 ? `Ultra ${g1} ${g2}` : `Ultra ${g1}`))
     .replace(/i(\d)\s*[-–—]?\s*(\d+\w*)?/i, (_, g1, g2) => (g2 ? `i${g1}-${g2}` : `i${g1}`))
     .replace(/\bProcessor\b/gi, "")
     .replace(/--+/g, "-")
@@ -91,18 +99,34 @@ function formatCpuSpec(val?: string): string {
 
 function formatGpuSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .split(/[\/,;]/)[0]
+  const clean = val.replace(/\([^)]*\)/g, "").replace(/®|™/g, "");
+  // Prefer discrete GPU short name (e.g. "RTX 4060", "RTX 3050 Ti", "GTX 1660 Ti")
+  const rtx = clean.match(/\b(RTX\s*(?:[A-Z]?\d{3,4}(?:\s*(?:Ti|Super|Ada))?))/i);
+  if (rtx) {
+    return rtx[1]
+      .replace(/\s+/g, " ")
+      .toUpperCase()
+      .replace(/\bTI\b/g, "Ti")
+      .replace(/\bSUPER\b/g, "Super")
+      .replace(/\bADA\b/g, "Ada");
+  }
+  const gtx = clean.match(/\b(GTX\s*\d{3,4}(?:\s*Ti)?)/i);
+  if (gtx) return gtx[1].replace(/\s+/g, " ").toUpperCase().replace(/\bTI\b/g, "Ti");
+  const rx = clean.match(/\b(RX\s*\d{3,4}[A-Z]*)/i);
+  if (rx) return rx[1].replace(/\s+/g, " ").toUpperCase();
+  const radeon = clean.match(/\b(Radeon\s*\d{3,4}[A-Z]*)/i);
+  if (radeon) return radeon[1].replace(/\s+/g, " ");
+  const arc = clean.match(/\b(Intel\s*Arc(?:\s*\d+\w*)?)/i);
+  if (arc) return arc[1].replace(/\s+/g, " ");
+  if (/Iris\s*Xe/i.test(clean)) return "Iris Xe";
+  return clean
+    .split(/[\/,;+]/)[0]
     .replace(/^(?:NVIDIA|AMD|Intel|Qualcomm|Apple)\s+/i, "")
-    .replace(/^(?:GeForce|Radeon|Arc|Iris|Adreno)\s+/i, (m) => (/Iris|Arc|Adreno/i.test(m) ? m : ""))
-    .replace(/\bNvidia\s+GeForce\s+/i, "")
     .replace(/\bGeForce\s+/i, "")
-    .replace(/\bRadeon\s+/i, "")
     .replace(/\s+Graphics\b/i, "")
     .replace(/\s+\d+\s*GB(\s+GDDR\d+)?/i, "")
     .replace(/\s+Laptop\s+GPU/i, "")
-    .replace(/\s+Ada\s+Generation/i, " Ada")
+    .replace(/\s+Max-Q\b/i, "")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -115,7 +139,7 @@ function formatRamSpec(val?: string): string {
 
 function formatStorageSpec(val?: string): string {
   if (!isMeaningfulSpec(val)) return "";
-  const matchTb = val.match(/(\d+)\s*TB/i);
+  const matchTb = val.match(/(\d+(?:\.\d+)?)\s*TB/i);
   if (matchTb) return `${matchTb[1]}TB`;
   const matchGb = val.match(/(\d+)\s*GB/i);
   if (matchGb) {
@@ -133,10 +157,10 @@ function formatDisplaySpec(val?: string): string {
 
   let res = "";
   if (/4K|UHD/i.test(val)) res = "4K";
-  else if (/3\.2K|3K|2\.8K|2\.5K/i.test(val)) {
-    const m = val.match(/(3\.2K|3K|2\.8K|2\.5K)/i);
+  else if (/3\.2K|3\.1K|3K|2\.8K|2\.5K/i.test(val)) {
+    const m = val.match(/(3\.2K|3\.1K|3K|2\.8K|2\.5K)/i);
     res = m ? m[1].toUpperCase() : "2.5K";
-  } else if (/2K|QHD\+?|\bWQXGA\b/i.test(val)) res = "2K";
+  } else if (/2K|QHD\+?|\bWQXGA\b/i.test(val)) res = "2.5K";
   else if (/FHD\+?|\bWUXGA\b/i.test(val)) res = "FHD";
   else if (/Retina/i.test(val)) res = "Retina";
   else if (/OLED/i.test(val)) res = "OLED";
@@ -150,64 +174,13 @@ function formatDisplaySpec(val?: string): string {
 }
 
 /**
- * Clean readable formatters for Smartphone (SP) vertical spec lines
+ * Use the same concise formatters for Smartphone (SP) vertical spec lines
  */
-function formatMobileCpuSpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .split(/[\/,;]/)[0]
-    .replace(/®|™/g, "")
-    .replace(/^Intel\s+/i, "")
-    .replace(/^AMD\s+/i, "")
-    .replace(/\bProcessor\b/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function formatMobileGpuSpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .split(/[\/,;]/)[0]
-    .replace(/®|™/g, "")
-    .replace(/^NVIDIA\s+GeForce\s+/i, "")
-    .replace(/^NVIDIA\s+/i, "")
-    .replace(/^GeForce\s+/i, "")
-    .replace(/\bLaptop\s+GPU\b/gi, "")
-    .replace(/\s+GDDR\d+[A-Z]*/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function formatMobileRamSpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .split(/[\/,;]/)[0]
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function formatMobileStorageSpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .split(/[\/,;]/)[0]
-    .replace(/^Ổ\s*cứng\s*/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function formatMobileDisplaySpec(val?: string): string {
-  if (!isMeaningfulSpec(val)) return "";
-  return val
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\s*inch\b/gi, '"')
-    .split(/[,;]/)[0]
-    .replace(/\s+/g, " ")
-    .trim();
-}
+const formatMobileCpuSpec = formatCpuSpec;
+const formatMobileGpuSpec = formatGpuSpec;
+const formatMobileRamSpec = formatRamSpec;
+const formatMobileStorageSpec = formatStorageSpec;
+const formatMobileDisplaySpec = formatDisplaySpec;
 
 function formatWarranty(val?: string, condition?: string): string {
   const defaultMonths = defaultWarrantyMonthsForCondition(condition);
@@ -254,6 +227,9 @@ export default function ProductCard({
   rank,
   footerAction,
   showSpecs = true,
+  hideQuickActions = false,
+  hideMetaRow = false,
+  topRightSticker,
   className = "",
   imageLoading = "lazy",
   variant = "default",
@@ -371,42 +347,50 @@ export default function ProductCard({
           />
         </div>
 
-        <div className="flex items-center gap-1 shrink-0 pointer-events-auto">
-          {/* Compare Button */}
-          <button
-            type="button"
-            onClick={toggleCompare}
-            aria-pressed={inCompare}
-            aria-label={
-              inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
-            }
-            title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
-            className={`relative w-7 h-7 md:w-7.5 md:h-7.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs transition-[background-color,border-color,transform] duration-150 motion-reduce:transition-none ${
-              inCompare
-                ? "text-white bg-blue-600 border border-blue-600"
-                : "text-text-muted hover:text-blue-600 bg-white/95 backdrop-blur-xs hover:bg-blue-50/80 border border-border-default"
-            }`}
-          >
-            <Scale className="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" />
-          </button>
+        {topRightSticker ? (
+          <div className="shrink-0 pointer-events-none">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#dc2626] via-[#ea580c] to-[#f59e0b] text-white font-black text-[11px] md:text-xs tracking-tight shadow-md shadow-red-600/40 ring-2 ring-amber-300/90">
+              {topRightSticker}
+            </span>
+          </div>
+        ) : !hideQuickActions ? (
+          <div className="flex items-center gap-1 shrink-0 pointer-events-auto">
+            {/* Compare Button */}
+            <button
+              type="button"
+              onClick={toggleCompare}
+              aria-pressed={inCompare}
+              aria-label={
+                inCompare ? `Bỏ ${product.name} khỏi so sánh` : `Thêm ${product.name} vào so sánh`
+              }
+              title={inCompare ? "Bỏ khỏi so sánh" : "Thêm vào so sánh"}
+              className={`relative w-7 h-7 md:w-7.5 md:h-7.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:outline-hidden shadow-2xs transition-[background-color,border-color,transform] duration-150 motion-reduce:transition-none ${
+                inCompare
+                  ? "text-white bg-blue-600 border border-blue-600"
+                  : "text-text-muted hover:text-blue-600 bg-white/95 backdrop-blur-xs hover:bg-blue-50/80 border border-border-default"
+              }`}
+            >
+              <Scale className="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" />
+            </button>
 
-          {/* Wishlist Button */}
-          <button
-            type="button"
-            onClick={toggleWishlist}
-            aria-pressed={liked}
-            aria-label={
-              liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
-            }
-            className={`relative w-7 h-7 md:w-7.5 md:h-7.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden shadow-2xs transition-[background-color,border-color,transform] duration-150 motion-reduce:transition-none ${
-              liked
-                ? "text-error bg-red-50 border border-red-200"
-                : "text-text-muted hover:text-error bg-white/95 backdrop-blur-xs hover:bg-red-50/80 border border-border-default"
-            }`}
-          >
-            <Heart className="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
-          </button>
-        </div>
+            {/* Wishlist Button */}
+            <button
+              type="button"
+              onClick={toggleWishlist}
+              aria-pressed={liked}
+              aria-label={
+                liked ? `Bỏ lưu ${product.name}` : `Lưu ${product.name} vào danh sách yêu thích`
+              }
+              className={`relative w-7 h-7 md:w-7.5 md:h-7.5 rounded-full flex items-center justify-center cursor-pointer active:scale-95 focus-visible:ring-2 focus-visible:ring-red-600 focus-visible:outline-hidden shadow-2xs transition-[background-color,border-color,transform] duration-150 motion-reduce:transition-none ${
+                liked
+                  ? "text-error bg-red-50 border border-red-200"
+                  : "text-text-muted hover:text-error bg-white/95 backdrop-blur-xs hover:bg-red-50/80 border border-border-default"
+              }`}
+            >
+              <Heart className="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" fill={liked ? "currentColor" : "none"} strokeWidth={liked ? 2.5 : 2} />
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {/* Product Image Container */}
@@ -554,6 +538,7 @@ export default function ProductCard({
           )}
 
           {/* Footer Meta: Warranty & Stock Status */}
+          {!hideMetaRow && (
           <div className="pt-1 md:pt-2 border-t border-black/[0.06] flex items-center justify-between gap-1 text-[10.5px] md:text-caption">
             {/* Warranty tag */}
             <div
@@ -596,6 +581,7 @@ export default function ProductCard({
               />
             )}
           </div>
+          )}
 
           {/* Optional Custom Action Slot (e.g. Wishlist Add To Cart) */}
           {footerAction && (
