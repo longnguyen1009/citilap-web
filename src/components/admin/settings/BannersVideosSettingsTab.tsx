@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { Share2, Video, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { inputCls, labelCls, type SettingsTabProps } from "./settings-helpers";
+import { HomepagePopupSettingsSection } from "./HomepagePopupSettingsSection";
 
 interface BannersVideosSettingsTabProps extends SettingsTabProps {
   quickVideoUrl: string;
@@ -40,6 +41,8 @@ export function BannersVideosSettingsTab({
           Mở Bố cục Trang chủ →
         </Link>
       </div>
+
+      <HomepagePopupSettingsSection settings={settings} update={update} />
 
       <div className="space-y-3">
         <h2 className="text-xs font-bold text-slate-800">Hero Banner chính (Dự phòng)</h2>

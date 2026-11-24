@@ -55,6 +55,66 @@ export const reviewVideoSchema = z.object({
 
 export type ReviewVideoItem = z.infer<typeof reviewVideoSchema>;
 
+export const homepagePopupTierSchema = z.object({
+  label: safeText(40).min(1),
+  value: safeText(40).min(1),
+});
+
+export const homepagePopupSchema = z.object({
+  enabled: z.boolean().default(true),
+  displayMode: z.enum(["rich", "image_only"]).default("rich"),
+  frequency: z.enum(["session", "daily", "always"]).default("session"),
+  delayMs: z.coerce.number().int().min(0).max(15000).default(650),
+  startAt: safeText(64).default("2026-11-24T17:00:00.000Z"),
+  endAt: safeText(64).default("2026-11-29T16:59:59.000Z"),
+  showCountdown: z.boolean().default(true),
+  imageUrl: safeUrlOrPath.default("/images/banners/black-friday-popup-bg.jpg"),
+  badgeText: safeText(60).default("25/11 – 29/11/2026"),
+  title: safeText(80).default("BLACK FRIDAY"),
+  highlightText: safeText(60).default("GIẢM TỚI -999K"),
+  description: safeText(260).default("Áp dụng toàn bộ Laptop LikeNew 99% tuyển chọn tại CitiLap."),
+  tiers: z
+    .array(homepagePopupTierSchema)
+    .max(3)
+    .default([
+      { label: "20 Deal Hot", value: "-999K" },
+      { label: "50 Deal Ngon", value: "-599K" },
+      { label: "100 Deal Hời", value: "-399K" },
+    ]),
+  trustNote1: safeText(100).default("Giảm trực tiếp vào giá bán"),
+  trustNote2: safeText(100).default("Bao test 7 ngày · Bảo hành minh bạch"),
+  ctaText: safeText(60).default("Săn Deal Black Friday Ngay"),
+  ctaLink: safeUrlOrPath.default("/black-friday"),
+  dismissText: safeText(40).default("Bữa khác nha!"),
+});
+
+export type HomepagePopupConfig = z.infer<typeof homepagePopupSchema>;
+
+export const DEFAULT_HOMEPAGE_POPUP: HomepagePopupConfig = {
+  enabled: true,
+  displayMode: "rich",
+  frequency: "session",
+  delayMs: 650,
+  startAt: "2026-11-24T17:00:00.000Z",
+  endAt: "2026-11-29T16:59:59.000Z",
+  showCountdown: true,
+  imageUrl: "/images/banners/black-friday-popup-bg.jpg",
+  badgeText: "25/11 – 29/11/2026",
+  title: "BLACK FRIDAY",
+  highlightText: "GIẢM TỚI -999K",
+  description: "Áp dụng toàn bộ Laptop LikeNew 99% tuyển chọn tại CitiLap.",
+  tiers: [
+    { label: "20 Deal Hot", value: "-999K" },
+    { label: "50 Deal Ngon", value: "-599K" },
+    { label: "100 Deal Hời", value: "-399K" },
+  ],
+  trustNote1: "Giảm trực tiếp vào giá bán",
+  trustNote2: "Bao test 7 ngày · Bảo hành minh bạch",
+  ctaText: "Săn Deal Black Friday Ngay",
+  ctaLink: "/black-friday",
+  dismissText: "Bữa khác nha!",
+};
+
 export const DEFAULT_REVIEW_VIDEOS: ReviewVideoItem[] = [
   {
     title: "10 Bước Setup Laptop Gaming Mới - Tránh Những Sai Lầm Này!",
@@ -229,6 +289,7 @@ export const adminSettingsDocumentSchema = z.object({
   flashSalePreShowHours: z.coerce.number().min(0).max(168).default(2),
 
   // Hero & Banners
+  homepagePopup: homepagePopupSchema.default(DEFAULT_HOMEPAGE_POPUP),
   heroBadge: safeText(100),
   heroTitle: safeText(100),
   heroHighlight: safeText(100),
@@ -348,6 +409,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminSettingsDocument = {
   flashSaleEndAt: "2026-12-31T23:59:59Z",
   flashSalePreShowHours: 2,
 
+  homepagePopup: DEFAULT_HOMEPAGE_POPUP,
   heroBadge: "CitiLap Gaming Zone",
   heroTitle: "CHỌN LAPTOP",
   heroHighlight: "CHUẨN NHU CẦU",
@@ -442,6 +504,7 @@ export const publicStorefrontSettingsSchema = z.object({
   flashSaleEndAt: z.string(),
   flashSalePreShowHours: z.number().min(0).max(168).default(2),
 
+  homepagePopup: homepagePopupSchema.default(DEFAULT_HOMEPAGE_POPUP),
   heroBadge: z.string(),
   heroTitle: z.string(),
   heroHighlight: z.string(),

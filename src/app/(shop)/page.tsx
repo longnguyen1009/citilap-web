@@ -18,6 +18,7 @@ import {
 
 import HeroSection from "@/components/home/HeroSection";
 import CampaignStripBanner from "@/components/home/CampaignStripBanner";
+import BlackFridayPopup from "@/components/home/BlackFridayPopup";
 import PromoDualBanners from "@/components/home/PromoDualBanners";
 import CategoryGridSection from "@/components/home/CategoryGridSection";
 import FlashSaleSection from "@/components/home/FlashSaleSection";
@@ -272,6 +273,7 @@ export default async function Home() {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
         />
+        <BlackFridayPopup config={settings?.homepagePopup} />
         <BlockRenderer
           sections={cmsHomepage.sections}
           settings={settings}
@@ -318,6 +320,7 @@ export default async function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
+      <BlackFridayPopup config={settings?.homepagePopup} />
 
       {/* 1. HERO SECTION & SUB-BANNERS */}
       <HeroSection settings={settings ?? undefined} />

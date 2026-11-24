@@ -1257,20 +1257,37 @@ export default function SiteBuilderEditor({ pageId }: SiteBuilderEditorProps) {
                 )}
 
                 {pageId === 'home' && (
-                  <div className="mt-3 p-3 rounded-xl bg-slate-100/90 border border-slate-200/90 text-[11px] text-slate-600 space-y-1.5">
-                    <div className="font-bold text-slate-800 flex items-center justify-between">
-                      <span>Khối chân trang chủ cố định</span>
-                      <Link
-                        href="/admin/settings"
-                        target="_blank"
-                        className="text-blue-600 hover:text-blue-700 font-bold"
-                      >
-                        Cấu hình ↗
-                      </Link>
+                  <div className="mt-3 space-y-2">
+                    <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-200/90 text-[11px] text-amber-950 space-y-1.5">
+                      <div className="font-bold text-amber-900 flex items-center justify-between">
+                        <span>Popup Khuyến mãi Trang chủ</span>
+                        <Link
+                          href="/admin/settings?tab=banners#homepage-popup"
+                          className="text-red-600 hover:text-red-700 font-bold"
+                        >
+                          Bật / Tắt &amp; Chỉnh sửa →
+                        </Link>
+                      </div>
+                      <p className="leading-snug text-amber-900/80">
+                        Bật/tắt popup sự kiện (Black Friday, Tết, Flash Sale...), đổi ảnh, chỉnh nội dung, hẹn giờ và tần suất hiển thị khi khách vào Trang chủ.
+                      </p>
                     </div>
-                    <p className="leading-snug text-slate-500">
-                      Khối <strong>Đánh giá khách hàng</strong> &amp; <strong>Form Tư vấn chọn máy</strong> ở cuối trang chủ lấy dữ liệu Hotline/Zalo và Đánh giá từ Cài đặt Cửa hàng.
-                    </p>
+
+                    <div className="p-3 rounded-xl bg-slate-100/90 border border-slate-200/90 text-[11px] text-slate-600 space-y-1.5">
+                      <div className="font-bold text-slate-800 flex items-center justify-between">
+                        <span>Khối chân trang chủ cố định</span>
+                        <Link
+                          href="/admin/settings"
+                          target="_blank"
+                          className="text-blue-600 hover:text-blue-700 font-bold"
+                        >
+                          Cấu hình ↗
+                        </Link>
+                      </div>
+                      <p className="leading-snug text-slate-500">
+                        Khối <strong>Đánh giá khách hàng</strong> &amp; <strong>Form Tư vấn chọn máy</strong> ở cuối trang chủ lấy dữ liệu Hotline/Zalo và Đánh giá từ Cài đặt Cửa hàng.
+                      </p>
+                    </div>
                   </div>
                 )}
 

@@ -433,7 +433,7 @@ export default function SettingsPage() {
     { id: "store", label: "Cửa hàng & Liên hệ", icon: Store, description: "Thông tin dùng chung cho cửa hàng, hotline và các điểm bán." },
     { id: "shipping", label: "Giao hàng & Thanh toán", icon: Truck, description: "Phí giao hàng và phương thức thanh toán khách có thể chọn khi đặt đơn." },
     { id: "product", label: "Trang sản phẩm", icon: CreditCard, description: "Nội dung dùng chung trên trang sản phẩm. Giá, cấu hình và tồn kho được quản lý riêng tại Sản phẩm và Kho & Kiểm định." },
-    { id: "banners", label: "Banner & Kênh video", icon: LayoutTemplate, description: "Quản lý banner, kênh mạng xã hội và danh sách video. Chọn vị trí, thứ tự các khối tại Bố cục trang." },
+    { id: "banners", label: "Popup, Banner & Video", icon: LayoutTemplate, description: "Bật/tắt và tùy chỉnh Popup Trang chủ, banner dự phòng, kênh mạng xã hội và danh sách video. Sắp xếp các khối trang chủ tại Bố cục trang." },
     { id: "features", label: "Cam kết & Đánh giá", icon: ShieldCheck, description: "Nội dung cam kết dịch vụ và đánh giá khách hàng hiển thị trên website." },
     { id: "flashsale", label: "Flash Sale dự phòng", icon: Flame, description: "Cấu hình hiển thị dự phòng khi không có chiến dịch riêng. Quản lý lịch chạy và giá khuyến mãi tại Flash Sale." },
   ];
