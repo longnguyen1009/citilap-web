@@ -293,7 +293,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
   page = Math.min(page, totalPages);
   const offset = (page - 1) * limit;
 
-  // 2. Rows query
+  // 2. Rows query (avoid correlated json_each + MediaAsset full scans & avoid transferring full draft/published blobs)
   const itemsSql = `
     SELECT
       p.id,
@@ -317,8 +317,9 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       c.slug AS categorySlug,
       s.productId AS studioId,
       s.revision,
-      s.draft,
-      s.published,
+      CASE WHEN s.draft IS NOT NULL THEN 1 ELSE 0 END AS hasDraft,
+      CASE WHEN s.published IS NOT NULL THEN 1 ELSE 0 END AS hasPublished,
+      CASE WHEN s.published IS NOT NULL AND s.draft IS NOT NULL AND s.draft != s.published THEN 1 ELSE 0 END AS hasUnpublishedDraft,
       COALESCE(s.updatedAt, p.updatedAt) AS updatedAt,
       json_extract(s.draft, '$.template') AS draftTemplate,
       json_extract(s.draft, '$.name') AS draftName,
@@ -326,10 +327,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       json_extract(s.draft, '$.originalPrice') AS draftOriginalPrice,
       json_extract(s.draft, '$.stock') AS draftStock,
       json_extract(s.draft, '$.brand') AS draftBrand,
-      (SELECT COUNT(*) FROM SerialUnit su WHERE su.productId = p.id AND su.status = 'AVAILABLE') AS availableSerialsCount,
-      (SELECT json_object('id', a.id, 'storageKey', a.storageKey)
-       FROM json_each(s.draft, '$.media') m JOIN MediaAsset a ON a.id=json_extract(m.value, '$.assetId')
-       WHERE a.kind='IMAGE' AND a.state='READY' ORDER BY CAST(m.key AS INTEGER) LIMIT 1) AS draftImage,
+      json_extract(s.draft, '$.media') AS draftMediaJson,
       json_extract(s.published, '$.template') AS publicTemplate,
       json_extract(s.draft, '$.availability') AS draftAvailability,
       json_extract(s.published, '$.availability') AS publishedAvailability
@@ -340,16 +338,72 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
   `;
   const itemsStmt = db.prepare(itemsSql);
   const itemsParams = [...params, limit, offset];
-  const itemsRows = await itemsStmt.bind(...itemsParams).all<Record<string, unknown>>();
 
-  // 3. Populate categories & brands for filter selectors
-  const categoriesRes = await db.prepare("SELECT id, name, slug FROM Category WHERE status='ACTIVE' ORDER BY sortOrder, name").all<{ id: string; name: string; slug: string }>();
-  const brandsRes = await db.prepare("SELECT DISTINCT COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS name, COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS id FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id WHERE p.deletedAt IS NULL AND COALESCE(json_extract(s.draft, '$.brand'), p.brand, '') != '' ORDER BY name").all<{ id: string; name: string }>();
+  // 3. Execute page rows, categories, and brands in parallel
+  const [itemsRows, categoriesRes, brandsRes] = await Promise.all([
+    itemsStmt.bind(...itemsParams).all<Record<string, unknown>>(),
+    db.prepare("SELECT id, name, slug FROM Category WHERE status='ACTIVE' ORDER BY sortOrder, name").all<{ id: string; name: string; slug: string }>(),
+    db.prepare("SELECT DISTINCT COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS name, COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS id FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id WHERE p.deletedAt IS NULL AND COALESCE(json_extract(s.draft, '$.brand'), p.brand, '') != '' ORDER BY name").all<{ id: string; name: string }>(),
+  ]);
 
-  const items: CatalogItem[] = (itemsRows.results || []).map((r: Record<string, unknown>) => {
-    const isPublished = (!!r.published && ['ACTIVE', 'active'].includes(String(r.productStatus))) || (r.studioId == null && ['ACTIVE', 'active'].includes(String(r.productStatus)));
-    const isDraftOnly = r.published == null && r.draft != null;
-    const hasUnpublishedDraft = !!r.published && !!r.draft && r.draft !== r.published;
+  const rawRows = itemsRows.results || [];
+  const pageProductIds = rawRows.map((r) => String(r.id));
+
+  // Resolve serial counts and first READY cover image ONLY for the 20 products on this page
+  const candidateAssetIdsByProduct = new Map<string, string[]>();
+  const allAssetIds = new Set<string>();
+  for (const r of rawRows) {
+    if (!r.draftMediaJson) continue;
+    try {
+      const mediaArr = JSON.parse(String(r.draftMediaJson)) as Array<{ assetId?: string; kind?: string }>;
+      if (Array.isArray(mediaArr)) {
+        const ids = mediaArr
+          .filter((m) => m && typeof m.assetId === 'string' && m.assetId && (!m.kind || m.kind === 'IMAGE'))
+          .map((m) => m.assetId as string);
+        if (ids.length > 0) {
+          candidateAssetIdsByProduct.set(String(r.id), ids);
+          for (const aid of ids.slice(0, 3)) allAssetIds.add(aid);
+        }
+      }
+    } catch { /* ignore malformed media JSON */ }
+  }
+
+  const serialCountByProduct = new Map<string, number>();
+  const readyAssetById = new Map<string, { id: string; storageKey: string }>();
+
+  const assetIdList = [...allAssetIds].slice(0, 90);
+  const [serialRows, assetRows] = await Promise.all([
+    pageProductIds.length > 0
+      ? db
+          .prepare(
+            `SELECT productId, COUNT(*) AS cnt FROM SerialUnit WHERE status = 'AVAILABLE' AND productId IN (${pageProductIds.map(() => '?').join(',')}) GROUP BY productId`
+          )
+          .bind(...pageProductIds)
+          .all<{ productId: string; cnt: number }>()
+      : Promise.resolve({ results: [] as Array<{ productId: string; cnt: number }> }),
+    assetIdList.length > 0
+      ? db
+          .prepare(
+            `SELECT id, storageKey FROM MediaAsset WHERE kind = 'IMAGE' AND state = 'READY' AND id IN (${assetIdList.map(() => '?').join(',')})`
+          )
+          .bind(...assetIdList)
+          .all<{ id: string; storageKey: string }>()
+      : Promise.resolve({ results: [] as Array<{ id: string; storageKey: string }> }),
+  ]);
+
+  for (const sr of serialRows.results || []) {
+    serialCountByProduct.set(sr.productId, Number(sr.cnt) || 0);
+  }
+  for (const ar of assetRows.results || []) {
+    if (ar.storageKey) readyAssetById.set(ar.id, ar);
+  }
+
+  const items: CatalogItem[] = rawRows.map((r: Record<string, unknown>) => {
+    const hasDraft = Boolean(r.hasDraft);
+    const hasPublished = Boolean(r.hasPublished);
+    const isPublished = (hasPublished && ['ACTIVE', 'active'].includes(String(r.productStatus))) || (r.studioId == null && ['ACTIVE', 'active'].includes(String(r.productStatus)));
+    const isDraftOnly = !hasPublished && hasDraft;
+    const hasUnpublishedDraft = Boolean(r.hasUnpublishedDraft);
 
     const draftTemplate = String(r.draftTemplate || '');
     const categoryId = String(r.categoryId || '');
@@ -365,8 +419,9 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
 
     let image = '/images/placeholder-laptop.svg';
     try {
-      if (r.draft) {
-        const cover = r.draftImage ? JSON.parse(String(r.draftImage)) : null;
+      if (hasDraft) {
+        const candidates = candidateAssetIdsByProduct.get(String(r.id)) || [];
+        const cover = candidates.map((aid) => readyAssetById.get(aid)).find(Boolean) || null;
         if (cover?.storageKey?.startsWith('library/')) image = `/api/library/${encodeURIComponent(cover.id)}`;
         else if (cover?.storageKey && /^(products|brand)\/[a-zA-Z0-9_./-]+\.(png|jpe?g|webp)$/.test(cover.storageKey) && !cover.storageKey.includes('..')) image = `/api/media/${cover.storageKey}`;
       } else {
@@ -374,7 +429,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
         if (Array.isArray(parsed) && parsed[0]) image = parsed[0];
       }
     } catch {
-      if (!r.draft && typeof r.images === 'string' && r.images.startsWith('http')) image = r.images;
+      if (!hasDraft && typeof r.images === 'string' && r.images.startsWith('http')) image = r.images;
     }
 
     return {
@@ -384,7 +439,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       slug: String(r.slug),
       price: Number(r.draftPrice ?? r.price),
       publicPrice: Number(r.price),
-      originalPrice: (r.draft ? r.draftOriginalPrice : r.originalPrice) == null ? null : Number(r.draft ? r.draftOriginalPrice : r.originalPrice),
+      originalPrice: (hasDraft ? r.draftOriginalPrice : r.originalPrice) == null ? null : Number(hasDraft ? r.draftOriginalPrice : r.originalPrice),
       productStatus: String(r.productStatus),
       revision: Number(r.revision ?? 0),
       isPublished,
@@ -404,7 +459,7 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
       isFlashSale: !!r.isFlashSale,
       image,
       stock: Number(r.draftStock ?? r.stock ?? 0),
-      availableSerialsCount: Number(r.availableSerialsCount ?? 0),
+      availableSerialsCount: serialCountByProduct.get(String(r.id)) ?? 0,
       updatedAt: String(r.updatedAt),
       hasStudio: r.studioId != null,
     };

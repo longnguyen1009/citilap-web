@@ -14,6 +14,7 @@ export async function mediaEnvironment(): Promise<MediaEnvironment> {
 }
 export function mediaFailure(error: unknown) {
   const status = error instanceof MediaError ? error.status : error instanceof ZodError || error instanceof SyntaxError ? 400 : 503;
+  if (status >= 500) console.error('[mediaFailure]', error);
   const message = error instanceof MediaError ? error.message : status === 400 ? 'Dữ liệu không hợp lệ. Kiểm tra tên, độ dài và các trường bắt buộc.' : 'Không thể truy cập thư viện. Kiểm tra D1/R2 và migration, rồi thử lại.';
   const issues =
     error instanceof MediaError && error.issues
