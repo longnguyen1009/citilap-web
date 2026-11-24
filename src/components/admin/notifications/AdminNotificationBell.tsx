@@ -40,10 +40,14 @@ export default function AdminNotificationBell() {
     }
   }, []);
 
-  // Initial fetch and visibility-aware polling
+  // Initial fetch and visibility-aware polling (60s interval + 15s cooldown on tab focus)
   useEffect(() => {
     let canceled = false;
-    const load = () => {
+    let lastLoadedAt = 0;
+    const load = (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastLoadedAt < 15000) return;
+      lastLoadedAt = now;
       fetch("/api/admin/notifications?limit=15", {
         headers: { "Cache-Control": "no-cache" },
       })
@@ -57,17 +61,17 @@ export default function AdminNotificationBell() {
         .catch(() => {});
     };
 
-    load();
+    load(true);
 
     const intervalId = setInterval(() => {
       if (!document.hidden) {
-        load();
+        load(true);
       }
-    }, 30000);
+    }, 60000);
 
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        load();
+        load(false);
       }
     };
 

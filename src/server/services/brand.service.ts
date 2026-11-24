@@ -105,17 +105,24 @@ export async function listBrands(
       COALESCE(b.seoDescription, '') AS seoDescription,
       b.status,
       b.createdAt,
-      b.updatedAt,
-      count(p.id) AS productCount
+      b.updatedAt
     FROM Brand b
-    LEFT JOIN Product p ON p.brandId = b.id AND p.deletedAt IS NULL
     WHERE ${whereSql}
-    GROUP BY b.id
     ORDER BY b.name ASC
   `;
 
   const stmt = db.prepare(sql);
-  const rows = await (params.length ? stmt.bind(...params) : stmt).all<Record<string, unknown>>();
+  const [rows, countRows] = await Promise.all([
+    (params.length ? stmt.bind(...params) : stmt).all<Record<string, unknown>>(),
+    db
+      .prepare('SELECT brandId, COUNT(*) AS cnt FROM Product WHERE deletedAt IS NULL AND brandId IS NOT NULL GROUP BY brandId')
+      .all<{ brandId: string; cnt: number }>(),
+  ]);
+
+  const countByBrandId = new Map<string, number>();
+  for (const cr of countRows.results || []) {
+    countByBrandId.set(cr.brandId, Number(cr.cnt) || 0);
+  }
 
   const items: BrandDto[] = (rows.results || []).map((r: Record<string, unknown>) => ({
     id: String(r.id),
@@ -126,7 +133,7 @@ export async function listBrands(
     seoTitle: r.seoTitle ? String(r.seoTitle) : null,
     seoDescription: r.seoDescription ? String(r.seoDescription) : null,
     status: (r.status as 'ACTIVE' | 'INACTIVE') || 'ACTIVE',
-    productCount: Number(r.productCount || 0),
+    productCount: countByBrandId.get(String(r.id)) ?? 0,
     createdAt: String(r.createdAt),
     updatedAt: String(r.updatedAt),
   }));

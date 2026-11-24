@@ -53,19 +53,22 @@ export async function pageList(
   }
   const whereSql = whereClauses.join(' AND ');
 
-  const countRow = await db.prepare(`SELECT count(*) AS total FROM Page p LEFT JOIN PageStudio s ON s.pageId = p.id WHERE ${whereSql}`).bind(...params).first<{ total: number }>();
+  const [countRow, rows] = await Promise.all([
+    db.prepare(`SELECT count(*) AS total FROM Page p LEFT JOIN PageStudio s ON s.pageId = p.id WHERE ${whereSql}`).bind(...params).first<{ total: number }>(),
+    db.prepare(`
+      SELECT p.id, p.slug, p.pageType, p.updatedAt, s.revision,
+        (s.published IS NOT NULL) AS isPublished,
+        (s.published IS NOT NULL AND s.draft IS NOT NULL AND s.draft != s.published) AS hasUnpublishedDraft,
+        json_extract(s.draft, '$.title') AS draftTitle,
+        json_extract(s.draft, '$.slug') AS draftSlug,
+        json_extract(s.draft, '$.pageType') AS draftPageType
+      FROM Page p LEFT JOIN PageStudio s ON s.pageId = p.id
+      WHERE ${whereSql}
+      ORDER BY p.updatedAt DESC, p.id DESC
+      LIMIT ? OFFSET ?
+    `).bind(...params, limit, offset).all<Record<string, unknown>>(),
+  ]);
   const total = countRow?.total ?? 0;
-
-  const rows = await db.prepare(`
-    SELECT p.id, p.slug, p.pageType, p.updatedAt, s.revision, s.draft, s.published,
-      json_extract(s.draft, '$.title') AS draftTitle,
-      json_extract(s.draft, '$.slug') AS draftSlug,
-      json_extract(s.draft, '$.pageType') AS draftPageType
-    FROM Page p LEFT JOIN PageStudio s ON s.pageId = p.id
-    WHERE ${whereSql}
-    ORDER BY p.updatedAt DESC, p.id DESC
-    LIMIT ? OFFSET ?
-  `).bind(...params, limit, offset).all<Record<string, unknown>>();
 
   const items: PageListItem[] = (rows.results || []).map((r) => ({
     id: String(r.id),
@@ -73,8 +76,8 @@ export async function pageList(
     title: String(r.draftTitle || '(Chưa có tiêu đề)'),
     pageType: String(r.draftPageType || r.pageType || 'CUSTOM'),
     revision: Number(r.revision ?? 0),
-    isPublished: !!r.published,
-    hasUnpublishedDraft: !!r.published && !!r.draft && r.draft !== r.published,
+    isPublished: Boolean(r.isPublished),
+    hasUnpublishedDraft: Boolean(r.hasUnpublishedDraft),
     updatedAt: String(r.updatedAt),
   }));
 

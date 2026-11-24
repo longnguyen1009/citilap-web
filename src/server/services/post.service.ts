@@ -74,15 +74,13 @@ export async function postList(db: D1Database, opts: PostListOptions = {}): Prom
   const orderSql = `ORDER BY ${sortCol} ${sortOrder}, p.id DESC`;
 
   const countSql = `SELECT count(*) AS total FROM Post p LEFT JOIN PostStudio s ON s.postId = p.id WHERE ${whereSql}`;
-  const countRow = await (params.length ? db.prepare(countSql).bind(...params) : db.prepare(countSql)).first<{ total: number }>();
-  const total = countRow?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-
   const itemsSql = `
     SELECT
       p.id, p.slug, p.updatedAt, p.categoryId,
       c.name AS categoryName,
-      s.revision, s.draft, s.published,
+      s.revision,
+      (s.published IS NOT NULL) AS isPublished,
+      (s.published IS NOT NULL AND s.draft IS NOT NULL AND s.draft != s.published) AS hasUnpublishedDraft,
       json_extract(s.draft, '$.title') AS draftTitle,
       json_extract(s.draft, '$.isFeatured') AS draftIsFeatured
     FROM Post p
@@ -92,16 +90,21 @@ export async function postList(db: D1Database, opts: PostListOptions = {}): Prom
     ${orderSql}
     LIMIT ? OFFSET ?
   `;
-  const itemsRows = await db.prepare(itemsSql).bind(...params, limit, offset).all<Record<string, unknown>>();
-  const categoriesRes = await db.prepare("SELECT id, name FROM PostCategory WHERE status='ACTIVE' ORDER BY sortOrder, name").all<{ id: string; name: string }>();
+  const [countRow, itemsRows, categoriesRes] = await Promise.all([
+    (params.length ? db.prepare(countSql).bind(...params) : db.prepare(countSql)).first<{ total: number }>(),
+    db.prepare(itemsSql).bind(...params, limit, offset).all<Record<string, unknown>>(),
+    db.prepare("SELECT id, name FROM PostCategory WHERE status='ACTIVE' ORDER BY sortOrder, name").all<{ id: string; name: string }>(),
+  ]);
+  const total = countRow?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const items: PostListItem[] = (itemsRows.results || []).map((r) => ({
     id: String(r.id),
     slug: String(r.slug),
     title: String(r.draftTitle || '(Chưa có tiêu đề)'),
     revision: Number(r.revision ?? 0),
-    isPublished: !!r.published,
-    hasUnpublishedDraft: !!r.published && !!r.draft && r.draft !== r.published,
+    isPublished: Boolean(r.isPublished),
+    hasUnpublishedDraft: Boolean(r.hasUnpublishedDraft),
     category: r.categoryId ? { id: String(r.categoryId), name: String(r.categoryName || '') } : null,
     isFeatured: !!r.draftIsFeatured,
     updatedAt: String(r.updatedAt),

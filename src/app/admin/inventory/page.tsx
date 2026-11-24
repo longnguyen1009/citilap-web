@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import {
@@ -176,6 +176,8 @@ function InventoryContent() {
     }
   }, [activeTab, warehouseFilter, statusFilter, searchQuery, lowStockOnly, pathname]);
 
+  const catalogLoadedRef = useRef(false);
+
   const loadInventory = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -184,6 +186,7 @@ function InventoryContent() {
       if (warehouseFilter !== "ALL") params.set("warehouseId", warehouseFilter);
       if (statusFilter !== "ALL") params.set("status", statusFilter);
       if (searchQuery.trim()) params.set("q", searchQuery.trim());
+      if (catalogLoadedRef.current) params.set("includeCatalog", "0");
 
       const res = await fetch(`/api/admin/inventory?${params.toString()}`, {
         cache: "no-store",
@@ -195,8 +198,13 @@ function InventoryContent() {
       setWarehouses(json.data.warehouses || []);
       setSerialUnits(json.data.serialUnits || []);
       setBalances(json.data.balances || []);
-      setProducts(json.data.products || []);
-      setVariants(json.data.variants || []);
+      if (Array.isArray(json.data.products)) {
+        setProducts(json.data.products);
+        catalogLoadedRef.current = true;
+      }
+      if (Array.isArray(json.data.variants)) {
+        setVariants(json.data.variants);
+      }
       if (!newSerial.productId && json.data.products?.[0]?.id) {
         const firstProdId = json.data.products[0].id;
         const firstVarId =

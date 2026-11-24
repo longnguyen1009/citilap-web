@@ -45,11 +45,23 @@ const fields = 'a.*,(SELECT count(*) FROM MediaUsage u WHERE u.assetId=a.id) AS 
 
 const schemaReadyByDb = new WeakMap<D1Database, Promise<void>>();
 
+/**
+ * Lightweight schema check: `MediaFolder` and `MediaAsset_folder_idx` are now created
+ * by D1 migration 0032, so normal read requests avoid running DDL/writes on cold starts.
+ */
 export async function ensureMediaFolderSchema(db: D1Database): Promise<void> {
   const existing = schemaReadyByDb.get(db);
   if (existing) return existing;
 
   const task = (async () => {
+    // Fast read-only probe: if MediaFolder already has rows, skip all DDL/seed writes.
+    try {
+      const probe = await db.prepare('SELECT 1 AS ok FROM MediaFolder LIMIT 1').first<{ ok: number }>();
+      if (probe?.ok === 1) return;
+    } catch {
+      // Table missing in an unmigrated local/test DB; fall through to bootstrap.
+    }
+
     let addedColumn = false;
     try {
       await db.prepare("ALTER TABLE MediaAsset ADD COLUMN folder TEXT NOT NULL DEFAULT 'general'").run();
@@ -338,26 +350,59 @@ export async function listMedia(db: D1Database, input: unknown) {
   const query = mediaQuerySchema.parse(input);
   const kindFilter = buildKindFilterSql(query.kind);
   const hasFolderFilter = Boolean(query.folder && query.folder !== 'ALL');
-  const folderClause = hasFolderFilter ? " AND coalesce(a.folder, 'general') = ?" : '';
-  const where = `a.state=? AND (${kindFilter.clause})${folderClause} AND (instr(lower(a.name),lower(?))>0 OR instr(lower(a.alt),lower(?))>0 OR instr(lower(a.caption),lower(?))>0)`;
+  const trimmedQ = query.q.trim();
+  const hasSearch = trimmedQ.length > 0;
+  const folderClause = hasFolderFilter ? " AND a.folder = ?" : '';
+  // Omit instr(lower(...)) when search is empty so SQLite uses MediaAsset_folder_idx / MediaAsset_state_createdAt_idx
+  const searchClause = hasSearch
+    ? ' AND (instr(lower(a.name),lower(?))>0 OR instr(lower(a.alt),lower(?))>0 OR instr(lower(a.caption),lower(?))>0)'
+    : '';
+  const where = `a.state=? AND (${kindFilter.clause})${folderClause}${searchClause}`;
   const args = [
     query.state,
     ...kindFilter.bindings,
     ...(hasFolderFilter ? [query.folder] : []),
-    query.q,
-    query.q,
-    query.q,
+    ...(hasSearch ? [trimmedQ, trimmedQ, trimmedQ] : []),
   ];
-  const [count, folderSummary] = await Promise.all([
+
+  const [count, folderSummary, firstPageRows] = await Promise.all([
     db.prepare(`SELECT count(*) AS total FROM MediaAsset a WHERE ${where}`).bind(...args).first<{ total: number }>(),
     listMediaFolders(db, query.state),
+    query.page === 1
+      ? db
+          .prepare(`SELECT a.* FROM MediaAsset a WHERE ${where} ORDER BY a.createdAt DESC, a.id DESC LIMIT ? OFFSET 0`)
+          .bind(...args, PAGE_SIZE)
+          .all<Row>()
+      : Promise.resolve(null),
   ]);
+
   const total = count?.total || 0;
   const page = Math.min(query.page, Math.max(1, Math.ceil(total / PAGE_SIZE)));
-  const rows = await db.prepare(`SELECT ${fields} FROM MediaAsset a WHERE ${where} ORDER BY a.createdAt DESC,a.id DESC LIMIT ? OFFSET ?`)
-    .bind(...args, PAGE_SIZE, (page - 1) * PAGE_SIZE).all<Row & { usageCount: number }>();
+  const rawRows =
+    firstPageRows && page === 1
+      ? firstPageRows.results
+      : (
+          await db
+            .prepare(`SELECT a.* FROM MediaAsset a WHERE ${where} ORDER BY a.createdAt DESC, a.id DESC LIMIT ? OFFSET ?`)
+            .bind(...args, PAGE_SIZE, (page - 1) * PAGE_SIZE)
+            .all<Row>()
+        ).results;
+
+  // Resolve usage counts in 1 grouped IN(...) query for only the <=24 visible rows
+  const usageByAssetId = new Map<string, number>();
+  if (rawRows.length > 0) {
+    const ids = rawRows.map((r) => r.id);
+    const usageRows = await db
+      .prepare(`SELECT assetId, COUNT(*) AS cnt FROM MediaUsage WHERE assetId IN (${ids.map(() => '?').join(',')}) GROUP BY assetId`)
+      .bind(...ids)
+      .all<{ assetId: string; cnt: number }>();
+    for (const u of usageRows.results || []) {
+      usageByAssetId.set(u.assetId, Number(u.cnt) || 0);
+    }
+  }
+
   return {
-    items: rows.results.map(dto),
+    items: rawRows.map((row) => dto({ ...row, usageCount: usageByAssetId.get(row.id) ?? 0 })),
     total,
     page,
     pageSize: PAGE_SIZE,

@@ -127,12 +127,6 @@ export async function getLandingPageList(
   db: D1Database,
   opts: { q?: string; page?: number; limit?: number; status?: string; excludeHome?: boolean } = {}
 ) {
-  try {
-    await ensureHomepageBootstrapped(db);
-  } catch (e) {
-    console.warn('[SiteBuilder] Auto-bootstrap homepage check:', e);
-  }
-
   const page = Math.max(1, Math.floor(Number(opts.page) || 1));
   const limit = Math.min(100, Math.max(1, Math.floor(Number(opts.limit) || 20)));
   const offset = (page - 1) * limit;
@@ -154,45 +148,61 @@ export async function getLandingPageList(
 
   const whereSql = whereClauses.join(' AND ');
 
-  const countRow = await db
-    .prepare(`SELECT count(*) AS total FROM LandingPage p WHERE ${whereSql}`)
-    .bind(...params)
-    .first<{ total: number }>();
-  const total = countRow?.total ?? 0;
+  const fetchList = () =>
+    Promise.all([
+      db
+        .prepare(`SELECT count(*) AS total FROM LandingPage p WHERE ${whereSql}`)
+        .bind(...params)
+        .first<{ total: number }>(),
+      db
+        .prepare(`
+          SELECT p.id, p.slug, p.isHome, p.name, p.status, p.updatedAt,
+                 s.revision, s.publishedRevision,
+                 json_extract(s.draft, '$.internalName') AS draftInternalName,
+                 json_extract(s.draft, '$.title') AS draftTitle,
+                 json_array_length(s.draft, '$.sections') AS sectionCount,
+                 (s.published IS NOT NULL AND s.draft IS NOT NULL AND s.draft != s.published) AS hasUnpublishedDraft
+          FROM LandingPage p
+          LEFT JOIN LandingPageStudio s ON s.pageId = p.id
+          WHERE ${whereSql}
+          ORDER BY p.isHome DESC, p.updatedAt DESC, p.id DESC
+          LIMIT ? OFFSET ?
+        `)
+        .bind(...params, limit, offset)
+        .all<Record<string, unknown>>(),
+    ]);
 
-  const rows = await db
-    .prepare(`
-      SELECT p.id, p.slug, p.isHome, p.name, p.status, p.updatedAt,
-             s.revision, s.draft, s.published, s.publishedRevision
-      FROM LandingPage p
-      LEFT JOIN LandingPageStudio s ON s.pageId = p.id
-      WHERE ${whereSql}
-      ORDER BY p.isHome DESC, p.updatedAt DESC, p.id DESC
-      LIMIT ? OFFSET ?
-    `)
-    .bind(...params, limit, offset)
-    .all<Record<string, unknown>>();
+  let [countRow, rows] = await fetchList();
+  let total = countRow?.total ?? 0;
+
+  // Only bootstrap default homepage if the unfiltered table is completely empty
+  if (total === 0 && !opts.excludeHome && !q && !opts.status) {
+    try {
+      await ensureHomepageBootstrapped(db);
+      [countRow, rows] = await fetchList();
+      total = countRow?.total ?? 0;
+    } catch (e) {
+      console.warn('[SiteBuilder] Auto-bootstrap homepage check:', e);
+    }
+  }
 
   const items: LandingPageListItem[] = (rows.results || []).map((r) => {
     const isHome = Number(r.isHome) === 1;
     const revision = Number(r.revision ?? 0);
     const publishedRevision = r.publishedRevision != null ? Number(r.publishedRevision) : null;
-    const draft = typeof r.draft === 'string' ? r.draft : '';
-    const published = typeof r.published === 'string' ? r.published : null;
-    const document: LandingPageDocument = JSON.parse(draft || '{}');
 
     return {
       id: String(r.id),
       slug: String(r.slug),
       name: String(r.name),
-      internalName: document.internalName || String(r.name),
-      title: document.title || String(r.name),
-      sectionCount: document.sections?.length ?? 0,
+      internalName: String(r.draftInternalName || r.name),
+      title: String(r.draftTitle || r.name),
+      sectionCount: Number(r.sectionCount ?? 0),
       isHome,
       status: (r.status as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED') || 'DRAFT',
       revision,
       publishedRevision,
-      hasUnpublishedDraft: !!published && !!draft && draft !== published,
+      hasUnpublishedDraft: Boolean(r.hasUnpublishedDraft),
       updatedAt: String(r.updatedAt),
     };
   });

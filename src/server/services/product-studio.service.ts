@@ -283,15 +283,10 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
   const sortOrder = opts.order === 'asc' ? 'ASC' : 'DESC';
   const orderSql = `ORDER BY ${sortCol} ${sortOrder}, p.id DESC`;
 
-  // 1. Total count query
+  // 1. Total count & rows queries (run in parallel on page 1 to save a full D1 round-trip)
   const joins = "FROM Product p LEFT JOIN ProductStudio s ON s.productId = p.id LEFT JOIN Category c ON c.id = COALESCE(json_extract(s.draft, '$.categoryId'), p.categoryId)";
   const countSql = `SELECT count(*) AS total ${joins} WHERE ${whereSql}`;
   const countStmt = db.prepare(countSql);
-  const countRow = await (params.length ? countStmt.bind(...params) : countStmt).first<{ total: number }>();
-  const total = countRow?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  page = Math.min(page, totalPages);
-  const offset = (page - 1) * limit;
 
   // 2. Rows query (avoid correlated json_each + MediaAsset full scans & avoid transferring full draft/published blobs)
   const itemsSql = `
@@ -337,14 +332,43 @@ export async function catalogList(db: D1Database, opts: CatalogListOptions = {})
     LIMIT ? OFFSET ?
   `;
   const itemsStmt = db.prepare(itemsSql);
-  const itemsParams = [...params, limit, offset];
 
-  // 3. Execute page rows, categories, and brands in parallel
-  const [itemsRows, categoriesRes, brandsRes] = await Promise.all([
-    itemsStmt.bind(...itemsParams).all<Record<string, unknown>>(),
-    db.prepare("SELECT id, name, slug FROM Category WHERE status='ACTIVE' ORDER BY sortOrder, name").all<{ id: string; name: string; slug: string }>(),
-    db.prepare("SELECT DISTINCT COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS name, COALESCE(json_extract(s.draft, '$.brand'), p.brand) AS id FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id WHERE p.deletedAt IS NULL AND COALESCE(json_extract(s.draft, '$.brand'), p.brand, '') != '' ORDER BY name").all<{ id: string; name: string }>(),
-  ]);
+  const categoriesQuery = db.prepare("SELECT id, name, slug FROM Category WHERE status='ACTIVE' ORDER BY sortOrder, name").all<{ id: string; name: string; slug: string }>();
+  // Query Brand table (~39 rows) instead of scanning & JSON-parsing all 479 ProductStudio blobs
+  const brandsQuery = db.prepare("SELECT name AS id, name FROM Brand WHERE deletedAt IS NULL AND status='ACTIVE' ORDER BY name").all<{ id: string; name: string }>();
+
+  let total: number;
+  let totalPages: number;
+  let itemsRows: { results?: Record<string, unknown>[] };
+  let categoriesRes: { results?: { id: string; name: string; slug: string }[] };
+  let brandsRes: { results?: { id: string; name: string }[] };
+
+  if (page === 1) {
+    const [countRow, firstPageRows, cats, brs] = await Promise.all([
+      (params.length ? countStmt.bind(...params) : countStmt).first<{ total: number }>(),
+      itemsStmt.bind(...params, limit, 0).all<Record<string, unknown>>(),
+      categoriesQuery,
+      brandsQuery,
+    ]);
+    total = countRow?.total ?? 0;
+    totalPages = Math.max(1, Math.ceil(total / limit));
+    itemsRows = firstPageRows;
+    categoriesRes = cats;
+    brandsRes = brs;
+  } else {
+    const [countRow, cats, brs] = await Promise.all([
+      (params.length ? countStmt.bind(...params) : countStmt).first<{ total: number }>(),
+      categoriesQuery,
+      brandsQuery,
+    ]);
+    total = countRow?.total ?? 0;
+    totalPages = Math.max(1, Math.ceil(total / limit));
+    page = Math.min(page, totalPages);
+    const offset = (page - 1) * limit;
+    itemsRows = await itemsStmt.bind(...params, limit, offset).all<Record<string, unknown>>();
+    categoriesRes = cats;
+    brandsRes = brs;
+  }
 
   const rawRows = itemsRows.results || [];
   const pageProductIds = rawRows.map((r) => String(r.id));

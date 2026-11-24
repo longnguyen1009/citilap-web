@@ -21,17 +21,7 @@ async function GETHandler(request: Request) {
     const warehouseFilter = searchParams.get('warehouseId') || '';
     const statusFilter = searchParams.get('status') || '';
     const search = (searchParams.get('q') || '').trim();
-
-    const warehousesRes = await db
-      .prepare(
-        `SELECT w.id, w.code, w.name, w.status, w.address, w.sortOrder,
-                (SELECT COUNT(*) FROM SerialUnit su WHERE su.warehouseId = w.id AND su.status = 'AVAILABLE') as availableSerials,
-                (SELECT COUNT(*) FROM SerialUnit su WHERE su.warehouseId = w.id) as totalSerials,
-                (SELECT COALESCE(SUM(ib.onHand), 0) FROM InventoryBalance ib WHERE ib.warehouseId = w.id) as totalOnHand
-         FROM Warehouse w
-         ORDER BY w.sortOrder ASC, w.name ASC`
-      )
-      .all();
+    const includeCatalog = searchParams.get('includeCatalog') !== '0';
 
     let serialSql = `
       SELECT u.id, u.productId, u.variantId, u.warehouseId, u.serialNumber, u.condition, u.status,
@@ -62,44 +52,56 @@ async function GETHandler(request: Request) {
     }
     serialSql += ` ORDER BY u.updatedAt DESC LIMIT 100`;
 
-    const serialsRes = await db
-      .prepare(serialSql)
-      .bind(...binds)
-      .all();
-
-    const balancesRes = await db
-      .prepare(
-        `SELECT ib.id, ib.warehouseId, ib.productId, ib.variantId, ib.onHand, ib.reserved, ib.updatedAt,
-                p.name as productName, p.slug as productSlug, p.stock as productStock,
-                v.sku as variantSku, v.name as variantName,
-                w.name as warehouseName, w.code as warehouseCode
-         FROM InventoryBalance ib
-         JOIN Product p ON p.id = ib.productId
-         LEFT JOIN ProductVariant v ON v.id = ib.variantId
-         JOIN Warehouse w ON w.id = ib.warehouseId
-         ORDER BY ib.onHand ASC, p.name ASC
-         LIMIT 100`
-      )
-      .all();
-
-    const productsRes = await db
-      .prepare(
-        `SELECT id, name, slug, condition, warranty
-         FROM Product
-         WHERE deletedAt IS NULL AND status IN ('ACTIVE', 'DRAFT')
-         ORDER BY name ASC
-         LIMIT 200`
-      )
-      .all();
-
-    const variantsRes = await db
-      .prepare(
-        `SELECT id, productId, sku, name, price
-         FROM ProductVariant
-         WHERE status = 'ACTIVE'
-         ORDER BY createdAt ASC`
-      )
-      .all();
+    // Execute all inventory queries in parallel instead of 5 sequential round-trips
+    const [warehousesRes, serialsRes, balancesRes, productsRes, variantsRes] = await Promise.all([
+      db
+        .prepare(
+          `SELECT w.id, w.code, w.name, w.status, w.address, w.sortOrder,
+                  (SELECT COUNT(*) FROM SerialUnit su WHERE su.warehouseId = w.id AND su.status = 'AVAILABLE') as availableSerials,
+                  (SELECT COUNT(*) FROM SerialUnit su WHERE su.warehouseId = w.id) as totalSerials,
+                  (SELECT COALESCE(SUM(ib.onHand), 0) FROM InventoryBalance ib WHERE ib.warehouseId = w.id) as totalOnHand
+           FROM Warehouse w
+           ORDER BY w.sortOrder ASC, w.name ASC`
+        )
+        .all(),
+      db.prepare(serialSql).bind(...binds).all(),
+      db
+        .prepare(
+          `SELECT ib.id, ib.warehouseId, ib.productId, ib.variantId, ib.onHand, ib.reserved, ib.updatedAt,
+                  p.name as productName, p.slug as productSlug, p.stock as productStock,
+                  v.sku as variantSku, v.name as variantName,
+                  w.name as warehouseName, w.code as warehouseCode
+           FROM InventoryBalance ib
+           JOIN Product p ON p.id = ib.productId
+           LEFT JOIN ProductVariant v ON v.id = ib.variantId
+           JOIN Warehouse w ON w.id = ib.warehouseId
+           ORDER BY ib.onHand ASC, p.name ASC
+           LIMIT 100`
+        )
+        .all(),
+      includeCatalog
+        ? db
+            .prepare(
+              `SELECT id, name, slug, condition, warranty
+               FROM Product
+               WHERE deletedAt IS NULL AND status IN ('ACTIVE', 'DRAFT')
+               ORDER BY name ASC
+               LIMIT 200`
+            )
+            .all()
+        : Promise.resolve({ results: undefined }),
+      includeCatalog
+        ? db
+            .prepare(
+              `SELECT id, productId, sku, name, price
+               FROM ProductVariant
+               WHERE status = 'ACTIVE'
+               ORDER BY createdAt ASC
+               LIMIT 500`
+            )
+            .all()
+        : Promise.resolve({ results: undefined }),
+    ]);
 
     return NextResponse.json(
       {
@@ -108,8 +110,12 @@ async function GETHandler(request: Request) {
           warehouses: warehousesRes.results || [],
           serialUnits: serialsRes.results || [],
           balances: balancesRes.results || [],
-          products: productsRes.results || [],
-          variants: variantsRes.results || [],
+          ...(includeCatalog
+            ? {
+                products: productsRes.results || [],
+                variants: variantsRes.results || [],
+              }
+            : {}),
         },
       },
       { headers: NO_STORE_HEADERS }
