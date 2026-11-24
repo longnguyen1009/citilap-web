@@ -1,8 +1,9 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from './lib/auth';
 import { mediaEnvironment } from './server/media-http';
-import { publicRedirect } from './server/services/redirect.service';
+import { redirectPath } from './server/services/redirect.service';
 import { publicNavigation } from './server/services/navigation.service';
+import { cachedJson } from './server/cache/kv-cache';
 import { RESERVED_CATEGORY_ROOTS, canonicalCategoryPath } from './lib/category-paths';
 import { productHref } from './lib/product-paths';
 // ponytail: DB check per admin page ensures immediate revocation; move to per-page DAL guards if latency grows.
@@ -17,10 +18,24 @@ async function routeRequest(request: NextRequest) {
     try{
       const { DB } = await mediaEnvironment();
       const path = request.nextUrl.pathname;
-      let target=await publicRedirect(DB,path);
+      const redirectsMap = await cachedJson<Record<string, string>>('proxy:redirects', 120, async () => {
+        const rows = await DB.prepare('SELECT source, target FROM CmsRedirect WHERE enabled=1').all<{ source: string; target: string }>();
+        const map: Record<string, string> = {};
+        for (const r of rows.results) {
+          try {
+            map[redirectPath(r.source)] = redirectPath(r.target);
+          } catch { /* skip invalid stored redirect */ }
+        }
+        return map;
+      });
+      let normalizedPath: string | null = null;
+      try { normalizedPath = redirectPath(path); } catch { normalizedPath = null; }
+      let target: string | null = normalizedPath ? (redirectsMap[normalizedPath] ?? null) : null;
       const root = path.split('/')[1];
       const categoryCandidate = ['category','phan-loai','phu-kien'].includes(root) || !RESERVED_CATEGORY_ROOTS.has(root);
-      const navigation = target || categoryCandidate ? await publicNavigation(DB).catch(error => { if (error.status === 404) return null; throw error; }) : null;
+      const navigation = target || categoryCandidate
+        ? await cachedJson('proxy:navigation', 120, () => publicNavigation(DB).catch(error => { if (error.status === 404) return null; throw error; }))
+        : null;
       if (navigation) {
         const canonical = canonicalCategoryPath(path, navigation.categories);
         // A live canonical category wins over old stored aliases pointing back to root URLs.
@@ -47,7 +62,10 @@ async function routeRequest(request: NextRequest) {
         return new Response('<!doctype html><html lang="vi"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta name="robots" content="noindex"><title>Không tìm thấy phân loại | CitiLap</title><body style="font:16px/1.7 system-ui;color:#334155;padding:8vh 24px;max-width:720px;margin:auto"><h1>Không tìm thấy phân loại</h1><p>Đường dẫn phân loại không tồn tại hoặc đã thay đổi.</p><a href="/phan-loai" style="color:#1d4ed8">Xem các phân loại sản phẩm</a></body></html>',{status:404,headers:{'Content-Type':'text/html; charset=utf-8'}});
       }
       return NextResponse.next();
-    }catch{return Response.json({success:false,error:'Redirect service unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});}
+    }catch(error){
+      console.error('[proxy] storefront redirect check failed, failing open:', error);
+      return NextResponse.next();
+    }
   }
   const denied=await requireAdmin(request);
   if(!denied)return NextResponse.next();
