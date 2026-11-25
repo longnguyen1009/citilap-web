@@ -138,12 +138,24 @@ export async function updateCoupon(db: D1Database, id: string, rawInput: unknown
       throw new CouponError('COUPON_CODE_EXISTS', `Mã giảm giá "${input.code}" đã tồn tại.`, 409);
     }
   }
-  if (input.quantityLimit != null && input.quantityLimit < existing.usedCount) {
-    throw new CouponError(
-      'COUPON_LIMIT_TOO_LOW',
-      `Số lượng phát hành (${input.quantityLimit}) không được nhỏ hơn số lượt đã dùng (${existing.usedCount}).`,
-      400
-    );
+  let effectiveQuantityLimit = input.quantityLimit ?? null;
+  let effectiveUsedCount = existing.usedCount;
+
+  if (effectiveQuantityLimit != null) {
+    if (input.remainingCount != null) {
+      if (input.remainingCount > effectiveQuantityLimit) {
+        effectiveQuantityLimit = input.remainingCount;
+        effectiveUsedCount = 0;
+      } else {
+        effectiveUsedCount = effectiveQuantityLimit - input.remainingCount;
+      }
+    } else if (effectiveQuantityLimit < existing.usedCount) {
+      throw new CouponError(
+        'COUPON_LIMIT_TOO_LOW',
+        `Số lượng phát hành (${effectiveQuantityLimit}) không được nhỏ hơn số lượt đã dùng (${existing.usedCount}).`,
+        400
+      );
+    }
   }
 
   const now = new Date().toISOString();
@@ -155,7 +167,7 @@ export async function updateCoupon(db: D1Database, id: string, rawInput: unknown
     .prepare(
       `UPDATE "Coupon"
        SET "code" = ?, "name" = ?, "description" = ?, "discountType" = ?, "discountValue" = ?,
-           "maxDiscountAmount" = ?, "minOrderAmount" = ?, "quantityLimit" = ?,
+           "maxDiscountAmount" = ?, "minOrderAmount" = ?, "quantityLimit" = ?, "usedCount" = ?,
            "startAt" = ?, "endAt" = ?, "status" = ?, "applyScope" = ?, "productIdsJson" = ?, "updatedAt" = ?
        WHERE "id" = ?`
     )
@@ -167,7 +179,8 @@ export async function updateCoupon(db: D1Database, id: string, rawInput: unknown
       input.discountValue,
       input.maxDiscountAmount ?? null,
       input.minOrderAmount ?? 0,
-      input.quantityLimit ?? null,
+      effectiveQuantityLimit,
+      effectiveUsedCount,
       startIso,
       endIso,
       input.status,

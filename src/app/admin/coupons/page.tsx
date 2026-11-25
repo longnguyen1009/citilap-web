@@ -40,6 +40,7 @@ interface FormState {
   maxDiscountAmount: string;
   minOrderAmount: string;
   quantityLimit: string;
+  remainingCount: string;
   startAt: string;
   endAt: string;
   status: 'ACTIVE' | 'INACTIVE';
@@ -78,6 +79,7 @@ function defaultForm(): FormState {
     maxDiscountAmount: '',
     minOrderAmount: '0',
     quantityLimit: '50',
+    remainingCount: '',
     startAt: toDatetimeLocal(start.toISOString()),
     endAt: toDatetimeLocal(end.toISOString()),
     status: 'ACTIVE',
@@ -97,6 +99,8 @@ export default function AdminCouponsPage() {
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingUsedCount, setEditingUsedCount] = useState(0);
+  const [baselineUsedCount, setBaselineUsedCount] = useState(0);
   const [form, setForm] = useState<FormState>(defaultForm());
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -192,6 +196,8 @@ export default function AdminCouponsPage() {
 
   const openCreate = () => {
     setEditingId(null);
+    setEditingUsedCount(0);
+    setBaselineUsedCount(0);
     setForm(defaultForm());
     setFormError('');
     setPickerQuery('');
@@ -202,6 +208,8 @@ export default function AdminCouponsPage() {
 
   const openEdit = (c: CouponRecord) => {
     setEditingId(c.id);
+    setEditingUsedCount(c.usedCount);
+    setBaselineUsedCount(c.usedCount);
     setForm({
       code: c.code,
       name: c.name,
@@ -211,6 +219,7 @@ export default function AdminCouponsPage() {
       maxDiscountAmount: c.maxDiscountAmount != null ? String(c.maxDiscountAmount) : '',
       minOrderAmount: String(c.minOrderAmount || 0),
       quantityLimit: c.quantityLimit != null ? String(c.quantityLimit) : '',
+      remainingCount: c.quantityLimit != null ? String(Math.max(0, c.quantityLimit - c.usedCount)) : '',
       startAt: toDatetimeLocal(c.startAt),
       endAt: toDatetimeLocal(c.endAt),
       status: c.status,
@@ -222,6 +231,35 @@ export default function AdminCouponsPage() {
     setPickerBrand('ALL');
     setPickerCondition('ALL');
     setModalOpen(true);
+  };
+
+  const handleQuantityLimitChange = (val: string) => {
+    if (!editingId) {
+      setForm((f) => ({ ...f, quantityLimit: val }));
+      return;
+    }
+    if (!val.trim()) {
+      setForm((f) => ({ ...f, quantityLimit: val, remainingCount: '' }));
+      return;
+    }
+    const parsedLimit = Number(val);
+    if (Number.isFinite(parsedLimit) && parsedLimit > 0) {
+      const nextRemaining = Math.max(0, Math.floor(parsedLimit) - baselineUsedCount);
+      setForm((f) => ({ ...f, quantityLimit: val, remainingCount: String(nextRemaining) }));
+    } else {
+      setForm((f) => ({ ...f, quantityLimit: val }));
+    }
+  };
+
+  const handleRemainingCountChange = (val: string) => {
+    setForm((f) => ({ ...f, remainingCount: val }));
+    if (editingId && form.quantityLimit.trim() && val.trim() !== '') {
+      const parsedLimit = Number(form.quantityLimit);
+      const parsedRemaining = Number(val);
+      if (Number.isFinite(parsedLimit) && Number.isFinite(parsedRemaining) && parsedRemaining >= 0) {
+        setBaselineUsedCount(Math.max(0, Math.floor(parsedLimit) - Math.floor(parsedRemaining)));
+      }
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -238,6 +276,9 @@ export default function AdminCouponsPage() {
         maxDiscountAmount: form.discountType === 'PERCENT' && form.maxDiscountAmount.trim() ? Number(form.maxDiscountAmount) : null,
         minOrderAmount: form.minOrderAmount.trim() ? Number(form.minOrderAmount) : 0,
         quantityLimit: form.quantityLimit.trim() ? Number(form.quantityLimit) : null,
+        ...(editingId && form.quantityLimit.trim() && form.remainingCount.trim() !== ''
+          ? { remainingCount: Number(form.remainingCount) }
+          : {}),
         startAt: new Date(form.startAt).toISOString(),
         endAt: new Date(form.endAt).toISOString(),
         status: form.status,
@@ -441,9 +482,16 @@ export default function AdminCouponsPage() {
                           </div>
                         )}
                       </td>
-                      <td className="py-3.5 px-4 min-w-[140px]">
-                        <div className="text-xs font-bold text-slate-800">
-                          {c.quantityLimit != null ? `${c.usedCount} / ${c.quantityLimit} lượt` : `${c.usedCount} / ∞`}
+                      <td className="py-3.5 px-4 min-w-[160px]">
+                        <div className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800">
+                          <span>
+                            {c.quantityLimit != null ? `${c.usedCount} / ${c.quantityLimit} lượt` : `${c.usedCount} / ∞`}
+                          </span>
+                          {c.quantityLimit != null && (
+                            <span className={exhausted ? 'text-red-600' : 'text-amber-700'}>
+                              Còn {Math.max(0, c.quantityLimit - c.usedCount)}
+                            </span>
+                          )}
                         </div>
                         {c.quantityLimit != null && (
                           <div className="w-full h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
@@ -613,7 +661,7 @@ export default function AdminCouponsPage() {
                     type="number"
                     min={1}
                     value={form.quantityLimit}
-                    onChange={(e) => setForm((f) => ({ ...f, quantityLimit: e.target.value }))}
+                    onChange={(e) => handleQuantityLimitChange(e.target.value)}
                     placeholder="VD: 20"
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-red-500 focus:outline-none"
                   />
@@ -629,6 +677,74 @@ export default function AdminCouponsPage() {
                   />
                 </div>
               </div>
+
+              {editingId && (() => {
+                const limitNum = form.quantityLimit.trim() ? Number(form.quantityLimit) : null;
+                const remNum = form.remainingCount.trim() !== '' ? Number(form.remainingCount) : null;
+                const hasLimit = limitNum != null && Number.isFinite(limitNum) && limitNum > 0;
+                const hasValidRem = remNum != null && Number.isFinite(remNum) && remNum >= 0;
+                const willRaiseLimit = hasLimit && hasValidRem && remNum > limitNum;
+                const previewLimit = willRaiseLimit ? remNum : limitNum;
+                const previewUsed =
+                  hasLimit && hasValidRem
+                    ? willRaiseLimit
+                      ? 0
+                      : Math.max(0, limitNum - remNum)
+                    : editingUsedCount;
+
+                return (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 grid grid-cols-12 gap-4 items-center">
+                    <div className="col-span-4">
+                      <label className="block text-xs font-bold text-amber-900 uppercase mb-1">
+                        Số lượng mã còn lại
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        disabled={!hasLimit}
+                        value={hasLimit ? form.remainingCount : ''}
+                        onChange={(e) => handleRemainingCountChange(e.target.value)}
+                        placeholder={hasLimit ? 'VD: 10' : 'Không giới hạn (∞)'}
+                        className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-black text-amber-950 focus:border-red-500 focus:outline-none disabled:bg-slate-100 disabled:text-slate-400"
+                      />
+                    </div>
+                    <div className="col-span-8 text-xs text-amber-950 space-y-1">
+                      <div className="font-bold">
+                        Điều chỉnh số mã thực tế còn lại (bao gồm cả khách dùng trực tiếp tại cửa hàng)
+                      </div>
+                      {hasLimit ? (
+                        <div className="text-amber-900/90 flex flex-wrap items-center gap-x-4 gap-y-1">
+                          <span>
+                            Đã ghi nhận trên web: <strong>{editingUsedCount} lượt</strong>
+                          </span>
+                          <span>
+                            Sau khi lưu:{' '}
+                            <strong>
+                              {previewUsed} / {previewLimit} lượt đã dùng
+                            </strong>
+                            {hasValidRem && (
+                              <>
+                                {' '}
+                                (còn <strong>{remNum}</strong> mã)
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-amber-900/80">
+                          Mã đang không giới hạn số lượng (∞). Nhập &ldquo;Số lượng mã&rdquo; phía trên nếu muốn giới hạn và điều chỉnh số mã còn lại.
+                        </div>
+                      )}
+                      {willRaiseLimit && (
+                        <div className="text-red-700 font-semibold">
+                          Số mã còn lại ({remNum}) lớn hơn tổng số lượng ({limitNum}) → hệ thống sẽ tự động nâng tổng số lượng lên {remNum} (đã dùng: 0).
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-3 gap-4">
                 <div>

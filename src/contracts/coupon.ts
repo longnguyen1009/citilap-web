@@ -20,6 +20,7 @@ export const couponInputSchema = z
     maxDiscountAmount: z.number().int().positive().nullish(),
     minOrderAmount: z.number().int().min(0).default(0),
     quantityLimit: z.number().int().positive('Số lượng phải lớn hơn 0').nullish(),
+    remainingCount: z.number().int().min(0, 'Số lượng mã còn lại không được âm').nullish(),
     startAt: z.string().trim().min(1, 'Vui lòng chọn thời gian bắt đầu'),
     endAt: z.string().trim().min(1, 'Vui lòng chọn thời gian kết thúc'),
     status: couponStatusSchema.default('ACTIVE'),
