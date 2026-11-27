@@ -6,7 +6,7 @@ const slugSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).min(1).max(220
 // Routes reserved by other R05/R04 features or Next.js app segments. A post/page slug
 // must never collide with these at the storefront root.
 export const RESERVED_SLUGS = [
-  'news', 'product', 'category', 'brand', 'collection', 'search', 'cart', 'checkout',
+  'news', 'khach-hang-chia-se', 'product', 'category', 'brand', 'collection', 'search', 'cart', 'checkout',
   'contact', 'lien-he', 'wishlist', 'profile', 'order-tracking', 'hot-sale', 'admin',
   'api', 'login', 'chon-laptop', 'san-pham', 'laptop', 'phu-kien', 'phan-loai', 'so-sanh',
 ] as const;
@@ -35,11 +35,15 @@ export const postDocumentSchema = z.object({
     assetId: z.string().trim().max(128),
     alt: text(300),
   }).nullable().default(null),
+  galleryImages: z.array(z.object({
+    assetId: z.string().trim().min(1).max(128),
+    alt: text(300).default(''),
+  })).max(20).default([]),
   isFeatured: z.boolean().default(false),
   seo: seoSchema,
   relatedProductIds: z.array(z.string().trim().min(1)).max(10).default([]),
 }).superRefine((d, ctx) => {
-  if (d.coverImage && !d.coverImage.alt.trim()) {
+  if (d.coverImage && !d.coverImage.alt.trim() && d.galleryImages.length === 0) {
     ctx.addIssue({ code: 'custom', message: 'Ảnh đại diện cần có mô tả ALT.', path: ['coverImage', 'alt'] });
   }
   if (new Set(d.relatedProductIds).size !== d.relatedProductIds.length) {
@@ -65,6 +69,7 @@ export function blankPost(): PostDocument {
     categoryId: null,
     authorName: '',
     coverImage: null,
+    galleryImages: [],
     isFeatured: false,
     seo: { title: '', description: '', ogImageAssetId: null },
     relatedProductIds: [],
@@ -73,7 +78,7 @@ export function blankPost(): PostDocument {
 
 export const postCategoryDocumentSchema = z.object({
   name: text(120).min(1, 'Tên chuyên mục không được để trống'),
-  slug: slugSchema.refine(notReserved, {
+  slug: slugSchema.refine((val) => val === 'khach-hang-chia-se' || notReserved(val), {
     message: 'Đường dẫn này được hệ thống dành riêng, vui lòng chọn đường dẫn khác.',
   }),
   sortOrder: z.number().int().min(0).max(10_000).default(0),
@@ -98,6 +103,7 @@ export const publicPostSchema = z.object({
   isFeatured: z.boolean(),
   category: z.object({ id: z.string(), name: z.string(), slug: z.string() }).nullable(),
   coverImage: z.object({ url: z.string(), alt: z.string(), thumbnailUrl: z.string().optional() }).nullable(),
+  galleryImages: z.array(z.object({ url: z.string(), alt: z.string(), thumbnailUrl: z.string().optional() })).default([]),
   seo: z.object({ title: z.string(), description: z.string(), ogImageUrl: z.string().nullable() }),
   relatedProductIds: z.array(z.string()),
   publishedAt: z.string(),

@@ -324,6 +324,106 @@ export const getCachedPublicPostCategories = cache(async () => {
   });
 });
 
+export async function enrichPostsWithPrimaryProduct<
+  T extends {
+    id: string;
+    slug: string;
+    title: string;
+    excerpt: string;
+    authorName: string;
+    publishedAt: string;
+    isFeatured: boolean;
+    coverImage: { url: string; alt: string; thumbnailUrl?: string } | null;
+    category: { id: string; name: string; slug: string } | null;
+    relatedProductIds?: string[];
+  },
+>(
+  posts: T[],
+  totalCount?: number,
+  pageOffset = 0,
+): Promise<import('@/lib/customer-experience').CustomerExperienceCardItem[]> {
+  const firstProductIds = [
+    ...new Set(
+      posts
+        .map((p) => p.relatedProductIds?.[0])
+        .filter((id): id is string => Boolean(id && id.trim())),
+    ),
+  ];
+
+  const productMap = new Map<string, { id: string; name: string; slug: string }>();
+  if (firstProductIds.length > 0) {
+    try {
+      const { DB } = await mediaEnvironment();
+      const placeholders = firstProductIds.map(() => '?').join(',');
+      const res = await DB.prepare(
+        `SELECT id, name, slug FROM Product WHERE id IN (${placeholders}) AND status IN ('ACTIVE', 'active') AND deletedAt IS NULL`,
+      )
+        .bind(...firstProductIds)
+        .all<{ id: string; name: string; slug: string }>();
+      for (const row of res.results || []) {
+        productMap.set(row.id, row);
+      }
+    } catch {
+      // Non-fatal: cards still render cleanly without product chips
+    }
+  }
+
+  const baseTotal = typeof totalCount === 'number' && totalCount > 0 ? totalCount : posts.length;
+  return posts.map((post, idx) => {
+    const firstId = post.relatedProductIds?.[0];
+    const entryNum = Math.max(1, baseTotal - (pageOffset + idx));
+    return {
+      id: post.id,
+      slug: post.slug,
+      title: post.title,
+      excerpt: post.excerpt,
+      authorName: post.authorName,
+      publishedAt: post.publishedAt,
+      isFeatured: post.isFeatured,
+      coverImage: post.coverImage,
+      category: post.category,
+      relatedProduct: firstId ? productMap.get(firstId) ?? null : null,
+      entryNumber: entryNum,
+    };
+  });
+}
+
+export const getCachedCustomerExperiencePosts = cache(async (limit = 3) => {
+  return cachedJson(`public-customer-experience:l${limit}`, PUBLIC_CMS_TTL_SECONDS, async () => {
+    const {
+      CUSTOMER_EXPERIENCE_BASE_PATH,
+      isCustomerExperienceCategory,
+    } = await import('@/lib/customer-experience');
+
+    const categories = await getCachedPublicPostCategories().catch(() => []);
+    const expCategory = categories.find((c) => isCustomerExperienceCategory(c)) ?? null;
+
+    let rawList = expCategory
+      ? await getCachedPublicPostList(expCategory.id, 1, limit).catch(() => null)
+      : null;
+
+    let isFallbackFromAllNews = false;
+    if (!rawList || rawList.items.length === 0) {
+      rawList = await getCachedPublicPostList(undefined, 1, limit).catch(() => null);
+      isFallbackFromAllNews = true;
+    }
+
+    const rawItems = rawList?.items ?? [];
+    const total = rawList?.total ?? rawItems.length;
+    const items = await enrichPostsWithPrimaryProduct(rawItems, total, 0);
+
+    return {
+      category: expCategory
+        ? { id: expCategory.id, name: expCategory.name, slug: expCategory.slug }
+        : null,
+      viewAllHref: CUSTOMER_EXPERIENCE_BASE_PATH,
+      total,
+      isFallbackFromAllNews,
+      items,
+    };
+  });
+});
+
 /**
  * Related products, cached with their raw prices. Callers must re-apply live pricing
  * (`applyPricingToHomepageProducts` is idempotent) so campaign boundaries stay exact.

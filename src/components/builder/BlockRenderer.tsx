@@ -36,10 +36,18 @@ import MediaSection from '@/components/home/MediaSectionView';
 import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
 import VideoReviews from '@/components/home/VideoReviews';
 import CustomerGallery from '@/components/home/CustomerGallery';
+import HeroBannerSlider from '@/components/home/HeroBannerSlider';
 import LazyBelowFold from '@/components/home/LazyBelowFold';
 import { customerGallerySectionDataSchema, videoReviewsSectionDataSchema } from '@/contracts/cms/site-builder';
 import type { PublicStorefrontSettings } from '@/contracts/cms/settings';
 import type { ProductCardProduct } from '@/components/product/ProductCard';
+import type { CustomerExperienceCardItem } from '@/lib/customer-experience';
+
+export interface HomepageCustomerStoriesProp {
+  items: CustomerExperienceCardItem[];
+  viewAllHref: string;
+  title?: string;
+}
 
 function dedupeSectionProducts(products: ProductCardProduct[]): ProductCardProduct[] {
   const seenKeys = new Set<string>();
@@ -87,10 +95,12 @@ export default function BlockRenderer({
   sections,
   flashSale,
   settings,
+  customerStories,
 }: {
   sections: ResolvedSectionItem[];
   flashSale?: ReactNode;
   settings?: PublicStorefrontSettings | null;
+  customerStories?: HomepageCustomerStoriesProp | null;
 }) {
   if (!sections || sections.length === 0) {
     return null;
@@ -98,6 +108,11 @@ export default function BlockRenderer({
 
   // Sections after the first screens are skipped by the browser's rendering until they approach the viewport.
   const DEFER_FROM_INDEX = 3;
+  const firstHeroBannerIndex = sections.findIndex((s) => {
+    if (!s.enabled || s.type !== 'banner') return false;
+    const layout = s.data && 'layout' in s.data ? s.data.layout : undefined;
+    return !layout || layout === 'hero';
+  });
   const firstProductGridIndex = sections.findIndex(
     (s) => s.enabled && s.type === 'product_grid' && (s.id !== 'sec-hot-sale' || flashSale === undefined)
   );
@@ -114,7 +129,13 @@ export default function BlockRenderer({
         let blockNode: ReactNode = null;
         switch (section.type) {
           case 'banner':
-            blockNode = <BannerBlock key={section.id} data={section.data} />;
+            blockNode = (
+              <BannerBlock
+                key={section.id}
+                data={section.data}
+                customerStories={sectionIndex === firstHeroBannerIndex ? customerStories : null}
+              />
+            );
             break;
 
           case 'promo_banners': {
@@ -246,7 +267,7 @@ import SliderSection from '@/components/home/SliderSection';
 
 // 1. BANNER BLOCK
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function BannerBlock({ data }: { data: any }) {
+function BannerBlock({ data, customerStories }: { data: any; customerStories?: HomepageCustomerStoriesProp | null }) {
   const imageUrl = data.imageUrl || '/brand/citilap-hero-v2.webp';
   const mobileImageUrl =
     data.mobileImageUrl?.trim() ||
@@ -405,25 +426,38 @@ function BannerBlock({ data }: { data: any }) {
       </picture>
     );
 
+    const primaryCleanSlide = (
+      <div className="w-full relative">
+        {data.link ? (
+          <Link
+            href={data.link}
+            prefetch={false}
+            aria-label={mobileTitle || data.title || 'Hero Banner'}
+            className="block w-full focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden"
+          >
+            {cleanHeroImages}
+          </Link>
+        ) : (
+          cleanHeroImages
+        )}
+      </div>
+    );
+
     return (
       <section className="bg-[#110f14] relative overflow-hidden mb-5 sm:mb-6 md:mb-8 lg:mb-10" aria-label={data.title || 'Hero Banner'}>
         <h1 className="sr-only">
           {data.title || 'CitiLap — Chuyên Laptop Gaming, Ultrabook, Workstation & Máy Like New Tuyển Chọn'}
         </h1>
-        <div className="w-full relative">
-          {data.link ? (
-            <Link
-              href={data.link}
-              prefetch={false}
-              aria-label={mobileTitle || data.title || 'Hero Banner'}
-              className="block w-full focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-hidden"
-            >
-              {cleanHeroImages}
-            </Link>
-          ) : (
-            cleanHeroImages
-          )}
-        </div>
+        {customerStories && customerStories.items.length > 0 ? (
+          <HeroBannerSlider
+            primarySlide={primaryCleanSlide}
+            stories={customerStories.items}
+            viewAllHref={customerStories.viewAllHref}
+            sectionTitle={customerStories.title}
+          />
+        ) : (
+          primaryCleanSlide
+        )}
 
         {/* Quick Need & Budget Pills right below Hero Banner */}
         <div className="bg-slate-900/95 border-t border-white/10 py-2">
@@ -456,101 +490,114 @@ function BannerBlock({ data }: { data: any }) {
     );
   }
 
-  return (
-    <section className="bg-[#060f23] relative overflow-hidden mb-5 sm:mb-6 md:mb-8 lg:mb-10" aria-label={data.title || 'Hero Banner'}>
-      <div className="w-full relative min-h-[216px] sm:min-h-[236px] md:h-[300px] lg:h-[364px]">
-        <picture className="contents">
-          {hasSeparateMobileImage && (
-            <source media="(max-width: 767px)" srcSet={mobileImageUrl} />
-          )}
-          <img
-            src={imageUrl}
-            alt={data.title || 'Hero banner'}
-            width={1920}
-            height={680}
-            loading="eager"
-            fetchPriority="high"
-            decoding="async"
-            className="absolute inset-0 w-full h-full object-cover object-right"
-          />
-        </picture>
-        {hideOverlayOnMobile && data.link && (
-          <Link
-            href={data.link}
-            aria-label={mobileTitle || data.title || 'Hero Banner'}
-            className="md:hidden absolute inset-0 z-10"
-          />
+  const primaryOverlaySlide = (
+    <div className="w-full relative min-h-[216px] sm:min-h-[236px] md:h-[300px] lg:h-[364px]">
+      <picture className="contents">
+        {hasSeparateMobileImage && (
+          <source media="(max-width: 767px)" srcSet={mobileImageUrl} />
         )}
-        <div
-          className={`relative z-10 min-h-[216px] sm:min-h-[236px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#060f23]/92 via-[#091836]/80 to-[#091836]/55 md:via-[#091836]/66 md:to-transparent ${
-            hideOverlayOnMobile ? 'hidden md:flex' : 'flex'
-          } items-center py-4 sm:py-5 md:py-0`}
-        >
-          <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
-            <div className="max-w-xl lg:max-w-[680px] text-white">
-              {data.badge && (
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/35 bg-sky-500/15 px-3 py-1 mb-2 md:mb-3 backdrop-blur-md shadow-xs max-w-full">
-                  <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-amber-300 shrink-0" />
-                  <span className="text-sky-200 font-bold text-[10px] sm:text-[11px] md:text-xs tracking-wide uppercase line-clamp-1">
-                    {data.badge}
-                  </span>
-                </div>
+        <img
+          src={imageUrl}
+          alt={data.title || 'Hero banner'}
+          width={1920}
+          height={680}
+          loading="eager"
+          fetchPriority="high"
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover object-right"
+        />
+      </picture>
+      {hideOverlayOnMobile && data.link && (
+        <Link
+          href={data.link}
+          aria-label={mobileTitle || data.title || 'Hero Banner'}
+          className="md:hidden absolute inset-0 z-10"
+        />
+      )}
+      <div
+        className={`relative z-10 min-h-[216px] sm:min-h-[236px] md:min-h-0 md:absolute md:inset-0 bg-gradient-to-r from-[#060f23]/92 via-[#091836]/80 to-[#091836]/55 md:via-[#091836]/66 md:to-transparent ${
+          hideOverlayOnMobile ? 'hidden md:flex' : 'flex'
+        } items-center py-4 sm:py-5 md:py-0`}
+      >
+        <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
+          <div className="max-w-xl lg:max-w-[680px] text-white">
+            {data.badge && (
+              <div className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/35 bg-sky-500/15 px-3 py-1 mb-2 md:mb-3 backdrop-blur-md shadow-xs max-w-full">
+                <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-amber-300 shrink-0" />
+                <span className="text-sky-200 font-bold text-[10px] sm:text-[11px] md:text-xs tracking-wide uppercase line-clamp-1">
+                  {data.badge}
+                </span>
+              </div>
+            )}
+            <h1 className="text-[22px] sm:text-[26px] md:text-[34px] lg:text-[40px] font-black mb-1.5 md:mb-2.5 tracking-tight text-white drop-shadow-xs leading-[1.15]">
+              {mobileTitle ? (
+                <>
+                  <span className="md:hidden">{mobileTitle}</span>
+                  <span className="hidden md:inline">{data.title}</span>
+                </>
+              ) : (
+                data.title
               )}
-              <h1 className="text-[22px] sm:text-[26px] md:text-[34px] lg:text-[40px] font-black mb-1.5 md:mb-2.5 tracking-tight text-white drop-shadow-xs leading-[1.15]">
-                {mobileTitle ? (
+            </h1>
+            {(data.subtitle || mobileSubtitle) && (
+              <p className="text-xs sm:text-[13px] md:text-[15px] font-medium text-slate-200/95 mb-3 md:mb-5 max-w-lg leading-relaxed line-clamp-2">
+                {mobileSubtitle ? (
                   <>
-                    <span className="md:hidden">{mobileTitle}</span>
-                    <span className="hidden md:inline">{data.title}</span>
+                    <span className="md:hidden">{mobileSubtitle}</span>
+                    <span className="hidden md:inline">{data.subtitle}</span>
                   </>
                 ) : (
-                  data.title
+                  data.subtitle
                 )}
-              </h1>
-              {(data.subtitle || mobileSubtitle) && (
-                <p className="text-xs sm:text-[13px] md:text-[15px] font-medium text-slate-200/95 mb-3 md:mb-5 max-w-lg leading-relaxed line-clamp-2">
-                  {mobileSubtitle ? (
-                    <>
-                      <span className="md:hidden">{mobileSubtitle}</span>
-                      <span className="hidden md:inline">{data.subtitle}</span>
-                    </>
-                  ) : (
-                    data.subtitle
-                  )}
-                </p>
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2 sm:gap-2.5 md:gap-3">
+              {data.link && data.buttonText && (
+                <Link
+                  href={data.link}
+                  className="min-h-11 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-4 sm:px-5 md:px-6 rounded-full text-xs md:text-sm shadow-lg shadow-blue-600/35 transition duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                >
+                  {data.buttonText}
+                  <ChevronRight aria-hidden="true" className="w-4 h-4 -mr-0.5" />
+                </Link>
               )}
-              <div className="flex flex-wrap gap-2 sm:gap-2.5 md:gap-3">
-                {data.link && data.buttonText && (
-                  <Link
-                    href={data.link}
-                    className="min-h-11 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold py-2 px-4 sm:px-5 md:px-6 rounded-full text-xs md:text-sm shadow-lg shadow-blue-600/35 transition duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
-                  >
-                    {data.buttonText}
-                    <ChevronRight aria-hidden="true" className="w-4 h-4 -mr-0.5" />
-                  </Link>
-                )}
-                {data.secondaryLink && data.secondaryButtonText && (
-                  <Link
-                    href={data.secondaryLink}
-                    className="min-h-11 inline-flex items-center justify-center gap-1.5 bg-amber-400/15 hover:bg-amber-400/25 active:scale-95 backdrop-blur-md border border-amber-300/45 text-amber-200 font-bold py-2 px-4 sm:px-5 md:px-6 rounded-full text-xs md:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
-                  >
-                    {data.secondaryButtonText}
-                  </Link>
-                )}
-              </div>
-              <div className="hidden sm:flex flex-wrap items-center gap-x-4 gap-y-1 mt-3.5 text-[11.5px] font-medium text-slate-300/90">
-                <span className="inline-flex items-center gap-1.5">
-                  <ShieldCheck aria-hidden="true" className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                  Máy tuyển chọn, test kỹ trước giao
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <Headphones aria-hidden="true" className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                  Tư vấn thật theo nhu cầu &amp; ngân sách
-                </span>
-              </div>
+              {data.secondaryLink && data.secondaryButtonText && (
+                <Link
+                  href={data.secondaryLink}
+                  className="min-h-11 inline-flex items-center justify-center gap-1.5 bg-amber-400/15 hover:bg-amber-400/25 active:scale-95 backdrop-blur-md border border-amber-300/45 text-amber-200 font-bold py-2 px-4 sm:px-5 md:px-6 rounded-full text-xs md:text-sm transition duration-200 motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"
+                >
+                  {data.secondaryButtonText}
+                </Link>
+              )}
+            </div>
+            <div className="hidden sm:flex flex-wrap items-center gap-x-4 gap-y-1 mt-3.5 text-[11.5px] font-medium text-slate-300/90">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck aria-hidden="true" className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                Máy tuyển chọn, test kỹ trước giao
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Headphones aria-hidden="true" className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                Tư vấn thật theo nhu cầu &amp; ngân sách
+              </span>
             </div>
           </div>
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <section className="bg-[#060f23] relative overflow-hidden mb-5 sm:mb-6 md:mb-8 lg:mb-10" aria-label={data.title || 'Hero Banner'}>
+      {customerStories && customerStories.items.length > 0 ? (
+        <HeroBannerSlider
+          primarySlide={primaryOverlaySlide}
+          stories={customerStories.items}
+          viewAllHref={customerStories.viewAllHref}
+          sectionTitle={customerStories.title}
+        />
+      ) : (
+        primaryOverlaySlide
+      )}
 
       {/* Quick Need & Budget Pills right below Hero Banner */}
       <div className="bg-slate-900/95 border-t border-white/10 py-2">

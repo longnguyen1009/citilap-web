@@ -12,6 +12,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ChevronRight, Calendar, User, ArrowLeft, Tag, Sparkles } from "lucide-react";
 import ProductCard from "@/components/product/ProductCard";
+import PostPhotoGallery from "@/components/news/PostPhotoGallery";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import { businessProfile } from "@/config/business-profile";
 import {
@@ -21,6 +22,11 @@ import {
   generateBreadcrumbJsonLd,
   serializeJsonLd,
 } from "@/lib/seo-helpers";
+import {
+  CUSTOMER_EXPERIENCE_BASE_PATH,
+  getPostHref,
+  isCustomerExperienceCategory,
+} from "@/lib/customer-experience";
 
 interface PostDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -87,6 +93,13 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
   ]);
   const phone=settings?.storePhone || businessProfile.displayPhone;
   if (!post) notFound();
+
+  // Customer experience stories live under /khach-hang-chia-se/[slug]
+  if (isCustomerExperienceCategory(post.category)) {
+    permanentRedirect(
+      `${CUSTOMER_EXPERIENCE_BASE_PATH}/${encodeURIComponent(post.slug)}`
+    );
+  }
 
   // Historical alias handling: if the slug accessed matches an old published revision,
   // Next.js App Router permanentRedirect issues HTTP 308 (RFC 7538 Permanent Redirect)
@@ -223,19 +236,18 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
                 </div>
               )}
 
-              {/* Cover Image */}
-              {post.coverImage && (
-                <div className="relative aspect-16/9 rounded-2xl overflow-hidden mb-8 bg-slate-100 shadow-2xs">
-                  <Image
-                    src={post.coverImage.url}
-                    alt={post.coverImage.alt || post.title}
-                    fill
-                    sizes="(max-width: 1024px) 100vw, 800px"
-                    className="object-cover"
-                    priority
-                  />
-                </div>
-              )}
+              {/* Cover / Multi-image Photo Gallery */}
+              {(() => {
+                const gallery =
+                  post.galleryImages && post.galleryImages.length > 0
+                    ? post.galleryImages
+                    : post.coverImage
+                      ? [post.coverImage]
+                      : [];
+                return gallery.length > 0 ? (
+                  <PostPhotoGallery images={gallery} title={post.title} />
+                ) : null;
+              })()}
 
               {/* Rich Body Content */}
               <div
@@ -299,7 +311,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
                   {morePosts.map((other) => (
                     <Link
                       key={other.id}
-                      href={`/news/${other.slug}`}
+                      href={getPostHref(other)}
                       className="group flex gap-3.5 items-start"
                     >
                       <div className="relative w-20 h-16 rounded-xl overflow-hidden shrink-0 bg-slate-100">

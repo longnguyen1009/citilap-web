@@ -159,9 +159,27 @@ export async function writePost(env: MediaEnvironment, id: string | null, input:
   }
 
   const postId = id || crypto.randomUUID();
-  const assetIds = action === 'unpublish' ? new Set<string>() : await contentAssets(env, d.contentHtml, [d.coverImage?.assetId, d.seo.ogImageAssetId], action === 'publish');
+  // Normalize galleryImages: first image automatically becomes coverImage (thumbnail)
+  const cleanGallery = (d.galleryImages || []).filter((g) => Boolean(g.assetId?.trim()));
+  if (cleanGallery.length > 0) {
+    d.galleryImages = cleanGallery.map((g, idx) => ({
+      assetId: g.assetId.trim(),
+      alt: g.alt.trim() || `${d.title} - ảnh ${idx + 1}`,
+    }));
+    d.coverImage = {
+      assetId: d.galleryImages[0].assetId,
+      alt: d.galleryImages[0].alt || d.coverImage?.alt?.trim() || d.title,
+    };
+  } else {
+    d.galleryImages = [];
+  }
+
+  const galleryAssetIds = d.galleryImages.map((g) => g.assetId);
+  const assetIds = action === 'unpublish'
+    ? new Set<string>()
+    : await contentAssets(env, d.contentHtml, [d.coverImage?.assetId, d.seo.ogImageAssetId, ...galleryAssetIds], action === 'publish');
   if (action === 'publish') {
-    if (!d.coverImage) throw new MediaError('Cần có ảnh đại diện trước khi xuất bản.');
+    if (!d.coverImage) throw new MediaError('Cần có ít nhất 1 ảnh đại diện trước khi xuất bản.');
     if (!d.contentHtml.trim()) throw new MediaError('Cần có nội dung trước khi xuất bản.');
   }
 
@@ -354,19 +372,54 @@ export async function publicFeaturedPosts(db: D1Database, limit = 3) {
 
 async function toPublicPost(db: D1Database, id: string, revision: number, updatedAt: string, publishedAt: string) {
   const d = await publishedDocument<PostDocument>(db, 'Post', id, revision);
+  const rawGallery = Array.isArray(d.galleryImages) ? d.galleryImages.filter((g) => Boolean(g?.assetId)) : [];
+  const effectiveCover = d.coverImage || (rawGallery[0] ? { assetId: rawGallery[0].assetId, alt: rawGallery[0].alt || d.title } : null);
+
+  // Dedupe media lookups across cover + gallery + og
+  const uniqueGalleryIds = [...new Set(rawGallery.map((g) => g.assetId).filter((aid) => aid !== effectiveCover?.assetId))];
+
   // Independent lookups run in parallel: each D1 call is a network round trip from the edge.
-  const [coverAsset, ogAsset, categoryRow, relatedProductIds] = await Promise.all([
-    d.coverImage ? mediaDetail(db, d.coverImage.assetId).then((r) => r.asset) : Promise.resolve(null),
-    d.seo.ogImageAssetId ? mediaDetail(db, d.seo.ogImageAssetId).then((r) => r.asset) : Promise.resolve(null),
+  const [coverAsset, ogAsset, categoryRow, relatedProductIds, extraGalleryAssets] = await Promise.all([
+    effectiveCover ? mediaDetail(db, effectiveCover.assetId).then((r) => r.asset).catch(() => null) : Promise.resolve(null),
+    d.seo.ogImageAssetId ? mediaDetail(db, d.seo.ogImageAssetId).then((r) => r.asset).catch(() => null) : Promise.resolve(null),
     d.categoryId
       ? db.prepare("SELECT id, name, slug FROM PostCategory WHERE id=? AND status='ACTIVE'").bind(d.categoryId).first<{ id: string; name: string; slug: string }>()
       : Promise.resolve(null),
     publicRelatedIds(db, d.relatedProductIds),
+    Promise.all(
+      uniqueGalleryIds.map((aid) =>
+        mediaDetail(db, aid).then((r) => ({ id: aid, asset: r.asset })).catch(() => ({ id: aid, asset: null })),
+      ),
+    ),
   ]);
-  let coverImage: { url: string; alt: string; thumbnailUrl?: string } | null = null;
-  if (d.coverImage && coverAsset?.url) {
-    coverImage = { url: coverAsset.url, alt: d.coverImage.alt, thumbnailUrl: coverAsset.thumbnailUrl || coverAsset.url };
+
+  const assetById = new Map<string, { url: string; thumbnailUrl?: string }>();
+  if (effectiveCover && coverAsset?.url) {
+    assetById.set(effectiveCover.assetId, { url: coverAsset.url, thumbnailUrl: coverAsset.thumbnailUrl || coverAsset.url });
   }
+  for (const item of extraGalleryAssets) {
+    if (item.asset?.url) {
+      assetById.set(item.id, { url: item.asset.url, thumbnailUrl: item.asset.thumbnailUrl || item.asset.url });
+    }
+  }
+
+  let coverImage: { url: string; alt: string; thumbnailUrl?: string } | null = null;
+  if (effectiveCover && coverAsset?.url) {
+    coverImage = { url: coverAsset.url, alt: effectiveCover.alt || d.title, thumbnailUrl: coverAsset.thumbnailUrl || coverAsset.url };
+  }
+
+  const galleryImages = rawGallery
+    .map((g, idx) => {
+      const resolved = assetById.get(g.assetId);
+      if (!resolved?.url) return null;
+      return {
+        url: resolved.url,
+        alt: g.alt || `${d.title} - ảnh ${idx + 1}`,
+        thumbnailUrl: resolved.thumbnailUrl || resolved.url,
+      };
+    })
+    .filter((img): img is { url: string; alt: string; thumbnailUrl: string } => img !== null);
+
   let ogImageUrl: string | null = null;
   if (d.seo.ogImageAssetId) {
     ogImageUrl = ogAsset?.url ?? null;
@@ -388,6 +441,7 @@ async function toPublicPost(db: D1Database, id: string, revision: number, update
     isFeatured: d.isFeatured,
     category,
     coverImage,
+    galleryImages,
     seo: { title: d.seo.title || d.title, description: d.seo.description || d.excerpt, ogImageUrl },
     relatedProductIds,
     publishedAt,

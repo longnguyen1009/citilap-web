@@ -32,6 +32,7 @@ function resolveSitemapMeta(
   }
   if (
     path.startsWith('/news') ||
+    path.startsWith('/khach-hang-chia-se') ||
     path.startsWith('/brand/') ||
     path.startsWith('/collection') ||
     path.startsWith('/landing/')

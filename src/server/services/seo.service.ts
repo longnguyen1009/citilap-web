@@ -12,7 +12,7 @@ export async function publicSitemapPaths(db:D1Database){
     SELECT CASE WHEN COALESCE(json_extract(s.published,'$.template'),CASE WHEN p.categoryId='cat-phu-kien' OR p.categoryId LIKE '%accessory%' THEN 'ACCESSORY' ELSE 'LAPTOP' END)='LAPTOP' THEN '/laptop/' ELSE '/phu-kien/' END || CASE WHEN s.productId IS NULL THEN p.slug ELSE json_extract(s.published,'$.slug') END AS path
       FROM Product p LEFT JOIN ProductStudio s ON s.productId=p.id
       WHERE p.deletedAt IS NULL AND p.status IN ('ACTIVE','active') AND (s.productId IS NULL OR (s.published IS NOT NULL AND COALESCE(json_extract(s.published,'$.availability'),'AVAILABLE') != 'HIDDEN'))
-    UNION SELECT '/news/' || json_extract(s.published,'$.slug') FROM Post p JOIN PostStudio s ON s.postId=p.id WHERE p.deletedAt IS NULL AND s.published IS NOT NULL
+    UNION SELECT CASE WHEN lower(COALESCE(pc.slug,'')) IN ('khach-hang-chia-se','trai-nghiem-khach-hang') OR lower(COALESCE(pc.slug,'')) LIKE '%khach-hang-chia-se%' OR lower(COALESCE(pc.slug,'')) LIKE '%trai-nghiem%' THEN '/khach-hang-chia-se/' ELSE '/news/' END || json_extract(s.published,'$.slug') FROM Post p JOIN PostStudio s ON s.postId=p.id LEFT JOIN PostCategory pc ON pc.id=json_extract(s.published,'$.categoryId') WHERE p.deletedAt IS NULL AND s.published IS NOT NULL
     UNION SELECT '/' || json_extract(s.published,'$.slug') FROM Page p JOIN PageStudio s ON s.pageId=p.id WHERE p.deletedAt IS NULL AND s.published IS NOT NULL
     UNION SELECT '/landing/' || json_extract(s.published,'$.slug') FROM LandingPage p JOIN LandingPageStudio s ON s.pageId=p.id WHERE p.deletedAt IS NULL AND p.isHome=0 AND s.published IS NOT NULL
     UNION SELECT '/brand/' || slug FROM Brand WHERE deletedAt IS NULL AND status='ACTIVE'
@@ -29,6 +29,7 @@ export async function publicSitemapPaths(db:D1Database){
     '/laptop-moi',
     '/laptop-likenew',
     '/news',
+    '/khach-hang-chia-se',
     '/collection',
     '/gioi-thieu',
     '/he-thong-cua-hang',

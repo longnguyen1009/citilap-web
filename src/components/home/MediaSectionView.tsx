@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import type { publicPostList } from '@/server/services/post.service';
+import { getPostCategoryHref, getPostHref } from '@/lib/customer-experience';
 
 type MediaPost = Awaited<ReturnType<typeof publicPostList>>['items'][number];
 
@@ -72,7 +73,7 @@ export default function MediaSectionView({
 
   const activeCategory = categories.find((c) => c.id === selectedCategoryId);
   const visiblePosts = activeCategory ? activeCategory.posts : posts;
-  const activeViewAllLink = activeCategory ? `/news/category/${activeCategory.slug}` : viewAllLink || '/news';
+  const activeViewAllLink = activeCategory ? getPostCategoryHref(activeCategory) : viewAllLink || '/news';
 
   useEffect(() => {
     const el = rail.current;
@@ -220,7 +221,7 @@ export default function MediaSectionView({
                 return (
                 <Link
                   key={post.id}
-                  href={`/news/${post.slug}`}
+                  href={getPostHref(post)}
                   prefetch={false}
                   className="group flex min-w-0 snap-start flex-col rounded-lg lg:rounded-xl border border-slate-200/90 bg-white p-2 md:p-2.5 shadow-2xs transition duration-200 motion-reduce:transition-none hover:-translate-y-0.5 motion-reduce:hover:translate-y-0 hover:border-blue-500 hover:shadow-sm focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 focus-visible:outline-hidden"
                 >

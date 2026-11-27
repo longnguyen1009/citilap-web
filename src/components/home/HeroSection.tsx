@@ -2,12 +2,18 @@ import Link from "next/link";
 import Image from "next/image";
 import { DEFAULT_SETTINGS, type StorefrontSettings } from "@/contracts/cms/settings";
 import { normalizeLegacyCategoryHref } from "@/lib/category-paths";
+import HeroBannerSlider from "@/components/home/HeroBannerSlider";
+import type { HomepageCustomerStoriesProp } from "@/components/builder/BlockRenderer";
 
 interface HeroSectionProps {
   settings?: Partial<StorefrontSettings>;
+  customerStories?: HomepageCustomerStoriesProp | null;
 }
 
-export default function HeroSection({ settings: customSettings }: HeroSectionProps) {
+export default function HeroSection({
+  settings: customSettings,
+  customerStories,
+}: HeroSectionProps) {
   const raw = { ...DEFAULT_SETTINGS, ...customSettings };
   const heroBgImage = raw.heroBgImage?.trim() || DEFAULT_SETTINGS.heroBgImage;
   const heroMobileBgImage =
@@ -39,10 +45,9 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
       settings.heroCtaSecondaryText?.trim()
   );
 
-  return (
-    <section className="py-3 md:py-5 mb-4 sm:mb-5 md:mb-7 lg:mb-9 bg-slate-50/60 border-b border-slate-200/70" aria-label="Banner nổi bật và khuyến mãi">
-      <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2.5 sm:gap-3 lg:gap-4">
+  const primaryHeroGrid = (
+    <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-2.5 sm:gap-3 lg:gap-4">
           {/* 1. MAIN HERO (Left 2fr on PC) */}
           <div className="relative w-full min-h-[188px] sm:min-h-[208px] md:h-[260px] lg:h-[360px] rounded-lg lg:rounded-xl overflow-hidden bg-[#0f172a] shadow-xs border border-slate-800/80">
             <picture className="contents">
@@ -179,6 +184,20 @@ export default function HeroSection({ settings: customSettings }: HeroSectionPro
           </div>
         </div>
       </div>
+  );
+
+  return (
+    <section className="py-3 md:py-5 mb-4 sm:mb-5 md:mb-7 lg:mb-9 bg-slate-50/60 border-b border-slate-200/70" aria-label="Banner nổi bật và khuyến mãi">
+      {customerStories && customerStories.items.length > 0 ? (
+        <HeroBannerSlider
+          primarySlide={primaryHeroGrid}
+          stories={customerStories.items}
+          viewAllHref={customerStories.viewAllHref}
+          sectionTitle={customerStories.title}
+        />
+      ) : (
+        primaryHeroGrid
+      )}
     </section>
   );
 }

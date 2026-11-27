@@ -34,6 +34,7 @@ import {
   getPublishedHomepage,
   getStorefrontSettings,
   getCachedHomepageCatalog,
+  getCachedCustomerExperiencePosts,
 } from "@/server/services/storefront-cms.service";
 import BlockRenderer from "@/components/builder/BlockRenderer";
 import {
@@ -196,11 +197,21 @@ async function FallbackHomepageCatalog() {
 }
 
 export default async function Home() {
-  const [navigation, cmsHomepage, settings] = await Promise.all([
+  const [navigation, cmsHomepage, settings, customerExperience] = await Promise.all([
     getPublishedNavigation(),
     getPublishedHomepage(),
     getStorefrontSettings(),
+    getCachedCustomerExperiencePosts(8).catch(() => null),
   ]);
+
+  const heroCustomerStories =
+    customerExperience && customerExperience.items.length > 0
+      ? {
+          items: customerExperience.items,
+          viewAllHref: customerExperience.viewAllHref,
+          title: customerExperience.category?.name || "Trải Nghiệm Khách Hàng",
+        }
+      : null;
 
   const rootCategories = (navigation?.categories ?? []).filter((c) => !c.parentId);
   const jsonLd = {
@@ -277,6 +288,7 @@ export default async function Home() {
         <BlockRenderer
           sections={cmsHomepage.sections}
           settings={settings}
+          customerStories={heroCustomerStories}
           flashSale={
             <Suspense fallback={<FlashSaleSkeleton />}>
               <FlashSaleSection settings={settings} />
@@ -323,7 +335,7 @@ export default async function Home() {
       <BlackFridayPopup config={settings?.homepagePopup} />
 
       {/* 1. HERO SECTION & SUB-BANNERS */}
-      <HeroSection settings={settings ?? undefined} />
+      <HeroSection settings={settings ?? undefined} customerStories={heroCustomerStories} />
 
       {/* 1.5 CAMPAIGN HORIZONTAL STRIP BANNER */}
       <CampaignStripBanner />

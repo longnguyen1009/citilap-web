@@ -97,7 +97,7 @@ export default function PostEditor({ id }: { id: string | null }) {
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  const [mediaDialogTarget, setMediaDialogTarget] = useState<'cover' | 'og' | 'body' | null>(null);
+  const [mediaDialogTarget, setMediaDialogTarget] = useState<'cover' | 'gallery' | 'og' | 'body' | null>(null);
 
   const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [productQuery, setProductQuery] = useState('');
@@ -410,9 +410,103 @@ export default function PostEditor({ id }: { id: string | null }) {
     updateDoc('relatedProductIds', list);
   };
 
+  const effectiveGallery: { assetId: string; alt: string }[] =
+    doc.galleryImages && doc.galleryImages.length > 0
+      ? doc.galleryImages
+      : doc.coverImage?.assetId
+        ? [{ assetId: doc.coverImage.assetId, alt: doc.coverImage.alt || '' }]
+        : [];
+
+  const updateGalleryImages = (nextGallery: { assetId: string; alt: string }[]) => {
+    editVersionRef.current += 1;
+    setDoc((prev) => {
+      const nextCover = nextGallery[0]
+        ? {
+            assetId: nextGallery[0].assetId,
+            alt: nextGallery[0].alt.trim() || prev.title || 'Ảnh đại diện',
+          }
+        : null;
+      const next = {
+        ...prev,
+        galleryImages: nextGallery,
+        coverImage: nextCover,
+      };
+      latestDoc.current = next;
+      return next;
+    });
+    setHasUnsavedChanges(true);
+    setSaveSuccess(null);
+    setConflictError(null);
+  };
+
+  const addGalleryAsset = (asset: MediaAssetDto) => {
+    const current =
+      latestDoc.current.galleryImages && latestDoc.current.galleryImages.length > 0
+        ? latestDoc.current.galleryImages
+        : latestDoc.current.coverImage?.assetId
+          ? [{ assetId: latestDoc.current.coverImage.assetId, alt: latestDoc.current.coverImage.alt || '' }]
+          : [];
+    if (current.some((item) => item.assetId === asset.id)) {
+      toast.info('Ảnh này đã có trong danh sách.');
+      return;
+    }
+    if (current.length >= 20) {
+      toast.warning('Tối đa 20 ảnh cho mỗi bài viết.');
+      return;
+    }
+    const nextItem = {
+      assetId: asset.id,
+      alt: asset.alt || asset.name || latestDoc.current.title || `Ảnh ${current.length + 1}`,
+    };
+    updateGalleryImages([...current, nextItem]);
+    toast.success(
+      current.length === 0
+        ? 'Đã thêm ảnh đầu tiên (tự động làm ảnh đại diện).'
+        : `Đã thêm ảnh #${current.length + 1} vào bộ sưu tập.`
+    );
+  };
+
+  const removeGalleryImage = (index: number) => {
+    const next = effectiveGallery.filter((_, idx) => idx !== index);
+    updateGalleryImages(next);
+  };
+
+  const moveGalleryImage = (index: number, direction: 'up' | 'down' | 'first') => {
+    const list = [...effectiveGallery];
+    if (direction === 'first') {
+      if (index <= 0 || index >= list.length) return;
+      const [picked] = list.splice(index, 1);
+      list.unshift(picked);
+      updateGalleryImages(list);
+      return;
+    }
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= list.length) return;
+    const temp = list[index];
+    list[index] = list[target];
+    list[target] = temp;
+    updateGalleryImages(list);
+  };
+
+  const updateGalleryAlt = (index: number, alt: string) => {
+    const list = effectiveGallery.map((item, idx) => (idx === index ? { ...item, alt } : item));
+    updateGalleryImages(list);
+  };
+
   const handleMediaSelect = (asset: MediaAssetDto) => {
+    if (mediaDialogTarget === 'gallery') {
+      addGalleryAsset(asset);
+      return;
+    }
     if (mediaDialogTarget === 'cover') {
-      updateDoc('coverImage', { assetId: asset.id, alt: asset.alt || asset.name || doc.title });
+      const next = [...effectiveGallery];
+      const coverItem = { assetId: asset.id, alt: asset.alt || asset.name || doc.title || 'Ảnh đại diện' };
+      if (next.length > 0) {
+        next[0] = coverItem;
+      } else {
+        next.push(coverItem);
+      }
+      updateGalleryImages(next);
     } else if (mediaDialogTarget === 'og') {
       updateSeo('ogImageAssetId', asset.id);
     }
@@ -909,55 +1003,116 @@ export default function PostEditor({ id }: { id: string | null }) {
                 <span>Bài viết nổi bật (Featured)</span>
               </label>
 
-              <div className="pt-3 border-t border-slate-100 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-600">Ảnh đại diện</span>
-                  {doc.coverImage?.assetId && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setMediaDialogTarget('cover')}
-                        className="text-blue-600 hover:underline font-medium cursor-pointer"
-                      >
-                        Đổi ảnh
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateDoc('coverImage', null)}
-                        className="text-rose-600 hover:underline cursor-pointer"
-                      >
-                        Xóa
-                      </button>
-                    </div>
-                  )}
+              <div className="pt-3 border-t border-slate-100 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[11px] font-semibold text-slate-700 block">
+                      Danh sách ảnh bài viết ({effectiveGallery.length}/20)
+                    </span>
+                    <span className="text-[10.5px] text-slate-400">
+                      Ảnh đầu tiên tự động làm thumbnail ra trang chủ &amp; card
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMediaDialogTarget('gallery')}
+                    className="inline-flex items-center gap-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 px-2.5 py-1 text-[11px] font-bold transition cursor-pointer shrink-0"
+                  >
+                    <Plus size={12} /> Thêm ảnh
+                  </button>
                 </div>
 
-                {doc.coverImage?.assetId ? (
+                {effectiveGallery.length > 0 ? (
                   <div className="space-y-2">
-                    <div className="relative border border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center h-32">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/api/library/${doc.coverImage.assetId}`}
-                        alt={doc.coverImage.alt || 'Ảnh đại diện'}
-                        className="max-h-full max-w-full object-contain"
-                      />
-                    </div>
-                    <input
-                      type="text"
-                      value={doc.coverImage.alt}
-                      onChange={(e) => updateDoc('coverImage', { ...doc.coverImage!, alt: e.target.value })}
-                      placeholder="Mô tả ảnh (ALT) *"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    />
+                    {effectiveGallery.map((img, idx) => (
+                      <div
+                        key={`${img.assetId}-${idx}`}
+                        className={`rounded-lg border p-2 space-y-1.5 ${
+                          idx === 0
+                            ? 'border-blue-300 bg-blue-50/40'
+                            : 'border-slate-200 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="relative h-14 w-18 shrink-0 rounded-md overflow-hidden border border-slate-200 bg-slate-100">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={`/api/library/${img.assetId}`}
+                              alt={img.alt || `Ảnh ${idx + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                            {idx === 0 && (
+                              <span className="absolute bottom-0 inset-x-0 bg-blue-600/95 text-[9px] font-bold text-white text-center py-0.5">
+                                Thumbnail
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="text-[11px] font-bold text-slate-700">
+                                {idx === 0 ? 'Ảnh #1 (Đại diện)' : `Ảnh #${idx + 1}`}
+                              </span>
+                              <div className="flex items-center gap-0.5">
+                                {idx > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => moveGalleryImage(idx, 'first')}
+                                    title="Đặt làm ảnh đại diện (Thumbnail)"
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer"
+                                  >
+                                    Đặt đại diện
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => moveGalleryImage(idx, 'up')}
+                                  title="Di chuyển lên"
+                                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 cursor-pointer"
+                                >
+                                  <ArrowUp size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={idx === effectiveGallery.length - 1}
+                                  onClick={() => moveGalleryImage(idx, 'down')}
+                                  title="Di chuyển xuống"
+                                  className="p-1 text-slate-400 hover:text-slate-700 disabled:opacity-30 cursor-pointer"
+                                >
+                                  <ArrowDown size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeGalleryImage(idx)}
+                                  title="Xóa ảnh"
+                                  className="p-1 text-rose-500 hover:bg-rose-50 rounded cursor-pointer"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            </div>
+
+                            <input
+                              type="text"
+                              value={img.alt}
+                              onChange={(e) => updateGalleryAlt(idx, e.target.value)}
+                              placeholder="Mô tả ảnh (ALT)"
+                              className="w-full text-[11px] px-2 py-1 border border-slate-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:outline-none bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setMediaDialogTarget('cover')}
+                    onClick={() => setMediaDialogTarget('gallery')}
                     className="w-full py-4 border border-dashed border-slate-300 hover:border-blue-400 rounded-lg text-xs text-slate-500 hover:text-blue-600 flex flex-col items-center gap-1 transition cursor-pointer bg-slate-50/50"
                   >
                     <ImageIcon size={20} className="text-slate-400" />
-                    <span>+ Chọn ảnh đại diện</span>
+                    <span>+ Thêm ảnh bài viết (có thể chọn nhiều ảnh)</span>
                   </button>
                 )}
               </div>
@@ -969,7 +1124,15 @@ export default function PostEditor({ id }: { id: string | null }) {
       {/* Media Library Dialog */}
       {mediaDialogTarget && (
         <MediaDialog
-          title={mediaDialogTarget === 'cover' ? 'Chọn ảnh đại diện' : mediaDialogTarget === 'og' ? 'Chọn ảnh OG mạng xã hội' : 'Chèn ảnh vào nội dung bài viết'}
+          title={
+            mediaDialogTarget === 'gallery'
+              ? 'Thêm ảnh vào bài viết (click lần lượt để thêm nhiều ảnh)'
+              : mediaDialogTarget === 'cover'
+                ? 'Chọn ảnh đại diện'
+                : mediaDialogTarget === 'og'
+                  ? 'Chọn ảnh OG mạng xã hội'
+                  : 'Chèn ảnh vào nội dung bài viết'
+          }
           onClose={() => setMediaDialogTarget(null)}
         >
           <div className="space-y-4">

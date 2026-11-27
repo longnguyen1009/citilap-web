@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
+import { permanentRedirect } from "next/navigation";
 import {
   ChevronRight,
   Newspaper,
@@ -12,11 +13,20 @@ import {
 } from "lucide-react";
 import { mediaEnvironment } from "@/server/media-http";
 import {
+  enrichPostsWithPrimaryProduct,
   getCachedPublicPostCategories,
   getCachedPublicPostList,
   getPublishedHomepage,
   getStorefrontSettings,
 } from "@/server/services/storefront-cms.service";
+import {
+  CUSTOMER_EXPERIENCE_BASE_PATH,
+  getPostCategoryHref,
+  getPostHref,
+  isCustomerExperienceCategory,
+  isCustomerExperienceSlug,
+} from "@/lib/customer-experience";
+import CustomerJournalView from "@/components/news/CustomerJournalView";
 import { videoReviewsSectionDataSchema } from "@/contracts/cms/site-builder";
 import { DEFAULT_REVIEW_VIDEOS } from "@/contracts/cms/settings";
 import { businessProfile } from "@/config/business-profile";
@@ -136,8 +146,21 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
   ]);
 
   const activeCategory = categorySlug ? categories.find((c) => c.slug === categorySlug) : undefined;
+  const isCustomerJournal =
+    isCustomerExperienceCategory(activeCategory) || isCustomerExperienceSlug(categorySlug);
+
+  if (isCustomerJournal) {
+    permanentRedirect(
+      currentPage > 1
+        ? `${CUSTOMER_EXPERIENCE_BASE_PATH}?page=${currentPage}`
+        : CUSTOMER_EXPERIENCE_BASE_PATH
+    );
+  }
 
   const { items, total, totalPages, page } = await getCachedPublicPostList(activeCategory?.id, currentPage, 10);
+  const journalEntries = isCustomerJournal
+    ? await enrichPostsWithPrimaryProduct(items, total, (page - 1) * 10)
+    : [];
 
   // Extract videos from Settings or CMS Homepage video_reviews block
   let sidebarVideos: SidebarVideoItem[] =
@@ -231,10 +254,16 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
       <div className="container mx-auto px-4 max-w-[1370px]">
         <div className="mb-4">
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            {activeCategory ? `Chuyên mục: ${activeCategory.name}` : "Tin tức & Đánh giá Công nghệ"}
+            {isCustomerJournal
+              ? activeCategory?.name || "Nhật ký Trải nghiệm Khách hàng"
+              : activeCategory
+                ? `Chuyên mục: ${activeCategory.name}`
+                : "Tin tức & Đánh giá Công nghệ"}
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Đánh giá chi tiết laptop gaming, ultrabook, tư vấn cấu hình và kinh nghiệm sử dụng từ đội ngũ CitiLap.
+            {isCustomerJournal
+              ? "Tổng hợp nhật ký bàn giao máy, hình ảnh thực tế và chia sẻ cảm nhận từ khách hàng đã tin chọn CitiLap."
+              : "Đánh giá chi tiết laptop gaming, ultrabook, tư vấn cấu hình và kinh nghiệm sử dụng từ đội ngũ CitiLap."}
           </p>
         </div>
 
@@ -256,7 +285,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
               return (
                 <Link
                   key={cat.id}
-                  href={`/news?category=${cat.slug}`}
+                  href={getPostCategoryHref(cat)}
                   className={`flex-shrink-0 px-4 py-2 rounded-full font-bold text-xs md:text-sm transition-all ${
                     isSelected
                       ? "bg-blue-600 text-white shadow-sm shadow-blue-600/25"
@@ -273,7 +302,66 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
           </span>
         </div>
 
-        {/* 2-COLUMN MAIN CONTENT */}
+        {/* MAIN CONTENT: 2-Column Journal Timeline for Customer Experience, or 8+4 News Feed */}
+        {isCustomerJournal ? (
+          <div>
+            <CustomerJournalView
+              entries={journalEntries}
+              categoryName={activeCategory?.name || "Trải nghiệm khách hàng"}
+              total={total}
+            />
+
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-8">
+                {page > 1 && (
+                  <Link
+                    href={`/news?${new URLSearchParams({
+                      ...(categorySlug ? { category: categorySlug } : {}),
+                      page: String(page - 1),
+                    }).toString()}`}
+                    className="px-3.5 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Trang trước
+                  </Link>
+                )}
+
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                    const isCurrent = p === page;
+                    return (
+                      <Link
+                        key={p}
+                        href={`/news?${new URLSearchParams({
+                          ...(categorySlug ? { category: categorySlug } : {}),
+                          page: String(p),
+                        }).toString()}`}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition ${
+                          isCurrent
+                            ? "bg-blue-600 text-white shadow-2xs"
+                            : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {p}
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                {page < totalPages && (
+                  <Link
+                    href={`/news?${new URLSearchParams({
+                      ...(categorySlug ? { category: categorySlug } : {}),
+                      page: String(page + 1),
+                    }).toString()}`}
+                    className="px-3.5 py-2 rounded-xl border border-gray-200 bg-white text-xs font-bold text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Trang sau
+                  </Link>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* LEFT COLUMN (8 cols): VERTICAL ARTICLE FEED */}
           <div className="lg:col-span-8 min-w-0">
@@ -315,7 +403,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                     >
                       {/* Left Thumbnail */}
                       <Link
-                        href={`/news/${post.slug}`}
+                        href={getPostHref(post)}
                         className="relative w-full sm:w-[240px] md:w-[270px] aspect-[16/10] shrink-0 overflow-hidden rounded-xl bg-slate-100 border border-slate-200/60 block"
                       >
                         {post.coverImage ? (
@@ -343,7 +431,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                       <div className="flex-1 min-w-0 flex flex-col justify-between">
                         <div>
                           <h2 className="text-base sm:text-[18px] font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-snug line-clamp-2">
-                            <Link href={`/news/${post.slug}`}>{post.title}</Link>
+                            <Link href={getPostHref(post)}>{post.title}</Link>
                           </h2>
 
                           {post.excerpt && (
@@ -369,7 +457,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
                             <>
                               <span className="text-slate-300">•</span>
                               <Link
-                                href={`/news?category=${post.category.slug}`}
+                                href={getPostCategoryHref(post.category)}
                                 className="text-slate-500 hover:text-blue-600 font-semibold transition"
                               >
                                 {post.category.name}
@@ -539,6 +627,7 @@ export default async function NewsPage({ searchParams }: NewsPageProps) {
             </div>
           </aside>
         </div>
+        )}
       </div>
     </div>
   );
