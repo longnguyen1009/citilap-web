@@ -28,6 +28,7 @@ export default function HeroBannerSlider({
   storiesDurationMs = 15000,
 }: HeroBannerSliderProps) {
   const [activeSlide, setActiveSlide] = useState<0 | 1>(0);
+  const [hasTransitioned, setHasTransitioned] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
   const visibleStories = stories.slice(0, 8);
@@ -46,6 +47,7 @@ export default function HeroBannerSlider({
     const timer = window.setTimeout(() => {
       // Auto-slide only applies on tablet/desktop (md+); mobile stacks both sections vertically
       if (window.matchMedia('(min-width: 768px)').matches) {
+        setHasTransitioned(true);
         setActiveSlide((prev) => (prev === 0 ? 1 : 0));
       }
     }, delay);
@@ -57,11 +59,14 @@ export default function HeroBannerSlider({
     return <>{primarySlide}</>;
   }
 
-  const toggleSlide = () => setActiveSlide((prev) => (prev === 0 ? 1 : 0));
+  const toggleSlide = () => {
+    setHasTransitioned(true);
+    setActiveSlide((prev) => (prev === 0 ? 1 : 0));
+  };
 
   return (
     <div
-      className="relative group/hero-slider"
+      className="relative group/hero-slider overflow-hidden"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onFocusCapture={() => setIsPaused(true)}
@@ -69,14 +74,14 @@ export default function HeroBannerSlider({
       aria-label="Banner nổi bật và Trải nghiệm khách hàng"
     >
       {/* Mobile (< md): stacked vertically (Banner 1 on top, swipeable Stories below).
-          Desktop (md+): stacked grid with smooth crossfade auto-slide. */}
+          Desktop (md+): stacked grid with diagonal top-right -> bottom-left wipe reveal. */}
       <div className="flex flex-col md:grid md:grid-cols-1 md:grid-rows-1">
         {/* SLIDE 1: Primary Hero Banner */}
         <div
-          className={`md:col-start-1 md:row-start-1 md:transition-opacity md:duration-500 motion-reduce:transition-none ${
+          className={`md:col-start-1 md:row-start-1 ${
             activeSlide === 0
-              ? 'md:opacity-100 md:z-10 md:pointer-events-auto'
-              : 'md:opacity-0 md:z-0 md:pointer-events-none md:select-none'
+              ? `md:z-20 md:pointer-events-auto ${hasTransitioned ? 'hero-wipe-enter' : ''}`
+              : 'md:z-10 md:pointer-events-none md:select-none'
           }`}
         >
           {primarySlide}
@@ -84,10 +89,10 @@ export default function HeroBannerSlider({
 
         {/* SLIDE 2 (Desktop) / Below-Hero Story Strip (Mobile) */}
         <div
-          className={`md:col-start-1 md:row-start-1 flex items-center bg-[#0f172a] text-white md:transition-opacity md:duration-500 motion-reduce:transition-none ${
+          className={`md:col-start-1 md:row-start-1 flex items-center bg-[#0f172a] text-white ${
             activeSlide === 1
-              ? 'md:opacity-100 md:z-10 md:pointer-events-auto'
-              : 'md:opacity-0 md:z-0 md:pointer-events-none md:select-none'
+              ? `md:z-20 md:pointer-events-auto ${hasTransitioned ? 'hero-wipe-enter' : ''}`
+              : 'md:z-10 md:pointer-events-none md:select-none'
           }`}
         >
           <div className="w-full min-w-0 mx-auto max-w-[1370px] px-3 md:px-4 py-3 md:py-3.5">

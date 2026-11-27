@@ -635,25 +635,31 @@ export async function resolveSectionsForStorefront(
           );
         }
       } else if (data.type === 'news_reviews') {
+        const { isCustomerExperienceCategory } = await import('../../lib/customer-experience');
         const effectiveLimit = data.limit && data.limit > 0 ? data.limit : 10;
-        const fetchLimit = data.postIds.length === 0 && !data.categoryId ? Math.max(effectiveLimit, 30) : effectiveLimit;
-        const [{ items }, postCatsResult] = await Promise.all([
+        const excludeCustomerStories = data.postIds.length === 0 && !data.categoryId;
+        const fetchLimit = excludeCustomerStories ? Math.max(effectiveLimit, 40) : effectiveLimit;
+        const [{ items: rawItems }, postCatsResult] = await Promise.all([
           publicPostList(db, {
             ids: data.postIds,
             categoryId: data.categoryId || undefined,
             limit: fetchLimit,
           }),
-          data.postIds.length === 0 && !data.categoryId
+          excludeCustomerStories
             ? db
-                .prepare('SELECT id, name, slug FROM PostCategory ORDER BY sortOrder ASC, name ASC')
+                .prepare("SELECT id, name, slug FROM PostCategory WHERE status = 'ACTIVE' ORDER BY sortOrder ASC, name ASC")
                 .all<{ id: string; name: string; slug: string }>()
                 .catch(() => ({ results: [] as Array<{ id: string; name: string; slug: string }> }))
             : Promise.resolve({ results: [] as Array<{ id: string; name: string; slug: string }> }),
         ]);
+        const items = excludeCustomerStories
+          ? rawItems.filter((post) => !isCustomerExperienceCategory(post.category))
+          : rawItems;
         if (data.postIds.length) items.sort((a, b) => data.postIds.indexOf(a.id) - data.postIds.indexOf(b.id));
         resolvedSec.resolvedPosts = items.slice(0, effectiveLimit);
         if (postCatsResult.results.length > 0) {
           resolvedSec.resolvedPostCategories = postCatsResult.results
+            .filter((cat) => !isCustomerExperienceCategory(cat))
             .map((cat) => ({
               ...cat,
               posts: items.filter((post) => post.category?.id === cat.id).slice(0, effectiveLimit),

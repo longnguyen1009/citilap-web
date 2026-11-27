@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BookOpen, ChevronLeft, ChevronRight, Flame } from 'lucide-react';
 import type { publicPostList } from '@/server/services/post.service';
-import { getPostCategoryHref, getPostHref } from '@/lib/customer-experience';
+import {
+  getPostCategoryHref,
+  getPostHref,
+  isCustomerExperienceCategory,
+} from '@/lib/customer-experience';
 
 type MediaPost = Awaited<ReturnType<typeof publicPostList>>['items'][number];
 
@@ -71,19 +75,28 @@ export default function MediaSectionView({
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [bounds, setBounds] = useState({ start: true, end: false });
 
-  const activeCategory = categories.find((c) => c.id === selectedCategoryId);
-  const visiblePosts = activeCategory ? activeCategory.posts : posts;
+  const filteredCategories = useMemo(
+    () => categories.filter((c) => !isCustomerExperienceCategory(c)),
+    [categories],
+  );
+  const filteredPosts = useMemo(
+    () => posts.filter((p) => !isCustomerExperienceCategory(p.category)),
+    [posts],
+  );
+
+  const activeCategory = filteredCategories.find((c) => c.id === selectedCategoryId);
+  const visiblePosts = activeCategory ? activeCategory.posts : filteredPosts;
   const activeViewAllLink = activeCategory ? getPostCategoryHref(activeCategory) : viewAllLink || '/news';
 
   useEffect(() => {
     const el = rail.current;
     if (!el) return;
     el.scrollTo({ left: 0 });
-    const update = () =>
-      setBounds({
-        start: el.scrollLeft <= 2,
-        end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4,
-      });
+    const update = () => {
+      const start = el.scrollLeft <= 2;
+      const end = el.scrollLeft + el.clientWidth >= el.scrollWidth - 4;
+      setBounds((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+    };
     const observer = new ResizeObserver(update);
     observer.observe(el);
     el.addEventListener('scroll', update, { passive: true });
@@ -142,7 +155,7 @@ export default function MediaSectionView({
 
             {/* Right side: Category Filter Pills + Desktop Scroll Controls */}
             <div className="flex items-center justify-between lg:justify-end gap-2 min-w-0">
-              {categories.length > 0 && (
+              {filteredCategories.length > 0 && (
                 <div
                   role="tablist"
                   aria-label="Phân loại tin tức"
@@ -161,7 +174,7 @@ export default function MediaSectionView({
                   >
                     Tất cả
                   </button>
-                  {categories.map((cat) => {
+                  {filteredCategories.map((cat) => {
                     const isSelected = selectedCategoryId === cat.id;
                     return (
                       <button

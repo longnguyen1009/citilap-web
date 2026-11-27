@@ -71,6 +71,13 @@ export function getPostCategoryHref(category: {
   return `/news?category=${encodeURIComponent(category.slug)}`;
 }
 
+const VN_DATE_PARTS_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Ho_Chi_Minh',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+
 export function formatJournalDateParts(dateInput: string): {
   day: string;
   monthLabel: string;
@@ -82,23 +89,15 @@ export function formatJournalDateParts(dateInput: string): {
     return { day: '--', monthLabel: 'Th--', fullDate: '', isToday: false };
   }
 
-  const dayNum = parsed.getDate();
-  const monthNum = parsed.getMonth() + 1;
-  const yearNum = parsed.getFullYear();
-
-  const now = new Date();
-  const isToday =
-    now.getDate() === dayNum &&
-    now.getMonth() === parsed.getMonth() &&
-    now.getFullYear() === yearNum;
-
-  const day = String(dayNum).padStart(2, '0');
-  const month = String(monthNum).padStart(2, '0');
+  const parts = VN_DATE_PARTS_FORMATTER.formatToParts(parsed);
+  const day = parts.find((p) => p.type === 'day')?.value || '--';
+  const month = parts.find((p) => p.type === 'month')?.value || '--';
+  const year = parts.find((p) => p.type === 'year')?.value || '----';
 
   return {
     day,
     monthLabel: `Th${month}`,
-    fullDate: `${day}/${month}/${yearNum}`,
-    isToday,
+    fullDate: `${day}/${month}/${year}`,
+    isToday: false,
   };
 }
