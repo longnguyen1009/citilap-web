@@ -395,11 +395,11 @@ export default function ProductCard({
         ) : null}
       </div>
 
-      {/* Product Image Container */}
+      {/* Product Image Container (4:3 standard frame) */}
       <div
-        className={`relative aspect-[16/11] md:aspect-[4/3] ${compactMobile ? "p-1.5 pt-7 pb-1" : "p-2 pt-8 pb-1"} md:p-3.5 md:pt-8 md:pb-2 w-full border-b border-black/[0.04] ${brandTheme.imageBg} flex items-center justify-center overflow-hidden`}
+        className={`relative aspect-[4/3] ${compactMobile ? "p-1" : "p-1 sm:p-1.5"} w-full border-b border-black/[0.04] ${brandTheme.imageBg} flex items-center justify-center overflow-hidden`}
       >
-        <div className="relative block w-full h-full">
+        <div className="relative block w-full h-full overflow-hidden rounded-md">
           {(() => {
             const rawImage = product.thumbnailUrl || product.image || (product as { primaryImage?: string }).primaryImage || null;
             const cardImage = rawImage && rawImage.startsWith('/api/library/') && !rawImage.includes('?') ? `${rawImage}?size=thumb&v=2` : rawImage;
@@ -412,7 +412,7 @@ export default function ProductCard({
                 unoptimized={cardImage.includes('size=thumb') || cardImage.startsWith('/brand/')}
                 sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, 20vw"
                 onError={() => setImageError(true)}
-                className={`object-contain transition-transform duration-300 scale-[0.9] md:scale-[0.88] group-hover/product:scale-[0.94] motion-reduce:transform-none ${isOutOfStock ? "grayscale opacity-60" : ""
+                className={`object-contain transition-transform duration-300 scale-100 group-hover/product:scale-[1.03] motion-reduce:transform-none ${isOutOfStock ? "grayscale opacity-60" : ""
                   }`}
               />
             ) : (

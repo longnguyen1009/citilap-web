@@ -211,7 +211,7 @@ export function ProductGallery({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchCancel}
-        className="group relative flex h-[290px] sm:h-[430px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50/70 to-white p-3 pt-11 sm:p-6 cursor-zoom-in touch-pan-y touch-pinch-zoom select-none"
+        className="group relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200/80 bg-gradient-to-b from-slate-50/70 to-white p-1.5 sm:p-2 cursor-zoom-in touch-pan-y touch-pinch-zoom select-none"
       >
         {/* Top Badges Bar (Single non-overlapping row on mobile & desktop) */}
         <div className="absolute top-2.5 inset-x-2.5 sm:top-3.5 sm:inset-x-3.5 z-10 flex items-start justify-between gap-1.5 pointer-events-none">
@@ -264,8 +264,8 @@ export function ProductGallery({
           </>
         )}
 
-        {/* Main Image (Uniform container size) */}
-        <div className="relative flex h-[215px] sm:h-[330px] w-full max-w-[460px] items-center justify-center">
+        {/* Main Image (Full 4:3 container) */}
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl">
           {activeImg.url.startsWith('/api/library/') ? (
             <Image
               src={activeImg.url}
@@ -274,9 +274,9 @@ export function ProductGallery({
               unoptimized
               priority
               fetchPriority="high"
-              sizes="(max-width: 640px) calc(100vw - 32px), 460px"
+              sizes="(max-width: 640px) calc(100vw - 32px), 620px"
               style={{ objectFit: 'contain' }}
-              className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
+              className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]"
             />
           ) : (
             <img
@@ -285,7 +285,7 @@ export function ProductGallery({
               fetchPriority="high"
               loading="eager"
               decoding="async"
-              className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-105"
+              className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]"
             />
           )}
         </div>
@@ -337,7 +337,7 @@ export function ProductGallery({
                 }}
                 aria-label={`Xem ảnh ${idx + 1}`}
                 aria-pressed={isActive}
-                className={`relative h-16 w-16 sm:h-20 sm:w-20 shrink-0 overflow-hidden rounded-xl border-2 bg-white p-1.5 transition-all cursor-pointer ${
+                className={`relative w-20 sm:w-24 aspect-[4/3] shrink-0 overflow-hidden rounded-xl border-2 bg-white p-0.5 transition-all cursor-pointer ${
                   isActive
                     ? 'border-[#2563EB] ring-2 ring-blue-100 opacity-100 shadow-xs'
                     : 'border-slate-200 opacity-75 hover:opacity-100 hover:border-blue-400'
