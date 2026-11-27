@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useMobileBackDismiss } from "@/hooks/useMobileBackDismiss";
 import Link from "next/link";
 import { RotateCcw, SlidersHorizontal, X } from "lucide-react";
 
@@ -67,17 +68,10 @@ export default function CatalogFilterPanel({
       }
     };
 
-    const handlePopState = () => {
-      closeReasonRef.current = "navigate";
-      setIsOpen(false);
-    };
-
     window.addEventListener("resize", handleResize);
-    window.addEventListener("popstate", handlePopState);
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      window.removeEventListener("popstate", handlePopState);
       if (node?.open) node.close();
       document.body.style.overflow = previousOverflow;
       if (
@@ -89,6 +83,15 @@ export default function CatalogFilterPanel({
       }
     };
   }, [isOpen]);
+
+  useMobileBackDismiss(
+    isOpen,
+    () => {
+      closeReasonRef.current = "user";
+      setIsOpen(false);
+    },
+    "catalog-filter-drawer",
+  );
 
   return (
     <>

@@ -18,6 +18,7 @@ import { businessProfile } from "@/config/business-profile";
 import { useTurnstile } from "@/components/Turnstile";
 import { trackStorefront } from "@/lib/storefront-metrics";
 import { useCompare } from "@/context/CompareContext";
+import { useMobileBackDismiss } from "@/hooks/useMobileBackDismiss";
 import ScrollToTop from "./ScrollToTop";
 
 const CALLBACK_TOPICS = [
@@ -37,6 +38,8 @@ export default function FloatingContactWidget({
   const { items: compareItems } = useCompare();
   const [callbackOpen, setCallbackOpen] = useState(false);
   const [mobileExpanded, setMobileExpanded] = useState(false);
+
+  useMobileBackDismiss(callbackOpen, () => setCallbackOpen(false), "floating-callback-modal");
   const [pdpBarVisible, setPdpBarVisible] = useState(false);
   const isProductOrCartRoute =
     pathname.startsWith("/laptop/") ||

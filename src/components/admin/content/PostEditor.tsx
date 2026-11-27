@@ -454,9 +454,11 @@ export default function PostEditor({ id }: { id: string | null }) {
       toast.warning('Tối đa 20 ảnh cho mỗi bài viết.');
       return;
     }
+    const cleanAssetAlt = (asset.alt || '').trim();
+    const fallbackTitle = (latestDoc.current.title || '').trim();
     const nextItem = {
       assetId: asset.id,
-      alt: asset.alt || asset.name || latestDoc.current.title || `Ảnh ${current.length + 1}`,
+      alt: cleanAssetAlt || (fallbackTitle ? `${fallbackTitle} - ảnh ${current.length + 1}` : `Ảnh bài viết ${current.length + 1}`),
     };
     updateGalleryImages([...current, nextItem]);
     toast.success(

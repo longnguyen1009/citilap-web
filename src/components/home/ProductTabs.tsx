@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState, useId } from 'react';
+import { useCallback, useEffect, useRef, useState, useId } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ProductCard, { type ProductCardProduct } from '@/components/product/ProductCard';
@@ -12,6 +12,7 @@ type Tab = {
   limit?: number;
   mobileLimit?: number | null;
   enabled?: boolean;
+  lazy?: boolean;
   products: ProductCardProduct[];
 };
 
@@ -77,11 +78,13 @@ function TabHighlightFlameIcon({ className = 'h-4 w-4 md:h-5 md:w-5' }: { classN
 }
 
 export default function ProductTabs({
+  sectionId,
   title,
   subtitle,
   tabs: rawTabs,
   eagerImages = false,
 }: {
+  sectionId?: string;
   title: string;
   subtitle?: string;
   tabs: Tab[];
@@ -91,17 +94,50 @@ export default function ProductTabs({
     .filter((t) => t.enabled !== false)
     .map((t) => ({ ...t, label: formatTabLabel(t) }));
   const [active, setActive] = useState(0);
+  const [loadedMap, setLoadedMap] = useState<Record<string, ProductCardProduct[]>>({});
+  const [loadingTabId, setLoadingTabId] = useState<string | null>(null);
+  const inFlightRef = useRef<Set<string>>(new Set());
   const prefix = useId();
+
+  const loadTabIfNeeded = useCallback(
+    async (targetTab: Tab | undefined) => {
+      if (!targetTab || !targetTab.lazy || !sectionId) return;
+      if (loadedMap[targetTab.id] || inFlightRef.current.has(targetTab.id)) return;
+
+      inFlightRef.current.add(targetTab.id);
+      setLoadingTabId(targetTab.id);
+      try {
+        const res = await fetch(
+          `/api/homepage/tab?sectionId=${encodeURIComponent(sectionId)}&tabId=${encodeURIComponent(targetTab.id)}`,
+        );
+        if (res.ok) {
+          const json = (await res.json()) as { products?: ProductCardProduct[] };
+          setLoadedMap((prev) => ({ ...prev, [targetTab.id]: json.products ?? [] }));
+        } else {
+          setLoadedMap((prev) => ({ ...prev, [targetTab.id]: [] }));
+        }
+      } catch {
+        setLoadedMap((prev) => ({ ...prev, [targetTab.id]: [] }));
+      } finally {
+        inFlightRef.current.delete(targetTab.id);
+        setLoadingTabId((curr) => (curr === targetTab.id ? null : curr));
+      }
+    },
+    [sectionId, loadedMap],
+  );
+
   const safeIndex = active < tabs.length ? active : 0;
   const rawTab = tabs[safeIndex];
   if (!rawTab) return null;
+  const resolvedProducts = rawTab.lazy ? (loadedMap[rawTab.id] ?? rawTab.products) : rawTab.products;
+  const isTabLoading = Boolean(rawTab.lazy && !loadedMap[rawTab.id] && loadingTabId === rawTab.id);
   const isLaptopTab =
     ['new-arrivals', 'new', 'new-laptops', 'like-new', 'likenew', 'clearance'].includes(rawTab.id) ||
     /laptop|mới|likenew/i.test(rawTab.label);
   const filteredProducts = deduplicateListingProducts(
     isLaptopTab
-      ? rawTab.products.filter((p) => p.template !== 'ACCESSORY' && !p.href?.startsWith('/phu-kien/'))
-      : rawTab.products
+      ? resolvedProducts.filter((p) => p.template !== 'ACCESSORY' && !p.href?.startsWith('/phu-kien/'))
+      : resolvedProducts
   );
   const tab = {
     ...rawTab,
@@ -110,6 +146,7 @@ export default function ProductTabs({
   };
   function select(index: number) {
     setActive(index);
+    void loadTabIfNeeded(tabs[index]);
     document
       .getElementById(`${prefix}-tab-${tabs[index].id}`)
       ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' });
@@ -141,6 +178,8 @@ export default function ProductTabs({
                   aria-selected={safeIndex === index}
                   aria-controls={`${prefix}-panel`}
                   tabIndex={safeIndex === index ? 0 : -1}
+                  onMouseEnter={() => { void loadTabIfNeeded(t); }}
+                  onFocus={() => { void loadTabIfNeeded(t); }}
                   onClick={() => select(index)}
                   onKeyDown={(e) => {
                     const next =
@@ -184,7 +223,21 @@ export default function ProductTabs({
             tabIndex={0}
             className="rounded-b-xl md:rounded-b-2xl border-2 border-blue-500 bg-gradient-to-b from-blue-50 via-white to-white px-2.5 pb-3.5 pt-3 md:px-5 md:pb-5 md:pt-5 shadow-xs focus-visible:outline-hidden"
           >
-            {tab.products.length ? (
+            {isTabLoading ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2.5 md:gap-3.5 py-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-xl border border-slate-200/80 bg-white p-3 space-y-2.5 ${i >= 2 ? 'hidden md:block' : ''} ${i >= 3 ? 'md:hidden lg:block' : ''} ${i >= 4 ? 'lg:hidden xl:block' : ''}`}
+                  >
+                    <div className="aspect-[4/3] rounded-lg skeleton" />
+                    <div className="h-3.5 w-4/5 rounded skeleton" />
+                    <div className="h-3 w-3/5 rounded skeleton" />
+                    <div className="h-5 w-1/2 rounded skeleton" />
+                  </div>
+                ))}
+              </div>
+            ) : tab.products.length ? (
               <ProductCarousel
                 key={tab.id}
                 products={tab.products}

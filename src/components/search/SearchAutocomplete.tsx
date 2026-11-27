@@ -1,7 +1,7 @@
 "use client";
 import { productVariantHref } from '@/lib/product-paths';
 
-import { useState, useRef, useEffect, useCallback, FormEvent, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, useCallback, useId, FormEvent, KeyboardEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -45,6 +45,7 @@ export default function SearchAutocomplete({
   showIcon = true,
 }: SearchAutocompleteProps) {
   const router = useRouter();
+  const searchInputId = useId();
   const [query, setQuery] = useState(initialQuery);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -339,6 +340,8 @@ export default function SearchAutocomplete({
         )}
 
         <input
+          id={searchInputId}
+          name="q"
           ref={inputRef}
           type="text"
           value={query}

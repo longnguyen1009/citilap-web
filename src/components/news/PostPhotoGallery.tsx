@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useMobileBackDismiss } from '@/hooks/useMobileBackDismiss';
 
 export interface PostGalleryImage {
   url: string;
@@ -19,6 +20,8 @@ export default function PostPhotoGallery({
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  useMobileBackDismiss(lightboxOpen, () => setLightboxOpen(false), 'post-photo-lightbox');
 
   if (!images || images.length === 0) return null;
 

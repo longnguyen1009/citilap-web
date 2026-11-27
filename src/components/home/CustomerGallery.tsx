@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, X, ExternalLink } from 'lucide-react';
+import { useMobileBackDismiss } from '@/hooks/useMobileBackDismiss';
 
 type GalleryImage = { url: string; alt: string; href?: string; enabled?: boolean };
 
@@ -57,6 +58,8 @@ export default function CustomerGallery({
     setSelected(null);
     triggerRef.current?.focus();
   }
+
+  useMobileBackDismiss(Boolean(selected), close, 'customer-gallery-lightbox');
 
   const scrollByAmount = (direction: -1 | 1) => {
     const el = rail.current;

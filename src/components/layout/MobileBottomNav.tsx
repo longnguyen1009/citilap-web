@@ -27,6 +27,7 @@ import {
   Phone,
 } from "lucide-react";
 import { useCart } from "@/context/CartContext";
+import { useMobileBackDismiss } from "@/hooks/useMobileBackDismiss";
 import type { CategorySummary } from "@/server/services/catalog.service";
 import type { ResolvedNavigation } from "@/contracts/cms/navigation";
 import { businessProfile } from "@/config/business-profile";
@@ -100,6 +101,8 @@ export default function MobileBottomNav({ categories = [], navigation, settings 
     }
     setDrawerOpen(false);
   }, []);
+
+  useMobileBackDismiss(drawerOpen, () => closeDrawer(true), "mobile-category-drawer");
 
   // Close drawer on route change
   if (prevPath !== pathname) {

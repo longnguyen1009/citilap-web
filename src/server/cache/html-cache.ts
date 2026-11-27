@@ -22,6 +22,7 @@ const CACHEABLE_EXACT_PATHS = new Set([
   '/chinh-sach-doi-tra',
   '/chinh-sach-van-chuyen',
   '/news',
+  '/khach-hang-chia-se',
   '/phan-loai',
   '/category',
   '/collection',
@@ -37,6 +38,7 @@ const CACHEABLE_PREFIXES = [
   '/collection/',
   '/landing/',
   '/news/',
+  '/khach-hang-chia-se/',
   '/chinh-sach/',
   '/phan-loai/',
 ];

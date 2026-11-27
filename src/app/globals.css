@@ -363,8 +363,13 @@ textarea,
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Prevent iOS Safari automatic viewport zoom when focusing inputs < 16px */
+/* Prevent iOS Safari automatic viewport zoom when focusing inputs < 16px,
+   and prevent horizontal edge-overscroll from triggering accidental browser back exits */
 @media (max-width: 767px) {
+  html,
+  body {
+    overscroll-behavior-x: none;
+  }
   input:not([type="checkbox"]):not([type="radio"]),
   select,
   textarea {

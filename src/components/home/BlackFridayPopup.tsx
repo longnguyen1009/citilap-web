@@ -7,6 +7,7 @@ import {
   DEFAULT_HOMEPAGE_POPUP,
   type HomepagePopupConfig,
 } from "@/contracts/cms/settings";
+import { useMobileBackDismiss } from "@/hooks/useMobileBackDismiss";
 
 const SESSION_DISMISS_KEY = "citilap_home_popup_dismissed";
 const DAILY_DISMISS_KEY = "citilap_home_popup_dismissed_date";
@@ -88,7 +89,6 @@ export default function BlackFridayPopup({ config }: BlackFridayPopupProps) {
     if (!popup.enabled) return;
 
     const now = Date.now();
-    setNowMs(now);
     if (endMs !== null && now >= endMs) return;
     if (isDismissedByFrequency(popup.frequency)) return;
 
@@ -160,16 +160,18 @@ export default function BlackFridayPopup({ config }: BlackFridayPopupProps) {
     };
   }, [popup.frequency]);
 
-  if (!popup.enabled) {
-    return null;
-  }
-
   const closePopup = () => {
     const dialog = dialogRef.current;
     if (dialog?.open) {
       dialog.close();
     }
   };
+
+  useMobileBackDismiss(isOpen, closePopup, "homepage-promo-popup");
+
+  if (!popup.enabled) {
+    return null;
+  }
 
   const hasCountdownTarget = popup.showCountdown && (startMs !== null || endMs !== null);
   const isBeforeStart = startMs !== null && nowMs !== null && nowMs < startMs;
@@ -193,9 +195,9 @@ export default function BlackFridayPopup({ config }: BlackFridayPopupProps) {
         className="m-auto w-[min(92vw,560px)] max-h-[92dvh] overflow-hidden rounded-2xl border border-amber-400/35 bg-[#0b0b11] p-0 text-white shadow-[0_24px_70px_rgba(0,0,0,0.75)] backdrop:bg-black/70 backdrop:backdrop-blur-xs open:block"
       >
         <div className="relative">
-          <h1 id={titleId} className="sr-only">
+          <h2 id={titleId} className="sr-only">
             {popup.title || "Chương trình khuyến mãi CitiLap"}
-          </h1>
+          </h2>
           <button
             type="button"
             onClick={closePopup}
@@ -293,12 +295,12 @@ export default function BlackFridayPopup({ config }: BlackFridayPopupProps) {
               </div>
             ) : null}
 
-            <h1
+            <h2
               id={titleId}
               className="mt-2 text-[26px] sm:text-[32px] font-black uppercase leading-[1.05] tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-amber-200 via-amber-400 to-red-500 drop-shadow-[0_2px_12px_rgba(220,38,38,0.45)]"
             >
               {popup.title || "BLACK FRIDAY"}
-            </h1>
+            </h2>
 
             {popup.highlightText ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">

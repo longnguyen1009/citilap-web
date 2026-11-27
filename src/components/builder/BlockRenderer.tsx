@@ -34,6 +34,7 @@ import CampaignStripBanner from '@/components/home/CampaignStripBanner';
 import PromoDualBanners from '@/components/home/PromoDualBanners';
 import MediaSection from '@/components/home/MediaSectionView';
 import ProductTabs, { ProductCarousel } from '@/components/home/ProductTabs';
+import LazyProductCarousel from '@/components/home/LazyProductCarousel';
 import VideoReviews from '@/components/home/VideoReviews';
 import CustomerGallery from '@/components/home/CustomerGallery';
 import HeroBannerSlider from '@/components/home/HeroBannerSlider';
@@ -179,7 +180,14 @@ export default function BlockRenderer({
               );
               break;
             }
-            blockNode = <ProductGridBlock key={section.id} section={section} eagerImages={sectionIndex === firstProductGridIndex} />;
+            blockNode = (
+              <ProductGridBlock
+                key={section.id}
+                section={section}
+                eagerImages={sectionIndex === firstProductGridIndex}
+                lazyProducts={firstProductGridIndex >= 0 && sectionIndex > firstProductGridIndex}
+              />
+            );
             break;
           }
 
@@ -648,18 +656,39 @@ function resolveProductGridIcon(sectionId: string, colorTheme?: string, customIc
   return Sparkles;
 }
 
-function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedSectionItem; eagerImages?: boolean }) {
+function ProductGridBlock({
+  section,
+  eagerImages = false,
+  lazyProducts = false,
+}: {
+  section: ResolvedSectionItem;
+  eagerImages?: boolean;
+  lazyProducts?: boolean;
+}) {
   const data = section.data as ProductGridSectionData;
   const limit = data.ruleCriteria?.limit && data.ruleCriteria.limit > 0 ? data.ruleCriteria.limit : 48;
   const mobileLimit = data.mobileLimit && data.mobileLimit > 0 ? data.mobileLimit : null;
-  const products = dedupeSectionProducts(section.resolvedProducts || []).slice(0, limit);
+  const products = lazyProducts ? [] : dedupeSectionProducts(section.resolvedProducts || []).slice(0, limit);
   const colorClass = THEME_GRADIENT_MAP[data.colorTheme] || THEME_GRADIENT_MAP.blue;
   const links = Array.isArray(data.links) ? data.links.filter((l) => l && l.label && l.href) : [];
   const headerIconNode = createElement(
     resolveProductGridIcon(section.id, data.colorTheme, data.icon),
     { className: 'w-5 h-5 text-yellow-300' }
   );
-  if (section.resolvedTabs?.length) return <ProductTabs title={data.title} subtitle={data.subtitle} tabs={section.resolvedTabs} eagerImages={eagerImages} />;
+  if (section.resolvedTabs?.length) {
+    const initialTabs = section.resolvedTabs.map((t, idx) =>
+      idx === 0 ? t : { ...t, products: [], lazy: true }
+    );
+    return (
+      <ProductTabs
+        sectionId={section.id}
+        title={data.title}
+        subtitle={data.subtitle}
+        tabs={initialTabs}
+        eagerImages={eagerImages}
+      />
+    );
+  }
 
   return (
     <section className="py-4 md:py-6 lg:py-8" aria-label={data.title}>
@@ -716,7 +745,14 @@ function ProductGridBlock({ section, eagerImages = false }: { section: ResolvedS
 
           {/* Product grid content */}
           <div className="p-2.5 md:p-4 lg:p-6 bg-slate-50/30">
-            {products.length === 0 ? (
+            {lazyProducts ? (
+              <LazyProductCarousel
+                sectionId={section.id}
+                label={data.title}
+                mobileLimit={mobileLimit}
+                rankNumbering={Boolean(data.rankNumbering)}
+              />
+            ) : products.length === 0 ? (
               <div className="text-center py-10 sm:py-12 text-slate-500">
                 <p className="text-sm">Chưa có sản phẩm nào phù hợp trong danh mục này.</p>
               </div>

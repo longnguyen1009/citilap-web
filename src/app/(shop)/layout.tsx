@@ -41,6 +41,32 @@ export default async function ShopLayout({
     }),
   ]);
 
+  // Strip heavy homepage-only arrays before passing settings/navigation to client shell components
+  // so RSC inline payloads stay lean across every storefront page.
+  const clientSettings = settings
+    ? {
+        ...settings,
+        reviewVideos: [],
+        testimonials: [],
+        productBanners: [],
+      }
+    : null;
+
+  const clientNavigation = navigation
+    ? {
+        ...navigation,
+        collections: [],
+        categories: navigation.categories.map((c) => ({
+          ...c,
+          description: '',
+        })),
+        menus: {
+          main: navigation.menus.main,
+          footer: [],
+        },
+      }
+    : null;
+
   return (
     <StorefrontProviders><div className="storefront-shell flex flex-col min-h-screen min-w-0">
       <a href="#main-content" className="storefront-skip-link">
@@ -50,13 +76,13 @@ export default async function ShopLayout({
         <NavigationProgress />
       </Suspense>
       <PublicPriceRefresh nextChange={boundary.nextChange} version={boundary.token} serverTime={serverTime}/>
-      <Header categories={categories} brands={brands} navigation={navigation} settings={settings} />
+      <Header categories={categories} brands={brands} navigation={clientNavigation} settings={clientSettings} />
       <main id="main-content" tabIndex={-1} className="storefront-main flex-grow min-w-0">{children}</main>
       <Footer navigation={navigation} settings={settings} />
       <StorefrontMetrics />
       <Analytics />
-      <FloatingContactWidget settings={settings} />
-      <MobileBottomNav categories={categories} navigation={navigation} settings={settings} />
+      <FloatingContactWidget settings={clientSettings} />
+      <MobileBottomNav categories={categories} navigation={clientNavigation} settings={clientSettings} />
     </div></StorefrontProviders>
   );
 }
